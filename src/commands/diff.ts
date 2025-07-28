@@ -23,7 +23,7 @@ export const diffCommand = (taskId: string, filePath?: string, options: { onlyFi
         const worktreePath = join(taskPath, 'workspace');
         if (!existsSync(worktreePath)) {
             console.log(colors.red(`✗ No workspace found for task '${taskId}'`));
-            console.log(colors.gray('  Run ') + colors.cyan(`rover tasks start ${taskId}`) + colors.gray(' first'));
+            console.log(colors.gray('  Run ') + colors.cyan(`rover task ${taskId}`) + colors.gray(' first'));
             return;
         }
         
@@ -166,8 +166,8 @@ export const diffCommand = (taskId: string, filePath?: string, options: { onlyFi
         
         // Show additional context if not showing only files
         if (!options.onlyFiles && !filePath) {
-            console.log(colors.gray('\nTip: Use ') + colors.cyan(`rover tasks diff ${taskId} --only-files`) + colors.gray(' to see only changed filenames'));
-            console.log(colors.gray('     Use ') + colors.cyan(`rover tasks diff ${taskId} <file>`) + colors.gray(' to see diff for a specific file'));
+            console.log(colors.gray('\nTip: Use ') + colors.cyan(`rover diff ${taskId} --only-files`) + colors.gray(' to see only changed filenames'));
+            console.log(colors.gray('     Use ') + colors.cyan(`rover diff ${taskId} <file>`) + colors.gray(' to see diff for a specific file'));
         }
         
     } catch (error) {

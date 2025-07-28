@@ -83,7 +83,7 @@ export const logsCommand = (taskId: string, iterationNumber?: string, options: {
         
         if (availableIterations.length === 0) {
             console.log(colors.yellow(`⚠ No iterations found for task '${taskId}'`));
-            console.log(colors.gray('  Run ') + colors.cyan(`rover tasks start ${taskId}`) + colors.gray(' to start the task'));
+            console.log(colors.gray('  Run ') + colors.cyan(`rover task ${taskId}`) + colors.gray(' to start the task'));
             return;
         }
         
@@ -103,7 +103,7 @@ export const logsCommand = (taskId: string, iterationNumber?: string, options: {
         if (!containerId) {
             console.log(colors.yellow(`⚠ No container found for task '${taskId}'`));
             console.log(colors.gray('  Logs are only available for recently executed tasks'));
-            console.log(colors.gray('  Run ') + colors.cyan(`rover tasks start ${taskId}`) + colors.gray(' to start the task'));
+            console.log(colors.gray('  Run ') + colors.cyan(`rover task ${taskId}`) + colors.gray(' to start the task'));
             return;
         }
         
@@ -215,13 +215,13 @@ export const logsCommand = (taskId: string, iterationNumber?: string, options: {
                 const otherIterations = availableIterations.filter(i => i !== actualIteration);
                 if (otherIterations.length > 0) {
                     console.log(colors.gray('💡 Tips:'));
-                    console.log(colors.gray('   Use ') + colors.cyan(`rover tasks logs ${taskId} <iteration>`) + colors.gray(' to view specific iteration (if container exists)'));
+                    console.log(colors.gray('   Use ') + colors.cyan(`rover logs ${taskId} <iteration>`) + colors.gray(' to view specific iteration (if container exists)'));
                     console.log(colors.gray('   Available: ') + colors.cyan(otherIterations.join(', ')));
                 }
             }
-            console.log(colors.gray('   Use ') + colors.cyan(`rover tasks logs ${taskId} --follow`) + colors.gray(' to follow logs in real-time'));
-            console.log(colors.gray('   Use ') + colors.cyan(`rover tasks diff ${taskId}`) + colors.gray(' to see code changes'));
-            console.log(colors.gray('   Use ') + colors.cyan(`rover tasks start ${taskId} --follow`) + colors.gray(' to follow live logs during execution'));
+            console.log(colors.gray('   Use ') + colors.cyan(`rover logs ${taskId} --follow`) + colors.gray(' to follow logs in real-time'));
+            console.log(colors.gray('   Use ') + colors.cyan(`rover diff ${taskId}`) + colors.gray(' to see code changes'));
+            console.log(colors.gray('   Use ') + colors.cyan(`rover task ${taskId} --follow`) + colors.gray(' to follow live logs during execution'));
             console.log(colors.gray('   Note: Logs are only available while containers exist (recent executions)'));
         }
         

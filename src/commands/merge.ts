@@ -432,7 +432,7 @@ export const mergeCommand = async (taskId: string, options: { force?: boolean } 
         if (!worktreePath || !existsSync(worktreePath)) {
             console.log('');
             console.log(colors.red('✗ No worktree found for this task'));
-            console.log(colors.gray('  Run ') + colors.cyan(`rover tasks start ${taskId}`) + colors.gray(' first'));
+            console.log(colors.gray('  Run ') + colors.cyan(`rover task ${taskId}`) + colors.gray(' first'));
             return;
         }
         
@@ -657,7 +657,7 @@ export const mergeCommand = async (taskId: string, options: { force?: boolean } 
                         console.log(colors.cyan('  1. Fix conflicts in the listed files'));
                         console.log(colors.cyan('  2. Run: git add <resolved-files>'));
                         console.log(colors.cyan('  3. Run: git commit'));
-                        console.log(colors.cyan(`  4. Run: rover tasks merge ${taskId} to complete the process`));
+                        console.log(colors.cyan(`  4. Run: rover merge ${taskId} to complete the process`));
                         try {
                             execSync('git merge --abort', { stdio: 'pipe' });
                         } catch (abortError) {

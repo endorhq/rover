@@ -172,9 +172,9 @@ export const listCommand = async (options: { watch?: boolean; verbose?: boolean 
         // Show tips
         console.log('');
         console.log(colors.gray('Tips:'));
-        console.log(colors.gray('  Use ') + colors.cyan('rover ps --verbose') + colors.gray(' to see error details'));
-        console.log(colors.gray('  Use ') + colors.cyan('rover tasks start <id> --follow') + colors.gray(' to follow logs'));
-        console.log(colors.gray('  Use ') + colors.cyan('rover tasks diff <id>') + colors.gray(' to see changes'));
+        console.log(colors.gray('  Use ') + colors.cyan('rover list --verbose') + colors.gray(' to see error details'));
+        console.log(colors.gray('  Use ') + colors.cyan('rover task <id> --follow') + colors.gray(' to follow logs'));
+        console.log(colors.gray('  Use ') + colors.cyan('rover diff <id>') + colors.gray(' to see changes'));
         
         // Watch mode (simple refresh every 5 seconds)
         if (options.watch) {

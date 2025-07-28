@@ -41,7 +41,7 @@ export const shellCommand = async (taskId: string) => {
         if (!worktreePath || !existsSync(worktreePath)) {
             console.log('');
             console.log(colors.red('✗ No worktree found for this task'));
-            console.log(colors.gray('  Run ') + colors.cyan(`rover tasks start ${taskId}`) + colors.gray(' first to create a workspace'));
+            console.log(colors.gray('  Run ') + colors.cyan(`rover task ${taskId}`) + colors.gray(' first to create a workspace'));
             return;
         }
         
@@ -127,8 +127,8 @@ export const shellCommand = async (taskId: string) => {
                 }
                 console.log('');
                 console.log(colors.cyan('💡 Your worktree is preserved at: ') + colors.white(worktreePath));
-                console.log(colors.gray('   Use ') + colors.cyan(`rover tasks diff ${taskId}`) + colors.gray(' to see any changes you made'));
-                console.log(colors.gray('   Use ') + colors.cyan(`rover tasks merge ${taskId}`) + colors.gray(' to merge when ready'));
+                console.log(colors.gray('   Use ') + colors.cyan(`rover diff ${taskId}`) + colors.gray(' to see any changes you made'));
+                console.log(colors.gray('   Use ') + colors.cyan(`rover merge ${taskId}`) + colors.gray(' to merge when ready'));
             });
 
             dockerProcess.on('error', (error) => {

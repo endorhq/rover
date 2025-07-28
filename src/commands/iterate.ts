@@ -222,7 +222,7 @@ export const iterateCommand = async (taskId: string, refinements: string, option
         // Ensure workspace exists
         if (!existsSync(worktreePath)) {
             console.log(colors.red('✗ No workspace found for this task'));
-            console.log(colors.gray('  Run ') + colors.cyan(`rover tasks start ${taskId}`) + colors.gray(' first'));
+            console.log(colors.gray('  Run ') + colors.cyan(`rover task ${taskId}`) + colors.gray(' first'));
             return;
         }
         
