@@ -81,8 +81,9 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
 
     // Load task data
     const taskData: TaskData = JSON.parse(readFileSync(descriptionPath, 'utf8'));
+    const worktreePath = join(taskPath, 'workspace');
 
-    if (!taskData.worktreePath || !existsSync(taskData.worktreePath)) {
+    if (!existsSync(worktreePath)) {
         console.log(colors.red(`✗ Task workspace not found`));
         console.log(colors.gray('  The task may need to be reinitialized'));
         process.exit(1);
@@ -92,7 +93,7 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
 
     try {
         // Change to worktree directory
-        process.chdir(taskData.worktreePath);
+        process.chdir(worktreePath);
 
         // Check for changes
         const statusOutput = execSync('git status --porcelain', { encoding: 'utf8' });

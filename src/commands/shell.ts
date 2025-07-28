@@ -37,11 +37,9 @@ export const shellCommand = async (taskId: string) => {
         }
         
         // Check if worktree exists
-        const worktreePath = taskData.worktreePath;
-        if (!worktreePath || !existsSync(worktreePath)) {
-            console.log('');
-            console.log(colors.red('✗ No worktree found for this task'));
-            console.log(colors.gray('  Run ') + colors.cyan(`rover task ${taskId}`) + colors.gray(' first to create a workspace'));
+        const worktreePath = join(taskPath, 'workspace');
+        if (!existsSync(worktreePath)) {
+            console.log(colors.red('\n✗ No worktree found for this task'));
             return;
         }
         

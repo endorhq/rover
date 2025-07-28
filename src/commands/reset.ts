@@ -12,7 +12,8 @@ export const resetCommand = async (taskId: string, options: { force?: boolean } 
     const tasksPath = join(endorPath, 'tasks');
     const taskPath = join(tasksPath, taskId);
     const descriptionPath = join(taskPath, 'description.json');
-    
+    const worktreePath = join(taskPath, 'workspace');
+
     // Check if task exists
     if (!existsSync(taskPath) || !existsSync(descriptionPath)) {
         console.log(colors.red(`✗ Task '${taskId}' not found`));
@@ -28,8 +29,8 @@ export const resetCommand = async (taskId: string, options: { force?: boolean } 
         console.log(colors.gray('Title: ') + colors.white(taskData.title));
         console.log(colors.gray('Status: ') + colors.yellow(taskData.status));
         
-        if (taskData.worktreePath && existsSync(taskData.worktreePath)) {
-            console.log(colors.gray('Workspace: ') + colors.cyan(taskData.worktreePath));
+        if (existsSync(worktreePath)) {
+            console.log(colors.gray('Workspace: ') + colors.cyan(worktreePath));
         }
         if (taskData.branchName) {
             console.log(colors.gray('Branch: ') + colors.cyan(taskData.branchName));
@@ -65,14 +66,14 @@ export const resetCommand = async (taskId: string, options: { force?: boolean } 
             execSync('git rev-parse --is-inside-work-tree', { stdio: 'pipe' });
             
             // Remove git workspace if it exists
-            if (taskData.worktreePath && existsSync(taskData.worktreePath)) {
+            if (worktreePath) {
                 try {
-                    execSync(`git worktree remove "${taskData.worktreePath}" --force`, { stdio: 'pipe' });
+                    execSync(`git worktree remove "${worktreePath}" --force`, { stdio: 'pipe' });
                     spinner.text = 'Workspace removed';
                 } catch (error) {
                     // If workspace removal fails, try to remove it manually
                     try {
-                        rmSync(taskData.worktreePath, { recursive: true, force: true });
+                        rmSync(worktreePath, { recursive: true, force: true });
                         // Remove worktree from git's tracking
                         execSync(`git worktree prune`, { stdio: 'pipe' });
                     } catch (manualError) {
