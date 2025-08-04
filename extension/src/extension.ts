@@ -123,6 +123,22 @@ export function activate(context: vscode.ExtensionContext) {
     // Register the inspect task command
     const inspectTaskCommand = vscode.commands.registerCommand('rover.inspectTask', async (item: TaskItem | any) => {
         try {
+            if (!item) {
+                const id = await vscode.window.showInputBox({
+                    prompt: 'Enter task ID',
+                    placeHolder: '1',
+                    ignoreFocusOut: true
+                });
+
+                if (!id) {
+                    throw new Error('Invalid task ID');
+                }
+
+                item = {
+                    id: parseInt(id)
+                }
+            }
+
             // Validate the item parameter
             if (!item) {
                 throw new Error('No task item provided');

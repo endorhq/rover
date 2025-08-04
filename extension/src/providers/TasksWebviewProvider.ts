@@ -1,8 +1,5 @@
 import * as vscode from 'vscode';
-import * as path from 'path';
-import * as fs from 'fs';
 import { RoverCLI } from '../rover/cli';
-import { RoverTask } from '../rover/types';
 
 export class TasksWebviewProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = 'roverTasks';
@@ -317,6 +314,22 @@ export class TasksWebviewProvider implements vscode.WebviewViewProvider {
         .codicon {
             font-size: 16px;
         }
+
+        .codicon.success {
+            color: var(--vscode-testing-iconPassed);
+        }
+
+        .codicon.failed {
+            color: var(--vscode-testing-iconFailed);
+        }
+
+        .codicon.running {
+            color: var(--vscode-testing-iconQueued);
+        }
+
+        .codicon.other {
+            color: var(--vscode-testing-iconUnset);
+        }
     </style>
 </head>
 <body>
@@ -374,12 +387,12 @@ export class TasksWebviewProvider implements vscode.WebviewViewProvider {
 
         function getStatusIcon(status) {
             switch (status?.toLowerCase()) {
-                case 'completed': return '✅';
-                case 'failed': return '❌';
-                case 'running': return '🔄';
-                case 'initializing': return '⚡';
-                case 'installing': return '📦';
-                default: return '⚪';
+                case 'completed': return '<i class="codicon codicon-pass success"></i>';
+                case 'failed': return '<i class="codicon codicon-error failed"></i>';
+                case 'running': return '<i class="codicon codicon-play-circle running"></i>';
+                case 'initializing': return '<i class="codicon codicon-play-circle running"></i>';
+                case 'installing': return '<i class="codicon codicon-desktop-download running"></i>';
+                default: return '<i class="codicon codicon-circle"></i>';
             }
         }
 

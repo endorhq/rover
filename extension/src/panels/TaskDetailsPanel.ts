@@ -127,7 +127,7 @@ export class TaskDetailsPanel {
                 const iterationNumber = parseInt(iterationDir.name);
 
                 // Check for common files in iteration directory
-                const commonFiles = ['summary.md', 'validation.md', 'planning.md'];
+                const commonFiles = ['summary.md', 'changes.md', 'review.md', 'validation.md', 'planning.md'];
                 const files = commonFiles.map(fileName => {
                     const filePath = path.join(iterationPath, fileName);
                     return {
@@ -136,6 +136,17 @@ export class TaskDetailsPanel {
                         exists: fs.existsSync(filePath)
                     };
                 });
+
+                // Read summary.md content if it exists
+                let summaryContent = null;
+                const summaryPath = path.join(iterationPath, 'summary.md');
+                if (fs.existsSync(summaryPath)) {
+                    try {
+                        summaryContent = fs.readFileSync(summaryPath, 'utf8');
+                    } catch (error) {
+                        console.warn('Error reading summary.md:', error);
+                    }
+                }
 
                 // Try to get iteration metadata if available
                 const metadataPath = path.join(iterationPath, 'metadata.json');
@@ -155,7 +166,8 @@ export class TaskDetailsPanel {
 
                 iterations.push({
                     ...iterationMeta,
-                    files
+                    files,
+                    summaryContent
                 });
             }
         } catch (error) {

@@ -52,39 +52,45 @@
     "commands": [
       {
         "command": "rover.refresh",
-        "title": "Refresh",
-        "icon": "$(refresh)"
+        "title": "Refresh Tasks",
+        "icon": "$(refresh)",
+        "category": "Rover"
       },
       {
         "command": "rover.createTask",
-        "title": "Rover: Create Task",
+        "title": "Create Task",
         "icon": "$(add)",
         "category": "Rover"
       },
       {
         "command": "rover.inspectTask",
         "title": "Inspect Task",
-        "icon": "$(info)"
+        "icon": "$(info)",
+        "category": "Rover"
       },
       {
         "command": "rover.deleteTask",
         "title": "Delete Task",
-        "icon": "$(trash)"
+        "icon": "$(trash)",
+        "category": "Rover"
       },
       {
         "command": "rover.shell",
-        "title": "Open Shell",
-        "icon": "$(terminal)"
+        "title": "Open Task Shell",
+        "icon": "$(terminal)",
+        "category": "Rover"
       },
       {
         "command": "rover.logs",
-        "title": "View Logs",
-        "icon": "$(output)"
+        "title": "View Task Logs",
+        "icon": "$(output)",
+        "category": "Rover"
       },
       {
         "command": "rover.openWorkspace",
-        "title": "Open Workspace",
-        "icon": "$(folder-opened)"
+        "title": "Open Task Workspace",
+        "icon": "$(folder-opened)",
+        "category": "Rover"
       }
     ],
     "menus": {
