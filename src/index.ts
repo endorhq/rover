@@ -64,6 +64,8 @@ program
 	.command('inspect')
 	.description('Inspect a task')
 	.argument('<taskId>', 'Task ID to inspect')
+	.argument('[iterationNumber]', 'Specific iteration number (defaults to latest)')
+	.option('--file <files...>', 'Output iteration file contents')
 	.option('--json', 'Output in JSON format')
 	.action(inspectCommand);
 
