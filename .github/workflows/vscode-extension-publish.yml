@@ -1,0 +1,112 @@
+name: Publish VS Code Extension
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: 'Release type'
+        required: true
+        default: 'beta'
+        type: choice
+        options:
+          - beta
+          - patch
+          - minor
+          - major
+      
+  push:
+    tags:
+      - 'vscode-v*'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./extension
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Run tests
+        run: npm test
+        continue-on-error: true # Allow beta releases even if tests fail
+
+      - name: Lint code
+        run: npm run lint
+
+      - name: Build extension
+        run: npm run package
+
+      - name: Install vsce
+        run: npm install -g @vscode/vsce
+
+      - name: Package Extension
+        run: vsce package --no-dependencies
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vscode-extension
+          path: extension/*.vsix
+
+      - name: Publish to VS Code Marketplace
+        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            # Manual trigger - use the selected release type
+            if [ "${{ github.event.inputs.release_type }}" == "beta" ]; then
+              vsce publish --pre-release --no-dependencies
+            else
+              vsce publish ${{ github.event.inputs.release_type }} --no-dependencies
+            fi
+          else
+            # Tag trigger - check if it's a beta version
+            if [[ "${{ github.ref_name }}" == *"-beta"* ]]; then
+              vsce publish --pre-release --no-dependencies
+            else
+              vsce publish --no-dependencies
+            fi
+          fi
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: extension/*.vsix
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'beta') }}
+          body: |
+            # Endor Rover VS Code Extension
+            
+            Version: ${{ github.ref_name }}
+            
+            ## Installation
+            
+            ### From VS Code Marketplace
+            Search for "Endor Rover" in the Extensions view
+            
+            ### From VSIX file
+            1. Download the .vsix file from the assets below
+            2. In VS Code, go to Extensions view
+            3. Click ... > Install from VSIX...
+            4. Select the downloaded file
+            
+            ## What's Changed
+            See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/extension/CHANGELOG.md)

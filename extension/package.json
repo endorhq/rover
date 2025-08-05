@@ -2,8 +2,19 @@
   "name": "endor-rover",
   "displayName": "Endor Rover",
   "description": "Collaborate with AI agents to complete any task",
-  "version": "0.0.1",
+  "version": "0.1.0-beta.1",
   "publisher": "endor",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/endor/rover"
+  },
+  "keywords": [
+    "AI",
+    "automation",
+    "agents",
+    "rover",
+    "endor"
+  ],
   "engines": {
     "vscode": "^1.102.0"
   },
@@ -11,7 +22,7 @@
     "Other",
     "Programming Languages"
   ],
-  "icon": "media/icon.png",
+  "icon": "assets/icons/logo.svg",
   "main": "./dist/extension.js",
   "contributes": {
     "configuration": {
@@ -164,7 +175,9 @@
     "pretest": "npm run compile-tests && npm run compile && npm run lint",
     "check-types": "tsc --noEmit",
     "lint": "eslint src",
-    "test": "vscode-test"
+    "test": "vscode-test",
+    "package-vsix": "vsce package --no-dependencies",
+    "publish": "vsce publish --no-dependencies"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
