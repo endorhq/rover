@@ -358,13 +358,53 @@ const showResolvedChanges = async (conflictedFiles: string[]): Promise<void> => 
     }
 };
 
-export const mergeCommand = async (taskId: string, options: { force?: boolean } = {}) => {
+interface MergeOptions {
+    force?: boolean;
+    json?: boolean;
+}
+
+interface MergeResult {
+    success: boolean;
+    taskId: number;
+    taskTitle: string;
+    branchName: string;
+    currentBranch: string;
+    hasWorktreeChanges: boolean;
+    hasUnmergedCommits: boolean;
+    committed: boolean;
+    commitMessage?: string;
+    merged: boolean;
+    conflictsResolved?: boolean;
+    cleanedUp?: boolean;
+    error?: string;
+}
+
+export const mergeCommand = async (taskId: string, options: MergeOptions = {}) => {
+    const result: MergeResult = {
+        success: false,
+        taskId: 0,
+        taskTitle: '',
+        branchName: '',
+        currentBranch: '',
+        hasWorktreeChanges: false,
+        hasUnmergedCommits: false,
+        committed: false,
+        merged: false
+    };
+
     // Convert string taskId to number
     const numericTaskId = parseInt(taskId, 10);
     if (isNaN(numericTaskId)) {
-        console.log(colors.red(`✗ Invalid task ID '${taskId}' - must be a number`));
+        result.error = `Invalid task ID '${taskId}' - must be a number`;
+        if (options.json) {
+            console.log(JSON.stringify(result, null, 2));
+        } else {
+            console.log(colors.red(`✗ ${result.error}`));
+        }
         return;
     }
+
+    result.taskId = numericTaskId;
 
     // Load rover configuration to get selected AI agent
     const roverConfigPath = join(process.cwd(), 'rover.json');
@@ -376,7 +416,9 @@ export const mergeCommand = async (taskId: string, options: { force?: boolean } 
             selectedAiAgent = config.environment?.selectedAiAgent || 'claude';
         }
     } catch (error) {
-        console.log(colors.yellow('⚠ Could not load rover configuration, defaulting to Claude'));
+        if (!options.json) {
+            console.log(colors.yellow('⚠ Could not load rover configuration, defaulting to Claude'));
+        }
     }
 
     // Create AI provider instance
@@ -387,36 +429,68 @@ export const mergeCommand = async (taskId: string, options: { force?: boolean } 
         const task = TaskDescription.load(numericTaskId);
         const taskPath = join(process.cwd(), '.rover', 'tasks', numericTaskId.toString());
 
-        console.log(colors.bold('\n🔄 Merge Task\n'));
-        console.log(colors.gray('ID: ') + colors.cyan(task.id.toString()));
-        console.log(colors.gray('Title: ') + colors.white(task.title));
-        console.log(colors.gray('Status: ') + colors.yellow(task.status));
+        result.taskTitle = task.title;
+        result.branchName = task.branchName;
+
+        if (!options.json) {
+            console.log(colors.bold('\n🔄 Merge Task\n'));
+            console.log(colors.gray('ID: ') + colors.cyan(task.id.toString()));
+            console.log(colors.gray('Title: ') + colors.white(task.title));
+            console.log(colors.gray('Status: ') + colors.yellow(task.status));
+        }
 
         // Check if worktree exists
         if (!task.worktreePath || !existsSync(task.worktreePath)) {
-            console.log('');
-            console.log(colors.red('✗ No worktree found for this task'));
-            console.log(colors.gray('  Run ') + colors.cyan(`rover task ${numericTaskId}`) + colors.gray(' first'));
+            result.error = 'No worktree found for this task';
+            if (options.json) {
+                console.log(JSON.stringify(result, null, 2));
+            } else {
+                console.log('');
+                console.log(colors.red('✗ No worktree found for this task'));
+                console.log(colors.gray('  Run ') + colors.cyan(`rover task ${numericTaskId}`) + colors.gray(' first'));
+            }
             return;
         }
 
-        console.log(colors.gray('Worktree: ') + colors.cyan(task.worktreePath));
-        console.log(colors.gray('Branch: ') + colors.cyan(task.branchName));
+        if (!options.json) {
+            console.log(colors.gray('Worktree: ') + colors.cyan(task.worktreePath));
+            console.log(colors.gray('Branch: ') + colors.cyan(task.branchName));
+        }
 
         // Check if we're in a git repository
         try {
             execSync('git rev-parse --is-inside-work-tree', { stdio: 'pipe' });
         } catch (error) {
-            console.log('')
-            console.log(colors.red('✗ Not in a git repository'));
+            result.error = 'Not in a git repository';
+            if (options.json) {
+                console.log(JSON.stringify(result, null, 2));
+            } else {
+                console.log('')
+                console.log(colors.red('✗ Not in a git repository'));
+            }
             return;
+        }
+
+        // Get current branch name
+        try {
+            result.currentBranch = execSync('git branch --show-current', {
+                stdio: 'pipe',
+                encoding: 'utf8'
+            }).trim();
+        } catch (error) {
+            result.currentBranch = 'unknown';
         }
 
         // Check for uncommitted changes in main repo
         if (hasUncommittedChanges()) {
-            console.log('');
-            console.log(colors.red('✗ Main repository has uncommitted changes'));
-            console.log(colors.gray('  Please commit or stash your changes before merging'));
+            result.error = 'Main repository has uncommitted changes';
+            if (options.json) {
+                console.log(JSON.stringify(result, null, 2));
+            } else {
+                console.log('');
+                console.log(colors.red('✗ Main repository has uncommitted changes'));
+                console.log(colors.gray('  Please commit or stash your changes before merging'));
+            }
             return;
         }
 
@@ -425,39 +499,49 @@ export const mergeCommand = async (taskId: string, options: { force?: boolean } 
         const taskBranch = task.branchName;
         const hasUnmerged = hasUnmergedCommits(taskBranch);
 
+        result.hasWorktreeChanges = hasWorktreeChanges;
+        result.hasUnmergedCommits = hasUnmerged;
+
         if (!hasWorktreeChanges && !hasUnmerged) {
-            console.log('');
-            console.log(colors.yellow('⚠ No changes to merge'));
-            console.log(colors.gray('  The task worktree has no uncommitted changes'));
-            console.log(colors.gray('  The task branch has no unmerged commits'));
+            result.success = true;
+            if (options.json) {
+                console.log(JSON.stringify(result, null, 2));
+            } else {
+                console.log('');
+                console.log(colors.yellow('⚠ No changes to merge'));
+                console.log(colors.gray('  The task worktree has no uncommitted changes'));
+                console.log(colors.gray('  The task branch has no unmerged commits'));
+            }
             return;
         }
 
-        // Show what's ready to merge
-        console.log('');
-        if (hasWorktreeChanges) {
-            console.log(colors.green('✓ Worktree has uncommitted changes ready to commit'));
-        }
-        if (hasUnmerged) {
-            const unmergedCommits = getUnmergedCommits(taskBranch);
-            console.log(colors.green(`✓ Task branch has ${unmergedCommits.length} unmerged commit(s):`));
-            unmergedCommits.forEach(commit => {
-                console.log(colors.gray(`  ${commit}`));
-            });
+        if (!options.json) {
+            // Show what's ready to merge
+            console.log('');
+            if (hasWorktreeChanges) {
+                console.log(colors.green('✓ Worktree has uncommitted changes ready to commit'));
+            }
+            if (hasUnmerged) {
+                const unmergedCommits = getUnmergedCommits(taskBranch);
+                console.log(colors.green(`✓ Task branch has ${unmergedCommits.length} unmerged commit(s):`));
+                unmergedCommits.forEach(commit => {
+                    console.log(colors.gray(`  ${commit}`));
+                });
+            }
+
+            // Show what will happen
+            console.log('');
+            console.log(colors.cyan('This will:'));
+            if (hasWorktreeChanges) {
+                console.log(colors.cyan('  • Commit changes in the task worktree'));
+                console.log(colors.cyan('  • Generate an AI-powered commit message'));
+            }
+            console.log(colors.cyan('  • Merge the task branch into the current branch'));
+            console.log(colors.cyan('  • Clean up the worktree and branch'));
         }
 
-        // Show what will happen
-        console.log('');
-        console.log(colors.cyan('This will:'));
-        if (hasWorktreeChanges) {
-            console.log(colors.cyan('  • Commit changes in the task worktree'));
-            console.log(colors.cyan('  • Generate an AI-powered commit message'));
-        }
-        console.log(colors.cyan('  • Merge the task branch into the current branch'));
-        console.log(colors.cyan('  • Clean up the worktree and branch'));
-
-        // Confirm merge unless force flag is used
-        if (!options.force) {
+        // Confirm merge unless force flag is used (skip in JSON mode)
+        if (!options.force && !options.json) {
             const { confirm } = await prompt<{ confirm: boolean }>({
                 type: 'confirm',
                 name: 'confirm',
@@ -466,22 +550,17 @@ export const mergeCommand = async (taskId: string, options: { force?: boolean } 
             });
 
             if (!confirm) {
+                result.success = true; // User cancelled, not an error
                 console.log(colors.yellow('\n⚠ Task merge cancelled'));
                 return;
             }
         }
 
-        const spinner = yoctoSpinner({ text: 'Preparing merge...' }).start();
+        const spinner = !options.json ? yoctoSpinner({ text: 'Preparing merge...' }).start() : null;
 
         try {
-            // Get current branch name
-            const currentBranch = execSync('git branch --show-current', {
-                stdio: 'pipe',
-                encoding: 'utf8'
-            }).trim();
-
             // Get recent commit messages for AI context
-            spinner.text = 'Gathering commit context...';
+            if (spinner) spinner.text = 'Gathering commit context...';
             const recentCommits = getRecentCommitMessages(5);
 
             let finalCommitMessage = '';
@@ -492,7 +571,7 @@ export const mergeCommand = async (taskId: string, options: { force?: boolean } 
                 const summaries = getTaskIterationSummaries(numericTaskId.toString());
 
                 // Generate AI commit message
-                spinner.text = 'Generating commit message with AI...';
+                if (spinner) spinner.text = 'Generating commit message with AI...';
                 const aiCommitMessage = await generateCommitMessage(
                     task.title,
                     task.description,
@@ -506,8 +585,9 @@ export const mergeCommand = async (taskId: string, options: { force?: boolean } 
 
                 // Add Co-Authored-By line
                 finalCommitMessage = `${commitMessage}\n\nCo-Authored-By: Rover <noreply@endor.dev>`;
+                result.commitMessage = finalCommitMessage.split('\n')[0]; // Store first line for result
 
-                spinner.text = 'Committing changes in worktree...';
+                if (spinner) spinner.text = 'Committing changes in worktree...';
 
                 // Switch to worktree and commit changes
                 const originalCwd = process.cwd();
@@ -522,6 +602,8 @@ export const mergeCommand = async (taskId: string, options: { force?: boolean } 
                         stdio: 'pipe'
                     });
 
+                    result.committed = true;
+
                     // Switch back to original directory
                     process.chdir(originalCwd);
 
@@ -531,7 +613,7 @@ export const mergeCommand = async (taskId: string, options: { force?: boolean } 
                 }
             }
 
-            spinner.text = 'Merging task branch...';
+            if (spinner) spinner.text = 'Merging task branch...';
 
             // Attempt to merge the task branch
             const taskBranch = task.branchName;
@@ -542,87 +624,118 @@ export const mergeCommand = async (taskId: string, options: { force?: boolean } 
                     stdio: 'pipe'
                 });
                 mergeSuccessful = true;
-                spinner.success('Task merged successfully');
+                result.merged = true;
+                if (spinner) spinner.success('Task merged successfully');
 
             } catch (mergeError) {
                 // Check if this is a merge conflict
                 if (hasMergeConflicts()) {
-                    spinner.error('Merge conflicts detected');
+                    if (spinner) spinner.error('Merge conflicts detected');
 
                     const conflictedFiles = getConflictedFiles();
-                    console.log(colors.yellow(`\n⚠ Merge conflicts detected in ${conflictedFiles.length} file(s):`));
-                    conflictedFiles.forEach(file => {
-                        console.log(colors.red(`  • ${file}`));
-                    });
+                    
+                    if (!options.json) {
+                        console.log(colors.yellow(`\n⚠ Merge conflicts detected in ${conflictedFiles.length} file(s):`));
+                        conflictedFiles.forEach(file => {
+                            console.log(colors.red(`  • ${file}`));
+                        });
+                    }
 
-                    // Ask user if they want AI to resolve conflicts
-                    const { useAI } = await prompt<{ useAI: boolean }>({
-                        type: 'confirm',
-                        name: 'useAI',
-                        message: 'Would you like AI to automatically resolve these merge conflicts?',
-                        initial: true
-                    });
+                    // In JSON mode, always attempt AI resolution automatically
+                    let useAI = options.json;
+                    if (!options.json) {
+                        // Ask user if they want AI to resolve conflicts
+                        const response = await prompt<{ useAI: boolean }>({
+                            type: 'confirm',
+                            name: 'useAI',
+                            message: 'Would you like AI to automatically resolve these merge conflicts?',
+                            initial: true
+                        });
+                        useAI = response.useAI;
+                    }
 
                     if (useAI) {
-                        console.log(colors.cyan('\n🤖 Starting AI-powered conflict resolution...\n'));
+                        if (!options.json) {
+                            console.log(colors.cyan('\n🤖 Starting AI-powered conflict resolution...\n'));
+                        }
 
                         const resolutionSuccessful = await resolveMergeConflicts(conflictedFiles, aiProvider);
 
                         if (resolutionSuccessful) {
-                            // Show what was resolved
-                            await showResolvedChanges(conflictedFiles);
+                            result.conflictsResolved = true;
+                            
+                            if (!options.json) {
+                                // Show what was resolved
+                                await showResolvedChanges(conflictedFiles);
 
-                            // Ask user to review and confirm
-                            const { confirmResolution } = await prompt<{ confirmResolution: boolean }>({
-                                type: 'confirm',
-                                name: 'confirmResolution',
-                                message: 'Do you approve these AI-resolved changes?',
-                                initial: false
-                            });
+                                // Ask user to review and confirm
+                                const { confirmResolution } = await prompt<{ confirmResolution: boolean }>({
+                                    type: 'confirm',
+                                    name: 'confirmResolution',
+                                    message: 'Do you approve these AI-resolved changes?',
+                                    initial: false
+                                });
 
-                            if (confirmResolution) {
-                                // Complete the merge with the resolved conflicts
-                                try {
-                                    execSync('git commit --no-edit', { stdio: 'pipe' });
-                                    mergeSuccessful = true;
-                                    console.log(colors.green('\n✓ Merge conflicts resolved and merge completed'));
-                                } catch (commitError) {
-                                    console.error(colors.red('Error completing merge after conflict resolution:'), commitError);
-                                    // Abort the merge to clean state
+                                if (!confirmResolution) {
+                                    console.log(colors.yellow('\n⚠ User rejected AI resolution. Aborting merge...'));
                                     try {
                                         execSync('git merge --abort', { stdio: 'pipe' });
                                     } catch (abortError) {
                                         // Ignore abort errors
                                     }
-                                    throw commitError;
+                                    console.log(colors.gray('You can resolve conflicts manually and run the merge command again.'));
+                                    return;
                                 }
-                            } else {
-                                console.log(colors.yellow('\n⚠ User rejected AI resolution. Aborting merge...'));
+                            }
+
+                            // Complete the merge with the resolved conflicts
+                            try {
+                                execSync('git commit --no-edit', { stdio: 'pipe' });
+                                mergeSuccessful = true;
+                                result.merged = true;
+                                if (!options.json) {
+                                    console.log(colors.green('\n✓ Merge conflicts resolved and merge completed'));
+                                }
+                            } catch (commitError) {
+                                result.error = `Error completing merge after conflict resolution: ${commitError}`;
+                                if (!options.json) {
+                                    console.error(colors.red('Error completing merge after conflict resolution:'), commitError);
+                                }
+                                // Abort the merge to clean state
                                 try {
                                     execSync('git merge --abort', { stdio: 'pipe' });
                                 } catch (abortError) {
                                     // Ignore abort errors
                                 }
-                                console.log(colors.gray('You can resolve conflicts manually and run the merge command again.'));
-                                return;
+                                throw commitError;
                             }
                         } else {
-                            console.log(colors.red('\n✗ AI failed to resolve conflicts. Aborting merge...'));
+                            result.error = 'AI failed to resolve merge conflicts';
+                            if (options.json) {
+                                console.log(JSON.stringify(result, null, 2));
+                            } else {
+                                console.log(colors.red('\n✗ AI failed to resolve conflicts. Aborting merge...'));
+                                console.log(colors.gray('You can resolve conflicts manually and run the merge command again.'));
+                            }
                             try {
                                 execSync('git merge --abort', { stdio: 'pipe' });
                             } catch (abortError) {
                                 // Ignore abort errors
                             }
-                            console.log(colors.gray('You can resolve conflicts manually and run the merge command again.'));
                             return;
                         }
                     } else {
-                        console.log(colors.yellow('\n⚠ Merge aborted due to conflicts.'));
-                        console.log(colors.gray('To resolve manually:'));
-                        console.log(colors.cyan('  1. Fix conflicts in the listed files'));
-                        console.log(colors.cyan('  2. Run: git add <resolved-files>'));
-                        console.log(colors.cyan('  3. Run: git commit'));
-                        console.log(colors.cyan(`  4. Run: rover merge ${taskId} to complete the process`));
+                        result.error = 'Merge aborted due to conflicts';
+                        if (options.json) {
+                            console.log(JSON.stringify(result, null, 2));
+                        } else {
+                            console.log(colors.yellow('\n⚠ Merge aborted due to conflicts.'));
+                            console.log(colors.gray('To resolve manually:'));
+                            console.log(colors.cyan('  1. Fix conflicts in the listed files'));
+                            console.log(colors.cyan('  2. Run: git add <resolved-files>'));
+                            console.log(colors.cyan('  3. Run: git commit'));
+                            console.log(colors.cyan(`  4. Run: rover merge ${taskId} to complete the process`));
+                        }
                         try {
                             execSync('git merge --abort', { stdio: 'pipe' });
                         } catch (abortError) {
@@ -632,35 +745,42 @@ export const mergeCommand = async (taskId: string, options: { force?: boolean } 
                     }
                 } else {
                     // Other merge error, not conflicts
-                    spinner.error('Merge failed');
+                    if (spinner) spinner.error('Merge failed');
                     throw mergeError;
                 }
             }
 
             if (mergeSuccessful) {
+                result.success = true;
 
-                console.log(colors.green('\n✓ Task has been successfully merged'));
-                if (hasWorktreeChanges && finalCommitMessage) {
-                    // Extract just the first line for display
-                    const displayMessage = finalCommitMessage.split('\n')[0];
-                    console.log(colors.gray('  New commit: ') + colors.white(displayMessage));
+                if (!options.json) {
+                    console.log(colors.green('\n✓ Task has been successfully merged'));
+                    if (hasWorktreeChanges && finalCommitMessage) {
+                        // Extract just the first line for display
+                        const displayMessage = finalCommitMessage.split('\n')[0];
+                        console.log(colors.gray('  New commit: ') + colors.white(displayMessage));
+                    }
+                    if (hasUnmerged) {
+                        const unmergedCount = getUnmergedCommits(taskBranch).length;
+                        console.log(colors.gray(`  Merged ${unmergedCount} existing commit(s) from task branch`));
+                    }
+                    console.log(colors.gray('  Merged into: ') + colors.cyan(result.currentBranch));
                 }
-                if (hasUnmerged) {
-                    const unmergedCount = getUnmergedCommits(taskBranch).length;
-                    console.log(colors.gray(`  Merged ${unmergedCount} existing commit(s) from task branch`));
+
+                // Ask if user wants to clean up worktree and branch (auto-cleanup in JSON mode)
+                let shouldCleanup = options.json; // Auto-cleanup in JSON mode
+                if (!options.json) {
+                    const { cleanup } = await prompt<{ cleanup: boolean }>({
+                        type: 'confirm',
+                        name: 'cleanup',
+                        message: 'Clean up worktree and branch?',
+                        initial: true
+                    });
+                    shouldCleanup = cleanup;
                 }
-                console.log(colors.gray('  Merged into: ') + colors.cyan(currentBranch));
 
-                // Ask if user wants to clean up worktree and branch
-                const { cleanup } = await prompt<{ cleanup: boolean }>({
-                    type: 'confirm',
-                    name: 'cleanup',
-                    message: 'Clean up worktree and branch?',
-                    initial: true
-                });
-
-                if (cleanup) {
-                    const cleanupSpinner = yoctoSpinner({ text: 'Cleaning up...' }).start();
+                if (shouldCleanup) {
+                    const cleanupSpinner = !options.json ? yoctoSpinner({ text: 'Cleaning up...' }).start() : null;
 
                     try {
                         // Remove worktree
@@ -669,31 +789,61 @@ export const mergeCommand = async (taskId: string, options: { force?: boolean } 
                         // Delete branch
                         execSync(`git branch -d "${taskBranch}"`, { stdio: 'pipe' });
 
-                        cleanupSpinner.success('Cleanup completed');
-                        console.log(colors.green('✓ Worktree and branch cleaned up'));
+                        result.cleanedUp = true;
+                        if (cleanupSpinner) {
+                            cleanupSpinner.success('Cleanup completed');
+                        }
+                        if (!options.json) {
+                            console.log(colors.green('✓ Worktree and branch cleaned up'));
+                        }
 
                     } catch (cleanupError) {
-                        cleanupSpinner.error('Cleanup failed');
-                        console.warn(colors.yellow('Warning: Could not clean up worktree/branch automatically'));
-                        console.log(colors.gray('  You may need to clean up manually:'));
-                        console.log(colors.cyan(`    git worktree remove "${task.worktreePath}" --force`));
-                        console.log(colors.cyan(`    git branch -d "${taskBranch}"`));
+                        if (cleanupSpinner) {
+                            cleanupSpinner.error('Cleanup failed');
+                        }
+                        if (!options.json) {
+                            console.warn(colors.yellow('Warning: Could not clean up worktree/branch automatically'));
+                            console.log(colors.gray('  You may need to clean up manually:'));
+                            console.log(colors.cyan(`    git worktree remove "${task.worktreePath}" --force`));
+                            console.log(colors.cyan(`    git branch -d "${taskBranch}"`));
+                        }
                     }
                 }
             }
 
         } catch (error: any) {
-            spinner.error('Merge failed');
-            console.log('');
-            console.error(colors.red('Error during merge:'), error.message);
-            console.log(colors.gray('The repository state has been preserved.'));
+            result.error = `Error during merge: ${error.message}`;
+            if (options.json) {
+                console.log(JSON.stringify(result, null, 2));
+            } else {
+                if (spinner) spinner.error('Merge failed');
+                console.log('');
+                console.error(colors.red('Error during merge:'), error.message);
+                console.log(colors.gray('The repository state has been preserved.'));
+            }
+            return;
+        }
+
+        // Output final result
+        if (options.json) {
+            console.log(JSON.stringify(result, null, 2));
         }
 
     } catch (error) {
         if (error instanceof TaskNotFoundError) {
-            console.log(colors.red(`✗ ${error.message}`));
+            result.error = error.message;
+            if (options.json) {
+                console.log(JSON.stringify(result, null, 2));
+            } else {
+                console.log(colors.red(`✗ ${error.message}`));
+            }
         } else {
-            console.error(colors.red('Error merging task:'), error);
+            result.error = `Error merging task: ${error}`;
+            if (options.json) {
+                console.log(JSON.stringify(result, null, 2));
+            } else {
+                console.error(colors.red('Error merging task:'), error);
+            }
         }
     }
 };

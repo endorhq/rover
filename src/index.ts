@@ -125,6 +125,7 @@ program
 	.description('Merge the task changes into your current branch')
 	.argument('<taskId>', 'Task ID to merge')
 	.option('-f, --force', 'Force merge without confirmation')
+	.option('--json', 'Output in JSON format')
 	.action(mergeCommand);
 
 program
