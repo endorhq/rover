@@ -23,7 +23,7 @@ const execAsync = promisify(exec);
 /**
  * Command validations.
  */
-const validations = (selectedAiAgent?: string, isJsonMode?: boolean): boolean => {
+const validations = (selectedAiAgent?: string, isJsonMode?: boolean, followMode?: boolean): boolean => {
     // Check if we're in a git repository
     try {
         execSync('git rev-parse --is-inside-work-tree', { stdio: 'pipe' });
@@ -68,13 +68,17 @@ const validations = (selectedAiAgent?: string, isJsonMode?: boolean): boolean =>
         }
     }
 
+    if (isJsonMode && followMode) {
+        return false;
+    }
+
     return true;
 }
 
 /**
  * Update task metadata with execution information
  */
-const updateTaskMetadata = (taskId: number, updates: any) => {
+const updateTaskMetadata = (taskId: number, updates: any, jsonMode?: boolean) => {
     try {
         if (TaskDescription.exists(taskId)) {
             const task = TaskDescription.load(taskId);
@@ -104,22 +108,27 @@ const updateTaskMetadata = (taskId: number, updates: any) => {
             }
         }
     } catch (error) {
-        console.error(colors.red('Error updating task metadata:'), error);
+        // Silently fail in JSON mode, otherwise log the error
+        if (!jsonMode) {
+            console.error(colors.red('Error updating task metadata:'), error);
+        }
     }
 };
 
 /**
  * Start environment using containers
  */
-export const startDockerExecution = async (taskId: number, taskData: any, worktreePath: string, iterationPath: string, selectedAiAgent: string, customTaskDescriptionPath?: string, followMode?: boolean) => {
+export const startDockerExecution = async (taskId: number, taskData: any, worktreePath: string, iterationPath: string, selectedAiAgent: string, customTaskDescriptionPath?: string, followMode?: boolean, jsonMode?: boolean) => {
     const containerName = `rover-task-${taskId}-${taskData.iterations}`;
 
     try {
         // Check if Docker is available
         execSync('docker --version', { stdio: 'pipe' });
     } catch (error) {
-        console.log(colors.red('\n✗ Docker is not available'));
-        console.log(colors.gray('  Please install Docker to use automated task execution'));
+        if (!jsonMode) {
+            console.log(colors.red('\n✗ Docker is not available'));
+            console.log(colors.gray('  Please install Docker to use automated task execution'));
+        }
         return;
     }
 
@@ -160,7 +169,9 @@ export const startDockerExecution = async (taskId: number, taskData: any, worktr
         return;
     }
 
-    console.log(colors.bold('\n🐳 Starting Docker container for task execution\n'));
+    if (!jsonMode) {
+        console.log(colors.bold('\n🐳 Starting Docker container for task execution\n'));
+    }
 
     // Clean up any existing container with same name
     try {
@@ -169,7 +180,7 @@ export const startDockerExecution = async (taskId: number, taskData: any, worktr
         // Container doesn't exist, which is fine
     }
 
-    const spinner = yoctoSpinner({ text: 'Starting container...' }).start();
+    const spinner = !jsonMode ? yoctoSpinner({ text: 'Starting container...' }).start() : null;
 
     try {
 
@@ -201,8 +212,10 @@ export const startDockerExecution = async (taskId: number, taskData: any, worktr
         );
 
         if (followMode) {
-            spinner.success('Container started');
-            console.log(colors.cyan(`Running automated task execution with ${selectedAiAgent} (follow mode)...\n`));
+            if (spinner) spinner.success('Container started');
+            if (!jsonMode) {
+                console.log(colors.cyan(`Running automated task execution with ${selectedAiAgent} (follow mode)...\n`));
+            }
 
             // Start Docker container with streaming output
             const dockerProcess = spawn('docker', dockerArgs, {
@@ -210,7 +223,9 @@ export const startDockerExecution = async (taskId: number, taskData: any, worktr
             });
 
             let currentStep = 'Initializing';
-            console.log(colors.yellow(`📋 Current step: ${currentStep}`));
+            if (!jsonMode) {
+                console.log(colors.yellow(`📋 Current step: ${currentStep}`));
+            }
 
             // Handle stdout
             dockerProcess.stdout?.on('data', (data) => {
@@ -220,98 +235,132 @@ export const startDockerExecution = async (taskId: number, taskData: any, worktr
                 if (output.includes(`Installing ${selectedAiAgent} CLI`)) {
                     if (currentStep !== `Installing ${selectedAiAgent} CLI`) {
                         currentStep = `Installing ${selectedAiAgent} CLI`;
-                        console.log(colors.yellow(`📋 Current step: ${currentStep}`));
+                        if (!jsonMode) {
+                            console.log(colors.yellow(`📋 Current step: ${currentStep}`));
+                        }
                     }
                 } else if (output.includes('Creating agent user')) {
                     if (currentStep !== 'Setting up agent user') {
                         currentStep = 'Setting up agent user';
-                        console.log(colors.yellow(`📋 Current step: ${currentStep}`));
+                        if (!jsonMode) {
+                            console.log(colors.yellow(`📋 Current step: ${currentStep}`));
+                        }
                     }
                 } else if (output.includes('Starting context phase')) {
                     if (currentStep !== 'Context Analysis') {
                         currentStep = 'Context Analysis';
-                        console.log(colors.yellow(`📋 Current step: ${currentStep}`));
+                        if (!jsonMode) {
+                            console.log(colors.yellow(`📋 Current step: ${currentStep}`));
+                        }
                     }
                 } else if (output.includes('Starting plan phase')) {
                     if (currentStep !== 'Planning') {
                         currentStep = 'Planning';
-                        console.log(colors.yellow(`📋 Current step: ${currentStep}`));
+                        if (!jsonMode) {
+                            console.log(colors.yellow(`📋 Current step: ${currentStep}`));
+                        }
                     }
                 } else if (output.includes('Starting implement phase')) {
                     if (currentStep !== 'Implementation') {
                         currentStep = 'Implementation';
-                        console.log(colors.yellow(`📋 Current step: ${currentStep}`));
+                        if (!jsonMode) {
+                            console.log(colors.yellow(`📋 Current step: ${currentStep}`));
+                        }
                     }
                 } else if (output.includes('Starting review phase')) {
                     if (currentStep !== 'Code Review') {
                         currentStep = 'Code Review';
-                        console.log(colors.yellow(`📋 Current step: ${currentStep}`));
+                        if (!jsonMode) {
+                            console.log(colors.yellow(`📋 Current step: ${currentStep}`));
+                        }
                     }
                 } else if (output.includes('Starting apply_review phase')) {
                     if (currentStep !== 'Applying Review Fixes') {
                         currentStep = 'Applying Review Fixes';
-                        console.log(colors.yellow(`📋 Current step: ${currentStep}`));
+                        if (!jsonMode) {
+                            console.log(colors.yellow(`📋 Current step: ${currentStep}`));
+                        }
                     }
                 } else if (output.includes('Starting summary phase')) {
                     if (currentStep !== 'Creating Summary') {
                         currentStep = 'Creating Summary';
-                        console.log(colors.yellow(`📋 Current step: ${currentStep}`));
+                        if (!jsonMode) {
+                            console.log(colors.yellow(`📋 Current step: ${currentStep}`));
+                        }
                     }
                 } else if (output.includes('Task execution completed')) {
                     if (currentStep !== 'Task execution complete') {
                         currentStep = 'Task execution complete';
-                        console.log(colors.yellow(`📋 Current step: ${currentStep}`));
+                        if (!jsonMode) {
+                            console.log(colors.yellow(`📋 Current step: ${currentStep}`));
+                        }
                     }
                 }
 
                 // Display output with proper formatting
-                process.stdout.write(colors.gray(output));
+                if (!jsonMode) {
+                    process.stdout.write(colors.gray(output));
+                }
             });
 
             // Handle stderr
             dockerProcess.stderr?.on('data', (data) => {
-                process.stderr.write(colors.gray(data.toString()));
+                if (!jsonMode) {
+                    process.stderr.write(colors.gray(data.toString()));
+                }
             });
 
             // Handle process completion
             dockerProcess.on('close', (code) => {
                 if (code === 0) {
-                    console.log(colors.green('\n✓ Task execution completed successfully'));
+                    if (!jsonMode) {
+                        console.log(colors.green('\n✓ Task execution completed successfully'));
+                    }
                     // Update task metadata
                     updateTaskMetadata(taskId, {
                         executionStatus: 'completed',
                         completedAt: new Date().toISOString(),
                         exitCode: code
-                    });
+                    }, jsonMode);
                 } else {
-                    console.log(colors.red(`\n✗ Task execution failed with code ${code}`));
+                    if (!jsonMode) {
+                        console.log(colors.red(`\n✗ Task execution failed with code ${code}`));
+                    }
                     // Update task metadata
                     updateTaskMetadata(taskId, {
                         executionStatus: 'failed',
                         failedAt: new Date().toISOString(),
                         exitCode: code
-                    });
+                    }, jsonMode);
                 }
             });
 
             dockerProcess.on('error', (error) => {
-                console.error(colors.red('\nError running Docker container:'), error);
+                if (!jsonMode) {
+                    console.error(colors.red('\nError running Docker container:'), error);
+                }
                 // Update task metadata
                 updateTaskMetadata(taskId, {
                     executionStatus: 'error',
                     error: error.message,
                     errorAt: new Date().toISOString()
-                });
+                }, jsonMode);
             });
 
             // Handle process interruption (Ctrl+C)
             process.on('SIGINT', () => {
-                console.log(colors.yellow('\n\n⚠ Stopping task execution...'));
+                if (!jsonMode) {
+                    console.log(colors.yellow('\n\n⚠ Stopping task execution...'));
+                }
                 try {
                     execSync(`docker stop ${containerName}`, { stdio: 'pipe' });
-                    console.log(colors.green('✓ Container stopped'));
+                    if (!jsonMode) {
+                        console.log(colors.green('✓ Container stopped'));
+                    }
                 } catch (error) {
-                    console.log(colors.red('✗ Failed to stop container'));
+                    if (!jsonMode) {
+                        console.log(colors.red('✗ Failed to stop container'));
+                    }
                 }
                 process.exit(0);
             });
@@ -323,35 +372,41 @@ export const startDockerExecution = async (taskId: number, taskData: any, worktr
                     encoding: 'utf8'
                 }).trim();
 
-                spinner.success('Container started in background');
-                console.log(colors.cyan(`🐳 Task is running in background (Container ID: ${containerId.substring(0, 12)})`));
-                console.log(colors.gray(`   Use `) + colors.cyan(`rover list`) + colors.gray(` to monitor progress`));
-                console.log(colors.gray(`   Use `) + colors.cyan(`rover logs ${taskId}`) + colors.gray(` to view logs`));
-                console.log(colors.gray(`   Use `) + colors.cyan(`rover task ${taskId} --follow`) + colors.gray(` to follow the logs`));
+                if (spinner) spinner.success('Container started in background');
+                if (!jsonMode) {
+                    console.log(colors.cyan(`🐳 Task is running in background (Container ID: ${containerId.substring(0, 12)})`));
+                    console.log(colors.gray(`   Use `) + colors.cyan(`rover list`) + colors.gray(` to monitor progress`));
+                    console.log(colors.gray(`   Use `) + colors.cyan(`rover logs ${taskId}`) + colors.gray(` to view logs`));
+                    console.log(colors.gray(`   Use `) + colors.cyan(`rover task ${taskId} --follow`) + colors.gray(` to follow the logs`));
+                }
 
                 // Update task metadata with container ID
                 updateTaskMetadata(taskId, {
                     containerId: containerId,
                     executionStatus: 'running',
                     runningAt: new Date().toISOString()
-                });
+                }, jsonMode);
 
             } catch (error: any) {
-                spinner.error('Failed to start container in background');
-                console.error(colors.red('Error starting Docker container:'), error.message);
+                if (spinner) spinner.error('Failed to start container in background');
+                if (!jsonMode) {
+                    console.error(colors.red('Error starting Docker container:'), error.message);
+                }
 
                 // Update task metadata
                 updateTaskMetadata(taskId, {
                     executionStatus: 'error',
                     error: error.message,
                     errorAt: new Date().toISOString()
-                });
+                }, jsonMode);
             }
         }
 
     } catch (error) {
-        spinner.error('Failed to start container');
-        console.error(colors.red('Error starting Docker container:'), error);
+        if (spinner) spinner.error('Failed to start container');
+        if (!jsonMode) {
+            console.error(colors.red('Error starting Docker container:'), error);
+        }
     }
 }
 
@@ -463,7 +518,9 @@ const fetchGitHubIssue = async (issueNumber: string, json: boolean): Promise<{ t
         const repoInfo = getGitHubRepoInfo(remoteUrl);
 
         if (!repoInfo) {
-            console.log(colors.red('✗ Could not determine GitHub repository from git remote'));
+            if (!json) {
+                console.log(colors.red('✗ Could not determine GitHub repository from git remote'));
+            }
             return null;
         }
 
@@ -483,14 +540,18 @@ const fetchGitHubIssue = async (issueNumber: string, json: boolean): Promise<{ t
         }
 
         if (!issueData) {
-            console.log(colors.red('✗ Failed to fetch GitHub issue'));
-            console.log(colors.gray('  The issue might be private or not exist'));
+            if (!json) {
+                console.log(colors.red('✗ Failed to fetch GitHub issue'));
+                console.log(colors.gray('  The issue might be private or not exist'));
+            }
             return null;
         }
 
         return issueData;
     } catch (error) {
-        console.log(colors.red('✗ Error fetching GitHub issue'));
+        if (!json) {
+            console.log(colors.red('✗ Error fetching GitHub issue'));
+        }
         return null;
     }
 };
@@ -532,7 +593,7 @@ export const taskCommand = async (initPrompt?: string, options: { fromGithub?: s
     }
 
     // Run initial validations
-    if (!validations(selectedAiAgent, json)) {
+    if (!validations(selectedAiAgent, json, follow)) {
         process.exit(1);
     }
 
@@ -571,8 +632,10 @@ export const taskCommand = async (initPrompt?: string, options: { fromGithub?: s
     if (!fromGithub && (typeof description !== 'string' || description.length == 0)) {
         if (yes) {
             // In non-interactive mode, we must have a description
-            console.error(colors.red('✗ Task description is required in non-interactive mode'));
-            console.error(colors.gray('  Please provide a description as an argument: rover task "your task description" --yes'));
+            if (!json) {
+                console.error(colors.red('✗ Task description is required in non-interactive mode'));
+                console.error(colors.gray('  Please provide a description as an argument: rover task "your task description" --yes'));
+            }
             process.exit(1);
         }
 
@@ -698,19 +761,7 @@ export const taskCommand = async (initPrompt?: string, options: { fromGithub?: s
             description: taskData.description
         });
 
-        if (json) {
-            // Prepare JSON output
-            const jsonOutput = {
-                success: true,
-                taskId: task.id,
-                title: task.title,
-                description: task.description,
-                status: task.status,
-                createdAt: task.createdAt,
-                savedTo: `.rover/tasks/${taskId}/description.json`
-            };
-            console.log(JSON.stringify(jsonOutput, null, 2));
-        } else {
+        if (!json) {
             console.log(colors.green('\n✓ Task created successfully!'));
             console.log(colors.gray(`  Task ID: ${task.id}`));
             console.log(colors.gray(`  Saved to: .rover/tasks/${taskId}/description.json\n`));
@@ -759,22 +810,7 @@ export const taskCommand = async (initPrompt?: string, options: { fromGithub?: s
         task.setWorkspace(worktreePath, branchName);
         task.markInProgress();
 
-        if (json) {
-            // Update JSON output with complete task information
-            const finalJsonOutput = {
-                success: true,
-                taskId: task.id,
-                title: task.title,
-                description: task.description,
-                status: task.status,
-                createdAt: task.createdAt,
-                startedAt: task.startedAt,
-                workspace: task.worktreePath,
-                branch: task.branchName,
-                savedTo: `.rover/tasks/${taskId}/description.json`
-            };
-            console.log(JSON.stringify(finalJsonOutput, null, 2));
-        } else {
+        if (!json) {
             console.log(colors.bold('\n🚀 Task Started\n'));
             console.log(colors.gray('ID: ') + colors.cyan(task.id.toString()));
             console.log(colors.gray('Title: ') + colors.white(task.title));
@@ -789,6 +825,23 @@ export const taskCommand = async (initPrompt?: string, options: { fromGithub?: s
         }
 
         // Start Docker container for task execution
-        await startDockerExecution(taskId, taskData, worktreePath, iterationPath, selectedAiAgent, undefined, follow);
+        await startDockerExecution(taskId, taskData, worktreePath, iterationPath, selectedAiAgent, undefined, follow, json);
+
+        if (json) {
+            // Output final JSON after all operations are complete
+            const finalJsonOutput = {
+                success: true,
+                taskId: task.id,
+                title: task.title,
+                description: task.description,
+                status: task.status,
+                createdAt: task.createdAt,
+                startedAt: task.startedAt,
+                workspace: task.worktreePath,
+                branch: task.branchName,
+                savedTo: `.rover/tasks/${taskId}/description.json`
+            };
+            console.log(JSON.stringify(finalJsonOutput, null, 2));
+        }
     }
 };
