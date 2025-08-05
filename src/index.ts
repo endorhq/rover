@@ -132,8 +132,9 @@ program
 	.description('Commit and push task changes to remote, with GitHub PR support')
 	.argument('<taskId>', 'Task ID to push')
 	.option('-m, --message <message>', 'Commit message')
-	.option('--no-pr', 'Skip pull request creation prompt')
+	.option('--pr', 'Creates a Pull Request in GitHub')
 	.option('-f, --force', 'Force push')
+	.option('--json', 'Output in JSON format')
 	.action(pushCommand);
 
 program.parse(process.argv);

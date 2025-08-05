@@ -276,7 +276,7 @@ export function activate(context: vscode.ExtensionContext) {
                         } else if (taskFileExists && !originalFileExists) {
                             // New file in task - compare with empty file
                             changes.push([
-                                vscode.Uri.parse(file),
+                                taskFileUri,
                                 vscode.Uri.parse('untitled:'), // Empty file
                                 taskFileUri
                             ]);
@@ -317,6 +317,140 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
     context.subscriptions.push(gitCompareTaskCommand);
+
+    // Register the inspect task command
+    const pushBranchCommand = vscode.commands.registerCommand('rover.pushBranch', async (item: TaskItem | any) => {
+        try {
+            if (!item) {
+                const id = await vscode.window.showInputBox({
+                    prompt: 'Enter task ID',
+                    placeHolder: '1',
+                    ignoreFocusOut: true
+                });
+
+                if (!id) {
+                    throw new Error('Invalid task ID');
+                }
+
+                item = {
+                    id: parseInt(id)
+                }
+            }
+
+            // Validate the item parameter
+            if (!item) {
+                throw new Error('No task item provided');
+            }
+
+            const message = await vscode.window.showInputBox({
+                prompt: 'Commit message',
+                placeHolder: 'feat: add ...',
+                ignoreFocusOut: true
+            });
+
+            if (!message) {
+                throw new Error('Invalid commit message');
+            }
+
+            // Handle different item formats (TaskItem vs direct task object)
+            let taskId: string;
+
+            if (item.task) {
+                // TaskItem format
+                taskId = item.task.id;
+            } else if (item.id) {
+                // Direct task object format
+                taskId = item.id;
+            } else {
+                throw new Error('Invalid task item format - missing task ID');
+            }
+
+            if (!taskId) {
+                throw new Error('Task ID is undefined or empty');
+            }
+
+            let statusBarItem: vscode.StatusBarItem | undefined;
+
+            try {
+
+                // Create status bar item for persistent progress indication
+                statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
+                statusBarItem.text = '$(loading~spin) Creating task...';
+                statusBarItem.show();
+
+                const pushResult = await vscode.window.withProgress({
+                    location: vscode.ProgressLocation.Notification,
+                    title: 'Pushing Task Branch',
+                    cancellable: false
+                }, async (progress, _token) => {
+                    // Step 1: Validating description
+                    progress.report({
+                        increment: 10,
+                        message: 'Retrieving Task data...'
+                    });
+                    statusBarItem!.text = '$(loading~spin) Retrieving Task data...';
+                    await new Promise(resolve => setTimeout(resolve, 500)); // Brief pause for UX
+
+                    // Step 2: Initializing task
+                    progress.report({
+                        increment: 20,
+                        message: 'Pushing branch...'
+                    });
+                    statusBarItem!.text = '$(loading~spin) Pushing branch...';
+
+                    const pushResult = await cli.pushBranch(taskId, message);
+
+                    // Step 4: Finalizing
+                    progress.report({
+                        increment: 40,
+                        message: 'Finalizing push...'
+                    });
+                    statusBarItem!.text = '$(loading~spin) Finalizing push...';
+                    await new Promise(resolve => setTimeout(resolve, 300)); // Brief pause for UX
+
+                    return pushResult;
+                });
+
+                if (pushResult.success) {
+                    statusBarItem.text = `$(check) Task pushed successfully (Branch: ${pushResult.branchName})!`;
+                    statusBarItem.tooltip = `Task: ${pushResult.taskTitle} (${pushResult.taskId})`;
+
+                    // Auto-hide status bar item after 3 seconds
+                    setTimeout(() => {
+                        statusBarItem?.dispose();
+                    }, 3000);
+
+                    vscode.window.showInformationMessage(`Task pushed successfully (Branch: ${pushResult.branchName})! "${pushResult.taskTitle}" (ID: ${pushResult.taskId})`);
+                } else {
+                    statusBarItem.text = `$(error) Task push failed`;
+                    statusBarItem.tooltip = `Error: ${pushResult.error}`;
+
+                    setTimeout(() => {
+                        statusBarItem?.dispose();
+                    }, 5000);
+
+                    vscode.window.showErrorMessage(`Failed to push task: ${pushResult.error}`);
+                }
+
+                taskTreeProvider.refresh();
+            } catch (error) {
+                // Update status bar to show error
+                if (statusBarItem) {
+                    statusBarItem.text = '$(error) Task push failed';
+                    statusBarItem.tooltip = `Error: ${error}`;
+                    setTimeout(() => {
+                        statusBarItem?.dispose();
+                    }, 5000);
+                }
+
+                vscode.window.showErrorMessage(`Failed to create task: ${error}`);
+            }
+        } catch (error) {
+            console.error('Error in inspectTask command:', error);
+            vscode.window.showErrorMessage(`Failed to open task details: ${error}`);
+        }
+    });
+    context.subscriptions.push(pushBranchCommand);
 
     // Register the delete task command
     const deleteTaskCommand = vscode.commands.registerCommand('rover.deleteTask', async (item: TaskItem | any) => {

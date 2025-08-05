@@ -14,6 +14,7 @@ interface PushOptions {
     message?: string;
     pr?: boolean;
     force?: boolean;
+    json?: boolean;
 }
 
 // Removed TaskData interface - using TaskDescription class instead
@@ -51,36 +52,84 @@ const getGitHubRepoInfo = (remoteUrl: string): { owner: string; repo: string } |
     return null;
 };
 
+interface PushResult {
+    success: boolean;
+    taskId: number;
+    taskTitle: string;
+    branchName: string;
+    hasChanges: boolean;
+    committed: boolean;
+    commitMessage?: string;
+    pushed: boolean;
+    pullRequest?: {
+        created: boolean;
+        url?: string;
+        exists?: boolean;
+    };
+    error?: string;
+}
+
 /**
  * Push command implementation
  */
 export const pushCommand = async (taskId: string, options: PushOptions) => {
+    const result: PushResult = {
+        success: false,
+        taskId: 0,
+        taskTitle: '',
+        branchName: '',
+        hasChanges: false,
+        committed: false,
+        pushed: false
+    };
+
     // Convert string taskId to number
     const numericTaskId = parseInt(taskId, 10);
     if (isNaN(numericTaskId)) {
-        console.log(colors.red(`✗ Invalid task ID '${taskId}' - must be a number`));
+        result.error = `Invalid task ID '${taskId}' - must be a number`;
+        if (options.json) {
+            console.log(JSON.stringify(result, null, 2));
+        } else {
+            console.log(colors.red(`✗ ${result.error}`));
+        }
         process.exit(1);
     }
+
+    result.taskId = numericTaskId;
 
     // Check if rover is initialized
     const roverPath = join(process.cwd(), '.rover');
     if (!existsSync(roverPath)) {
-        console.log(colors.red('✗ Rover is not initialized in this directory'));
-        console.log(colors.gray('  Run ') + colors.cyan('rover init') + colors.gray(' first'));
+        result.error = 'Rover is not initialized in this directory';
+        if (options.json) {
+            console.log(JSON.stringify(result, null, 2));
+        } else {
+            console.log(colors.red('✗ Rover is not initialized in this directory'));
+            console.log(colors.gray('  Run ') + colors.cyan('rover init') + colors.gray(' first'));
+        }
         process.exit(1);
     }
 
     try {
         // Load task using TaskDescription
         const task = TaskDescription.load(numericTaskId);
+        result.taskTitle = task.title;
+        result.branchName = task.branchName;
 
         if (!task.worktreePath || !existsSync(task.worktreePath)) {
-            console.log(colors.red(`✗ Task workspace not found`));
-            console.log(colors.gray('  The task may need to be reinitialized'));
+            result.error = 'Task workspace not found';
+            if (options.json) {
+                console.log(JSON.stringify(result, null, 2));
+            } else {
+                console.log(colors.red(`✗ Task workspace not found`));
+                console.log(colors.gray('  The task may need to be reinitialized'));
+            }
             process.exit(1);
         }
 
-        console.log(colors.bold(`\n📤 Pushing changes for task ${numericTaskId}\n`));
+        if (!options.json) {
+            console.log(colors.bold(`\n📤 Pushing changes for task ${numericTaskId}\n`));
+        }
 
         // Change to worktree directory
         process.chdir(task.worktreePath);
@@ -88,17 +137,23 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
         // Check for changes
         const statusOutput = execSync('git status --porcelain', { encoding: 'utf8' });
         const hasChanges = statusOutput.trim().length > 0;
+        result.hasChanges = hasChanges;
 
         if (!hasChanges) {
             // Check if there are unpushed commits
             try {
-                const unpushedCommits = execSync(`git rev-list --count origin/${task.branchName}..${task.branchName} 2>/dev/null`, { 
-                    encoding: 'utf8' 
+                const unpushedCommits = execSync(`git rev-list --count origin/${task.branchName}..${task.branchName} 2>/dev/null`, {
+                    encoding: 'utf8'
                 }).trim();
-                
+
                 if (unpushedCommits === '0') {
-                    console.log(colors.yellow('⚠ No changes to push'));
-                    console.log(colors.gray('  Working directory is clean and up to date with remote'));
+                    result.success = true;
+                    if (options.json) {
+                        console.log(JSON.stringify(result, null, 2));
+                    } else {
+                        console.log(colors.yellow('⚠ No changes to push'));
+                        console.log(colors.gray('  Working directory is clean and up to date with remote'));
+                    }
                     return;
                 }
             } catch {
@@ -108,131 +163,205 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
 
         // If there are changes, commit them
         if (hasChanges) {
-            console.log(colors.cyan('Found uncommitted changes:'));
-            
-            // Show brief status
-            const files = statusOutput.trim().split('\n');
-            files.forEach(file => {
-                const [status, ...pathParts] = file.trim().split(/\s+/);
-                const path = pathParts.join(' ');
-                const statusSymbol = status.includes('M') ? '±' : status.includes('A') ? '+' : status.includes('D') ? '-' : '?';
-                console.log(colors.gray(`  ${statusSymbol} ${path}`));
-            });
+            if (!options.json) {
+                console.log(colors.cyan('Found uncommitted changes:'));
+
+                // Show brief status
+                const files = statusOutput.trim().split('\n');
+                files.forEach(file => {
+                    const [status, ...pathParts] = file.trim().split(/\s+/);
+                    const path = pathParts.join(' ');
+                    const statusSymbol = status.includes('M') ? '±' : status.includes('A') ? '+' : status.includes('D') ? '-' : '?';
+                    console.log(colors.gray(`  ${statusSymbol} ${path}`));
+                });
+            }
 
             // Get commit message
             let commitMessage = options.message;
             if (!commitMessage) {
                 const defaultMessage = `Task ${numericTaskId}: ${task.title}`;
-                const { message } = await prompt<{ message: string }>({
-                    type: 'input',
-                    name: 'message',
-                    message: 'Commit message:',
-                    initial: defaultMessage
-                });
-                commitMessage = message;
+                if (options.json) {
+                    commitMessage = defaultMessage;
+                } else {
+                    const { message } = await prompt<{ message: string }>({
+                        type: 'input',
+                        name: 'message',
+                        message: 'Commit message:',
+                        initial: defaultMessage
+                    });
+                    commitMessage = message;
+                }
             }
 
+            result.commitMessage = commitMessage;
+
             // Stage and commit changes
-            const commitSpinner = yoctoSpinner({ text: 'Committing changes...' }).start();
+            const commitSpinner = !options.json ? yoctoSpinner({ text: 'Committing changes...' }).start() : null;
             try {
                 execSync('git add -A', { stdio: 'pipe' });
                 execSync(`git commit -m "${commitMessage}"`, { stdio: 'pipe' });
-                commitSpinner.success('Changes committed');
+                result.committed = true;
+                if (commitSpinner) {
+                    commitSpinner.success('Changes committed');
+                }
             } catch (error: any) {
-                commitSpinner.error('Failed to commit changes');
-                console.error(colors.red('Error:'), error.message);
+                result.error = `Failed to commit changes: ${error.message}`;
+                if (options.json) {
+                    console.log(JSON.stringify(result, null, 2));
+                } else {
+                    if (commitSpinner) commitSpinner.error('Failed to commit changes');
+                    console.error(colors.red('Error:'), error.message);
+                }
                 process.exit(1);
             }
         }
 
         // Push to remote
-        const pushSpinner = yoctoSpinner({ text: `Pushing branch ${task.branchName} to remote...` }).start();
+        const pushSpinner = !options.json ? yoctoSpinner({ text: `Pushing branch ${task.branchName} to remote...` }).start() : null;
         try {
             const pushCommand = `git push origin ${task.branchName}`;
-            
+
             execSync(pushCommand, { stdio: 'pipe' });
-            pushSpinner.success(`Branch pushed successfully`);
-            console.log(colors.green(`\n✓ Pushed branch: `) + colors.cyan(task.branchName));
+            result.pushed = true;
+            if (pushSpinner) {
+                pushSpinner.success(`Branch pushed successfully`);
+            }
+            if (!options.json) {
+                console.log(colors.green(`\n✓ Pushed branch: `) + colors.cyan(task.branchName));
+            }
         } catch (error: any) {
-            pushSpinner.error('Failed to push branch');
-            
+            if (pushSpinner) {
+                pushSpinner.error('Failed to push branch');
+            }
+
             // Check if it's because the remote branch doesn't exist
             if (error.message.includes('has no upstream branch')) {
-                console.log(colors.yellow('\n⚠ Setting upstream branch and retrying...'));
+                if (!options.json) {
+                    console.log(colors.yellow('\n⚠ Setting upstream branch and retrying...'));
+                }
                 try {
                     execSync(`git push --set-upstream origin ${task.branchName}`, { stdio: 'pipe' });
-                    console.log(colors.green(`✓ Branch pushed successfully`));
+                    result.pushed = true;
+                    if (!options.json) {
+                        console.log(colors.green(`✓ Branch pushed successfully`));
+                    }
                 } catch (retryError: any) {
-                    console.error(colors.red('Error:'), retryError.message);
+                    result.error = `Failed to push branch: ${retryError.message}`;
+                    if (options.json) {
+                        console.log(JSON.stringify(result, null, 2));
+                    } else {
+                        console.error(colors.red('Error:'), retryError.message);
+                    }
                     process.exit(1);
                 }
             } else {
-                console.error(colors.red('Error:'), error.message);
-                if (!options.force) {
-                    console.log(colors.gray('\n  Tip: Use ') + colors.cyan('--force') + colors.gray(' to force push'));
+                result.error = `Failed to push branch: ${error.message}`;
+                if (options.json) {
+                    console.log(JSON.stringify(result, null, 2));
+                } else {
+                    console.error(colors.red('Error:'), error.message);
                 }
                 process.exit(1);
             }
         }
 
         // Check if this is a GitHub repo
-        if (options.pr !== false) {
+        if (options.pr === true) {
             try {
                 const remoteUrl = execSync('git remote get-url origin', { encoding: 'utf8' }).trim();
                 const repoInfo = getGitHubRepoInfo(remoteUrl);
 
                 if (repoInfo) {
-                    console.log(colors.gray(`\n📍 GitHub repository detected: ${repoInfo.owner}/${repoInfo.repo}`));
+                    if (!options.json) {
+                        console.log(colors.gray(`\n📍 GitHub repository detected: ${repoInfo.owner}/${repoInfo.repo}`));
+                    }
 
                     // Check if gh CLI is available
                     if (!commandExists('gh')) {
-                        console.log(colors.yellow('\n⚠ GitHub CLI (gh) not found'));
-                        console.log(colors.gray('  Install it from: https://cli.github.com'));
-                        console.log(colors.gray('  Then you can create a PR with: ') + 
-                            colors.cyan(`gh pr create --title "${task.title}" --body "${task.description}"`));
+                        result.pullRequest = {
+                            created: false
+                        };
+                        if (!options.json) {
+                            console.log(colors.yellow('\n⚠ GitHub CLI (gh) not found'));
+                            console.log(colors.gray('  Install it from: https://cli.github.com'));
+                            console.log(colors.gray('  Then you can create a PR with: ') +
+                                colors.cyan(`gh pr create --title "${task.title}" --body "${task.description}"`));
+                        }
                     } else {
-                        // Prompt to create PR
-                        const { createPR } = await prompt<{ createPR: boolean }>({
-                            type: 'confirm',
-                            name: 'createPR',
-                            message: 'Would you like to create a GitHub Pull Request?',
-                            initial: true
-                        });
+                        // Prompt to create PR (skip in JSON mode and auto-create)
+                        let createPR = true;
+                        if (!options.json) {
+                            const response = await prompt<{ createPR: boolean }>({
+                                type: 'confirm',
+                                name: 'createPR',
+                                message: 'Would you like to create a GitHub Pull Request?',
+                                initial: true
+                            });
+                            createPR = response.createPR;
+                        }
 
                         if (createPR) {
-                            const prSpinner = yoctoSpinner({ text: 'Creating pull request...' }).start();
+                            const prSpinner = !options.json ? yoctoSpinner({ text: 'Creating pull request...' }).start() : null;
                             try {
                                 // Create PR with task details
                                 const prBody = `## Task ${numericTaskId}\n\n${task.description}\n\n---\n*Created by Rover CLI*`;
                                 const { stdout } = await execAsync(
                                     `gh pr create --title "${task.title}" --body "${prBody}" --head "${task.branchName}"`
                                 );
-                                
-                                prSpinner.success('Pull request created');
-                                
-                                // Extract PR URL from output
-                                const prUrl = stdout.trim().split('\n').pop();
-                                console.log(colors.green('\n✓ Pull Request created: ') + colors.cyan(prUrl || 'Not available'));
+
+                                result.pullRequest = {
+                                    created: true,
+                                    url: stdout.trim().split('\n').pop()
+                                };
+
+                                if (prSpinner) {
+                                    prSpinner.success('Pull request created');
+                                }
+
+                                if (!options.json) {
+                                    console.log(colors.green('\n✓ Pull Request created: ') + colors.cyan(result.pullRequest.url || 'Not available'));
+                                }
                             } catch (error: any) {
-                                prSpinner.error('Failed to create pull request');
-                                
+                                if (prSpinner) {
+                                    prSpinner.error('Failed to create pull request');
+                                }
+
                                 // Check if PR already exists
                                 if (error.message.includes('already exists')) {
-                                    console.log(colors.yellow('⚠ A pull request already exists for this branch'));
-                                    
+                                    result.pullRequest = {
+                                        created: false,
+                                        exists: true
+                                    };
+
                                     // Try to get existing PR URL
                                     try {
                                         const { stdout } = await execAsync(`gh pr view ${task.branchName} --json url -q .url`);
-                                        console.log(colors.gray('  Existing PR: ') + colors.cyan(stdout.trim()));
+                                        result.pullRequest.url = stdout.trim();
                                     } catch {
                                         // Couldn't get PR URL
                                     }
+
+                                    if (!options.json) {
+                                        console.log(colors.yellow('⚠ A pull request already exists for this branch'));
+                                        if (result.pullRequest.url) {
+                                            console.log(colors.gray('  Existing PR: ') + colors.cyan(result.pullRequest.url));
+                                        }
+                                    }
                                 } else {
-                                    console.error(colors.red('Error:'), error.message);
-                                    console.log(colors.gray('\n  You can manually create a PR at:'));
-                                    console.log(colors.cyan(`  https://github.com/${repoInfo.owner}/${repoInfo.repo}/pull/new/${task.branchName}`));
+                                    result.pullRequest = {
+                                        created: false
+                                    };
+                                    if (!options.json) {
+                                        console.error(colors.red('Error:'), error.message);
+                                        console.log(colors.gray('\n  You can manually create a PR at:'));
+                                        console.log(colors.cyan(`  https://github.com/${repoInfo.owner}/${repoInfo.repo}/pull/new/${task.branchName}`));
+                                    }
                                 }
                             }
+                        } else {
+                            result.pullRequest = {
+                                created: false
+                            };
                         }
                     }
                 }
@@ -241,15 +370,31 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
             }
         }
 
-        console.log(colors.green('\n✨ Push completed successfully!'));
+        result.success = true;
+
+        if (options.json) {
+            console.log(JSON.stringify(result, null, 2));
+        } else {
+            console.log(colors.green('\n✨ Push completed successfully!'));
+        }
 
     } catch (error: any) {
         if (error instanceof TaskNotFoundError) {
-            console.log(colors.red(`✗ ${error.message}`));
-            console.log(colors.gray('  Use ') + colors.cyan('rover list') + colors.gray(' to see available tasks'));
+            result.error = error.message;
+            if (options.json) {
+                console.log(JSON.stringify(result, null, 2));
+            } else {
+                console.log(colors.red(`✗ ${error.message}`));
+                console.log(colors.gray('  Use ') + colors.cyan('rover list') + colors.gray(' to see available tasks'));
+            }
             process.exit(1);
         } else {
-            console.error(colors.red('\n✗ Unexpected error:'), error.message);
+            result.error = `Unexpected error: ${error.message}`;
+            if (options.json) {
+                console.log(JSON.stringify(result, null, 2));
+            } else {
+                console.error(colors.red('\n✗ Unexpected error:'), error.message);
+            }
             process.exit(1);
         }
     }

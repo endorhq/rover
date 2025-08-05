@@ -20,3 +20,20 @@ export interface TaskDetails extends RoverTask {
         completedAt?: string;
     }>;
 }
+
+export interface PushResult {
+    success: boolean;
+    taskId: number;
+    taskTitle: string;
+    branchName: string;
+    hasChanges: boolean;
+    committed: boolean;
+    commitMessage?: string;
+    pushed: boolean;
+    pullRequest?: {
+        created: boolean;
+        url?: string;
+        exists?: boolean;
+    };
+    error?: string;
+}

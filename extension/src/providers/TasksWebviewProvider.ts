@@ -45,6 +45,9 @@ export class TasksWebviewProvider implements vscode.WebviewViewProvider {
                 case 'gitCompare':
                     await this.handleGitCompareTask(data.taskId);
                     break;
+                case 'pushBranch':
+                    await this.handlePushBranch(data.taskId);
+                    break;
                 case 'deleteTask':
                     await this.handleDeleteTask(data.taskId, data.taskTitle);
                     break;
@@ -88,6 +91,10 @@ export class TasksWebviewProvider implements vscode.WebviewViewProvider {
 
     private async handleGitCompareTask(taskId: string) {
         await vscode.commands.executeCommand('rover.gitCompareTask', { id: taskId, task: { id: taskId } });
+    }
+
+    private async handlePushBranch(taskId: string) {
+        await vscode.commands.executeCommand('rover.pushBranch', { id: taskId, task: { id: taskId } });
     }
 
     private async handleDeleteTask(taskId: string, taskTitle: string) {
@@ -478,6 +485,13 @@ export class TasksWebviewProvider implements vscode.WebviewViewProvider {
             });
         }
 
+        function pushBranch(taskId) {
+            vscode.postMessage({
+                command: 'pushBranch',
+                taskId: taskId
+            });
+        }
+
         function viewLogs(taskId, taskStatus) {
             vscode.postMessage({
                 command: 'viewLogs',
@@ -528,7 +542,7 @@ export class TasksWebviewProvider implements vscode.WebviewViewProvider {
                             \${task.status === 'TODO' ? 
                                 \`<button class="action-btn" onclick="event.stopPropagation(); mergeTask('\${task.id}')" title="Merge Task"><i class="codicon codicon-git-merge"></i></button>\` : ''
                             }
-                            \${task.status === 'TODO' ? 
+                            \${task.status === 'completed' ? 
                                 \`<button class="action-btn" onclick="event.stopPropagation(); pushBranch('\${task.id}')" title="Push Task Branch"><i class="codicon codicon-repo-push"></i></button>\` : ''
                             }
                             <button class="action-btn" onclick="event.stopPropagation(); viewLogs('\${task.id}', '\${task.status}')" title="View Logs">
