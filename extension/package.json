@@ -91,6 +91,12 @@
         "title": "Open Task Workspace",
         "icon": "$(folder-opened)",
         "category": "Rover"
+      },
+      {
+        "command": "rover.createTaskFromGitHub",
+        "title": "Create Task from GitHub Issue",
+        "icon": "$(github)",
+        "category": "Rover"
       }
     ],
     "menus": {
@@ -104,6 +110,11 @@
           "command": "rover.createTask",
           "when": "view == roverTasks",
           "group": "navigation@2"
+        },
+        {
+          "command": "rover.createTaskFromGitHub",
+          "when": "view == roverTasks",
+          "group": "navigation@3"
         }
       ],
       "view/item/context": [

@@ -1,9 +1,13 @@
 import * as vscode from 'vscode';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import { TaskTreeProvider } from './providers/TaskTreeProvider';
 import { TasksWebviewProvider } from './providers/TasksWebviewProvider';
 import { RoverCLI } from './rover/cli';
 import { TaskItem } from './providers/TaskItem';
 import { TaskDetailsPanel } from './panels/TaskDetailsPanel';
+
+const execAsync = promisify(exec);
 
 let taskTreeProvider: TaskTreeProvider;
 let tasksWebviewProvider: TasksWebviewProvider;
@@ -277,6 +281,159 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
     context.subscriptions.push(openWorkspaceCommand);
+
+    // Register the create task from GitHub command
+    const createTaskFromGitHubCommand = vscode.commands.registerCommand('rover.createTaskFromGitHub', async () => {
+        let statusBarItem: vscode.StatusBarItem | undefined;
+
+        try {
+            // Create status bar item for loading indication
+            statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
+            statusBarItem.text = '$(loading~spin) Fetching GitHub issues...';
+            statusBarItem.show();
+
+            // Try to get GitHub issues
+            const issues = await vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: 'Fetching GitHub Issues',
+                cancellable: true
+            }, async (progress, token) => {
+                progress.report({ increment: 0, message: 'Detecting repository...' });
+
+                // Try to get repository info from git remote
+                let repoInfo: { owner: string; repo: string } | null = null;
+                try {
+                    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd();
+                    const { stdout: remoteUrl } = await execAsync('git remote get-url origin', { cwd: workspaceRoot });
+                    const match = remoteUrl.match(/github\.com[:/]([^/]+)\/([^/.]+)(\.git)?/);
+                    if (match) {
+                        repoInfo = { owner: match[1], repo: match[2] };
+                    }
+                } catch (error) {
+                    console.warn('Failed to get git remote:', error);
+                }
+
+                if (!repoInfo) {
+                    return null;
+                }
+
+                if (token.isCancellationRequested) {
+                    return null;
+                }
+
+                progress.report({ increment: 30, message: 'Fetching issues...' });
+
+                // Try GitHub API first (for public repos)
+                try {
+                    const apiUrl = `https://api.github.com/repos/${repoInfo.owner}/${repoInfo.repo}/issues?state=open&per_page=100`;
+                    const response = await fetch(apiUrl);
+
+                    if (response.ok) {
+                        const issues = await response.json() as any[];
+                        // Filter out pull requests (they also appear in issues API)
+                        return issues.filter((issue: any) => !issue.pull_request);
+                    }
+                } catch (error) {
+                    console.warn('GitHub API failed:', error);
+                }
+
+                if (token.isCancellationRequested) {
+                    return null;
+                }
+
+                progress.report({ increment: 60, message: 'Trying GitHub CLI...' });
+
+                // Fall back to gh CLI
+                try {
+                    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd();
+                    const { stdout } = await execAsync('gh issue list --json number,title,assignees,labels --limit 100', { cwd: workspaceRoot });
+                    return JSON.parse(stdout);
+                } catch (error) {
+                    console.warn('GitHub CLI failed:', error);
+                    return null;
+                }
+            });
+
+            statusBarItem.dispose();
+            statusBarItem = undefined;
+
+            let issueNumber: string | undefined;
+
+            if (issues && issues.length > 0) {
+                // Show picker with issues
+                const quickPickItems = issues.map((issue: any) => {
+                    const assignees = issue.assignees?.map((a: any) => a.login || a).join(', ') || 'Unassigned';
+                    const labels = issue.labels?.map((l: any) => l.name || l).join(', ') || '';
+
+                    return {
+                        label: `#${issue.number}: ${issue.title}`,
+                        description: assignees,
+                        detail: labels ? `Labels: ${labels}` : undefined,
+                        issueNumber: issue.number.toString()
+                    };
+                });
+
+                const selected = await vscode.window.showQuickPick<any>(quickPickItems, {
+                    placeHolder: 'Select a GitHub issue to create a task from',
+                    ignoreFocusOut: true
+                });
+
+                if (selected) {
+                    issueNumber = selected.issueNumber;
+                }
+            } else {
+                // Fall back to input box
+                issueNumber = await vscode.window.showInputBox({
+                    prompt: 'Enter GitHub issue number',
+                    placeHolder: 'e.g., 123',
+                    ignoreFocusOut: true,
+                    validateInput: (value) => {
+                        if (!value || !value.match(/^\d+$/)) {
+                            return 'Please enter a valid issue number';
+                        }
+                        return null;
+                    }
+                });
+            }
+
+            if (issueNumber) {
+                // Create status bar for task creation
+                statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
+                statusBarItem.text = '$(loading~spin) Creating task from GitHub issue...';
+                statusBarItem.show();
+
+                const createdTask = await vscode.window.withProgress({
+                    location: vscode.ProgressLocation.Notification,
+                    title: 'Creating Task from GitHub Issue',
+                    cancellable: false
+                }, async (progress) => {
+                    progress.report({ increment: 50, message: 'Creating task...' });
+
+                    // Create task with --from-github flag
+                    const roverPath = vscode.workspace.getConfiguration('rover').get<string>('cliPath') || 'rover';
+                    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd();
+                    const { stdout } = await execAsync(
+                        `${roverPath} task --from-github ${issueNumber} --yes --json`,
+                        { cwd: workspaceRoot }
+                    );
+                    return JSON.parse(stdout);
+                });
+
+                statusBarItem.text = '$(check) Task created from GitHub issue';
+                setTimeout(() => statusBarItem?.dispose(), 3000);
+
+                vscode.window.showInformationMessage(`Task created successfully! "${createdTask.title}" (ID: ${createdTask.id})`);
+                taskTreeProvider.refresh();
+            }
+        } catch (error) {
+            if (statusBarItem) {
+                statusBarItem.text = '$(error) Failed to create task';
+                setTimeout(() => statusBarItem?.dispose(), 5000);
+            }
+            vscode.window.showErrorMessage(`Failed to create task from GitHub: ${error}`);
+        }
+    });
+    context.subscriptions.push(createTaskFromGitHubCommand);
 
     // Clean up the tree provider when extension is deactivated
     context.subscriptions.push({

@@ -456,7 +456,7 @@ const fetchGitHubIssueViaCLI = async (owner: string, repo: string, issueNumber: 
 /**
  * Fetch GitHub issue with fallback
  */
-const fetchGitHubIssue = async (issueNumber: string): Promise<{ title: string; body: string } | null> => {
+const fetchGitHubIssue = async (issueNumber: string, json: boolean): Promise<{ title: string; body: string } | null> => {
     try {
         // Try to get repo info from git remote
         const remoteUrl = execSync('git remote get-url origin', { encoding: 'utf8' }).trim();
@@ -467,14 +467,18 @@ const fetchGitHubIssue = async (issueNumber: string): Promise<{ title: string; b
             return null;
         }
 
-        console.log(colors.gray(`📍 Fetching issue #${issueNumber} from ${repoInfo.owner}/${repoInfo.repo}...`));
+        if (!json) {
+            console.log(colors.gray(`📍 Fetching issue #${issueNumber} from ${repoInfo.owner}/${repoInfo.repo}...`));
+        }
 
         // Try API first
         let issueData = await fetchGitHubIssueViaAPI(repoInfo.owner, repoInfo.repo, issueNumber);
 
         // If API fails and gh CLI is available, try gh
         if (!issueData && commandExists('gh')) {
-            console.log(colors.gray('  API request failed, trying gh CLI...'));
+            if (!json) {
+                console.log(colors.gray('  API request failed, trying gh CLI...'));
+            }
             issueData = await fetchGitHubIssueViaCLI(repoInfo.owner, repoInfo.repo, issueNumber);
         }
 
@@ -538,18 +542,25 @@ export const taskCommand = async (initPrompt?: string, options: { fromGithub?: s
 
     let description = initPrompt?.trim() || '';
     let skipExpansion = false;
-    let githubIssueData: { title: string; body: string } | null = null;
+    let taskData: TaskExpansion | null = null;
 
     // Handle --from-github option
     if (fromGithub) {
-        const issueData = await fetchGitHubIssue(fromGithub);
+        const issueData = await fetchGitHubIssue(fromGithub, json === true);
         if (issueData) {
-            githubIssueData = issueData;
             description = `${issueData.title}\n\n${issueData.body}`;
             skipExpansion = true;
-            console.log(colors.green('✓ GitHub issue fetched successfully'));
-            console.log(colors.gray('Title: ') + colors.cyan(issueData.title));
-            console.log(colors.gray('Body: ') + colors.white(issueData.body.substring(0, 100) + (issueData.body.length > 100 ? '...' : '')));
+
+            taskData = {
+                title: issueData.title,
+                description: issueData.body
+            }
+
+            if (!json) {
+                console.log(colors.green('✓ GitHub issue fetched successfully'));
+                console.log(colors.gray('Title: ') + colors.cyan(issueData.title));
+                console.log(colors.gray('Body: ') + colors.white(issueData.body.substring(0, 100) + (issueData.body.length > 100 ? '...' : '')));
+            }
         } else {
             // If GitHub fetch failed, exit
             process.exit(1);
@@ -575,7 +586,6 @@ export const taskCommand = async (initPrompt?: string, options: { fromGithub?: s
         description = input;
     }
 
-    let taskData: TaskExpansion | null = null;
     let satisfied = skipExpansion;
 
     while (!satisfied) {
