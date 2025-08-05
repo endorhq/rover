@@ -117,17 +117,18 @@ export class TaskDetailsPanel {
 
         try {
             // Look for iteration directories (typically numbered)
-            const entries = fs.readdirSync(taskDir, { withFileTypes: true });
+            const iterationsDir = path.join(taskDir, 'iterations');
+            const entries = fs.readdirSync(iterationsDir, { withFileTypes: true });
             const iterationDirs = entries
                 .filter(entry => entry.isDirectory() && /^\d+$/.test(entry.name))
                 .sort((a, b) => parseInt(a.name) - parseInt(b.name));
 
             for (const iterationDir of iterationDirs) {
-                const iterationPath = path.join(taskDir, iterationDir.name);
+                const iterationPath = path.join(iterationsDir, iterationDir.name);
                 const iterationNumber = parseInt(iterationDir.name);
 
                 // Check for common files in iteration directory
-                const commonFiles = ['summary.md', 'changes.md', 'review.md', 'validation.md', 'planning.md'];
+                const commonFiles = ['context.md', 'plan.md', 'changes.md', 'review.md', 'summary.md'];
                 const files = commonFiles.map(fileName => {
                     const filePath = path.join(iterationPath, fileName);
                     return {
@@ -149,7 +150,7 @@ export class TaskDetailsPanel {
                 }
 
                 // Try to get iteration metadata if available
-                const metadataPath = path.join(iterationPath, 'metadata.json');
+                const metadataPath = path.join(iterationPath, 'status.json');
                 let iterationMeta: any = {
                     number: iterationNumber,
                     status: 'unknown'
@@ -180,10 +181,18 @@ export class TaskDetailsPanel {
     private async openFile(filePath: string) {
         try {
             const uri = vscode.Uri.file(filePath);
-            await vscode.window.showTextDocument(uri, {
-                preview: true,
-                viewColumn: vscode.ViewColumn.Beside
-            });
+
+            // Check if it's a markdown file
+            if (filePath.endsWith('.md')) {
+                // Open markdown preview
+                await vscode.commands.executeCommand('markdown.showPreview', uri);
+            } else {
+                // Open as regular text document
+                await vscode.window.showTextDocument(uri, {
+                    preview: true,
+                    viewColumn: vscode.ViewColumn.Beside
+                });
+            }
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to open file: ${error}`);
         }
