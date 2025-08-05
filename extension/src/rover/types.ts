@@ -37,3 +37,19 @@ export interface PushResult {
     };
     error?: string;
 }
+
+export interface MergeResult {
+    success: boolean;
+    taskId: number;
+    taskTitle: string;
+    branchName: string;
+    currentBranch: string;
+    hasWorktreeChanges: boolean;
+    hasUnmergedCommits: boolean;
+    committed: boolean;
+    commitMessage?: string;
+    merged: boolean;
+    conflictsResolved?: boolean;
+    cleanedUp?: boolean;
+    error?: string;
+}

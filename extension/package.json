@@ -81,6 +81,12 @@
         "category": "Rover"
       },
       {
+        "command": "rover.mergeTask",
+        "title": "Merge a task into current branch",
+        "icon": "$(info)",
+        "category": "Rover"
+      },
+      {
         "command": "rover.deleteTask",
         "title": "Delete Task",
         "icon": "$(trash)",

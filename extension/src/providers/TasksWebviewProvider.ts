@@ -48,6 +48,9 @@ export class TasksWebviewProvider implements vscode.WebviewViewProvider {
                 case 'pushBranch':
                     await this.handlePushBranch(data.taskId);
                     break;
+                case 'mergeTask':
+                    await this.handleMergeTask(data.taskId);
+                    break;
                 case 'deleteTask':
                     await this.handleDeleteTask(data.taskId, data.taskTitle);
                     break;
@@ -95,6 +98,10 @@ export class TasksWebviewProvider implements vscode.WebviewViewProvider {
 
     private async handlePushBranch(taskId: string) {
         await vscode.commands.executeCommand('rover.pushBranch', { id: taskId, task: { id: taskId } });
+    }
+
+    private async handleMergeTask(taskId: string) {
+        await vscode.commands.executeCommand('rover.mergeTask', { id: taskId, task: { id: taskId } });
     }
 
     private async handleDeleteTask(taskId: string, taskTitle: string) {
@@ -492,6 +499,13 @@ export class TasksWebviewProvider implements vscode.WebviewViewProvider {
             });
         }
 
+        function mergeTask(taskId) {
+            vscode.postMessage({
+                command: 'mergeTask',
+                taskId: taskId
+            });
+        }
+
         function viewLogs(taskId, taskStatus) {
             vscode.postMessage({
                 command: 'viewLogs',
@@ -539,7 +553,7 @@ export class TasksWebviewProvider implements vscode.WebviewViewProvider {
                             \${task.status === 'completed' ? 
                                 \`<button class="action-btn" onclick="event.stopPropagation(); gitCompare('\${task.id}')" title="Compare Task Changes"><i class="codicon codicon-diff-multiple"></i></button>\` : ''
                             }
-                            \${task.status === 'TODO' ? 
+                            \${task.status === 'completed' ? 
                                 \`<button class="action-btn" onclick="event.stopPropagation(); mergeTask('\${task.id}')" title="Merge Task"><i class="codicon codicon-git-merge"></i></button>\` : ''
                             }
                             \${task.status === 'completed' ? 

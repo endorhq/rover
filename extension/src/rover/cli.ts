@@ -1,7 +1,7 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import * as vscode from 'vscode';
-import { PushResult, RoverTask, TaskDetails } from './types';
+import { MergeResult, PushResult, RoverTask, TaskDetails } from './types';
 
 const execAsync = promisify(exec);
 
@@ -129,9 +129,9 @@ export class RoverCLI {
     /**
      * Merge a task
      */
-    async mergeTask(taskId: string): Promise<string> {
-        const { stdout } = await execAsync(`${this.roverPath} merge ${taskId} --force`, this.getExecOptions());
-        return stdout;
+    async mergeTask(taskId: string): Promise<MergeResult> {
+        const { stdout } = await execAsync(`${this.roverPath} merge ${taskId} --force --json`, this.getExecOptions());
+        return JSON.parse(stdout) as MergeResult;
     }
 
     /**

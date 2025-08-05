@@ -177,7 +177,7 @@ export function activate(context: vscode.ExtensionContext) {
     });
     context.subscriptions.push(inspectTaskCommand);
 
-    // Register the inspect task command
+    // Register the git comppare task command
     const gitCompareTaskCommand = vscode.commands.registerCommand('rover.gitCompareTask', async (item: TaskItem | any) => {
         try {
             if (!item) {
@@ -318,7 +318,7 @@ export function activate(context: vscode.ExtensionContext) {
     });
     context.subscriptions.push(gitCompareTaskCommand);
 
-    // Register the inspect task command
+    // Register the push task command
     const pushBranchCommand = vscode.commands.registerCommand('rover.pushBranch', async (item: TaskItem | any) => {
         try {
             if (!item) {
@@ -451,6 +451,142 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
     context.subscriptions.push(pushBranchCommand);
+
+    const mergeTaskCommand = vscode.commands.registerCommand('rover.mergeTask', async (item: TaskItem | any) => {
+        try {
+            if (!item) {
+                const id = await vscode.window.showInputBox({
+                    prompt: 'Enter task ID',
+                    placeHolder: '1',
+                    ignoreFocusOut: true
+                });
+
+                if (!id) {
+                    throw new Error('Invalid task ID');
+                }
+
+                item = {
+                    id: parseInt(id)
+                }
+            }
+
+            // Validate the item parameter
+            if (!item) {
+                throw new Error('No task item provided');
+            }
+
+            // Handle different item formats (TaskItem vs direct task object)
+            let taskId: string;
+
+            if (item.task) {
+                // TaskItem format
+                taskId = item.task.id;
+            } else if (item.id) {
+                // Direct task object format
+                taskId = item.id;
+            } else {
+                throw new Error('Invalid task item format - missing task ID');
+            }
+
+            if (!taskId) {
+                throw new Error('Task ID is undefined or empty');
+            }
+
+            const answer = await vscode.window.showWarningMessage(
+                `Are you sure you want to merge task ${taskId}?`,
+                'Yes',
+                'No'
+            );
+
+            if (answer !== 'Yes') {
+                return;
+            }
+
+            let statusBarItem: vscode.StatusBarItem | undefined;
+
+            try {
+
+                // Create status bar item for persistent progress indication
+                statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
+                statusBarItem.text = '$(loading~spin) Merging task...';
+                statusBarItem.show();
+
+                const mergeResult = await vscode.window.withProgress({
+                    location: vscode.ProgressLocation.Notification,
+                    title: 'Merging the task',
+                    cancellable: false
+                }, async (progress, _token) => {
+                    // Step 1: Validating description
+                    progress.report({
+                        increment: 10,
+                        message: 'Retrieving Task data...'
+                    });
+                    statusBarItem!.text = '$(loading~spin) Retrieving Task data...';
+                    await new Promise(resolve => setTimeout(resolve, 500)); // Brief pause for UX
+
+                    // Step 2: Initializing task
+                    progress.report({
+                        increment: 20,
+                        message: 'Starting merge process...'
+                    });
+                    statusBarItem!.text = '$(loading~spin) Starting merge process...';
+
+                    await new Promise(resolve => setTimeout(resolve, 500)); // Brief pause for UX
+                    statusBarItem!.text = '$(loading~spin) Merging task...';
+
+                    const mergeResult = await cli.mergeTask(taskId);
+
+                    // Step 4: Finalizing
+                    progress.report({
+                        increment: 40,
+                        message: 'Finalizing merge...'
+                    });
+                    statusBarItem!.text = '$(loading~spin) Finalizing merge...';
+                    await new Promise(resolve => setTimeout(resolve, 300)); // Brief pause for UX
+
+                    return mergeResult;
+                });
+
+                if (mergeResult.success) {
+                    statusBarItem.text = `$(check) Task merged successfully!`;
+                    statusBarItem.tooltip = `Task: ${mergeResult.taskTitle} (${mergeResult.taskId})`;
+
+                    // Auto-hide status bar item after 3 seconds
+                    setTimeout(() => {
+                        statusBarItem?.dispose();
+                    }, 3000);
+
+                    vscode.window.showInformationMessage(`Task merged successfully! "${mergeResult.taskTitle}" (ID: ${mergeResult.taskId})`);
+                } else {
+                    statusBarItem.text = `$(error) Task merge failed`;
+                    statusBarItem.tooltip = `Error: ${mergeResult.error}`;
+
+                    setTimeout(() => {
+                        statusBarItem?.dispose();
+                    }, 5000);
+
+                    vscode.window.showErrorMessage(`Failed to merge task: ${mergeResult.error}`);
+                }
+
+                taskTreeProvider.refresh();
+            } catch (error) {
+                // Update status bar to show error
+                if (statusBarItem) {
+                    statusBarItem.text = '$(error) Task merge failed';
+                    statusBarItem.tooltip = `Error: ${error}`;
+                    setTimeout(() => {
+                        statusBarItem?.dispose();
+                    }, 5000);
+                }
+
+                vscode.window.showErrorMessage(`Failed to merge task: ${error}`);
+            }
+        } catch (error) {
+            console.error('Error in inspectTask command:', error);
+            vscode.window.showErrorMessage(`Failed to merge: ${error}`);
+        }
+    });
+    context.subscriptions.push(mergeTaskCommand);
 
     // Register the delete task command
     const deleteTaskCommand = vscode.commands.registerCommand('rover.deleteTask', async (item: TaskItem | any) => {
