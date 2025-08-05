@@ -69,6 +69,12 @@
         "category": "Rover"
       },
       {
+        "command": "rover.gitCompareTask",
+        "title": "Git Compare Task Workspace",
+        "icon": "$(info)",
+        "category": "Rover"
+      },
+      {
         "command": "rover.deleteTask",
         "title": "Delete Task",
         "icon": "$(trash)",

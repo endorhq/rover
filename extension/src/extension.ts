@@ -1,9 +1,14 @@
 import * as vscode from 'vscode';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import * as path from 'path';
 import { TaskTreeProvider } from './providers/TaskTreeProvider';
 import { TasksWebviewProvider } from './providers/TasksWebviewProvider';
 import { RoverCLI } from './rover/cli';
 import { TaskItem } from './providers/TaskItem';
 import { TaskDetailsPanel } from './panels/TaskDetailsPanel';
+
+const execAsync = promisify(exec);
 
 let taskTreeProvider: TaskTreeProvider;
 let tasksWebviewProvider: TasksWebviewProvider;
@@ -171,6 +176,147 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
     context.subscriptions.push(inspectTaskCommand);
+
+    // Register the inspect task command
+    const gitCompareTaskCommand = vscode.commands.registerCommand('rover.gitCompareTask', async (item: TaskItem | any) => {
+        try {
+            if (!item) {
+                const id = await vscode.window.showInputBox({
+                    prompt: 'Enter task ID',
+                    placeHolder: '1',
+                    ignoreFocusOut: true
+                });
+
+                if (!id) {
+                    throw new Error('Invalid task ID');
+                }
+
+                item = {
+                    id: parseInt(id)
+                }
+            }
+
+            // Validate the item parameter
+            if (!item) {
+                throw new Error('No task item provided');
+            }
+
+            // Handle different item formats (TaskItem vs direct task object)
+            let taskId: string;
+
+            if (item.task) {
+                // TaskItem format
+                taskId = item.task.id;
+            } else if (item.id) {
+                // Direct task object format
+                taskId = item.id;
+            } else {
+                throw new Error('Invalid task item format - missing task ID');
+            }
+
+            if (!taskId) {
+                throw new Error('Task ID is undefined or empty');
+            }
+
+            // Get the task workspace path
+            const taskWorkspacePath = await cli.getTaskWorkspacePath(taskId);
+
+            // Get current workspace root
+            const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+            if (!workspaceRoot) {
+                throw new Error('No workspace folder is open');
+            }
+
+            // Show progress while preparing comparison
+            await vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: 'Preparing Git Comparison',
+                cancellable: false
+            }, async (progress) => {
+                progress.report({ increment: 0, message: 'Getting changed files in task workspace...' });
+
+                // Get list of changed files in the task workspace
+                let changedFiles: string[] = [];
+                try {
+                    const { stdout: statusOutput } = await execAsync('git status --porcelain', { cwd: taskWorkspacePath });
+                    changedFiles = statusOutput.split('\n')
+                        .filter(line => line.trim())
+                        .map(line => line.substring(3).trim()) // Remove status flags (e.g., "M ", "A ", etc.)
+                        .filter(file => file.length > 0);
+                } catch (error) {
+                    throw new Error('Failed to get changed files from task workspace: ' + error);
+                }
+
+                if (changedFiles.length === 0) {
+                    vscode.window.showInformationMessage('No changes found in task workspace');
+                    return;
+                }
+
+                progress.report({ increment: 30, message: `Found ${changedFiles.length} changed files. Preparing comparisons...` });
+
+                // Prepare the changes array for vscode.changes command
+                const changes: [vscode.Uri, vscode.Uri, vscode.Uri][] = [];
+
+                for (const file of changedFiles) {
+                    try {
+                        const taskFileUri = vscode.Uri.file(path.join(taskWorkspacePath, file));
+                        const originalFileUri = vscode.Uri.file(path.join(workspaceRoot, file));
+
+                        // Check if files exist
+                        const taskFileExists = await vscode.workspace.fs.stat(taskFileUri).then(() => true, () => false);
+                        const originalFileExists = await vscode.workspace.fs.stat(originalFileUri).then(() => true, () => false);
+
+                        if (taskFileExists && originalFileExists) {
+                            // Both files exist - add to changes array
+                            changes.push([
+                                vscode.Uri.parse(file),
+                                originalFileUri,
+                                taskFileUri
+                            ]);
+                        } else if (taskFileExists && !originalFileExists) {
+                            // New file in task - compare with empty file
+                            changes.push([
+                                vscode.Uri.parse(file),
+                                vscode.Uri.parse('untitled:'), // Empty file
+                                taskFileUri
+                            ]);
+                        } else if (!taskFileExists && originalFileExists) {
+                            // File deleted in task - compare original with empty
+                            changes.push([
+                                vscode.Uri.parse(file),
+                                originalFileUri,
+                                vscode.Uri.parse('untitled:') // Empty file
+                            ]);
+                        }
+                    } catch (error) {
+                        console.warn(`Failed to prepare comparison for file ${file}:`, error);
+                    }
+                }
+
+                if (changes.length === 0) {
+                    vscode.window.showWarningMessage('No file comparisons could be prepared');
+                    return;
+                }
+
+                progress.report({ increment: 70, message: `Opening ${changes.length} file comparisons...` });
+
+                try {
+                    // Use vscode.changes command with the array of changes
+                    await vscode.commands.executeCommand('vscode.changes', `Changes on task ${taskId}`, changes);
+                    progress.report({ increment: 100, message: 'Git changes view opened' });
+                    vscode.window.showInformationMessage(
+                        `Opened git changes view with ${changes.length} file comparison(s) between current branch and task workspace`
+                    );
+                } catch (error) {
+                    console.log('vscode.changes command failed:', error);
+                }
+            });
+        } catch (error) {
+            console.error('Error in gitCompareTask command:', error);
+            vscode.window.showErrorMessage(`Failed to compare task changes: ${error}`);
+        }
+    });
+    context.subscriptions.push(gitCompareTaskCommand);
 
     // Register the delete task command
     const deleteTaskCommand = vscode.commands.registerCommand('rover.deleteTask', async (item: TaskItem | any) => {

@@ -42,6 +42,9 @@ export class TasksWebviewProvider implements vscode.WebviewViewProvider {
                 case 'inspectTask':
                     await this.handleInspectTask(data.taskId, data.taskTitle);
                     break;
+                case 'gitCompare':
+                    await this.handleGitCompareTask(data.taskId);
+                    break;
                 case 'deleteTask':
                     await this.handleDeleteTask(data.taskId, data.taskTitle);
                     break;
@@ -81,6 +84,10 @@ export class TasksWebviewProvider implements vscode.WebviewViewProvider {
 
     private async handleInspectTask(taskId: string, taskTitle: string) {
         await vscode.commands.executeCommand('rover.inspectTask', { id: taskId, task: { id: taskId, title: taskTitle } });
+    }
+
+    private async handleGitCompareTask(taskId: string) {
+        await vscode.commands.executeCommand('rover.gitCompareTask', { id: taskId, task: { id: taskId } });
     }
 
     private async handleDeleteTask(taskId: string, taskTitle: string) {
@@ -464,6 +471,13 @@ export class TasksWebviewProvider implements vscode.WebviewViewProvider {
             });
         }
 
+        function gitCompare(taskId) {
+            vscode.postMessage({
+                command: 'gitCompare',
+                taskId: taskId
+            });
+        }
+
         function viewLogs(taskId, taskStatus) {
             vscode.postMessage({
                 command: 'viewLogs',
@@ -508,6 +522,15 @@ export class TasksWebviewProvider implements vscode.WebviewViewProvider {
                             <div class="task-details">\${details.join(' • ')}</div>
                         </div>
                         <div class="task-actions">
+                            \${task.status === 'completed' ? 
+                                \`<button class="action-btn" onclick="event.stopPropagation(); gitCompare('\${task.id}')" title="Compare Task Changes"><i class="codicon codicon-diff-multiple"></i></button>\` : ''
+                            }
+                            \${task.status === 'TODO' ? 
+                                \`<button class="action-btn" onclick="event.stopPropagation(); mergeTask('\${task.id}')" title="Merge Task"><i class="codicon codicon-git-merge"></i></button>\` : ''
+                            }
+                            \${task.status === 'TODO' ? 
+                                \`<button class="action-btn" onclick="event.stopPropagation(); pushBranch('\${task.id}')" title="Push Task Branch"><i class="codicon codicon-repo-push"></i></button>\` : ''
+                            }
                             <button class="action-btn" onclick="event.stopPropagation(); viewLogs('\${task.id}', '\${task.status}')" title="View Logs">
                                 <i class="codicon codicon-file"></i>
                             </button>
