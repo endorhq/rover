@@ -238,7 +238,7 @@ export function activate(context: vscode.ExtensionContext) {
                 // Get list of changed files in the task workspace
                 let changedFiles: string[] = [];
                 try {
-                    const { stdout: statusOutput } = await execAsync('git status --porcelain', { cwd: taskWorkspacePath });
+                    const { stdout: statusOutput } = await execAsync('git status --porcelain -u', { cwd: taskWorkspacePath });
                     changedFiles = statusOutput.split('\n')
                         .filter(line => line.trim())
                         .map(line => line.substring(3).trim()) // Remove status flags (e.g., "M ", "A ", etc.)
