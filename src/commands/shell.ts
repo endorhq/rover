@@ -6,9 +6,9 @@ import { formatTaskStatus } from '../utils/task-status.js';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
 
 /**
- * Start an interactive Docker container shell for testing task changes
+ * Start an interactive shell for testing task changes
  */
-export const shellCommand = async (taskId: string) => {
+export const shellCommand = async (taskId: string, options: { container?: boolean }) => {
     // Convert string taskId to number
     const numericTaskId = parseInt(taskId, 10);
     if (isNaN(numericTaskId)) {
@@ -41,14 +41,16 @@ export const shellCommand = async (taskId: string) => {
         console.log(colors.gray('Worktree: ') + colors.cyan(task.worktreePath));
         console.log(colors.gray('Branch: ') + colors.cyan(task.branchName));
 
-        // Check if Docker is available
-        try {
-            execSync('docker --version', { stdio: 'pipe' });
-        } catch (error) {
-            console.log('');
-            console.log(colors.red('✗ Docker is not available'));
-            console.log(colors.gray('  Please install Docker to use the interactive shell'));
-            return;
+        if (options.container) {
+            // Check if Docker is available
+            try {
+                execSync('docker --version', { stdio: 'pipe' });
+            } catch (error) {
+                console.log('');
+                console.log(colors.red('✗ Docker is not available'));
+                console.log(colors.gray('  Please install Docker to use the interactive shell'));
+                return;
+            }
         }
 
         // Check if we're in a git repository
@@ -75,43 +77,74 @@ export const shellCommand = async (taskId: string) => {
         console.log(colors.magenta('💡 Type "exit" to leave the shell'));
         console.log('');
 
-        const spinner = yoctoSpinner({ text: 'Starting Docker shell...' }).start();
+        const spinner = yoctoSpinner({ text: 'Starting shell...' }).start();
 
-        try {
-            const containerName = `rover-shell-${numericTaskId}`;
-
-            // Clean up any existing container with same name
+        let shellProcess = undefined;
+        if (options.container) {
             try {
-                execSync(`docker rm -f ${containerName}`, { stdio: 'pipe' });
+                const containerName = `rover-shell-${numericTaskId}`;
+
+                // Clean up any existing container with same name
+                try {
+                    execSync(`docker rm -f ${containerName}`, { stdio: 'pipe' });
+                } catch (error) {
+                    // Container doesn't exist, which is fine
+                }
+
+                // Build Docker run command for interactive shell
+                const dockerArgs = [
+                    'run',
+                    '--rm', // Remove container when it exits
+                    '-it', // Interactive with TTY
+                    '--name', containerName,
+                    '-v', `${task.worktreePath}:/workspace:rw`,
+                    '-w', '/workspace',
+                    'node:24-alpine',
+                    '/bin/sh'
+                ];
+
+                spinner.success('Shell started');
+                console.log(colors.cyan('🚀 Starting interactive shell in Docker container...'));
+                console.log(colors.gray(`   Working directory: /workspace`));
+                console.log(colors.gray(`   Container: ${containerName}`));
+                console.log('');
+
+                // Start Docker container with direct stdio inheritance for true interactivity
+                shellProcess = spawn('docker', dockerArgs, {
+                    stdio: 'inherit' // This gives full control to the user
+                });
+
+                // Handle process interruption (Ctrl+C)
+                process.on('SIGINT', () => {
+                    console.log(colors.yellow('\n\n⚠ Stopping shell session...'));
+                    try {
+                        execSync(`docker stop ${containerName}`, { stdio: 'pipe' });
+                        console.log(colors.green('✓ Container stopped'));
+                    } catch (error) {
+                        console.log(colors.red('✗ Failed to stop container'));
+                    }
+                    process.exit(0);
+                });
             } catch (error) {
-                // Container doesn't exist, which is fine
+                spinner.error('Failed to start shell');
+                console.error(colors.red('Error starting Docker shell:'), error);
             }
+        } else {
+            try {
+                shellProcess = spawn(process.env.SHELL || '/bin/sh', [], { cwd: task.worktreePath, stdio: 'inherit' });
 
-            // Build Docker run command for interactive shell
-            const dockerArgs = [
-                'run',
-                '--rm', // Remove container when it exits
-                '-it', // Interactive with TTY
-                '--name', containerName,
-                '-v', `${task.worktreePath}:/workspace:rw`,
-                '-w', '/workspace',
-                'node:24-alpine',
-                '/bin/sh'
-            ];
+                spinner.success('Shell started');
+                console.log(colors.cyan('🚀 Starting interactive shell in workspace...'));
+                console.log(colors.gray(`   Working directory: ${task.worktreePath}`));
+            } catch (error) {
+                spinner.error('Failed to start shell');
+                console.error(colors.red('Error starting shell:'), error);
+            }
+        }
 
-            spinner.success('Shell started');
-            console.log(colors.cyan('🚀 Starting interactive shell in Docker container...'));
-            console.log(colors.gray(`   Working directory: /workspace`));
-            console.log(colors.gray(`   Container: ${containerName}`));
-            console.log('');
-
-            // Start Docker container with direct stdio inheritance for true interactivity
-            const dockerProcess = spawn('docker', dockerArgs, {
-                stdio: 'inherit' // This gives full control to the user
-            });
-
+        if (shellProcess) {
             // Handle process completion
-            dockerProcess.on('close', (code) => {
+            shellProcess.on('close', (code) => {
                 console.log('');
                 if (code === 0) {
                     console.log(colors.green('✓ Shell session ended'));
@@ -124,28 +157,11 @@ export const shellCommand = async (taskId: string) => {
                 console.log(colors.gray('   Use ') + colors.cyan(`rover merge ${numericTaskId}`) + colors.gray(' to merge when ready'));
             });
 
-            dockerProcess.on('error', (error) => {
+            shellProcess.on('error', (error) => {
                 console.log('');
-                console.error(colors.red('Error running Docker shell:'), error);
+                console.error(colors.red('Error running shell:'), error);
             });
-
-            // Handle process interruption (Ctrl+C)
-            process.on('SIGINT', () => {
-                console.log(colors.yellow('\n\n⚠ Stopping shell session...'));
-                try {
-                    execSync(`docker stop ${containerName}`, { stdio: 'pipe' });
-                    console.log(colors.green('✓ Container stopped'));
-                } catch (error) {
-                    console.log(colors.red('✗ Failed to stop container'));
-                }
-                process.exit(0);
-            });
-
-        } catch (error) {
-            spinner.error('Failed to start shell');
-            console.error(colors.red('Error starting Docker shell:'), error);
         }
-
     } catch (error) {
         if (error instanceof TaskNotFoundError) {
             console.log(colors.red(`✗ ${error.message}`));

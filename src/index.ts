@@ -107,6 +107,7 @@ program
 	.command('shell')
 	.description('Open interactive shell for testing task changes')
 	.argument('<taskId>', 'Task ID to open shell for')
+	.option('-c, --container', 'Start the interactive shell within a container')
 	.action(shellCommand);
 
 program
