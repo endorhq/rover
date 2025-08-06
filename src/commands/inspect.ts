@@ -11,44 +11,6 @@ interface FileInfo {
 }
 
 /**
- * Discover output files in task directory
- */
-const discoverTaskFiles = (taskId: number): FileInfo[] => {
-    const taskDir = join(process.cwd(), '.rover', 'tasks', taskId.toString());
-
-    if (!existsSync(taskDir)) {
-        return [];
-    }
-
-    const files: FileInfo[] = [];
-
-    try {
-        const entries = readdirSync(taskDir, { withFileTypes: true });
-
-        for (const entry of entries) {
-            // Skip directories and excluded files
-            if (entry.isDirectory()) {
-                continue;
-            }
-
-            const filePath = join(taskDir, entry.name);
-            const stats = statSync(filePath);
-
-            files.push({
-                path: filePath,
-                name: entry.name,
-                size: stats.size
-            });
-        }
-    } catch (error) {
-        // Return empty array if directory cannot be read
-        return [];
-    }
-
-    return files.sort((a, b) => a.name.localeCompare(b.name));
-};
-
-/**
  * Discover files in iteration directory with tree structure
  */
 const discoverIterationFiles = (taskId: number, iterationId: number): string[] => {
