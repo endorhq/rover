@@ -11,10 +11,23 @@ import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
 
 const { prompt } = enquirer;
 
+interface IterateResult {
+    success: boolean;
+    taskId: number;
+    taskTitle: string;
+    iterationNumber: number;
+    expandedTitle?: string;
+    expandedDescription?: string;
+    refinements: string;
+    worktreePath?: string;
+    iterationPath?: string;
+    error?: string;
+}
+
 /**
  * Get the latest iteration context from previous executions
  */
-const getLatestIterationContext = (taskPath: string): { plan?: string, summary?: string, iterationNumber?: number } => {
+const getLatestIterationContext = (taskPath: string, jsonMode: boolean): { plan?: string, summary?: string, iterationNumber?: number } => {
     const iterationsPath = join(taskPath, 'iterations');
 
     if (!existsSync(iterationsPath)) {
@@ -44,7 +57,9 @@ const getLatestIterationContext = (taskPath: string): { plan?: string, summary?:
             try {
                 plan = readFileSync(planPath, 'utf8');
             } catch (error) {
-                console.warn(colors.yellow('Warning: Could not read previous plan'));
+                if (!jsonMode) {
+                    console.warn(colors.yellow('Warning: Could not read previous plan'));
+                }
             }
         }
 
@@ -54,14 +69,18 @@ const getLatestIterationContext = (taskPath: string): { plan?: string, summary?:
             try {
                 summary = readFileSync(summaryPath, 'utf8');
             } catch (error) {
-                console.warn(colors.yellow('Warning: Could not read previous summary'));
+                if (!jsonMode) {
+                    console.warn(colors.yellow('Warning: Could not read previous summary'));
+                }
             }
         }
 
         return { plan, summary, iterationNumber: latestIteration };
 
     } catch (error) {
-        console.warn(colors.yellow('Warning: Could not read iteration context'));
+        if (!jsonMode) {
+            console.warn(colors.yellow('Warning: Could not read iteration context'));
+        }
         return {};
     }
 };
@@ -73,7 +92,8 @@ const expandTaskIteration = async (
     originalTask: any,
     refinements: string,
     previousContext: { plan?: string, summary?: string, iterationNumber?: number },
-    aiProvider: AIProvider
+    aiProvider: AIProvider,
+    jsonMode: boolean
 ): Promise<TaskExpansion | null> => {
     try {
         // Build context prompt for AI
@@ -98,18 +118,35 @@ const expandTaskIteration = async (
         return expanded;
 
     } catch (error) {
-        console.error(colors.red('Error expanding task iteration:'), error);
+        if (!jsonMode) {
+            console.error(colors.red('Error expanding task iteration:'), error);
+        }
         return null;
     }
 };
 
-export const iterateCommand = async (taskId: string, refinements: string, options: { follow?: boolean } = {}): Promise<void> => {
+export const iterateCommand = async (taskId: string, refinements: string, options: { follow?: boolean; json?: boolean } = {}): Promise<void> => {
+    const result: IterateResult = {
+        success: false,
+        taskId: 0,
+        taskTitle: '',
+        iterationNumber: 0,
+        refinements: refinements
+    };
+
     // Convert string taskId to number
     const numericTaskId = parseInt(taskId, 10);
     if (isNaN(numericTaskId)) {
-        console.log(colors.red(`✗ Invalid task ID '${taskId}' - must be a number`));
+        result.error = `Invalid task ID '${taskId}' - must be a number`;
+        if (options.json) {
+            console.log(JSON.stringify(result, null, 2));
+        } else {
+            console.log(colors.red(`✗ ${result.error}`));
+        }
         return;
     }
+
+    result.taskId = numericTaskId;
 
     // Load rover configuration to get selected AI agent
     const roverConfigPath = join(process.cwd(), 'rover.json');
@@ -121,7 +158,9 @@ export const iterateCommand = async (taskId: string, refinements: string, option
             selectedAiAgent = config.environment?.selectedAiAgent || 'claude';
         }
     } catch (error) {
-        console.log(colors.yellow('⚠ Could not load rover configuration, defaulting to Claude'));
+        if (!options.json) {
+            console.log(colors.yellow('⚠ Could not load rover configuration, defaulting to Claude'));
+        }
     }
 
     // Create AI provider instance
@@ -131,38 +170,48 @@ export const iterateCommand = async (taskId: string, refinements: string, option
         // Load task using TaskDescription
         const task = TaskDescription.load(numericTaskId);
         const taskPath = join(process.cwd(), '.rover', 'tasks', numericTaskId.toString());
-        console.log(colors.bold('\n🔄 Task Iteration\n'));
-        console.log(colors.gray('ID: ') + colors.cyan(task.id.toString()));
-        console.log(colors.gray('Title: ') + colors.white(task.title));
-        console.log(colors.gray('Current Status: ') + colors.yellow(task.status));
-        console.log(colors.gray('Current Iterations: ') + colors.cyan(task.iterations.toString()));
-        console.log(colors.gray('Refinements: ') + colors.white(refinements));
+        result.taskTitle = task.title;
+
+        if (!options.json) {
+            console.log(colors.bold('\n🔄 Task Iteration\n'));
+            console.log(colors.gray('ID: ') + colors.cyan(task.id.toString()));
+            console.log(colors.gray('Title: ') + colors.white(task.title));
+            console.log(colors.gray('Current Status: ') + colors.yellow(task.status));
+            console.log(colors.gray('Current Iterations: ') + colors.cyan(task.iterations.toString()));
+            console.log(colors.gray('Refinements: ') + colors.white(refinements));
+        }
 
         // Get previous iteration context
-        console.log(colors.gray('\n📖 Loading previous iteration context...'));
-        const previousContext = getLatestIterationContext(taskPath);
+        if (!options.json) {
+            console.log(colors.gray('\n📖 Loading previous iteration context...'));
+        }
+        const previousContext = getLatestIterationContext(taskPath, options.json === true);
 
-        if (previousContext.iterationNumber) {
-            console.log(colors.gray('Found previous iteration: ') + colors.cyan(`#${previousContext.iterationNumber}`));
-            if (previousContext.plan) console.log(colors.gray('✓ Previous plan loaded'));
-            if (previousContext.summary) console.log(colors.gray('✓ Previous summary loaded'));
-        } else {
-            console.log(colors.gray('No previous iterations found, using original task only'));
+        if (!options.json) {
+            if (previousContext.iterationNumber) {
+                console.log(colors.gray('Found previous iteration: ') + colors.cyan(`#${previousContext.iterationNumber}`));
+                if (previousContext.plan) console.log(colors.gray('✓ Previous plan loaded'));
+                if (previousContext.summary) console.log(colors.gray('✓ Previous summary loaded'));
+            } else {
+                console.log(colors.gray('No previous iterations found, using original task only'));
+            }
         }
 
         // Expand task with AI
-        const spinner = yoctoSpinner({ text: `Expanding task iteration with ${selectedAiAgent.charAt(0).toUpperCase() + selectedAiAgent.slice(1)}...` }).start();
+        const spinner = !options.json ? yoctoSpinner({ text: `Expanding task iteration with ${selectedAiAgent.charAt(0).toUpperCase() + selectedAiAgent.slice(1)}...` }).start() : null;
 
         let expandedTask: TaskExpansion | null = null;
 
         try {
-            expandedTask = await expandTaskIteration(task.toJSON(), refinements, previousContext, aiProvider);
+            expandedTask = await expandTaskIteration(task.toJSON(), refinements, previousContext, aiProvider, options.json === true);
 
             if (expandedTask) {
-                spinner.success('Task iteration expanded!');
+                if (spinner) spinner.success('Task iteration expanded!');
             } else {
-                spinner.error('Failed to expand task iteration');
-                console.log(colors.yellow('\n⚠ AI expansion failed. Using manual iteration approach.'));
+                if (spinner) spinner.error('Failed to expand task iteration');
+                if (!options.json) {
+                    console.log(colors.yellow('\n⚠ AI expansion failed. Using manual iteration approach.'));
+                }
 
                 // Fallback: create simple iteration based on refinements
                 expandedTask = {
@@ -171,8 +220,10 @@ export const iterateCommand = async (taskId: string, refinements: string, option
                 };
             }
         } catch (error) {
-            spinner.error('Failed to expand task iteration');
-            console.error(colors.red('Error:'), error);
+            if (spinner) spinner.error('Failed to expand task iteration');
+            if (!options.json) {
+                console.error(colors.red('Error:'), error);
+            }
 
             // Fallback approach
             expandedTask = {
@@ -182,75 +233,95 @@ export const iterateCommand = async (taskId: string, refinements: string, option
         }
 
         if (!expandedTask) {
-            console.log(colors.red('✗ Could not create iteration'));
+            result.error = 'Could not create iteration';
+            if (options.json) {
+                console.log(JSON.stringify(result, null, 2));
+            } else {
+                console.log(colors.red('✗ Could not create iteration'));
+            }
             return;
         }
 
-        // Display the expanded iteration
-        console.log('\n' + colors.bold('Updated Task for Iteration:'));
-        console.log(colors.gray('Title: ') + colors.cyan(expandedTask.title));
-        console.log(colors.gray('Description: ') + colors.white(expandedTask.description));
+        result.expandedTitle = expandedTask.title;
+        result.expandedDescription = expandedTask.description;
 
-        // Ask for confirmation
-        const { confirm } = await prompt<{ confirm: string }>({
-            type: 'select',
-            name: 'confirm',
-            message: '\nProceed with this iteration?',
-            choices: [
-                { name: 'yes', message: 'Yes, start iteration!' },
-                { name: 'refine', message: 'No, let me add more details' },
-                { name: 'cancel', message: 'Cancel iteration' }
-            ]
-        });
+        // Skip confirmation and refinements if --json flag is passed
+        if (!options.json) {
+            // Display the expanded iteration
+            console.log('\n' + colors.bold('Updated Task for Iteration:'));
+            console.log(colors.gray('Title: ') + colors.cyan(expandedTask.title));
+            console.log(colors.gray('Description: ') + colors.white(expandedTask.description));
 
-        if (confirm === 'cancel') {
-            console.log(colors.yellow('\n⚠ Task iteration cancelled'));
-            return;
-        }
-
-        if (confirm === 'refine') {
-            const { additionalInfo } = await prompt<{ additionalInfo: string }>({
-                type: 'input',
-                name: 'additionalInfo',
-                message: 'Provide additional refinements:',
-                validate: (value) => value.trim().length > 0 || 'Please provide additional information'
+            // Ask for confirmation
+            const { confirm } = await prompt<{ confirm: string }>({
+                type: 'select',
+                name: 'confirm',
+                message: '\nProceed with this iteration?',
+                choices: [
+                    { name: 'yes', message: 'Yes, start iteration!' },
+                    { name: 'refine', message: 'No, let me add more details' },
+                    { name: 'cancel', message: 'Cancel iteration' }
+                ]
             });
 
-            // Recursively call with additional refinements
-            const combinedRefinements = `${refinements}\n\nAdditional refinements: ${additionalInfo}`;
-            return iterateCommand(taskId, combinedRefinements);
+            if (confirm === 'cancel') {
+                console.log(colors.yellow('\n⚠ Task iteration cancelled'));
+                return;
+            }
+
+            if (confirm === 'refine') {
+                const { additionalInfo } = await prompt<{ additionalInfo: string }>({
+                    type: 'input',
+                    name: 'additionalInfo',
+                    message: 'Provide additional refinements:',
+                    validate: (value) => value.trim().length > 0 || 'Please provide additional information'
+                });
+
+                // Recursively call with additional refinements
+                const combinedRefinements = `${refinements}\n\nAdditional refinements: ${additionalInfo}`;
+                return iterateCommand(taskId, combinedRefinements, options);
+            }
         }
 
         // Check if we're in a git repository and setup worktree
         try {
             execSync('git rev-parse --is-inside-work-tree', { stdio: 'pipe' });
         } catch (error) {
-            console.log(colors.red('✗ Not in a git repository'));
-            console.log(colors.gray('  Git worktree required for task iteration'));
+            result.error = 'Not in a git repository';
+            if (options.json) {
+                console.log(JSON.stringify(result, null, 2));
+            } else {
+                console.log(colors.red('✗ Not in a git repository'));
+                console.log(colors.gray('  Git worktree required for task iteration'));
+            }
             return;
         }
 
         // Ensure workspace exists
         if (!task.worktreePath || !existsSync(task.worktreePath)) {
-            console.log(colors.red('✗ No workspace found for this task'));
-            console.log(colors.gray('  Run ') + colors.cyan(`rover task ${taskId}`) + colors.gray(' first'));
+            result.error = 'No workspace found for this task';
+            if (options.json) {
+                console.log(JSON.stringify(result, null, 2));
+            } else {
+                console.log(colors.red('✗ No workspace found for this task'));
+                console.log(colors.gray('  Run ') + colors.cyan(`rover task ${taskId}`) + colors.gray(' first'));
+            }
             return;
         }
 
+        result.worktreePath = task.worktreePath;
+
         // Increment iteration counter and update task
         const newIterationNumber = task.iterations + 1;
+        result.iterationNumber = newIterationNumber;
 
         // Create iteration directory for the NEW iteration
         const iterationPath = join(taskPath, 'iterations', newIterationNumber.toString());
         mkdirSync(iterationPath, { recursive: true });
+        result.iterationPath = iterationPath;
 
         // Update task with new iteration info
         task.incrementIteration();
-        task.updateIteration({
-            title: expandedTask.title,
-            description: expandedTask.description,
-            timestamp: new Date().toISOString()
-        });
         task.markIterating();
 
         // Save iteration metadata
@@ -270,13 +341,15 @@ export const iterateCommand = async (taskId: string, refinements: string, option
 
         // Task data is automatically saved by TaskDescription methods
 
-        console.log(colors.bold(`\n🚀 Starting Task Iteration #${newIterationNumber}\n`));
-        console.log(colors.gray('Updated Title: ') + colors.cyan(expandedTask.title));
-        console.log(colors.gray('Iteration Path: ') + colors.cyan(`/rover/tasks/${numericTaskId}/iterations/${newIterationNumber}/`));
-        console.log(colors.gray('Workspace: ') + colors.cyan(task.worktreePath));
+        if (!options.json) {
+            console.log(colors.bold(`\n🚀 Starting Task Iteration #${newIterationNumber}\n`));
+            console.log(colors.gray('Updated Title: ') + colors.cyan(expandedTask.title));
+            console.log(colors.gray('Iteration Path: ') + colors.cyan(`/rover/tasks/${numericTaskId}/iterations/${newIterationNumber}/`));
+            console.log(colors.gray('Workspace: ') + colors.cyan(task.worktreePath));
 
-        // Start Docker execution for this iteration
-        console.log(colors.green('\n✓ Iteration prepared, starting Docker execution...'));
+            // Start Docker execution for this iteration
+            console.log(colors.green('\n✓ Iteration prepared, starting Docker execution...'));
+        }
 
         // Create a temporary task description file for this iteration
         const iterationTaskDescriptionPath = join(iterationPath, 'task-description.json');
@@ -296,13 +369,30 @@ export const iterateCommand = async (taskId: string, refinements: string, option
         writeFileSync(iterationTaskDescriptionPath, JSON.stringify(iterationTaskData, null, 2));
 
         // Start Docker container for task execution
-        await startDockerExecution(numericTaskId, iterationTaskData, task.worktreePath, iterationPath, selectedAiAgent, iterationTaskDescriptionPath, options.follow);
+        await startDockerExecution(numericTaskId, iterationTaskData, task.worktreePath, iterationPath, selectedAiAgent, iterationTaskDescriptionPath, options.follow, options.json);
+
+        result.success = true;
+        if (options.json) {
+            console.log(JSON.stringify(result, null, 2));
+        }
 
     } catch (error) {
         if (error instanceof TaskNotFoundError) {
-            console.log(colors.red(`✗ ${error.message}`));
+            result.error = error.message;
+        } else if (error instanceof Error) {
+            result.error = `Error creating task iteration: ${error.message}`;
         } else {
-            console.error(colors.red('Error creating task iteration:'), error);
+            result.error = 'Unknown error creating task iteration';
+        }
+
+        if (options.json) {
+            console.log(JSON.stringify(result, null, 2));
+        } else {
+            if (error instanceof TaskNotFoundError) {
+                console.log(colors.red(`✗ ${error.message}`));
+            } else {
+                console.error(colors.red('Error creating task iteration:'), error);
+            }
         }
     }
 };

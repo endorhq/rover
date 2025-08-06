@@ -98,6 +98,7 @@ program
 	.argument('<taskId>', 'Task ID to iterate on')
 	.argument('<refinements>', 'New requirements or refinements to apply')
 	.option('-f, --follow', 'Follow execution logs in real-time')
+	.option('--json', 'Output JSON and skip confirmation prompts')
 	.action(iterateCommand);
 
 program

@@ -69,6 +69,12 @@
         "category": "Rover"
       },
       {
+        "command": "rover.iterateTask",
+        "title": "Iterate a task with new instructions",
+        "icon": "$(info)",
+        "category": "Rover"
+      },
+      {
         "command": "rover.gitCompareTask",
         "title": "Git Compare Task Workspace",
         "icon": "$(info)",

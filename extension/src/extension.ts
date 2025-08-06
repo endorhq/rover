@@ -452,6 +452,140 @@ export function activate(context: vscode.ExtensionContext) {
     });
     context.subscriptions.push(pushBranchCommand);
 
+    // Register the push task command
+    const iterateTaskCommand = vscode.commands.registerCommand('rover.iterateTask', async (item: TaskItem | any) => {
+        try {
+            if (!item) {
+                const id = await vscode.window.showInputBox({
+                    prompt: 'Enter task ID',
+                    placeHolder: '1',
+                    ignoreFocusOut: true
+                });
+
+                if (!id) {
+                    throw new Error('Invalid task ID');
+                }
+
+                item = {
+                    id: parseInt(id)
+                }
+            }
+
+            // Validate the item parameter
+            if (!item) {
+                throw new Error('No task item provided');
+            }
+
+            const instructions = await vscode.window.showInputBox({
+                prompt: 'Iterate instructions',
+                placeHolder: 'Update the X file to reuse the Y library',
+                ignoreFocusOut: true
+            });
+
+            if (!instructions) {
+                throw new Error('Invalid instruction message');
+            }
+
+            // Handle different item formats (TaskItem vs direct task object)
+            let taskId: string;
+
+            if (item.task) {
+                // TaskItem format
+                taskId = item.task.id;
+            } else if (item.id) {
+                // Direct task object format
+                taskId = item.id;
+            } else {
+                throw new Error('Invalid task item format - missing task ID');
+            }
+
+            if (!taskId) {
+                throw new Error('Task ID is undefined or empty');
+            }
+
+            let statusBarItem: vscode.StatusBarItem | undefined;
+
+            try {
+
+                // Create status bar item for persistent progress indication
+                statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
+                statusBarItem.text = '$(loading~spin) Creating a new iteration...';
+                statusBarItem.show();
+
+                const iterateResult = await vscode.window.withProgress({
+                    location: vscode.ProgressLocation.Notification,
+                    title: 'Creating a new iteration',
+                    cancellable: false
+                }, async (progress, _token) => {
+                    // Step 1: Validating description
+                    progress.report({
+                        increment: 10,
+                        message: 'Retrieving Task data...'
+                    });
+                    statusBarItem!.text = '$(loading~spin) Retrieving Task data...';
+                    await new Promise(resolve => setTimeout(resolve, 500)); // Brief pause for UX
+
+                    // Step 2: Initializing task
+                    progress.report({
+                        increment: 20,
+                        message: 'Formatting prompt...'
+                    });
+                    statusBarItem!.text = '$(loading~spin) Formatting prompt...';
+
+                    const iterateResult = await cli.iterate(taskId, instructions);
+
+                    // Step 4: Finalizing
+                    progress.report({
+                        increment: 40,
+                        message: 'Waiting for the iteration to start...'
+                    });
+                    statusBarItem!.text = '$(loading~spin) Waiting for the iteration to start...';
+                    await new Promise(resolve => setTimeout(resolve, 300)); // Brief pause for UX
+
+                    return iterateResult;
+                });
+
+                if (iterateResult.success) {
+                    statusBarItem.text = `$(check) Task iteration started!`;
+                    statusBarItem.tooltip = `Task: ${iterateResult.taskTitle} (Iteration: ${iterateResult.iterationNumber})`;
+
+                    // Auto-hide status bar item after 3 seconds
+                    setTimeout(() => {
+                        statusBarItem?.dispose();
+                    }, 3000);
+
+                    vscode.window.showInformationMessage(`Task iteration started!`);
+                } else {
+                    statusBarItem.text = `$(error) Task iteration failed`;
+                    statusBarItem.tooltip = `Error: ${iterateResult.error}`;
+
+                    setTimeout(() => {
+                        statusBarItem?.dispose();
+                    }, 5000);
+
+                    vscode.window.showErrorMessage(`Failed to push task: ${iterateResult.error}`);
+                }
+
+                taskTreeProvider.refresh();
+            } catch (error) {
+                // Update status bar to show error
+                if (statusBarItem) {
+                    statusBarItem.text = '$(error) Task push failed';
+                    statusBarItem.tooltip = `Error: ${error}`;
+                    setTimeout(() => {
+                        statusBarItem?.dispose();
+                    }, 5000);
+                }
+
+                vscode.window.showErrorMessage(`Failed to create task: ${error}`);
+            }
+        } catch (error) {
+            console.error('Error in inspectTask command:', error);
+            vscode.window.showErrorMessage(`Failed to open task details: ${error}`);
+        }
+    });
+    context.subscriptions.push(iterateTaskCommand);
+
     const mergeTaskCommand = vscode.commands.registerCommand('rover.mergeTask', async (item: TaskItem | any) => {
         try {
             if (!item) {

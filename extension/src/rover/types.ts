@@ -53,3 +53,16 @@ export interface MergeResult {
     cleanedUp?: boolean;
     error?: string;
 }
+
+export interface IterateResult {
+    success: boolean;
+    taskId: number;
+    taskTitle: string;
+    iterationNumber: number;
+    expandedTitle?: string;
+    expandedDescription?: string;
+    refinements: string;
+    worktreePath?: string;
+    iterationPath?: string;
+    error?: string;
+}

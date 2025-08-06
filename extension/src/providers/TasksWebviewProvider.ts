@@ -45,6 +45,9 @@ export class TasksWebviewProvider implements vscode.WebviewViewProvider {
                 case 'gitCompare':
                     await this.handleGitCompareTask(data.taskId);
                     break;
+                case 'iterateTask':
+                    await this.handleIterateTask(data.taskId);
+                    break;
                 case 'pushBranch':
                     await this.handlePushBranch(data.taskId);
                     break;
@@ -90,6 +93,10 @@ export class TasksWebviewProvider implements vscode.WebviewViewProvider {
 
     private async handleInspectTask(taskId: string, taskTitle: string) {
         await vscode.commands.executeCommand('rover.inspectTask', { id: taskId, task: { id: taskId, title: taskTitle } });
+    }
+
+    private async handleIterateTask(taskId: string) {
+        await vscode.commands.executeCommand('rover.iterateTask', { id: taskId, task: { id: taskId } });
     }
 
     private async handleGitCompareTask(taskId: string) {
@@ -514,6 +521,13 @@ export class TasksWebviewProvider implements vscode.WebviewViewProvider {
             });
         }
 
+        function iterateTask(taskId) {
+            vscode.postMessage({
+                command: 'iterateTask',
+                taskId: taskId
+            });
+        }
+
         function viewLogs(taskId, taskStatus) {
             vscode.postMessage({
                 command: 'viewLogs',
@@ -560,6 +574,9 @@ export class TasksWebviewProvider implements vscode.WebviewViewProvider {
                         <div class="task-actions">
                             \${task.status === 'completed' ? 
                                 \`<button class="action-btn" onclick="event.stopPropagation(); gitCompare('\${task.id}')" title="Compare Task Changes"><i class="codicon codicon-diff-multiple"></i></button>\` : ''
+                            }
+                            \${task.status === 'completed' ? 
+                                \`<button class="action-btn" onclick="event.stopPropagation(); iterateTask('\${task.id}')" title="Iterate Task"><i class="codicon codicon-debug-rerun"></i></button>\` : ''
                             }
                             \${task.status === 'completed' ? 
                                 \`<button class="action-btn" onclick="event.stopPropagation(); mergeTask('\${task.id}')" title="Merge Task"><i class="codicon codicon-git-merge"></i></button>\` : ''
