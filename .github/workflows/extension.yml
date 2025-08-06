@@ -55,6 +55,12 @@ jobs:
     - name: Install vsce
       run: npm install -g @vscode/vsce
 
+    # There's an issue when packaging the extension
+    # TODO: Avoid upgrading deps on every build
+    # Refs: https://github.com/microsoft/vscode-vsce/issues/477
+    - name: Update dependencies
+      run: npm upgrade
+
     - name: Package extension
       run: vsce package
 
