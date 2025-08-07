@@ -2,10 +2,10 @@ import { TaskDescription } from "./description.js";
 
 /***
  * This library provides the foundation to build prompts for different AI agents.
- * Most of the prompt messages are shared across different AI Agents, but some 
+ * Most of the prompt messages are shared across different AI Agents, but some
  * parts might be customized for specific agents.
- * 
- * This is a living library as models and tooling evolve over time. 
+ *
+ * This is a living library as models and tooling evolve over time.
  */
 export class PromptBuilder {
     // Store the current agent we are writing prompts for
@@ -47,7 +47,7 @@ You are preparing a technical analysis for this task implementation. Your goal i
 
 Task to analyze:
 Title: ${task.title}
-Description: 
+Description:
 ${task.description}
 
 Your analysis should:
@@ -55,6 +55,7 @@ Your analysis should:
 2. Identify required domain knowledge including libraries and design patterns
 3. Identify relevant code blocks and their relationships
 4. Identify the project's linting, formatting, and testing conventions
+5. Identify the mandatory OS package dependencies that this task needs in order to be implemented
 
 Write your analysis to context.md using this exact format:
 
@@ -74,7 +75,7 @@ Write your analysis to context.md using this exact format:
 ## Relevant code
 - path/to/file.ts:start_line-end_line: Description of this code block's purpose and relevance. You must include the relevant line numbers
 
-## Dependencies
+## Component dependencies
 - List any tasks or components this work depends on
 - List any tasks that might be blocked by this work
 
@@ -82,6 +83,10 @@ Write your analysis to context.md using this exact format:
 - Linting: Commands and configuration used in this project
 - Formatting: Commands and tools (if none exist, note the language's standard formatter)
 - Testing: Test framework and relevant test files
+
+## Installed OS packages
+- Refresh repositories before trying to install or update a package
+- List of all installed OS packages, provided by the \`package-manager\` MCP
 
 Example output:
 # Context
@@ -112,6 +117,26 @@ Example output:
 - Linting: npm run lint (ESLint configuration)
 - Formatting: npm run format (Prettier)
 - Testing: npm test (Jest framework, see src/__tests__/)
+
+## Installed OS packages
+- alpine-baselayout-3.7.0-r0
+- alpine-baselayout-data-3.7.0-r0
+- alpine-keys-2.5-r0
+- alpine-release-3.22.1-r0
+- apk-tools-2.14.9-r2
+- busybox-1.37.0-r18
+- busybox-binsh-1.37.0-r18
+- ca-certificates-bundle-20250619-r0
+- libapk2-2.14.9-r2
+- libcrypto3-3.5.1-r0
+- libgcc-14.2.0-r6
+- libssl3-3.5.1-r0
+- libstdc++-14.2.0-r6
+- musl-1.2.5-r10
+- musl-utils-1.2.5-r10
+- scanelf-1.3.8-r1
+- ssl_client-1.37.0-r18
+- zlib-1.3.1-r2
 `
     }
 
@@ -124,7 +149,7 @@ You are preparing an implementation plan for this task. Your goal is to create a
 
 Task to plan:
 Title: ${task.title}
-Description: 
+Description:
 ${task.description}
 
 Your plan should:
@@ -173,7 +198,7 @@ You are implementing this task following the established plan. Your goal is to c
 
 Task to implement:
 Title: ${task.title}
-Description: 
+Description:
 ${task.description}
 
 Your implementation should:
@@ -283,7 +308,7 @@ Implemented GitHub issue fetching functionality for the task command. Added a ne
 
 ## Validation Results
 - [✓] All tests pass: npm test shows 15/15 passing
-- [✓] Linting passes: npm run lint shows no errors  
+- [✓] Linting passes: npm run lint shows no errors
 - [✓] Feature works as described: Successfully fetched issues #123, #456 from test repo
 - [✓] No regressions: Existing task creation workflow unchanged
 `
@@ -298,7 +323,7 @@ You are acting as a senior code reviewer examining the implementation of this ta
 
 Task reviewed:
 Title: ${task.title}
-Description: 
+Description:
 ${task.description}
 
 Your review should:
@@ -416,7 +441,7 @@ You are implementing fixes based on the code review feedback. Your goal is to ad
 
 Task being fixed:
 Title: ${task.title}
-Description: 
+Description:
 ${task.description}
 
 Your implementation should:
@@ -444,7 +469,7 @@ After applying all fixes, update the changes.md file by adding a new section at 
 
 ### Validation
 - [ ] All "Must Fix" items resolved
-- [ ] All "Should Fix" items resolved  
+- [ ] All "Should Fix" items resolved
 - [ ] Tests still pass after fixes
 - [ ] No new issues introduced
 
@@ -466,7 +491,7 @@ Example addition to changes.md:
 
 ### Validation
 - [✓] All "Must Fix" items resolved
-- [✓] All "Should Fix" items resolved  
+- [✓] All "Should Fix" items resolved
 - [✓] Tests still pass after fixes
 - [✓] No new issues introduced
 
@@ -485,7 +510,7 @@ Check the context.md and changes.md file to gather information.
 
 Task completed:
 Title: ${task.title}
-Description: 
+Description:
 ${task.description}
 
 Your summary should:

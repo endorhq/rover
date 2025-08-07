@@ -17,6 +17,96 @@ export class SetupBuilder {
         this.taskId = taskDescription.id;
     }
 
+    private configureMcpServersFunction(): string {
+        switch (this.agent) {
+            case 'claude':
+                return `# Function to configure MCP servers for claude
+configure-mcp-servers() {
+  # Ensure configuration file exists
+  if [ ! -f /home/agent/.claude.json ]; then
+    echo '{}' > /home/agent/.claude.json
+    chown agent:agent /home/agent/.claude.json
+  fi
+
+  jq '.mcpServers //= {}' /home/agent/.claude.json | \
+    jq '.mcpServers += { "package-manager": { "type": "http", "url": "http://127.0.0.1:8090/mcp" } }' \
+    > /tmp/agent-settings.json
+  mv /tmp/agent-settings.json /home/agent/.claude.json
+}
+`
+            case 'gemini':
+                return `# Function to configure MCP servers for gemini
+configure-mcp-servers() {
+  # Ensure configuration file exists
+  if [ ! -f /home/agent/.gemini/settings.json ]; then
+    mkdir -p /home/agent/.gemini
+    echo '{}' > /home/agent/.gemini/settings.json
+    chown -R agent:agent /home/agent/.gemini
+  fi
+
+  jq '.mcpServers //= {}' /home/agent/.gemini/settings.json | \
+    jq '.mcpServers += { "package-manager": { "httpUrl": "http://127.0.0.1:8090/mcp", "oauth": { "enabled": false } } }' \
+    > /tmp/agent-settings.json
+  mv /tmp/agent-settings.json /home/agent/.gemini/settings.json
+}
+`
+            default:
+                return `configure-mcp-servers() {
+  echo "Unknown agent: '${this.agent}'"
+  exit 1;
+}`;
+        }
+    }
+
+    private buildSetupMcpScript(): string {
+        return `#!/bin/sh
+
+# Docker container setup script for Rover MCP servers integration
+# Generated for agent: ${this.agent}
+# Task ID: ${this.taskId}
+# Task description is mounted at /task/description.json
+
+# Download and install the MCP server
+wget -O /usr/local/bin/package-manager-mcp-server https://images.endor.dev/rover/assets/package-manager-mcp-x86_64-unknown-linux-musl
+chmod +x /usr/local/bin/package-manager-mcp-server
+
+echo "======================================="
+echo "📦 Starting the package manager MCP server"
+echo "======================================="
+export PACKAGE_MANAGER_MCP_PORT=8090
+package-manager-mcp-server $PACKAGE_MANAGER_MCP_PORT &
+
+while ! nc -w 0 127.0.0.1 "$PACKAGE_MANAGER_MCP_PORT" < /dev/null; do
+  echo "Waiting for package manager MCP to be ready at $PACKAGE_MANAGER_MCP_PORT..."
+  sleep 1
+done
+
+echo "Package manager MCP is ready"
+
+${this.configureMcpServersFunction()}
+
+configure-mcp-servers
+`
+    }
+
+    generateSetupMcpScript(): string {
+        // Ensure task directory exists
+        const taskDir = join(process.cwd(), '.rover', 'tasks', this.taskId.toString());
+        mkdirSync(taskDir, { recursive: true });
+
+        // Generate script content
+        const scriptContent = this.buildSetupMcpScript();
+
+        // Write script to file
+        const scriptPath = join(taskDir, 'setup-mcp.sh');
+        writeFileSync(scriptPath, scriptContent, 'utf8');
+
+        // Make script executable
+        chmodSync(scriptPath, 0o755);
+
+        return scriptPath;
+    }
+
     /**
      * Generate write_status function for the shell script
      */
@@ -27,7 +117,7 @@ write_status() {
     local step="$2"
     local progress="$3"
     local error="$4"
-    
+
     # Create base JSON object using jq
     jq -n \\
         --arg taskId "$TASK_ID" \\
@@ -45,7 +135,7 @@ write_status() {
             progress: $progress,
             startedAt: $startTime,
             updatedAt: $updatedAt
-        } 
+        }
         | if ($error != "") then . + {error: $error} else . end
         | if ($status == "completed" or $status == "failed") then . + {completedAt: $completedAt} else . end' \\
         > /output/status.json
@@ -59,11 +149,11 @@ write_status() {
         return `# Function to recover permissions before exit
 recover_permissions() {
     echo "🔧 Recovering permissions..."
-    
+
     # This works in a rootless docker installation
     chown -R root:root /workspace || true
     chown -R root:root /output || true
-    
+
     echo "✅ Permissions recovered"
 }
 
@@ -77,14 +167,14 @@ safe_exit() {
     mv /workspace/changes.md /output
     mv /workspace/summary.md /output
     mv /workspace/review.md /output
-    
+
     recover_permissions
-    
+
     if [ -n "$error_message" ]; then
         write_status "failed" "Script failed" 100 "$error_message"
         echo "❌ $error_message"
     fi
-    
+
     exit $exit_code
 }`;
     }
@@ -98,18 +188,18 @@ execute_prompt_phase() {
     local phase_name="$1"
     local progress="$2"
     local next_progress="$3"
-    
+
     echo "======================================="
     echo "🔄 Starting $phase_name phase"
     echo "======================================="
     write_status "running" "$phase_name phase" $progress
-    
+
     # Check if prompt file exists
     if [ ! -f "/prompts/$phase_name.txt" ]; then
         echo "❌ Prompt file not found: /prompts/$phase_name.txt"
         safe_exit 1 "Prompt file /prompts/$phase_name.txt not found"
     fi
-    
+
     # Switch to agent user and execute the prompt
     su agent << EOF
 # Change to workspace directory
@@ -137,12 +227,12 @@ EOF
 check_generated_file() {
     local file_path="$1"
     local phase_name="$2"
-    
+
     if [ ! -f "$file_path" ]; then
         echo "❌ Expected file not generated: $file_path"
         safe_exit 1 "$phase_name phase did not generate expected file: $file_path"
     fi
-    
+
     echo "✅ Generated file found: $file_path"
 }`;
     }
@@ -155,13 +245,13 @@ check_generated_file() {
 create_agent_user() {
     echo "👤 Creating agent user..."
     write_status "installing" "Creating agent user" 10
-    
+
     adduser -D -s /bin/sh agent
     if [ $? -ne 0 ]; then
         echo "❌ Failed to create user 'agent'"
         safe_exit 1 "adduser command failed"
     fi
-    
+
     echo "✅ User 'agent' created successfully"
     write_status "installing" "Agent user created" 10
 }
@@ -170,15 +260,15 @@ create_agent_user() {
 setup_agent_environment() {
     echo "🏠 Setting up agent user environment..."
     write_status "installing" "Setting up agent user environment" 10
-    
+
     # Create agent home directory
     mkdir -p /home/agent
-    
+
     # Set ownership of key directories
     chown -R agent:agent /home/agent
     chown -R agent:agent /workspace
     chown -R agent:agent /output
-    
+
     echo "✅ Agent user environment configured"
     write_status "installing" "Agent environment setup" 15
 }`;
@@ -211,7 +301,7 @@ echo "======================================="
 execute_prompt_phase "context" 20 30
 check_generated_file "context.md" "context"
 
-# Phase 2: Planning (30% -> 40%) 
+# Phase 2: Planning (30% -> 40%)
 execute_prompt_phase "plan" 30 40
 check_generated_file "plan.md" "plan"
 
@@ -275,13 +365,13 @@ chown -R agent:agent /home/agent/.claude
 `;
         } else if (this.agent == 'gemini') {
             return `npm install -g @google/gemini-cli
-            
+
 # Configure the CLI
 # Process and copy Gemini credentials
 if [ -d "/.gemini" ]; then
     echo "📝 Processing Gemini credentials..."
     write_status "installing" "Process Gemini credentials" 20
-    
+
     mkdir -p /home/gemini/.gemini
     cp /.gemini/oauth_creds.json /home/gemini/.gemini/
     cp /.gemini/settings.json /home/gemini/.gemini/
@@ -399,6 +489,9 @@ write_status "installing" "Installing ${this.agent} CLI" 20
 # Export variables for agent execution
 export TASK_ID TASK_TITLE TASK_DESCRIPTION
 
+# Run setup MCP script
+/setup-mcp.sh
+
 ${this.generateTaskExecutionWorkflow()}
 
 # Move all outputs to the right location
@@ -443,8 +536,8 @@ exit 0
     /**
      * Get the path where the setup script will be saved
      */
-    getScriptPath(): string {
-        return join(process.cwd(), '.rover', 'tasks', this.taskId.toString(), 'setup.sh');
+    getScriptPath(script: string): string {
+        return join(process.cwd(), '.rover', 'tasks', this.taskId.toString(), script);
     }
 
     /**

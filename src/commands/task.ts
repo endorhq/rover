@@ -139,6 +139,7 @@ export const startDockerExecution = async (taskId: number, taskData: any, worktr
     // Generate setup script using SetupBuilder
     const setupBuilder = new SetupBuilder(task, selectedAiAgent);
     const setupScriptPath = setupBuilder.generateSetupScript();
+    const setupMcpScriptPath = setupBuilder.generateSetupMcpScript();
 
     // Generate prompts using PromptBuilder
     const promptsDir = join(process.cwd(), '.rover', 'tasks', taskId.toString(), 'iterations', task.iterations.toString(), 'prompts');
@@ -204,6 +205,7 @@ export const startDockerExecution = async (taskId: number, taskData: any, worktr
             '-v', `${iterationPath}:/output:rw`,
             ...dockerMounts,
             '-v', `${setupScriptPath}:/setup.sh:ro`,
+            '-v', `${setupMcpScriptPath}:/setup-mcp.sh:ro`,
             '-v', `${taskDescriptionPath}:/task/description.json:ro`,
             '-v', `${promptsDir}:/prompts:ro`,
             '-w', '/workspace',
