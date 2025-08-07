@@ -1,8 +1,8 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { RoverCLI } from '../rover/cli';
-import { TaskDetails } from '../rover/types';
+import { RoverCLI } from '../rover/cli.js';
+import { TaskDetails } from '../rover/types.js';
 
 export class TaskDetailsPanel {
     public static currentPanel: TaskDetailsPanel | undefined;

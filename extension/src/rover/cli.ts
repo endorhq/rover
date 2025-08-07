@@ -1,7 +1,7 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import * as vscode from 'vscode';
-import { MergeResult, PushResult, RoverTask, TaskDetails, IterateResult } from './types';
+import { MergeResult, PushResult, RoverTask, TaskDetails, IterateResult } from './types.js';
 
 const execAsync = promisify(exec);
 

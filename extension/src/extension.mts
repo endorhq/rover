@@ -2,16 +2,14 @@ import * as vscode from 'vscode';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import * as path from 'path';
-import { TaskTreeProvider } from './providers/TaskTreeProvider';
-import { TasksWebviewProvider } from './providers/TasksWebviewProvider';
-import { RoverCLI } from './rover/cli';
-import { TaskItem } from './providers/TaskItem';
-import { TaskDetailsPanel } from './panels/TaskDetailsPanel';
+import { TasksLitWebviewProvider } from './providers/TasksLitWebviewProvider.mjs';
+import { RoverCLI } from './rover/cli.js';
+import { TaskItem } from './providers/TaskItem.js';
+import { TaskDetailsPanel } from './panels/TaskDetailsPanel.js';
 
 const execAsync = promisify(exec);
 
-let taskTreeProvider: TaskTreeProvider;
-let tasksWebviewProvider: TasksWebviewProvider;
+let tasksWebviewProvider: TasksLitWebviewProvider;
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('Rover extension is now active!');
@@ -20,14 +18,10 @@ export function activate(context: vscode.ExtensionContext) {
     const cli = new RoverCLI();
 
     // Create and register the Tasks Webview Provider (replaces tree view)
-    tasksWebviewProvider = new TasksWebviewProvider(context.extensionUri);
+    tasksWebviewProvider = new TasksLitWebviewProvider(context.extensionUri);
     context.subscriptions.push(
-        vscode.window.registerWebviewViewProvider(TasksWebviewProvider.viewType, tasksWebviewProvider)
+        vscode.window.registerWebviewViewProvider(TasksLitWebviewProvider.viewType, tasksWebviewProvider)
     );
-
-    // Keep the old tree provider for fallback if needed
-    taskTreeProvider = new TaskTreeProvider();
-    context.subscriptions.push(taskTreeProvider);
 
     // Register the refresh command
     const refreshCommand = vscode.commands.registerCommand('rover.refresh', () => {
@@ -106,7 +100,7 @@ export function activate(context: vscode.ExtensionContext) {
                 }, 3000);
 
                 vscode.window.showInformationMessage(`Task created successfully! "${createdTask.title}" (ID: ${createdTask.id})`);
-                taskTreeProvider.refresh();
+                tasksWebviewProvider.refresh();
             } catch (error) {
                 // Update status bar to show error
                 if (statusBarItem) {
@@ -432,7 +426,7 @@ export function activate(context: vscode.ExtensionContext) {
                     vscode.window.showErrorMessage(`Failed to push task: ${pushResult.error}`);
                 }
 
-                taskTreeProvider.refresh();
+                tasksWebviewProvider.refresh();
             } catch (error) {
                 // Update status bar to show error
                 if (statusBarItem) {
@@ -702,7 +696,7 @@ export function activate(context: vscode.ExtensionContext) {
                     vscode.window.showErrorMessage(`Failed to merge task: ${mergeResult.error}`);
                 }
 
-                taskTreeProvider.refresh();
+                tasksWebviewProvider.refresh();
             } catch (error) {
                 // Update status bar to show error
                 if (statusBarItem) {
@@ -748,7 +742,7 @@ export function activate(context: vscode.ExtensionContext) {
             if (answer === 'Yes') {
                 await cli.deleteTask(taskId);
                 vscode.window.showInformationMessage('Task deleted successfully!');
-                taskTreeProvider.refresh();
+                tasksWebviewProvider.refresh();
             }
         } catch (error) {
             console.error('Error in deleteTask command:', error);
@@ -969,7 +963,7 @@ export function activate(context: vscode.ExtensionContext) {
                 setTimeout(() => statusBarItem?.dispose(), 3000);
 
                 vscode.window.showInformationMessage(`Task created successfully! "${createdTask.title}" (ID: ${createdTask.id})`);
-                taskTreeProvider.refresh();
+                tasksWebviewProvider.refresh();
             }
         } catch (error) {
             if (statusBarItem) {
@@ -984,13 +978,13 @@ export function activate(context: vscode.ExtensionContext) {
     // Clean up the tree provider when extension is deactivated
     context.subscriptions.push({
         dispose: () => {
-            taskTreeProvider.dispose();
+            tasksWebviewProvider.dispose();
         }
     });
 }
 
 export function deactivate() {
-    if (taskTreeProvider) {
-        taskTreeProvider.dispose();
+    if (tasksWebviewProvider) {
+        tasksWebviewProvider.dispose();
     }
 }

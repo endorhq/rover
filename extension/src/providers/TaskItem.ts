@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { RoverTask } from '../rover/types';
+import { RoverTask } from '../rover/types.js';
 
 export class TaskItem extends vscode.TreeItem {
     constructor(

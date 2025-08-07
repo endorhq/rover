@@ -1,9 +1,10 @@
-const esbuild = require("esbuild");
-const fs = require("fs");
-const path = require("path");
+import esbuild from "esbuild";
+import fs from "fs";
+import path from "path";
 
 const production = process.argv.includes('--production');
 const watch = process.argv.includes('--watch');
+const __dirname = import.meta.dirname;
 
 /**
  * @type {import('esbuild').Plugin}
@@ -37,7 +38,7 @@ const copyHtmlTemplatePlugin = {
 			const templates = [
 				{ src: 'taskDetailsTemplate.html', name: 'Task details template' }
 			];
-			
+
 			const distPath = path.join(__dirname, 'dist', 'panels');
 
 			try {
@@ -50,7 +51,7 @@ const copyHtmlTemplatePlugin = {
 				for (const template of templates) {
 					const srcPath = path.join(__dirname, 'src', 'panels', template.src);
 					const destPath = path.join(distPath, template.src);
-					
+
 					if (fs.existsSync(srcPath)) {
 						fs.copyFileSync(srcPath, destPath);
 						console.log(`[copy-html-template] ${template.name} copied to dist/panels/`);
@@ -63,10 +64,37 @@ const copyHtmlTemplatePlugin = {
 	},
 };
 
+/**
+ * Bundle Lit components for webview consumption
+ * @type {import('esbuild').BuildOptions}
+ */
+const webviewComponentsConfig = {
+	entryPoints: [
+		'src/views/tasks-webview.mts'
+	],
+	bundle: true,
+	format: 'iife',
+	minify: production,
+	sourcemap: !production,
+	sourcesContent: false,
+	platform: 'browser',
+	target: 'es2022',
+	outfile: 'dist/views/tasks-webview.js',
+	loader: {
+		'.ts': 'ts',
+		'.mts': 'ts'
+	},
+	external: [],
+	define: {
+		'global': 'globalThis'
+	}
+};
+
 async function main() {
-	const ctx = await esbuild.context({
+	// Build the extension
+	const extensionCtx = await esbuild.context({
 		entryPoints: [
-			'src/extension.ts'
+			'src/extension.mts'
 		],
 		bundle: true,
 		format: 'cjs',
@@ -77,17 +105,26 @@ async function main() {
 		outfile: 'dist/extension.js',
 		external: ['vscode'],
 		logLevel: 'silent',
+		// Add loader for handling Lit decorators and ES modules
+		loader: {
+			'.mts': 'ts',
+			'.mjs': 'js'
+		},
 		plugins: [
 			copyHtmlTemplatePlugin,
 			/* add to the end of plugins array */
 			esbuildProblemMatcherPlugin,
 		],
 	});
+
+	// Build webview components
+	const webviewCtx = await esbuild.context(webviewComponentsConfig);
+
 	if (watch) {
-		await ctx.watch();
+		await Promise.all([extensionCtx.watch(), webviewCtx.watch()]);
 	} else {
-		await ctx.rebuild();
-		await ctx.dispose();
+		await Promise.all([extensionCtx.rebuild(), webviewCtx.rebuild()]);
+		await Promise.all([extensionCtx.dispose(), webviewCtx.dispose()]);
 	}
 }
 
