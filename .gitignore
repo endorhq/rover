@@ -144,5 +144,3 @@ vite.config.ts.timestamp-*
 # Extensions
 *.vsix
 
-# Lock files (we use pnpm)
-package-lock.json
