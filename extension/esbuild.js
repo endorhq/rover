@@ -69,9 +69,10 @@ const copyHtmlTemplatePlugin = {
  * @type {import('esbuild').BuildOptions}
  */
 const webviewComponentsConfig = {
-	entryPoints: [
-		'src/views/tasks-webview.mts'
-	],
+	entryPoints: {
+		'tasks-webview': 'src/views/tasks-webview.mts',
+		'task-details': 'src/views/task-details.mts'
+	},
 	bundle: true,
 	format: 'iife',
 	minify: production,
@@ -79,7 +80,7 @@ const webviewComponentsConfig = {
 	sourcesContent: false,
 	platform: 'browser',
 	target: 'es2022',
-	outfile: 'dist/views/tasks-webview.js',
+	outdir: 'dist/views',
 	loader: {
 		'.ts': 'ts',
 		'.mts': 'ts'

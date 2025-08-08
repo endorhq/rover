@@ -248,41 +248,39 @@ export class TaskDetailsPanel {
     }
 
     private _update() {
-        this._panel.webview.html = this._getTemplateContent();
+        this._panel.webview.html = this._getHtmlForWebview();
     }
 
-    private _getHtmlForWebview() {
-        // Read the template file at compile time using require/import
-        // This works better with bundlers like esbuild
-        try {
-            const templateContent = this._getTemplateContent();
-            return templateContent;
-        } catch (error) {
-            console.error('Error loading template, using inline fallback:', error);
-        }
-    }
+    private _getHtmlForWebview(): string {
+        // Get Codicons URI
+        const codiconsUri = this._panel.webview.asWebviewUri(
+            vscode.Uri.joinPath(this._extensionUri, 'node_modules', '@vscode', 'codicons', 'dist', 'codicon.css')
+        );
 
-    private _getTemplateContent(): string {
-        // Try to read from the copied template file in the dist directory (for bundled extension)
-        const distTemplatePath = path.join(__dirname, 'panels', 'taskDetailsTemplate.html');
-        if (fs.existsSync(distTemplatePath)) {
-            return fs.readFileSync(distTemplatePath, 'utf8');
-        }
+        // Get the bundled task-details component URI
+        const taskDetailsUri = this._panel.webview.asWebviewUri(
+            vscode.Uri.joinPath(this._extensionUri, 'dist', 'views', 'task-details.js')
+        );
 
-        // Try alternative paths for different build scenarios
-        const altPaths = [
-            path.join(__dirname, 'taskDetailsTemplate.html'),
-            path.join(__dirname, '..', 'panels', 'taskDetailsTemplate.html'),
-            path.join(__dirname, '..', '..', 'src', 'panels', 'taskDetailsTemplate.html'),
-            path.resolve(__dirname, '..', '..', 'src', 'panels', 'taskDetailsTemplate.html')
-        ];
-
-        for (const altPath of altPaths) {
-            if (fs.existsSync(altPath)) {
-                return fs.readFileSync(altPath, 'utf8');
-            }
-        }
-
-        throw new Error('Template file not found in any expected location');
+        return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Details</title>
+    <link href="${codiconsUri}" rel="stylesheet" />
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        overflow-y: auto;
+        height: 100vh;
+      }
+    </style>
+</head>
+<body>
+    <script src="${taskDetailsUri}"></script>
+</body>
+</html>`;
     }
 }

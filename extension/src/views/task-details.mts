@@ -1,5 +1,12 @@
+// This file is specifically designed to be bundled for webview consumption
 import { LitElement, html, css } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
+
+declare global {
+  interface Window {
+    acquireVsCodeApi?: () => any;
+  }
+}
 
 @customElement('task-details-view')
 export class TaskDetailsView extends LitElement {
@@ -521,10 +528,10 @@ export class TaskDetailsView extends LitElement {
     return html`
       <div id="iterationsList">
         ${this.taskData.iterations.map((iteration: any, index: number) => {
-      const iterationId = `${index}`;
-      const isExpanded = !this.expandedSections.has(`iteration-${iterationId}`);
+          const iterationId = `${index}`;
+          const isExpanded = !this.expandedSections.has(`iteration-${iterationId}`);
 
-      return html`
+          return html`
             <div class="iteration">
               <div class="iteration-header" @click=${() => this.toggleIteration(iterationId)}>
                 <span class="iteration-title">Iteration ${iteration.number || (index + 1)}</span>
@@ -559,8 +566,31 @@ export class TaskDetailsView extends LitElement {
               </div>
             </div>
           `;
-    })}
+        })}
       </div>
     `;
+  }
+}
+
+// Initialize the component when the DOM is ready
+if (typeof window !== 'undefined') {
+  // Acquire VS Code API
+  const vscode = typeof window.acquireVsCodeApi !== 'undefined' ? window.acquireVsCodeApi() : null;
+  
+  // Create and configure the component
+  const component = document.createElement('task-details-view');
+  
+  // Set VS Code API
+  if (vscode) {
+    (component as any).vscode = vscode;
+  }
+  
+  // Mount the component when DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      document.body.appendChild(component);
+    });
+  } else {
+    document.body.appendChild(component);
   }
 }

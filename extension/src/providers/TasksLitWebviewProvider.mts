@@ -175,7 +175,7 @@ export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
       vscode.Uri.joinPath(this.extensionUri, 'node_modules', '@vscode', 'codicons', 'dist', 'codicon.css')
     );
 
-    // Get the bundled tasks-webview component URI
+    // Get the bundled tasks-webview component URI  
     const tasksWebviewUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.extensionUri, 'dist', 'views', 'tasks-webview.js')
     );
