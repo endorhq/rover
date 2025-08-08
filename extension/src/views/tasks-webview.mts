@@ -2,6 +2,7 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import codiconsIcons from './common/codicons.mjs';
+import './components/tasks-intro.mjs';
 
 declare global {
   interface Window {
@@ -371,7 +372,7 @@ export class TasksWebview extends LitElement {
         ${this.loading ? html`
           <div class="empty-state">Loading tasks...</div>
         ` : this.tasks.length === 0 ? html`
-          <div class="empty-state">No tasks found. Create your first task below!</div>
+          <tasks-intro></tasks-intro>
         ` : this.tasks.map(task => {
       const timeInfo = this.formatTimeInfo(task);
       const details = [task.status.toUpperCase()];
