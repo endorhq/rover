@@ -23,8 +23,7 @@ export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
       enableScripts: true,
       localResourceRoots: [
         vscode.Uri.joinPath(this.extensionUri, 'dist'),
-        vscode.Uri.joinPath(this.extensionUri, 'src'),
-        vscode.Uri.joinPath(this.extensionUri, 'node_modules', '@vscode', 'codicons', 'dist')
+        vscode.Uri.joinPath(this.extensionUri, 'src')
       ]
     };
 
@@ -172,7 +171,7 @@ export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
   private _getHtmlForWebview(webview: vscode.Webview) {
     // Get Codicons URI
     const codiconsUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.extensionUri, 'node_modules', '@vscode', 'codicons', 'dist', 'codicon.css')
+      vscode.Uri.joinPath(this.extensionUri, 'dist', 'codicons', 'codicon.css')
     );
 
     // Get the bundled tasks-webview component URI  

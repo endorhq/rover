@@ -5,7 +5,8 @@ node_modules/**
 src/**
 .gitignore
 .yarnrc
-esbuild.js
+esbuild.*
+eslint.config.*
 vsc-extension-quickstart.md
 **/tsconfig.json
 **/eslint.config.mjs
@@ -16,6 +17,8 @@ CLAUDE.md
 README_TEMPLATE.md
 planning.md
 pnpm-lock.yaml
+../../**
+../**
 
 # codicons
 !node_modules/@vscode/codicons/dist/codicon.css

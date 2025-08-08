@@ -1,5 +1,11 @@
 {
     "name": "rover-workspace",
+    "version": "1.0.0",
+    "author": "The Endor Team <hello@endor.dev>",
+    "engines": {
+        "npm": "10.9.2",
+        "node": "22.17.0"
+    },
     "workspaces": [
         "packages/*"
     ],

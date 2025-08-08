@@ -29,36 +29,47 @@ const esbuildProblemMatcherPlugin = {
 /**
  * @type {import('esbuild').Plugin}
  */
-const copyHtmlTemplatePlugin = {
-	name: 'copy-html-template',
+const copyCodiconsPlugin = {
+	name: 'copy-codicons',
 
 	setup(build) {
 		build.onEnd(() => {
 			// Copy HTML templates to the dist directory
-			const templates = [
-				{ src: 'taskDetailsTemplate.html', name: 'Task details template' }
+			// !node_modules/@vscode/codicons/dist/codicon.css
+			// !node_modules/@vscode/codicons/dist/codicon.ttf
+			const files = [
+				{ filename: 'codicon.css', name: 'Codicon CSS' },
+				{ filename: 'codicon.ttf', name: 'Codicon Font' }
 			];
 
-			const distPath = path.join(__dirname, 'dist', 'panels');
+			// Dist path for the codicon library
+			const srcPath = path.join(__dirname, '../', '../', 'node_modules', '@vscode', 'codicons', 'dist');
+			const destPath = path.join(__dirname, 'dist', 'codicons');
 
 			try {
 				// Ensure the dist/panels directory exists
-				if (!fs.existsSync(distPath)) {
-					fs.mkdirSync(distPath, { recursive: true });
+				if (!fs.existsSync(srcPath)) {
+					throw Error(`The ${srcPath} library is missing. Run npm install.`);
+				}
+
+				if (!fs.existsSync(destPath)) {
+					fs.mkdirSync(destPath, { recursive: true })
 				}
 
 				// Copy each template file
-				for (const template of templates) {
-					const srcPath = path.join(__dirname, 'src', 'panels', template.src);
-					const destPath = path.join(distPath, template.src);
+				for (const file of files) {
+					const srcFile = path.join(srcPath, file.filename);
+					const destFile = path.join(destPath, file.filename);
 
-					if (fs.existsSync(srcPath)) {
-						fs.copyFileSync(srcPath, destPath);
-						console.log(`[copy-html-template] ${template.name} copied to dist/panels/`);
+					if (fs.existsSync(srcFile)) {
+						fs.copyFileSync(srcFile, destFile);
+						console.log(`[copy-codicons] ${file.name} copied to ${destFile}`);
+					} else {
+						throw Error(`The ${srcFile} codicon file is missing. Run npm install.`);
 					}
 				}
 			} catch (error) {
-				console.error('[copy-html-template] Error copying templates:', error);
+				console.error('[copy-codicons] Error copying files:', error);
 			}
 		});
 	},
@@ -112,7 +123,7 @@ async function main() {
 			'.mjs': 'js'
 		},
 		plugins: [
-			copyHtmlTemplatePlugin,
+			copyCodiconsPlugin,
 			/* add to the end of plugins array */
 			esbuildProblemMatcherPlugin,
 		],

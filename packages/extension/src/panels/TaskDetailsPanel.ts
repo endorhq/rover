@@ -254,7 +254,7 @@ export class TaskDetailsPanel {
     private _getHtmlForWebview(): string {
         // Get Codicons URI
         const codiconsUri = this._panel.webview.asWebviewUri(
-            vscode.Uri.joinPath(this._extensionUri, 'node_modules', '@vscode', 'codicons', 'dist', 'codicon.css')
+            vscode.Uri.joinPath(this._extensionUri, 'dist', 'codicons', 'codicon.css')
         );
 
         // Get the bundled task-details component URI
