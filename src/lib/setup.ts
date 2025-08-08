@@ -372,11 +372,11 @@ if [ -d "/.gemini" ]; then
     echo "📝 Processing Gemini credentials..."
     write_status "installing" "Process Gemini credentials" 20
 
-    mkdir -p /home/gemini/.gemini
-    cp /.gemini/oauth_creds.json /home/gemini/.gemini/
-    cp /.gemini/settings.json /home/gemini/.gemini/
-    cp /.gemini/user_id /home/gemini/.gemini/
-    chown -R gemini:gemini /home/gemini/.gemini
+    mkdir -p /home/agent/.gemini
+    cp /.gemini/oauth_creds.json /home/agent/.gemini/
+    cp /.gemini/settings.json /home/agent/.gemini/
+    cp /.gemini/user_id /home/agent/.gemini/
+    chown -R agent:agent /home/agent/.gemini
     echo "✅ Gemini credentials processed and copied to gemini user"
 else
     echo "❌  No Gemini configuration found at /.gemini"
