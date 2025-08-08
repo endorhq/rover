@@ -1,9 +1,9 @@
 // See https://go.microsoft.com/fwlink/?LinkId=733558
 // for the documentation about the tasks.json format
 {
-	"version": "2.0.0",
-	"tasks": [
-		{
+    "version": "2.0.0",
+    "tasks": [
+        {
             "label": "watch",
             "dependsOn": [
                 "npm: watch:tsc",
@@ -11,6 +11,9 @@
             ],
             "presentation": {
                 "reveal": "never"
+            },
+            "options": {
+                "cwd": "${workspaceFolder}/packages/extension"
             },
             "group": {
                 "kind": "build",
@@ -20,6 +23,9 @@
         {
             "type": "npm",
             "script": "watch:esbuild",
+            "options": {
+                "cwd": "${workspaceFolder}/packages/extension"
+            },
             "group": "build",
             "problemMatcher": "$esbuild-watch",
             "isBackground": true,
@@ -29,9 +35,12 @@
                 "reveal": "never"
             }
         },
-		{
+        {
             "type": "npm",
             "script": "watch:tsc",
+            "options": {
+                "cwd": "${workspaceFolder}/packages/extension"
+            },
             "group": "build",
             "problemMatcher": "$tsc-watch",
             "isBackground": true,
@@ -41,24 +50,30 @@
                 "reveal": "never"
             }
         },
-		{
-			"type": "npm",
-			"script": "watch-tests",
-			"problemMatcher": "$tsc-watch",
-			"isBackground": true,
-			"presentation": {
-				"reveal": "never",
-				"group": "watchers"
-			},
-			"group": "build"
-		},
-		{
-			"label": "tasks: watch-tests",
-			"dependsOn": [
-				"npm: watch",
-				"npm: watch-tests"
-			],
-			"problemMatcher": []
-		}
-	]
+        {
+            "type": "npm",
+            "script": "watch-tests",
+            "options": {
+                "cwd": "${workspaceFolder}/packages/extension"
+            },
+            "problemMatcher": "$tsc-watch",
+            "isBackground": true,
+            "presentation": {
+                "reveal": "never",
+                "group": "watchers"
+            },
+            "group": "build"
+        },
+        {
+            "label": "tasks: watch-tests",
+            "options": {
+                "cwd": "${workspaceFolder}/packages/extension"
+            },
+            "dependsOn": [
+                "npm: watch",
+                "npm: watch-tests"
+            ],
+            "problemMatcher": []
+        }
+    ]
 }

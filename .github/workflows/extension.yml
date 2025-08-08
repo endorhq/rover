@@ -12,7 +12,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: extension
+        working-directory: packages/extension
 
     steps:
     - uses: actions/checkout@v4
