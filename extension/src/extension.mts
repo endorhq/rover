@@ -560,7 +560,7 @@ export function activate(context: vscode.ExtensionContext) {
                     vscode.window.showErrorMessage(`Failed to push task: ${iterateResult.error}`);
                 }
 
-                taskTreeProvider.refresh();
+                tasksWebviewProvider.refresh();
             } catch (error) {
                 // Update status bar to show error
                 if (statusBarItem) {
