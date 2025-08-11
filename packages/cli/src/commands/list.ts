@@ -1,5 +1,8 @@
 import colors from 'ansi-colors';
 import { getAllTaskStatuses, updateTaskWithStatus } from '../utils/status.js';
+import { formatTaskStatus, statusColor } from '../utils/task-status.js';
+import { roverBanner } from '../utils/banner.js';
+import showTips from '../utils/tips.js';
 
 /**
  * Format duration from start to now or completion
@@ -19,26 +22,6 @@ const formatDuration = (startTime: string, endTime?: string): string => {
         return `${minutes}m ${seconds % 60}s`;
     } else {
         return `${seconds}s`;
-    }
-};
-
-/**
- * Format status with colors
- */
-const formatStatus = (status: string): string => {
-    switch (status) {
-        case 'initializing':
-            return colors.cyan(status.toUpperCase());
-        case 'installing':
-            return colors.yellow(status.toUpperCase());
-        case 'running':
-            return colors.blue(status.toUpperCase());
-        case 'completed':
-            return colors.green(status.toUpperCase());
-        case 'failed':
-            return colors.red(status.toUpperCase());
-        default:
-            return colors.gray(status.toUpperCase());
     }
 };
 
@@ -69,7 +52,7 @@ const truncateText = (text: string, maxLength: number): string => {
     return text.substring(0, maxLength - 3) + '...';
 };
 
-export const listCommand = async (options: { watch?: boolean; verbose?: boolean; json?: boolean } = {}) => {
+export const listCommand = async (options: { watch?: boolean; verbose?: boolean; json?: boolean, watching?: boolean } = {}) => {
     try {
         const allStatuses = getAllTaskStatuses();
 
@@ -84,6 +67,8 @@ export const listCommand = async (options: { watch?: boolean; verbose?: boolean;
 
             return false;
         });
+
+        // console.log(colors.green('🤖 Rover:'), colors.gray("Here you check the list of tasks\n"));
 
         if (activeStatuses.length === 0) {
             if (options.json) {
@@ -142,11 +127,12 @@ export const listCommand = async (options: { watch?: boolean; verbose?: boolean;
 
             const title = taskData?.title || 'Unknown Task';
             const duration = formatDuration(status.startedAt, status.completedAt);
+            const colorFunc = statusColor(status.status);
 
             let row = '';
             row += colors.cyan(taskId.padEnd(columnWidths[0]));
             row += colors.white(truncateText(title, columnWidths[1] - 1).padEnd(columnWidths[1]));
-            row += formatStatus(status.status).padEnd(columnWidths[2] + 10); // +10 for ANSI codes
+            row += colorFunc(formatTaskStatus(status.status).padEnd(columnWidths[2])); // +10 for ANSI codes
             row += formatProgress(status.status, status.progress).padEnd(columnWidths[3] + 10);
             row += colors.gray(truncateText(status.currentStep, columnWidths[4] - 1).padEnd(columnWidths[4]));
             row += colors.gray(duration);
@@ -159,58 +145,31 @@ export const listCommand = async (options: { watch?: boolean; verbose?: boolean;
             }
         }
 
-        console.log('');
-
-        // Show summary
-        const runningCount = activeStatuses.filter(({ status }) =>
-            status?.status === 'running' || status?.status === 'initializing' || status?.status === 'installing'
-        ).length;
-
-        const completedCount = activeStatuses.filter(({ status }) =>
-            status?.status === 'completed'
-        ).length;
-
-        const failedCount = activeStatuses.filter(({ status }) =>
-            status?.status === 'failed'
-        ).length;
-
-        let summary = '';
-        if (runningCount > 0) summary += colors.blue(`${runningCount} running`);
-        if (completedCount > 0) {
-            if (summary) summary += ', ';
-            summary += colors.green(`${completedCount} completed`);
-        }
-        if (failedCount > 0) {
-            if (summary) summary += ', ';
-            summary += colors.red(`${failedCount} failed`);
-        }
-
-        console.log(colors.gray('Summary: ') + summary);
-
-        // Show tips
-        console.log('');
-        console.log(colors.gray('Tips:'));
-        console.log(colors.gray('  Use ') + colors.cyan('rover list --verbose') + colors.gray(' to see error details'));
-        console.log(colors.gray('  Use ') + colors.cyan('rover logs <id> --follow') + colors.gray(' to follow logs'));
-        console.log(colors.gray('  Use ') + colors.cyan('rover diff <id>') + colors.gray(' to see changes'));
-
-        // Watch mode (simple refresh every 5 seconds)
+        // Watch mode (simple refresh every 3 seconds)
         if (options.watch) {
-            console.log(colors.gray('⏱️  Watching for changes (Ctrl+C to exit)...'));
+            console.log(colors.gray('\n⏱️  Watching for changes every 3s (Ctrl+C to exit)...'));
 
             const watchInterval = setInterval(async () => {
                 // Clear screen and show updated status
                 process.stdout.write('\x1b[2J\x1b[0f');
-                await listCommand({ ...options, watch: false });
-                console.log(colors.gray('⏱️  Refreshing every 5s (Ctrl+C to exit)...'));
-            }, 5000);
+                await listCommand({ ...options, watch: false, watching: true });
+                console.log(colors.gray('\n⏱️  Refreshing every 3s (Ctrl+C to exit)...'));
+            }, 3000);
 
             // Handle Ctrl+C
             process.on('SIGINT', () => {
                 clearInterval(watchInterval);
-                console.log(colors.yellow('\n\n⚠ Watch mode stopped'));
                 process.exit(0);
             });
+        }
+
+        if (!options.watch && !options.watching) {
+            showTips([
+                'Use ' + colors.cyan('rover list --watch') + ' to monitor the task status',
+                'Use ' + colors.cyan('rover task') + ' to assign a new task to an agent',
+                'Use ' + colors.cyan('rover inspect <id>') + ' to see the task details',
+                'Use ' + colors.cyan('rover logs <id> --follow') + ' to read the task logs'
+            ]);
         }
 
     } catch (error) {
