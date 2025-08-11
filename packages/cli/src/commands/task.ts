@@ -13,6 +13,7 @@ import { createAIProvider } from '../utils/ai-factory.js';
 import { TaskDescription, TaskNotFoundError, TaskValidationError } from '../lib/description.js';
 import { PromptBuilder } from '../lib/prompt.js';
 import { SetupBuilder } from '../lib/setup.js';
+import { UserSettings, AI_AGENT } from '../lib/config.js';
 import { request } from 'node:https';
 import { promisify } from 'node:util';
 import { exec } from 'node:child_process';
@@ -575,23 +576,28 @@ export const taskCommand = async (initPrompt?: string, options: { fromGithub?: s
         process.exit(1);
     }
 
-    // Load rover configuration to get selected AI agent
-    const roverConfigPath = join(process.cwd(), 'rover.json');
+    // Load AI agent selection from user settings
     let selectedAiAgent = 'claude'; // default
-
+    
     try {
-        if (existsSync(roverConfigPath)) {
-            const config = JSON.parse(readFileSync(roverConfigPath, 'utf-8'));
-            selectedAiAgent = config.environment?.selectedAiAgent || 'claude';
-        }
-
-        if (!json) {
-            console.log(colors.white(`Selected ${selectedAiAgent} from the project configuration.`));
+        if (UserSettings.exists()) {
+            const userSettings = UserSettings.load();
+            selectedAiAgent = userSettings.defaultAiAgent || AI_AGENT.Claude;
+            
+            if (!json) {
+                console.log(colors.white(`Selected ${selectedAiAgent} from user settings.`));
+            }
+        } else {
+            if (!json) {
+                console.log(colors.yellow('⚠ User settings not found, defaulting to Claude'));
+                console.log(colors.gray('  Run `rover init` to configure AI agent preferences'));
+            }
         }
     } catch (error) {
         if (!json) {
-            console.log(colors.yellow('⚠ Could not load rover configuration, defaulting to Claude'));
+            console.log(colors.yellow('⚠ Could not load user settings, defaulting to Claude'));
         }
+        selectedAiAgent = AI_AGENT.Claude;
     }
 
     // Run initial validations
