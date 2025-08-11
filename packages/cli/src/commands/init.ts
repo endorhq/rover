@@ -197,8 +197,8 @@ export const init = async (path: string = '.') => {
 
             showTips(
                 [
-                    colors.gray('Run ') + colors.cyan('rover help') + colors.gray(' to see available commands'),
-                    colors.gray('Run ') + colors.cyan('rover task') + colors.gray(' to assign a new task to an Agent')
+                    'Run ' + colors.cyan('rover help') + ' to see available commands',
+                    'Run ' + colors.cyan('rover task') + ' to assign a new task to an Agent'
                 ],
                 {
                     title: TIP_TITLES.NEXT_STEPS

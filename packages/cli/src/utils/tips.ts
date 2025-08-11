@@ -31,7 +31,7 @@ const showTips = (tips: string[], config: TipsConfig = {}) => {
     console.log(colors.white(`${buildConfig.emoji} ${buildConfig.title}:`));
 
     for (const tip of tips) {
-        console.log(`   ${tip}`)
+        console.log(colors.gray(`   ${tip}`));
     }
 };
 
