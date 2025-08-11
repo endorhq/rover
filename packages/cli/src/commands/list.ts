@@ -68,8 +68,6 @@ export const listCommand = async (options: { watch?: boolean; verbose?: boolean;
             return false;
         });
 
-        // console.log(colors.green('🤖 Rover:'), colors.gray("Here you check the list of tasks\n"));
-
         if (activeStatuses.length === 0) {
             if (options.json) {
                 console.log(JSON.stringify([]));

@@ -1,16 +1,14 @@
 import enquirer from 'enquirer';
 import colors from 'ansi-colors';
 import yoctoSpinner from 'yocto-spinner';
-import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import type { TaskExpansion, AIProvider } from '../types.js';
+import { existsSync, mkdirSync } from 'node:fs';
+import { join } from 'node:path';
+import type { TaskExpansion } from '../types.js';
 import { getNextTaskId } from '../utils/task-id.js';
 import { execSync, spawn } from 'node:child_process';
 import { homedir } from 'node:os';
-import { formatTaskStatus } from '../utils/task-status.js';
 import { createAIProvider } from '../utils/ai-factory.js';
-import { TaskDescription, TaskNotFoundError, TaskValidationError } from '../lib/description.js';
+import { TaskDescription } from '../lib/description.js';
 import { PromptBuilder } from '../lib/prompt.js';
 import { SetupBuilder } from '../lib/setup.js';
 import { UserSettings, AI_AGENT } from '../lib/config.js';
@@ -18,6 +16,9 @@ import { generateBranchName } from '../utils/branch-name.js';
 import { request } from 'node:https';
 import { promisify } from 'node:util';
 import { exec } from 'node:child_process';
+import { checkGitHubCLI } from '../utils/system.js';
+import { roverBanner } from '../utils/banner.js';
+import showTips from '../utils/tips.js';
 
 const { prompt } = enquirer;
 const execAsync = promisify(exec);
@@ -120,8 +121,8 @@ const updateTaskMetadata = (taskId: number, updates: any, jsonMode?: boolean) =>
 /**
  * Start environment using containers
  */
-export const startDockerExecution = async (taskId: number, taskData: any, worktreePath: string, iterationPath: string, selectedAiAgent: string, customTaskDescriptionPath?: string, followMode?: boolean, jsonMode?: boolean) => {
-    const containerName = `rover-task-${taskId}-${taskData.iterations}`;
+export const startDockerExecution = async (taskId: number, task: any, worktreePath: string, iterationPath: string, selectedAiAgent: string, customTaskDescriptionPath?: string, followMode?: boolean, jsonMode?: boolean) => {
+    const containerName = `rover-task-${taskId}-${task.iterations || task.iterationNumber}`;
 
     try {
         // Check if Docker is available
@@ -135,8 +136,7 @@ export const startDockerExecution = async (taskId: number, taskData: any, worktr
     }
 
     // Load task description
-    const taskDescriptionPath = customTaskDescriptionPath || join(process.cwd(), '.rover', 'tasks', taskId.toString(), 'description.json');
-    const task = TaskDescription.load(taskId);
+    const taskDescriptionPath = customTaskDescriptionPath || join(process.cwd(), '.rover', 'tasks', taskId.toString(), 'description.json');;
 
     // Generate setup script using SetupBuilder
     const setupBuilder = new SetupBuilder(task, selectedAiAgent);
@@ -173,7 +173,8 @@ export const startDockerExecution = async (taskId: number, taskData: any, worktr
     }
 
     if (!jsonMode) {
-        console.log(colors.bold('\n🐳 Starting Docker container for task execution\n'));
+        console.log(colors.white.bold('\n🐳 Starting Docker container for task:'));
+        console.log(colors.gray('└── Container Name: ') + colors.white(containerName));
     }
 
     // Clean up any existing container with same name
@@ -181,6 +182,10 @@ export const startDockerExecution = async (taskId: number, taskData: any, worktr
         execSync(`docker rm -f ${containerName}`, { stdio: 'pipe' });
     } catch (error) {
         // Container doesn't exist, which is fine
+    }
+
+    if (!jsonMode) {
+        console.log('');
     }
 
     const spinner = !jsonMode ? yoctoSpinner({ text: 'Starting container...' }).start() : null;
@@ -218,7 +223,7 @@ export const startDockerExecution = async (taskId: number, taskData: any, worktr
         if (followMode) {
             if (spinner) spinner.success('Container started');
             if (!jsonMode) {
-                console.log(colors.cyan(`Running automated task execution with ${selectedAiAgent} (follow mode)...\n`));
+                console.log(colors.bold.white(`Container logs (--follow)\n`));
             }
 
             // Start Docker container with streaming output
@@ -378,10 +383,12 @@ export const startDockerExecution = async (taskId: number, taskData: any, worktr
 
                 if (spinner) spinner.success('Container started in background');
                 if (!jsonMode) {
-                    console.log(colors.cyan(`🐳 Task is running in background (Container ID: ${containerId.substring(0, 12)})`));
-                    console.log(colors.gray(`   Use `) + colors.cyan(`rover list`) + colors.gray(` to monitor progress`));
-                    console.log(colors.gray(`   Use `) + colors.cyan(`rover inspect ${taskId}`) + colors.gray(` to get task details`));
-                    console.log(colors.gray(`   Use `) + colors.cyan(`rover logs -f ${taskId}`) + colors.gray(` to view logs`));
+                    showTips([
+                        'Use ' + colors.cyan(`rover logs -f ${task.id}`) + ` to monitor logs`,
+                        'Use ' + colors.cyan(`rover inspect ${task.id}`) + ` to get task details`,
+                        'Use ' + colors.cyan(`rover list`) + ` to check the status of all tasks`
+
+                    ]);
                 }
 
                 // Update task metadata with container ID
@@ -413,18 +420,6 @@ export const startDockerExecution = async (taskId: number, taskData: any, worktr
         }
     }
 }
-
-/**
- * Check if a command exists
- */
-const commandExists = (cmd: string): boolean => {
-    try {
-        execSync(`which ${cmd}`, { stdio: 'pipe' });
-        return true;
-    } catch {
-        return false;
-    }
-};
 
 /**
  * Get GitHub repo info from remote URL
@@ -528,18 +523,13 @@ const fetchGitHubIssue = async (issueNumber: string, json: boolean): Promise<{ t
             return null;
         }
 
-        if (!json) {
-            console.log(colors.gray(`📍 Fetching issue #${issueNumber} from ${repoInfo.owner}/${repoInfo.repo}...`));
-        }
-
         // Try API first
         let issueData = await fetchGitHubIssueViaAPI(repoInfo.owner, repoInfo.repo, issueNumber);
 
         // If API fails and gh CLI is available, try gh
-        if (!issueData && commandExists('gh')) {
-            if (!json) {
-                console.log(colors.gray('  API request failed, trying gh CLI...'));
-            }
+        const githubCLI = await checkGitHubCLI();
+
+        if (!issueData && githubCLI) {
             issueData = await fetchGitHubIssueViaCLI(repoInfo.owner, repoInfo.repo, issueNumber);
         }
 
@@ -578,21 +568,12 @@ export const taskCommand = async (initPrompt?: string, options: { fromGithub?: s
     }
 
     // Load AI agent selection from user settings
-    let selectedAiAgent = 'claude'; // default
-    
+    let selectedAiAgent = AI_AGENT.Claude; // default
+
     try {
         if (UserSettings.exists()) {
             const userSettings = UserSettings.load();
             selectedAiAgent = userSettings.defaultAiAgent || AI_AGENT.Claude;
-            
-            if (!json) {
-                console.log(colors.white(`Selected ${selectedAiAgent} from user settings.`));
-            }
-        } else {
-            if (!json) {
-                console.log(colors.yellow('⚠ User settings not found, defaulting to Claude'));
-                console.log(colors.gray('  Run `rover init` to configure AI agent preferences'));
-            }
         }
     } catch (error) {
         if (!json) {
@@ -607,7 +588,9 @@ export const taskCommand = async (initPrompt?: string, options: { fromGithub?: s
     }
 
     if (!json) {
-        console.log(colors.bold('\n📝 Create a new task\n'));
+        console.log(roverBanner());
+        console.log(`\n🤖 ${colors.green("Rover")}:`, 'hey human! Here you can assign new tasks to an agent');
+        console.log(`🤖 ${colors.green("Rover")}:`, 'Add detailed instructions for a better result\n');
     }
 
     let description = initPrompt?.trim() || '';
@@ -628,8 +611,8 @@ export const taskCommand = async (initPrompt?: string, options: { fromGithub?: s
 
             if (!json) {
                 console.log(colors.green('✓ GitHub issue fetched successfully'));
-                console.log(colors.gray('Title: ') + colors.cyan(issueData.title));
-                console.log(colors.gray('Body: ') + colors.white(issueData.body.substring(0, 100) + (issueData.body.length > 100 ? '...' : '')));
+                console.log(colors.gray('├── Title: ') + colors.cyan(issueData.title));
+                console.log(colors.gray('└── Body: ') + colors.white(issueData.body.substring(0, 100) + (issueData.body.length > 100 ? '...' : '')));
             }
         } else {
             // If GitHub fetch failed, exit
@@ -651,7 +634,7 @@ export const taskCommand = async (initPrompt?: string, options: { fromGithub?: s
         const { input } = await prompt<{ input: string }>({
             type: 'input',
             name: 'input',
-            message: 'Briefly describe the task you want to accomplish:',
+            message: 'Describe the task you want to assign:',
             validate: (value) => value.trim().length > 0 || 'Please provide a description'
         });
 
@@ -672,7 +655,7 @@ export const taskCommand = async (initPrompt?: string, options: { fromGithub?: s
             );
 
             if (expanded) {
-                if (spinner) spinner.success('Task expanded!');
+                if (spinner) spinner.success('Done!');
                 taskData = expanded;
 
                 // Skip confirmation if using GitHub issue
@@ -681,9 +664,9 @@ export const taskCommand = async (initPrompt?: string, options: { fromGithub?: s
                 } else {
                     // Display the expanded task
                     if (!json) {
-                        console.log('\n' + colors.bold('Task Details:'));
-                        console.log(colors.gray('Title: ') + colors.cyan(taskData.title));
-                        console.log(colors.gray('Description: ') + colors.white(taskData.description));
+                        console.log('\n' + colors.white.bold('Task Details:'));
+                        console.log(colors.gray('├── Title: ') + colors.cyan(taskData.title));
+                        console.log(colors.gray('└── Description: ') + colors.white(taskData.description));
                     }
 
                     // Ask for confirmation
@@ -705,12 +688,12 @@ export const taskCommand = async (initPrompt?: string, options: { fromGithub?: s
                         const { additionalInfo } = await prompt<{ additionalInfo: string }>({
                             type: 'input',
                             name: 'additionalInfo',
-                            message: 'Provide additional information or corrections:',
+                            message: 'Provide additional instructions:',
                             validate: (value) => value.trim().length > 0 || 'Please provide additional information'
                         });
 
                         // Update the description for next iteration
-                        taskData.description = `${taskData.description} Additional context: ${additionalInfo}`;
+                        taskData.description = `${taskData.description}. Additional instructions: ${additionalInfo}`;
                     } else {
                         // Cancel
                         if (!json) {
@@ -770,18 +753,9 @@ export const taskCommand = async (initPrompt?: string, options: { fromGithub?: s
             description: taskData.description
         });
 
-        if (!json) {
-            console.log(colors.green('\n✓ Task created successfully!'));
-            console.log(colors.gray(`  Task ID: ${task.id}`));
-            console.log(colors.gray(`  Saved to: .rover/tasks/${taskId}/description.json\n`));
-        }
-
         // Setup git worktree and branch
         const worktreePath = join(taskPath, 'workspace');
         const branchName = generateBranchName(taskId);
-
-        // Check if worktree and branch already exist
-        const workspaceSpinner = !json ? yoctoSpinner({ text: 'Creating git workspace...' }).start() : null;
 
         try {
             // Check if branch already exists
@@ -796,15 +770,11 @@ export const taskCommand = async (initPrompt?: string, options: { fromGithub?: s
             if (branchExists) {
                 // Create worktree from existing branch
                 execSync(`git worktree add "${worktreePath}" "${branchName}"`, { stdio: 'pipe' });
-                if (workspaceSpinner) workspaceSpinner.success('Git workspace created from existing branch');
-                if (!json) console.log(colors.cyan('🔄 Resuming work on existing branch'));
             } else {
                 // Create new worktree with a new branch
                 execSync(`git worktree add "${worktreePath}" -b "${branchName}"`, { stdio: 'pipe' });
-                if (workspaceSpinner) workspaceSpinner.success('Git workspace created');
             }
         } catch (error) {
-            if (workspaceSpinner) workspaceSpinner.error('Failed to create workspace');
             if (!json) {
                 console.error(colors.red('Error creating git workspace:'), error);
             }
@@ -820,21 +790,15 @@ export const taskCommand = async (initPrompt?: string, options: { fromGithub?: s
         task.markInProgress();
 
         if (!json) {
-            console.log(colors.bold('\n🚀 Task Started\n'));
-            console.log(colors.gray('ID: ') + colors.cyan(task.id.toString()));
-            console.log(colors.gray('Title: ') + colors.white(task.title));
-            console.log(colors.gray('Status: ') + colors.yellow(formatTaskStatus(task.status)));
-            console.log(colors.gray('Started: ') + colors.white(new Date().toLocaleString()));
-            console.log(colors.gray('Workspace: ') + colors.cyan(task.worktreePath));
-            console.log(colors.gray('Branch: ') + colors.cyan(task.branchName));
-
-            console.log(colors.green('\n✓ Task started with dedicated workspace'));
-
-            console.log(colors.gray('  You can now work in: ') + colors.cyan(worktreePath));
+            console.log(colors.bold.white('\n🚀 Task Created'));
+            console.log(colors.gray('├── ID: ') + colors.cyan(task.id.toString()));
+            console.log(colors.gray('├── Title: ') + colors.white(task.title));
+            console.log(colors.gray('├── Workspace: ') + colors.cyan(task.worktreePath));
+            console.log(colors.gray('└── Branch: ') + colors.cyan(task.branchName));
         }
 
         // Start Docker container for task execution
-        await startDockerExecution(taskId, taskData, worktreePath, iterationPath, selectedAiAgent, undefined, follow, json);
+        await startDockerExecution(taskId, task, worktreePath, iterationPath, selectedAiAgent, undefined, follow, json);
 
         if (json) {
             // Output final JSON after all operations are complete

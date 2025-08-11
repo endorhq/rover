@@ -59,9 +59,8 @@ export const init = async (path: string = '.') => {
     // Intro
     console.log(roverBanner());
 
-    console.log(colors.cyan('\nHello human! 🤖'));
-    console.log(`${colors.gray("I'm")} ${colors.green("Rover")}${colors.gray(", and I will help you managing AI agents.")}`);
-    console.log(colors.gray("Let me first run some checks in your systems.\n"));
+    console.log(`\n🤖 ${colors.green("Rover")}:`, "hey human! I'm Rover and I will help you managing AI agents.");
+    console.log(`🤖 ${colors.green("Rover")}:`, 'Let me first run some checks in your system.\n');
 
     const reqSpinner = ora({ text: 'Checking prerequisites', spinner: 'dots2' }).start();
 

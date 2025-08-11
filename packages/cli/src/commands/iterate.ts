@@ -151,7 +151,7 @@ export const iterateCommand = async (taskId: string, refinements: string, option
 
     // Load AI agent selection from user settings
     let selectedAiAgent = 'claude'; // default
-    
+
     try {
         if (UserSettings.exists()) {
             const userSettings = UserSettings.load();
