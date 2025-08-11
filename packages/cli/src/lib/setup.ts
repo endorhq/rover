@@ -1,6 +1,7 @@
 import { writeFileSync, chmodSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { TaskDescription } from './description.js';
+const { execSync } = require('child_process');
 
 /**
  * SetupBuilder class - Consolidates Docker setup script generation
@@ -146,13 +147,29 @@ write_status() {
      * Generate permission recovery function
      */
     private generatePermissionRecoveryFunction(): string {
+        const output = execSync('docker info -f json', { encoding: 'utf8' });
+        const info = JSON.parse(output);
+        const isDockerRootless = (info?.SecurityOptions || []).some(
+            (value: string) => value.includes('rootless')
+        );
+        let recoverPermissions;
+        if (isDockerRootless) {
+            recoverPermissions = `
+              chown -R root:root /workspace || true
+              chown -R root:root /output || true
+            `;
+        } else {
+            recoverPermissions = `
+              chown -R $uid:$gid /workspace || true
+              chown -R $uid:$gid /output || true
+            `;
+        }
+
         return `# Function to recover permissions before exit
 recover_permissions() {
     echo "🔧 Recovering permissions..."
 
-    # This works in a rootless docker installation
-    chown -R root:root /workspace || true
-    chown -R root:root /output || true
+    ${recoverPermissions}
 
     echo "✅ Permissions recovered"
 }
@@ -443,6 +460,12 @@ ${this.generateUserSetupFunctions()}`;
 # Generated for agent: ${this.agent}
 # Task ID: ${this.taskId}
 # Task description is mounted at /task/description.json
+
+uid=$1
+gid=$2
+
+echo "UID is $uid"
+echo "GID is $gid"
 
 ${this.generateCommonFunctions()}
 

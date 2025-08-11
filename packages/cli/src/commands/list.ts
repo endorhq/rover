@@ -73,7 +73,10 @@ export const listCommand = async (options: { watch?: boolean; verbose?: boolean;
                 console.log(JSON.stringify([]));
             } else {
                 console.log(colors.yellow('📋 No tasks found'));
-                console.log(colors.gray('   Use ') + colors.white('rover task') + colors.gray(' to create and start a task'));
+
+                showTips([
+                    'Use ' + colors.cyan('rover task') + ' to assign a new task to an agent'
+                ]);
             }
             return;
         }

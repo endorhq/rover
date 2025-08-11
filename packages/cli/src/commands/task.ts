@@ -19,6 +19,7 @@ import { exec } from 'node:child_process';
 import { checkGitHubCLI } from '../utils/system.js';
 import { roverBanner } from '../utils/banner.js';
 import showTips from '../utils/tips.js';
+import { userInfo } from 'node:os';
 
 const { prompt } = enquirer;
 const execAsync = promisify(exec);
@@ -207,6 +208,8 @@ export const startDockerExecution = async (taskId: number, task: any, worktreePa
             dockerArgs.push('-d'); // Detached mode for background execution
         }
 
+        const currentUser = userInfo();
+
         dockerArgs.push(
             '-v', `${worktreePath}:/workspace:rw`,
             '-v', `${iterationPath}:/output:rw`,
@@ -217,7 +220,7 @@ export const startDockerExecution = async (taskId: number, task: any, worktreePa
             '-v', `${promptsDir}:/prompts:ro`,
             '-w', '/workspace',
             'node:24-alpine',
-            '/bin/sh', '/setup.sh'
+            '/bin/sh', '/setup.sh', `"${currentUser.uid}"`, `"${currentUser.gid}"`
         );
 
         if (followMode) {
