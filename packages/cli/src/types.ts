@@ -1,7 +1,4 @@
-export type ProjectType = 'javascript' | 'typescript' | 'php' | 'unknown';
-export type PackageManager = 'npm' | 'pnpm' | 'yarn' | 'composer' | 'unknown';
-export type DevEnvironment = 'devcontainer' | 'docker-compose' | 'dockerfile' | 'local';
-export type TaskManager = 'task' | 'just' | 'make' | 'none';
+import { LANGUAGE, PACKAGE_MANAGER, TASK_MANAGER } from './lib/config.js';
 
 export interface ProjectInstructions {
     runDev: string;
@@ -35,13 +32,9 @@ export interface TaskExpansion {
 }
 
 export interface Environment {
-    projectType: ProjectType;
-    packageManager: PackageManager;
-    devEnvironments: DevEnvironment[];
-    taskManagers: TaskManager[];
-    aiAgents?: string[];
-    selectedAiAgent?: string;
-    instructions?: ProjectInstructions;
+    languages: LANGUAGE[];
+    packageManagers: PACKAGE_MANAGER[];
+    taskManagers: TASK_MANAGER[];
 }
 
 export interface AIProvider {

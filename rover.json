@@ -1,20 +1,10 @@
 {
-  "version": "1.0.4",
-  "createdAt": "2025-07-30T13:43:49.948Z",
-  "environment": {
-    "projectType": "typescript",
-    "packageManager": "pnpm",
-    "devEnvironments": [
-      "local"
-    ],
-    "taskManagers": [
-      "none"
-    ],
-    "aiAgents": [
-      "claude",
-      "gemini"
-    ],
-    "selectedAiAgent": "claude",
-    "instructions": null
-  }
+  "version": "1.0",
+  "languages": [
+    "javascript"
+  ],
+  "packageManagers": [
+    "npm"
+  ],
+  "taskManagers": []
 }

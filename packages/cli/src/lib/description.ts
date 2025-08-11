@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
 // Schema version for migrations
-const CURRENT_SCHEMA_VERSION = '1.0.0';
+const CURRENT_SCHEMA_VERSION = '1.0';
 
 // Status enum with ITERATING added
 export type TaskStatus = 'NEW' | 'IN_PROGRESS' | 'ITERATING' | 'COMPLETED' | 'FAILED';
