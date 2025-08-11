@@ -38,7 +38,6 @@ export interface Environment {
 }
 
 export interface AIProvider {
-    analyzeProject(projectPath: string, environment: Environment): Promise<ProjectInstructions | null>;
     expandTask(briefDescription: string, projectPath: string): Promise<TaskExpansion | null>;
     generateCommitMessage(taskTitle: string, taskDescription: string, recentCommits: string[], summaries: string[]): Promise<string | null>
     resolveMergeConflicts(filePath: string, diffContext: string, conflictedContent: string): Promise<string | null>
