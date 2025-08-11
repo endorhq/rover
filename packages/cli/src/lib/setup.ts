@@ -67,7 +67,7 @@ configure-mcp-servers() {
 # Task description is mounted at /task/description.json
 
 # Download and install the MCP server
-wget -O /usr/local/bin/package-manager-mcp-server https://images.endor.dev/rover/assets/package-manager-mcp-x86_64-unknown-linux-musl
+wget -O /usr/local/bin/package-manager-mcp-server https://images.endor.dev/rover/assets/package-manager-mcp-$(uname -m)-unknown-linux-musl
 chmod +x /usr/local/bin/package-manager-mcp-server
 
 echo "======================================="
