@@ -14,6 +14,7 @@ import { TaskDescription, TaskNotFoundError, TaskValidationError } from '../lib/
 import { PromptBuilder } from '../lib/prompt.js';
 import { SetupBuilder } from '../lib/setup.js';
 import { UserSettings, AI_AGENT } from '../lib/config.js';
+import { generateBranchName } from '../utils/branch-name.js';
 import { request } from 'node:https';
 import { promisify } from 'node:util';
 import { exec } from 'node:child_process';
@@ -777,7 +778,7 @@ export const taskCommand = async (initPrompt?: string, options: { fromGithub?: s
 
         // Setup git worktree and branch
         const worktreePath = join(taskPath, 'workspace');
-        const branchName = `task-${taskId}`;
+        const branchName = generateBranchName(taskId);
 
         // Check if worktree and branch already exist
         const workspaceSpinner = !json ? yoctoSpinner({ text: 'Creating git workspace...' }).start() : null;

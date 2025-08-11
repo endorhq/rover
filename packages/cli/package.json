@@ -25,6 +25,7 @@
     "commander": "^14.0.0",
     "enquirer": "^2.4.1",
     "execa": "^9.6.0",
+    "nanoid": "^5.0.9",
     "ora": "^8.2.0",
     "yocto-spinner": "^1.0.0",
     "zod": "^4.0.5"
