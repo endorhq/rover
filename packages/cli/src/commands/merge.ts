@@ -7,6 +7,7 @@ import yoctoSpinner from 'yocto-spinner';
 import { createAIProvider } from '../utils/ai-factory.js';
 import { AIProvider } from '../types.js';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
+import { UserSettings, AI_AGENT } from '../lib/config.js';
 
 const { prompt } = enquirer;
 
@@ -406,19 +407,24 @@ export const mergeCommand = async (taskId: string, options: MergeOptions = {}) =
 
     result.taskId = numericTaskId;
 
-    // Load rover configuration to get selected AI agent
-    const roverConfigPath = join(process.cwd(), 'rover.json');
+    // Load AI agent selection from user settings
     let selectedAiAgent = 'claude'; // default
-
+    
     try {
-        if (existsSync(roverConfigPath)) {
-            const config = JSON.parse(readFileSync(roverConfigPath, 'utf-8'));
-            selectedAiAgent = config.environment?.selectedAiAgent || 'claude';
+        if (UserSettings.exists()) {
+            const userSettings = UserSettings.load();
+            selectedAiAgent = userSettings.defaultAiAgent || AI_AGENT.Claude;
+        } else {
+            if (!options.json) {
+                console.log(colors.yellow('⚠ User settings not found, defaulting to Claude'));
+                console.log(colors.gray('  Run `rover init` to configure AI agent preferences'));
+            }
         }
     } catch (error) {
         if (!options.json) {
-            console.log(colors.yellow('⚠ Could not load rover configuration, defaulting to Claude'));
+            console.log(colors.yellow('⚠ Could not load user settings, defaulting to Claude'));
         }
+        selectedAiAgent = AI_AGENT.Claude;
     }
 
     // Create AI provider instance
