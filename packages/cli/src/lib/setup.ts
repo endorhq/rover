@@ -150,7 +150,7 @@ write_status() {
         const output = execSync('docker info -f json', { encoding: 'utf8' });
         const info = JSON.parse(output);
         const isDockerRootless = (info?.SecurityOptions || []).some(
-            (value) => value.includes('rootless')
+            (value: string) => value.includes('rootless')
         );
         let recoverPermissions;
         if (isDockerRootless) {
