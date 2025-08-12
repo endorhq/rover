@@ -1,6 +1,7 @@
 import colors from 'ansi-colors';
 import { existsSync } from 'node:fs';
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
+import { spawnSync } from '../lib/os.js';
 import yoctoSpinner from 'yocto-spinner';
 import { formatTaskStatus } from '../utils/task-status.js';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';

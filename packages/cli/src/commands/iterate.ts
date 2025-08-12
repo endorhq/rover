@@ -2,7 +2,7 @@ import colors from 'ansi-colors';
 import enquirer from 'enquirer';
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { spawnSync } from '../lib/os.js';
 import yoctoSpinner from 'yocto-spinner';
 import type { TaskExpansion, AIProvider } from '../types.js';
 import { startDockerExecution } from './task.js';

@@ -1,7 +1,8 @@
 import colors from 'ansi-colors';
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
+import { spawnSync } from '../lib/os.js';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
 
 /**
@@ -169,7 +170,7 @@ export const logsCommand = (taskId: string, iterationNumber?: string, options: {
                 const logs = spawnSync('docker', ['logs', containerId], {
                     encoding: 'utf8',
                     stdio: 'pipe'
-                }).stdout;
+                }).stdout.toString();
 
                 if (logs.trim() === '') {
                     console.log(colors.yellow('No logs available for this container'));

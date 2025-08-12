@@ -1,7 +1,7 @@
 import colors from 'ansi-colors';
 import enquirer from 'enquirer';
 import yoctoSpinner from 'yocto-spinner';
-import { spawnSync } from 'node:child_process';
+import { spawnSync } from '../lib/os.js';
 import { existsSync, openSync } from 'node:fs';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -134,7 +134,7 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
 
         // Check for changes
         const statusOutput = spawnSync('git', ['status', '--porcelain'], { encoding: 'utf8' });
-        const hasChanges = statusOutput.stdout.trim().length > 0;
+        const hasChanges = statusOutput.stdout.toString().trim().length > 0;
         result.hasChanges = hasChanges;
 
         if (!hasChanges) {
@@ -143,7 +143,7 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
                 const unpushedCommits = spawnSync('git', ['rev-list', '--count', `origin/${task.branchName}..${task.branchName}`], {
                     encoding: 'utf8',
                     stdio: ['inherit', 'inherit', 'ignore']
-                }).stdout.trim();
+                }).stdout.toString().trim();
 
                 if (unpushedCommits === '0') {
                     result.success = true;
@@ -166,7 +166,7 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
                 console.log(colors.cyan('Found uncommitted changes:'));
 
                 // Show brief status
-                const files = statusOutput.stdout.trim().split('\n');
+                const files = statusOutput.stdout.toString().trim().split('\n');
                 files.forEach(file => {
                     const [status, ...pathParts] = file.trim().split(/\s+/);
                     const path = pathParts.join(' ');
@@ -265,7 +265,7 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
         // Check if this is a GitHub repo
         if (options.pr === true) {
             try {
-                const remoteUrl = spawnSync('git', ['remote', 'get-url', 'origin'], { encoding: 'utf8' }).stdout.trim();
+                const remoteUrl = spawnSync('git', ['remote', 'get-url', 'origin'], { encoding: 'utf8' }).stdout.toString().trim();
                 const repoInfo = getGitHubRepoInfo(remoteUrl);
 
                 if (repoInfo) {

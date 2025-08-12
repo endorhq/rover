@@ -14,7 +14,8 @@ import { UserSettings, AI_AGENT } from '../lib/config.js';
 import { generateBranchName } from '../utils/branch-name.js';
 import { request } from 'node:https';
 import { promisify } from 'node:util';
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
+import { spawnSync } from '../lib/os.js';
 import { checkGitHubCLI } from '../utils/system.js';
 import { roverBanner } from '../utils/banner.js';
 import showTips from '../utils/tips.js';
@@ -380,7 +381,7 @@ export const startDockerExecution = async (taskId: number, task: any, worktreePa
                 const containerId = spawnSync('docker', dockerArgs, {
                     stdio: 'pipe',
                     encoding: 'utf8'
-                }).stdout.trim();
+                }).stdout.toString().trim();
 
                 if (spinner) spinner.success('Container started in background');
                 if (!jsonMode) {
@@ -513,7 +514,7 @@ const fetchGitHubIssueViaCLI = async (owner: string, repo: string, issueNumber: 
 const fetchGitHubIssue = async (issueNumber: string, json: boolean): Promise<{ title: string; body: string } | null> => {
     try {
         // Try to get repo info from git remote
-        const remoteUrl = spawnSync('git', ['remote', 'get-url', 'origin'], { encoding: 'utf8' }).stdout.trim();
+        const remoteUrl = spawnSync('git', ['remote', 'get-url', 'origin'], { encoding: 'utf8' }).stdout.toString().trim();
         const repoInfo = getGitHubRepoInfo(remoteUrl);
 
         if (!repoInfo) {

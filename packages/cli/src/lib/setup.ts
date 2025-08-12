@@ -1,7 +1,7 @@
 import { writeFileSync, chmodSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { TaskDescription } from './description.js';
-const { spawnSync } = require('child_process');
+import { spawnSync } from './os.js';
 
 /**
  * SetupBuilder class - Consolidates Docker setup script generation
@@ -148,7 +148,7 @@ write_status() {
      */
     private generatePermissionRecoveryFunction(): string {
         const output = spawnSync('docker', ['info', '-f', 'json'], { encoding: 'utf8' }).stdout;
-        const info = JSON.parse(output);
+        const info = JSON.parse(output.toString());
         const isDockerRootless = (info?.SecurityOptions || []).some(
             (value: string) => value.includes('rootless')
         );

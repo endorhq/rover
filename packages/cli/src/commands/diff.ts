@@ -1,7 +1,7 @@
 import colors from 'ansi-colors';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { spawnSync } from '../lib/os.js';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
 
 export const diffCommand = (taskId: string, filePath?: string, options: { onlyFiles?: boolean, branch?: string } = {}) => {
@@ -76,7 +76,7 @@ export const diffCommand = (taskId: string, filePath?: string, options: { onlyFi
                 const diffOutput = spawnSync('git', gitDiffArgs, {
                     stdio: 'pipe',
                     encoding: 'utf8'
-                }).stdout;
+                }).stdout.toString();
 
                 if (diffOutput.trim() === '') {
                     if (filePath) {

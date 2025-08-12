@@ -2,7 +2,7 @@ import colors from 'ansi-colors';
 import enquirer from 'enquirer';
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { spawnSync } from '../lib/os.js';
 import yoctoSpinner from 'yocto-spinner';
 import { createAIProvider } from '../utils/ai-factory.js';
 import { AIProvider } from '../types.js';
@@ -22,7 +22,7 @@ const getRecentCommitMessages = (count: number = 5): string[] => {
             const remoteHead = spawnSync('git', ['symbolic-ref', 'refs/remotes/origin/HEAD'], {
                 encoding: 'utf8',
                 stdio: ['pipe', 'pipe', 'ignore']
-            }).stdout.trim();
+            }).stdout.toString().trim();
             if (remoteHead) {
                 mainBranch = remoteHead.replace('refs/remotes/origin/', '');
             } else {
@@ -47,7 +47,7 @@ const getRecentCommitMessages = (count: number = 5): string[] => {
         const commits = spawnSync('git', ['log', mainBranch, '--pretty', 'format:"%s"', '-n', `${count}`], {
             stdio: 'pipe',
             encoding: 'utf8'
-        }).stdout.trim();
+        }).stdout.toString().trim();
 
         return commits.split('\n').filter(line => line.trim() !== '');
 
@@ -133,7 +133,7 @@ const hasUncommittedChanges = (): boolean => {
         const status = spawnSync('git', ['status', '--porcelain', '-u', 'no'], {
             stdio: 'pipe',
             encoding: 'utf8'
-        }).stdout.trim();
+        }).stdout.toString().trim();
 
         return status.length > 0;
     } catch (error) {
@@ -152,7 +152,7 @@ const worktreeHasChanges = (worktreePath: string): boolean => {
         const status = spawnSync('git', ['status', '--porcelain'], {
             stdio: 'pipe',
             encoding: 'utf8'
-        }).stdout.trim();
+        }).stdout.toString().trim();
 
         process.chdir(originalCwd);
 
@@ -172,7 +172,7 @@ const hasUnmergedCommits = (taskBranch: string): boolean => {
         const currentBranch = spawnSync('git', ['branch', '--show-current'], {
             stdio: 'pipe',
             encoding: 'utf8'
-        }).stdout.trim();
+        }).stdout.toString().trim();
 
         // Check if task branch exists
         try {
@@ -185,7 +185,7 @@ const hasUnmergedCommits = (taskBranch: string): boolean => {
         const unmergedCommits = spawnSync('git', ['log', `${currentBranch}..${taskBranch}`, '--oneline'], {
             stdio: 'pipe',
             encoding: 'utf8'
-        }).stdout.trim();
+        }).stdout.toString().trim();
 
         return unmergedCommits.length > 0;
 
@@ -203,13 +203,13 @@ const getUnmergedCommits = (taskBranch: string): string[] => {
         const currentBranch = spawnSync('git', ['branch', '--show-current'], {
             stdio: 'pipe',
             encoding: 'utf8'
-        }).stdout.trim();
+        }).stdout.toString().trim();
 
         // Get commits in task branch that are not in current branch
         const unmergedCommits = spawnSync('git', ['log', `${currentBranch}..${taskBranch}`, '--oneline'], {
             stdio: 'pipe',
             encoding: 'utf8'
-        }).stdout.trim();
+        }).stdout.toString().trim();
 
         return unmergedCommits.split('\n').filter(line => line.trim() !== '');
 
@@ -227,7 +227,7 @@ const hasMergeConflicts = (): boolean => {
         const status = spawnSync('git', ['status', '--porcelain'], {
             stdio: 'pipe',
             encoding: 'utf8'
-        }).stdout.trim();
+        }).stdout.toString().trim();
 
         // Look for conflict markers (UU, AA, etc.)
         const conflictLines = status.split('\n').filter(line =>
@@ -252,7 +252,7 @@ const getConflictedFiles = (): string[] => {
         const status = spawnSync('git', ['status', '--porcelain'], {
             stdio: 'pipe',
             encoding: 'utf8'
-        }).stdout.trim();
+        }).stdout.toString().trim();
 
         const conflictFiles = status.split('\n')
             .filter(line =>
@@ -295,7 +295,7 @@ const resolveMergeConflicts = async (conflictedFiles: string[], aiProvider: AIPr
                 diffContext = spawnSync('git', ['log', '--oneline', '-10'], {
                     stdio: 'pipe',
                     encoding: 'utf8'
-                }).stdout;
+                }).stdout.toString();
             } catch (error) {
                 diffContext = 'No recent commit history available';
             }
@@ -344,7 +344,7 @@ const showResolvedChanges = async (conflictedFiles: string[]): Promise<void> => 
             const diff = spawnSync('git', ['diff', '--cached', filePath], {
                 stdio: 'pipe',
                 encoding: 'utf8'
-            }).stdout;
+            }).stdout.toString();
 
             if (diff.trim()) {
                 console.log(colors.gray(diff));
@@ -482,7 +482,7 @@ export const mergeCommand = async (taskId: string, options: MergeOptions = {}) =
             result.currentBranch = spawnSync('git', ['branch', '--show-current'], {
                 stdio: 'pipe',
                 encoding: 'utf8'
-            }).stdout.trim();
+            }).stdout.toString().trim();
         } catch (error) {
             result.currentBranch = 'unknown';
         }
