@@ -8,6 +8,8 @@ export function spawnSync(
     const res = spawnSync_(command, args, options);
     if (res.error) {
         throw `failed to execute ${command}: ${res.error}`;
+    } else if (res.status !== 0) {
+        throw `exit code for ${command} is ${res.status}`;
     }
     return res;
 }
