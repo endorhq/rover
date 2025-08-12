@@ -4,6 +4,7 @@ import { TaskDescription, TaskNotFoundError, type TaskStatus } from '../lib/desc
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import showTips from '../utils/tips.js';
+import { getTelemetry } from '../lib/telemetry.js';
 
 /**
  * Interface for JSON output of task inspection
@@ -113,7 +114,7 @@ export const iterationFiles = (taskId: number, iterationNumber: number, files?: 
     return result;
 }
 
-export const inspectCommand = (taskId: string, iterationNumber?: number, options: { json?: boolean, file?: string[] } = {}) => {
+export const inspectCommand = async (taskId: string, iterationNumber?: number, options: { json?: boolean, file?: string[] } = {}) => {
     // Convert string taskId to number
     const numericTaskId = parseInt(taskId, 10);
 
@@ -131,6 +132,9 @@ export const inspectCommand = (taskId: string, iterationNumber?: number, options
         }
         return;
     }
+
+    const telemetry = getTelemetry();
+    telemetry?.eventInspectTask();
 
     try {
         // Load task using TaskDescription
@@ -252,6 +256,8 @@ export const inspectCommand = (taskId: string, iterationNumber?: number, options
                 'Use ' + colors.cyan(`rover iterate ${taskId}`) + ' to start a new agent iteration on this task'
             ]);
         }
+
+        await telemetry?.shutdown();
     } catch (error) {
         if (error instanceof TaskNotFoundError) {
             if (options.json) {

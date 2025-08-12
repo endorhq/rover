@@ -9,6 +9,7 @@ import { checkClaude, checkDocker, checkGemini, checkGit } from '../utils/system
 import { AI_AGENT, ProjectConfig, UserSettings } from '../lib/config.js';
 import showTips, { TIP_TITLES } from '../utils/tips.js';
 import { roverBanner } from '../utils/banner.js';
+import { getTelemetry } from '../lib/telemetry.js';
 
 // Get the default prompt
 const { prompt } = enquirer;
@@ -58,6 +59,8 @@ const ensureGitignore = async (projectPath: string): Promise<void> => {
 export const init = async (path: string = '.') => {
     // Intro
     console.log(roverBanner());
+
+    const telemetry = getTelemetry();
 
     console.log(`\n🤖 ${colors.green("Rover")}:`, "hey human! I'm Rover and I will help you managing AI agents.");
     console.log(`🤖 ${colors.green("Rover")}:`, 'Let me first run some checks in your system.\n');
@@ -153,16 +156,17 @@ export const init = async (path: string = '.') => {
             defaultAIAgent = availableAgents[0];
         }
 
+        // Send telemetry information
+        telemetry?.eventInit(availableAgents, defaultAIAgent, environment.languages);
+
         // Save configuration to .rover directory
         console.log('');
 
         try {
             // Save Project Configuration (rover.json)
             let projectConfig: ProjectConfig;
-            let exists = false;
 
             if (ProjectConfig.exists()) {
-                exists = true;
                 projectConfig = ProjectConfig.load();
                 // Update with detected values
                 environment.languages.forEach(lang => projectConfig.addLanguage(lang));
@@ -203,6 +207,8 @@ export const init = async (path: string = '.') => {
                     title: TIP_TITLES.NEXT_STEPS
                 }
             );
+
+            await telemetry?.shutdown();
         } catch (error) {
             console.error('\n' + colors.red('Rover initialization failed!'));
             console.error(colors.red('Error:'), error);

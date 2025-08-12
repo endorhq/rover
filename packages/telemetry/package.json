@@ -1,0 +1,26 @@
+{
+  "name": "rover-telemetry",
+  "version": "1.0.0",
+  "description": "Provide basic telemetry to the rover CLI and extension",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsdown --env.TSUP_DEV=false src/index.ts",
+    "dev": "TSUP_DEV=true tsdown --env.TSUP_DEV=true --watch src/ src/index.ts",
+    "start": "node dist/index.js",
+    "clean": "rm -rf dist",
+    "check": "tsc --noEmit"
+  },
+  "author": "The Endor team",
+  "dependencies": {
+    "posthog-node": "^5.6.0",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.1.0",
+    "@types/react": "^19.1.8",
+    "@types/uuid": "^10.0.0",
+    "tsdown": "^0.13.0",
+    "typescript": "^5.8.3"
+  }
+}
