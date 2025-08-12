@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { spawn } from 'node:child_process';
 import { spawnSync } from '../lib/os.js';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
+import { getTelemetry } from '../lib/telemetry.js';
 
 /**
  * Get available iterations for a task
@@ -50,7 +51,8 @@ const getContainerIdForIteration = (taskId: number, iterationNumber: number): st
     }
 };
 
-export const logsCommand = (taskId: string, iterationNumber?: string, options: { follow?: boolean } = {}) => {
+export const logsCommand = async (taskId: string, iterationNumber?: string, options: { follow?: boolean } = {}) => {
+    const telemetry = getTelemetry();
     // Convert string taskId to number
     const numericTaskId = parseInt(taskId, 10);
     if (isNaN(numericTaskId)) {
@@ -107,6 +109,8 @@ export const logsCommand = (taskId: string, iterationNumber?: string, options: {
         console.log(colors.gray('Iteration: ') + colors.cyan(`#${actualIteration}`));
         console.log(colors.gray('Container ID: ') + colors.cyan(containerId.substring(0, 12)));
 
+        telemetry?.eventLogs();
+
         if (availableIterations.length > 1) {
             console.log(colors.gray('Available iterations: ') + colors.cyan(availableIterations.join(', ')));
         }
@@ -153,7 +157,6 @@ export const logsCommand = (taskId: string, iterationNumber?: string, options: {
                     logsProcess.kill('SIGTERM');
                     process.exit(0);
                 });
-
             } catch (error: any) {
                 if (error.message.includes('No such container')) {
                     console.log(colors.yellow('Container no longer exists'));
@@ -225,5 +228,7 @@ export const logsCommand = (taskId: string, iterationNumber?: string, options: {
         } else {
             console.error(colors.red('Error reading task logs:'), error);
         }
+    } finally {
+        await telemetry?.shutdown();
     }
 };

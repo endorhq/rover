@@ -5,10 +5,12 @@ import { join } from 'node:path';
 import { spawnSync } from '../lib/os.js';
 import yoctoSpinner from 'yocto-spinner';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
+import { getTelemetry } from '../lib/telemetry.js';
 
 const { prompt } = enquirer;
 
 export const resetCommand = async (taskId: string, options: { force?: boolean } = {}) => {
+    const telemetry = getTelemetry();
     // Convert string taskId to number
     const numericTaskId = parseInt(taskId, 10);
     if (isNaN(numericTaskId)) {
@@ -57,6 +59,8 @@ export const resetCommand = async (taskId: string, options: { force?: boolean } 
         }
 
         const spinner = yoctoSpinner({ text: 'Resetting task...' }).start();
+
+        telemetry?.eventReset();
 
         try {
             // Check if we're in a git repository
@@ -117,5 +121,7 @@ export const resetCommand = async (taskId: string, options: { force?: boolean } 
         } else {
             console.error(colors.red('Error resetting task:'), error);
         }
+    } finally {
+        await telemetry?.shutdown();
     }
 };

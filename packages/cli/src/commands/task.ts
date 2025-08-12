@@ -20,6 +20,8 @@ import { checkGitHubCLI } from '../utils/system.js';
 import { roverBanner } from '../utils/banner.js';
 import showTips from '../utils/tips.js';
 import { userInfo } from 'node:os';
+import { getTelemetry } from '../lib/telemetry.js';
+import { NewTaskProvider } from 'rover-telemetry';
 
 const { prompt } = enquirer;
 
@@ -556,6 +558,7 @@ const fetchGitHubIssue = async (issueNumber: string, json: boolean): Promise<{ t
  * Task commands
  */
 export const taskCommand = async (initPrompt?: string, options: { fromGithub?: string, follow?: boolean, yes?: boolean, json?: boolean } = {}) => {
+    const telemetry = getTelemetry();
     // Extract options
     const { follow, yes, json, fromGithub } = options;
 
@@ -807,6 +810,9 @@ export const taskCommand = async (initPrompt?: string, options: { fromGithub?: s
             console.log(colors.gray('└── Branch: ') + colors.cyan(task.branchName));
         }
 
+        // Track new task event
+        telemetry?.eventNewTask(options.fromGithub != null ? NewTaskProvider.GITHUB : NewTaskProvider.INPUT);
+
         // Start Docker container for task execution
         await startDockerExecution(taskId, task, worktreePath, iterationPath, selectedAiAgent, follow, json);
 
@@ -827,4 +833,6 @@ export const taskCommand = async (initPrompt?: string, options: { fromGithub?: s
             console.log(JSON.stringify(finalJsonOutput, null, 2));
         }
     }
+
+    await telemetry?.shutdown();
 };

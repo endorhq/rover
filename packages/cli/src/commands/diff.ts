@@ -3,8 +3,10 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from '../lib/os.js';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
+import { getTelemetry } from '../lib/telemetry.js';
 
-export const diffCommand = (taskId: string, filePath?: string, options: { onlyFiles?: boolean, branch?: string } = {}) => {
+export const diffCommand = async (taskId: string, filePath?: string, options: { onlyFiles?: boolean, branch?: string } = {}) => {
+    const telemetry = getTelemetry();
     // Convert string taskId to number
     const numericTaskId = parseInt(taskId, 10);
     if (isNaN(numericTaskId)) {
@@ -37,6 +39,8 @@ export const diffCommand = (taskId: string, filePath?: string, options: { onlyFi
         if (task.branchName) {
             console.log(colors.gray('Branch: ') + colors.cyan(task.branchName));
         }
+
+        telemetry?.eventDiff();
 
         // Build git diff command
         const originalCwd = process.cwd();
@@ -148,5 +152,7 @@ export const diffCommand = (taskId: string, filePath?: string, options: { onlyFi
         } else {
             console.error(colors.red('Error showing task diff:'), error);
         }
+    } finally {
+        await telemetry?.shutdown();
     }
 };

@@ -8,6 +8,7 @@ import { createAIProvider } from '../utils/ai-factory.js';
 import { AIProvider } from '../types.js';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
 import { UserSettings, AI_AGENT } from '../lib/config.js';
+import { getTelemetry } from '../lib/telemetry.js';
 
 const { prompt } = enquirer;
 
@@ -381,6 +382,7 @@ interface MergeResult {
 }
 
 export const mergeCommand = async (taskId: string, options: MergeOptions = {}) => {
+    const telemetry = getTelemetry();
     const result: MergeResult = {
         success: false,
         taskId: 0,
@@ -598,6 +600,8 @@ export const mergeCommand = async (taskId: string, options: MergeOptions = {}) =
                 // Switch to worktree and commit changes
                 const originalCwd = process.cwd();
                 process.chdir(task.worktreePath);
+                
+                telemetry?.eventMergeTask();
 
                 try {
                     // Add all changes
@@ -851,5 +855,7 @@ export const mergeCommand = async (taskId: string, options: MergeOptions = {}) =
                 console.error(colors.red('Error merging task:'), error);
             }
         }
+    } finally {
+        await telemetry?.shutdown();
     }
 };

@@ -5,11 +5,13 @@ import { spawnSync } from '../lib/os.js';
 import yoctoSpinner from 'yocto-spinner';
 import { formatTaskStatus } from '../utils/task-status.js';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
+import { getTelemetry } from '../lib/telemetry.js';
 
 /**
  * Start an interactive shell for testing task changes
  */
 export const shellCommand = async (taskId: string, options: { container?: boolean }) => {
+    const telemetry = getTelemetry();
     // Convert string taskId to number
     const numericTaskId = parseInt(taskId, 10);
     if (isNaN(numericTaskId)) {
@@ -41,6 +43,8 @@ export const shellCommand = async (taskId: string, options: { container?: boolea
 
         console.log(colors.gray('Worktree: ') + colors.cyan(task.worktreePath));
         console.log(colors.gray('Branch: ') + colors.cyan(task.branchName));
+        
+        telemetry?.eventShell();
 
         if (options.container) {
             // Check if Docker is available
@@ -169,5 +173,7 @@ export const shellCommand = async (taskId: string, options: { container?: boolea
         } else {
             console.error(colors.red('Error opening task shell:'), error);
         }
+    } finally {
+        await telemetry?.shutdown();
     }
 };

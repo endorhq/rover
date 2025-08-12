@@ -2,9 +2,11 @@ import colors from 'ansi-colors';
 import enquirer from 'enquirer';
 import yoctoSpinner from 'yocto-spinner';
 import { spawnSync } from '../lib/os.js';
-import { existsSync, openSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
+import { getTelemetry } from '../lib/telemetry.js';
+
 const { prompt } = enquirer;
 
 interface PushOptions {
@@ -70,6 +72,7 @@ interface PushResult {
  * Push command implementation
  */
 export const pushCommand = async (taskId: string, options: PushOptions) => {
+    const telemetry = getTelemetry();
     const result: PushResult = {
         success: false,
         taskId: 0,
@@ -215,6 +218,8 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
         }
 
         // Push to remote
+        telemetry?.eventPushBranch();
+
         const pushSpinner = !options.json ? yoctoSpinner({ text: `Pushing branch ${task.branchName} to remote...` }).start() : null;
         try {
             spawnSync('git', ['push', 'origin', task.branchName], { stdio: 'pipe' });
@@ -330,7 +335,7 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
 
                                     // Try to get existing PR URL
                                     try {
-                                        const { stdout } = spawnSync('gh', ['pr', 'view', task.branchName, '--json', 'url', '-q',  '.url']);
+                                        const { stdout } = spawnSync('gh', ['pr', 'view', task.branchName, '--json', 'url', '-q', '.url']);
                                         result.pullRequest.url = stdout.toString().trim();
                                     } catch {
                                         // Couldn't get PR URL
@@ -392,5 +397,7 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
             }
             process.exit(1);
         }
+    } finally {
+        await telemetry?.shutdown();
     }
 };

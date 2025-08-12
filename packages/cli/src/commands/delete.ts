@@ -3,10 +3,12 @@ import enquirer from 'enquirer';
 import { rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
+import { getTelemetry } from '../lib/telemetry.js';
 
 const { prompt } = enquirer;
 
 export const deleteCommand = async (taskId: string) => {
+    const telemetry = getTelemetry();
     // Convert string taskId to number
     const numericTaskId = parseInt(taskId, 10);
     if (isNaN(numericTaskId)) {
@@ -36,6 +38,7 @@ export const deleteCommand = async (taskId: string) => {
             // Create backup before deletion
             task.delete();
             rmSync(taskPath, { recursive: true, force: true });
+            telemetry?.eventDeleteTask();
             console.log(colors.green('\n✓ Task deleted successfully!'));
         } else {
             console.log(colors.yellow('\n⚠ Task deletion cancelled'));
@@ -47,5 +50,7 @@ export const deleteCommand = async (taskId: string) => {
         } else {
             console.error(colors.red('Error deleting task:'), error);
         }
+    } finally {
+        await telemetry?.shutdown();
     }
 };

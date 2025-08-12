@@ -4,7 +4,12 @@ import { homedir } from 'os';
 import { join } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import devConfig, { prodConfig } from './config.js';
-import { InitMetadata, IterateMetadata, NewTaskMetadata, NewTaskProvider } from './types.js';
+import { NewTaskMetadata, IterateMetadata, InitMetadata } from './types.js';
+
+export enum NewTaskProvider {
+    INPUT = 'user_input',
+    GITHUB = 'github'
+}
 
 const config = process.env.TSUP_DEV === 'true' ? devConfig : prodConfig;
 

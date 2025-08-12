@@ -9,6 +9,7 @@ import { createAIProvider } from '../utils/ai-factory.js';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
 import { UserSettings, AI_AGENT } from '../lib/config.js';
 import { IterationConfig } from '../lib/iteration.js';
+import { getTelemetry } from '../lib/telemetry.js';
 
 interface IterateResult {
     success: boolean;
@@ -116,6 +117,7 @@ const expandIterationInstructions = async (
 };
 
 export const iterateCommand = async (taskId: string, refinements: string, options: { follow?: boolean; json?: boolean } = {}): Promise<void> => {
+    const telemetry = getTelemetry();
     const result: IterateResult = {
         success: false,
         taskId: 0,
@@ -279,6 +281,9 @@ export const iterateCommand = async (taskId: string, refinements: string, option
         const newIterationNumber = task.iterations + 1;
         result.iterationNumber = newIterationNumber;
 
+        // Track iteration event
+        telemetry?.eventIterateTask(newIterationNumber);
+
         // Create iteration directory for the NEW iteration
         const iterationPath = join(taskPath, 'iterations', newIterationNumber.toString());
         mkdirSync(iterationPath, { recursive: true });
@@ -324,5 +329,7 @@ export const iterateCommand = async (taskId: string, refinements: string, option
                 console.error(colors.red('Error creating task iteration:'), error);
             }
         }
+    } finally {
+        await telemetry?.shutdown();
     }
 };

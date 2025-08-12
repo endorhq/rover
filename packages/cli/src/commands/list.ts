@@ -1,8 +1,8 @@
 import colors from 'ansi-colors';
 import { getAllTaskStatuses, updateTaskWithStatus } from '../utils/status.js';
 import { formatTaskStatus, statusColor } from '../utils/task-status.js';
-import { roverBanner } from '../utils/banner.js';
 import showTips from '../utils/tips.js';
+import { getTelemetry } from '../lib/telemetry.js';
 
 /**
  * Format duration from start to now or completion
@@ -53,8 +53,13 @@ const truncateText = (text: string, maxLength: number): string => {
 };
 
 export const listCommand = async (options: { watch?: boolean; verbose?: boolean; json?: boolean, watching?: boolean } = {}) => {
+    const telemetry = getTelemetry();
     try {
         const allStatuses = getAllTaskStatuses();
+
+        if (!options.watching) {
+            telemetry?.eventListTasks();
+        }
 
         // Filter out tasks without active status or recent activity
         const activeStatuses = allStatuses.filter(({ status, taskData }) => {
@@ -175,5 +180,7 @@ export const listCommand = async (options: { watch?: boolean; verbose?: boolean;
 
     } catch (error) {
         console.error(colors.red('Error getting task status:'), error);
+    } finally {
+        await telemetry?.shutdown();
     }
 };

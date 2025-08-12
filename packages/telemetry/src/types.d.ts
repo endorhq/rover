@@ -1,8 +1,3 @@
-export enum NewTaskProvider {
-    INPUT = 'user_input',
-    GITHUB = 'github'
-}
-
 export type NewTaskMetadata = {
     provider: NewTaskProvider
 }
