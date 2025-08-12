@@ -609,7 +609,7 @@ export const taskCommand = async (initPrompt?: string, options: { fromGithub?: s
 
             taskData = {
                 title: issueData.title,
-                description: issueData.body
+                description
             }
 
             if (!json) {
