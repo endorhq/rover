@@ -2,7 +2,7 @@ import colors from 'ansi-colors';
 import enquirer from 'enquirer';
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { execSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import yoctoSpinner from 'yocto-spinner';
 import { createAIProvider } from '../utils/ai-factory.js';
 import { AIProvider } from '../types.js';
@@ -19,20 +19,20 @@ const getRecentCommitMessages = (count: number = 5): string[] => {
         // Get the main branch name
         let mainBranch = 'main';
         try {
-            const remoteHead = execSync('git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null || echo ""', {
-                stdio: 'pipe',
-                encoding: 'utf8'
-            }).trim();
+            const remoteHead = spawnSync('git', ['symbolic-ref', 'refs/remotes/origin/HEAD'], {
+                encoding: 'utf8',
+                stdio: ['pipe', 'pipe', 'ignore']
+            }).stdout.trim();
             if (remoteHead) {
                 mainBranch = remoteHead.replace('refs/remotes/origin/', '');
             } else {
                 // Fallback: check if main or master exists
                 try {
-                    execSync('git show-ref --verify --quiet refs/heads/main', { stdio: 'pipe' });
+                    spawnSync('git', ['show-ref', '--verify', '--quiet', 'refs/heads/main'], { stdio: 'pipe' });
                     mainBranch = 'main';
                 } catch (error) {
                     try {
-                        execSync('git show-ref --verify --quiet refs/heads/master', { stdio: 'pipe' });
+                        spawnSync('git', ['show-ref', '--verify', '--quiet', 'refs/heads/master'], { stdio: 'pipe' });
                         mainBranch = 'master';
                     } catch (error) {
                         mainBranch = 'main'; // Default fallback
@@ -44,10 +44,10 @@ const getRecentCommitMessages = (count: number = 5): string[] => {
         }
 
         // Get recent commit messages from main branch
-        const commits = execSync(`git log ${mainBranch} --pretty=format:"%s" -n ${count}`, {
+        const commits = spawnSync('git', ['log', mainBranch, '--pretty', 'format:"%s"', '-n', `${count}`], {
             stdio: 'pipe',
             encoding: 'utf8'
-        }).trim();
+        }).stdout.trim();
 
         return commits.split('\n').filter(line => line.trim() !== '');
 
@@ -130,10 +130,10 @@ const generateCommitMessage = async (taskTitle: string, taskDescription: string,
  */
 const hasUncommittedChanges = (): boolean => {
     try {
-        const status = execSync('git status --porcelain -u no', {
+        const status = spawnSync('git', ['status', '--porcelain', '-u', 'no'], {
             stdio: 'pipe',
             encoding: 'utf8'
-        }).trim();
+        }).stdout.trim();
 
         return status.length > 0;
     } catch (error) {
@@ -149,10 +149,10 @@ const worktreeHasChanges = (worktreePath: string): boolean => {
         const originalCwd = process.cwd();
         process.chdir(worktreePath);
 
-        const status = execSync('git status --porcelain', {
+        const status = spawnSync('git', ['status', '--porcelain'], {
             stdio: 'pipe',
             encoding: 'utf8'
-        }).trim();
+        }).stdout.trim();
 
         process.chdir(originalCwd);
 
@@ -169,23 +169,23 @@ const worktreeHasChanges = (worktreePath: string): boolean => {
 const hasUnmergedCommits = (taskBranch: string): boolean => {
     try {
         // Get current branch name
-        const currentBranch = execSync('git branch --show-current', {
+        const currentBranch = spawnSync('git', ['branch', '--show-current'], {
             stdio: 'pipe',
             encoding: 'utf8'
-        }).trim();
+        }).stdout.trim();
 
         // Check if task branch exists
         try {
-            execSync(`git show-ref --verify --quiet refs/heads/${taskBranch}`, { stdio: 'pipe' });
+            spawnSync('git', ['show-ref', '--verify', '--quiet', `refs/heads/${taskBranch}`], { stdio: 'pipe' });
         } catch (error) {
             return false; // Branch doesn't exist
         }
 
         // Get commits in task branch that are not in current branch
-        const unmergedCommits = execSync(`git log ${currentBranch}..${taskBranch} --oneline`, {
+        const unmergedCommits = spawnSync('git', ['log', `${currentBranch}..${taskBranch}`, '--oneline'], {
             stdio: 'pipe',
             encoding: 'utf8'
-        }).trim();
+        }).stdout.trim();
 
         return unmergedCommits.length > 0;
 
@@ -200,16 +200,16 @@ const hasUnmergedCommits = (taskBranch: string): boolean => {
 const getUnmergedCommits = (taskBranch: string): string[] => {
     try {
         // Get current branch name
-        const currentBranch = execSync('git branch --show-current', {
+        const currentBranch = spawnSync('git', ['branch', '--show-current'], {
             stdio: 'pipe',
             encoding: 'utf8'
-        }).trim();
+        }).stdout.trim();
 
         // Get commits in task branch that are not in current branch
-        const unmergedCommits = execSync(`git log ${currentBranch}..${taskBranch} --oneline`, {
+        const unmergedCommits = spawnSync('git', ['log', `${currentBranch}..${taskBranch}`, '--oneline'], {
             stdio: 'pipe',
             encoding: 'utf8'
-        }).trim();
+        }).stdout.trim();
 
         return unmergedCommits.split('\n').filter(line => line.trim() !== '');
 
@@ -224,10 +224,10 @@ const getUnmergedCommits = (taskBranch: string): string[] => {
 const hasMergeConflicts = (): boolean => {
     try {
         // Check if we're in a merge state
-        const status = execSync('git status --porcelain', {
+        const status = spawnSync('git', ['status', '--porcelain'], {
             stdio: 'pipe',
             encoding: 'utf8'
-        }).trim();
+        }).stdout.trim();
 
         // Look for conflict markers (UU, AA, etc.)
         const conflictLines = status.split('\n').filter(line =>
@@ -249,10 +249,10 @@ const hasMergeConflicts = (): boolean => {
  */
 const getConflictedFiles = (): string[] => {
     try {
-        const status = execSync('git status --porcelain', {
+        const status = spawnSync('git', ['status', '--porcelain'], {
             stdio: 'pipe',
             encoding: 'utf8'
-        }).trim();
+        }).stdout.trim();
 
         const conflictFiles = status.split('\n')
             .filter(line =>
@@ -292,10 +292,10 @@ const resolveMergeConflicts = async (conflictedFiles: string[], aiProvider: AIPr
             // Get git diff context for better understanding
             let diffContext = '';
             try {
-                diffContext = execSync(`git log --oneline -10`, {
+                diffContext = spawnSync('git', ['log', '--oneline', '-10'], {
                     stdio: 'pipe',
                     encoding: 'utf8'
-                });
+                }).stdout;
             } catch (error) {
                 diffContext = 'No recent commit history available';
             }
@@ -312,7 +312,7 @@ const resolveMergeConflicts = async (conflictedFiles: string[], aiProvider: AIPr
                 writeFileSync(filePath, resolvedContent);
 
                 // Stage the resolved file
-                execSync(`git add "${filePath}"`, { stdio: 'pipe' });
+                spawnSync('git', ['add', filePath], { stdio: 'pipe' });
 
             } catch (error) {
                 spinner.error(`Error resolving ${filePath}: ${error}`);
@@ -341,10 +341,10 @@ const showResolvedChanges = async (conflictedFiles: string[]): Promise<void> => 
 
         try {
             // Show the diff of what was resolved
-            const diff = execSync(`git diff --cached "${filePath}"`, {
+            const diff = spawnSync('git', ['diff', '--cached', filePath], {
                 stdio: 'pipe',
                 encoding: 'utf8'
-            });
+            }).stdout;
 
             if (diff.trim()) {
                 console.log(colors.gray(diff));
@@ -409,7 +409,7 @@ export const mergeCommand = async (taskId: string, options: MergeOptions = {}) =
 
     // Load AI agent selection from user settings
     let selectedAiAgent = 'claude'; // default
-    
+
     try {
         if (UserSettings.exists()) {
             const userSettings = UserSettings.load();
@@ -465,7 +465,7 @@ export const mergeCommand = async (taskId: string, options: MergeOptions = {}) =
 
         // Check if we're in a git repository
         try {
-            execSync('git rev-parse --is-inside-work-tree', { stdio: 'pipe' });
+            spawnSync('git', ['rev-parse', '--is-inside-work-tree'], { stdio: 'pipe' });
         } catch (error) {
             result.error = 'Not in a git repository';
             if (options.json) {
@@ -479,10 +479,10 @@ export const mergeCommand = async (taskId: string, options: MergeOptions = {}) =
 
         // Get current branch name
         try {
-            result.currentBranch = execSync('git branch --show-current', {
+            result.currentBranch = spawnSync('git', ['branch', '--show-current'], {
                 stdio: 'pipe',
                 encoding: 'utf8'
-            }).trim();
+            }).stdout.trim();
         } catch (error) {
             result.currentBranch = 'unknown';
         }
@@ -601,10 +601,10 @@ export const mergeCommand = async (taskId: string, options: MergeOptions = {}) =
 
                 try {
                     // Add all changes
-                    execSync('git add .', { stdio: 'pipe' });
+                    spawnSync('git', ['add', '.'], { stdio: 'pipe' });
 
                     // Create commit with the generated message
-                    execSync(`git commit -m "${finalCommitMessage.replace(/"/g, '\\\\"')}"`, {
+                    spawnSync('git', ['commit', '-m', finalCommitMessage], {
                         stdio: 'pipe'
                     });
 
@@ -626,7 +626,7 @@ export const mergeCommand = async (taskId: string, options: MergeOptions = {}) =
             let mergeSuccessful = false;
 
             try {
-                execSync(`git merge --no-ff ${taskBranch} -m "merge: ${task.title}"`, {
+                spawnSync('git', ['merge', '--no-ff', taskBranch, '-m', `merge: ${task.title}`], {
                     stdio: 'pipe'
                 });
                 mergeSuccessful = true;
@@ -639,7 +639,7 @@ export const mergeCommand = async (taskId: string, options: MergeOptions = {}) =
                     if (spinner) spinner.error('Merge conflicts detected');
 
                     const conflictedFiles = getConflictedFiles();
-                    
+
                     if (!options.json) {
                         console.log(colors.yellow(`\n⚠ Merge conflicts detected in ${conflictedFiles.length} file(s):`));
                         conflictedFiles.forEach(file => {
@@ -669,7 +669,7 @@ export const mergeCommand = async (taskId: string, options: MergeOptions = {}) =
 
                         if (resolutionSuccessful) {
                             result.conflictsResolved = true;
-                            
+
                             if (!options.json) {
                                 // Show what was resolved
                                 await showResolvedChanges(conflictedFiles);
@@ -685,7 +685,7 @@ export const mergeCommand = async (taskId: string, options: MergeOptions = {}) =
                                 if (!confirmResolution) {
                                     console.log(colors.yellow('\n⚠ User rejected AI resolution. Aborting merge...'));
                                     try {
-                                        execSync('git merge --abort', { stdio: 'pipe' });
+                                        spawnSync('git', ['merge', '--abort'], { stdio: 'pipe' });
                                     } catch (abortError) {
                                         // Ignore abort errors
                                     }
@@ -696,7 +696,7 @@ export const mergeCommand = async (taskId: string, options: MergeOptions = {}) =
 
                             // Complete the merge with the resolved conflicts
                             try {
-                                execSync('git commit --no-edit', { stdio: 'pipe' });
+                                spawnSync('git', ['commit', '--no-edit'], { stdio: 'pipe' });
                                 mergeSuccessful = true;
                                 result.merged = true;
                                 if (!options.json) {
@@ -709,7 +709,7 @@ export const mergeCommand = async (taskId: string, options: MergeOptions = {}) =
                                 }
                                 // Abort the merge to clean state
                                 try {
-                                    execSync('git merge --abort', { stdio: 'pipe' });
+                                    spawnSync('git', ['merge', '--abort'], { stdio: 'pipe' });
                                 } catch (abortError) {
                                     // Ignore abort errors
                                 }
@@ -724,7 +724,7 @@ export const mergeCommand = async (taskId: string, options: MergeOptions = {}) =
                                 console.log(colors.gray('You can resolve conflicts manually and run the merge command again.'));
                             }
                             try {
-                                execSync('git merge --abort', { stdio: 'pipe' });
+                                spawnSync('git', ['merge', '--abort'], { stdio: 'pipe' });
                             } catch (abortError) {
                                 // Ignore abort errors
                             }
@@ -743,7 +743,7 @@ export const mergeCommand = async (taskId: string, options: MergeOptions = {}) =
                             console.log(colors.cyan(`  4. Run: rover merge ${taskId} to complete the process`));
                         }
                         try {
-                            execSync('git merge --abort', { stdio: 'pipe' });
+                            spawnSync('git', ['merge', '--abort'], { stdio: 'pipe' });
                         } catch (abortError) {
                             // Ignore abort errors
                         }
@@ -790,10 +790,10 @@ export const mergeCommand = async (taskId: string, options: MergeOptions = {}) =
 
                     try {
                         // Remove worktree
-                        execSync(`git worktree remove "${task.worktreePath}" --force`, { stdio: 'pipe' });
+                        spawnSync('git', ['worktree', 'remove', task.worktreePath, '--force'], { stdio: 'pipe' });
 
                         // Delete branch
-                        execSync(`git branch -d "${taskBranch}"`, { stdio: 'pipe' });
+                        spawnSync('git', ['branch', '-d', taskBranch], { stdio: 'pipe' });
 
                         result.cleanedUp = true;
                         if (cleanupSpinner) {

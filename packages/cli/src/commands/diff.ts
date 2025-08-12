@@ -1,7 +1,7 @@
 import colors from 'ansi-colors';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { execSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
 
 export const diffCommand = (taskId: string, filePath?: string, options: { onlyFiles?: boolean, branch?: string } = {}) => {
@@ -25,7 +25,7 @@ export const diffCommand = (taskId: string, filePath?: string, options: { onlyFi
 
         // Check if we're in a git repository
         try {
-            execSync('git rev-parse --is-inside-work-tree', { stdio: 'pipe' });
+            spawnSync('git', ['rev-parse', '--is-inside-work-tree'], { stdio: 'pipe' });
         } catch (error) {
             console.log(colors.red('✗ Not in a git repository'));
             return;
@@ -73,10 +73,10 @@ export const diffCommand = (taskId: string, filePath?: string, options: { onlyFi
 
             // Execute git diff command
             try {
-                const diffOutput = execSync(`git ${gitDiffArgs.join(' ')}`, {
+                const diffOutput = spawnSync('git', gitDiffArgs, {
                     stdio: 'pipe',
                     encoding: 'utf8'
-                });
+                }).stdout;
 
                 if (diffOutput.trim() === '') {
                     if (filePath) {

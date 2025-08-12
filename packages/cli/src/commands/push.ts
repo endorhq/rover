@@ -1,13 +1,11 @@
 import colors from 'ansi-colors';
 import enquirer from 'enquirer';
 import yoctoSpinner from 'yocto-spinner';
-import { execSync, exec } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { existsSync, openSync } from 'node:fs';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
-
-const execAsync = promisify(exec);
 const { prompt } = enquirer;
 
 interface PushOptions {
@@ -24,7 +22,7 @@ interface PushOptions {
  */
 const commandExists = (cmd: string): boolean => {
     try {
-        execSync(`which ${cmd}`, { stdio: 'pipe' });
+        spawnSync('which', [cmd], { stdio: 'pipe' });
         return true;
     } catch {
         return false;
@@ -135,16 +133,17 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
         process.chdir(task.worktreePath);
 
         // Check for changes
-        const statusOutput = execSync('git status --porcelain', { encoding: 'utf8' });
-        const hasChanges = statusOutput.trim().length > 0;
+        const statusOutput = spawnSync('git', ['status', '--porcelain'], { encoding: 'utf8' });
+        const hasChanges = statusOutput.stdout.trim().length > 0;
         result.hasChanges = hasChanges;
 
         if (!hasChanges) {
             // Check if there are unpushed commits
             try {
-                const unpushedCommits = execSync(`git rev-list --count origin/${task.branchName}..${task.branchName} 2>/dev/null`, {
-                    encoding: 'utf8'
-                }).trim();
+                const unpushedCommits = spawnSync('git', ['rev-list', '--count', 'origin/${task.branchName}..${task.branchName}'], {
+                    encoding: 'utf8',
+                    stdio: ['inherit', 'inherit', 'ignore']
+                }).stdout.trim();
 
                 if (unpushedCommits === '0') {
                     result.success = true;
@@ -167,7 +166,7 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
                 console.log(colors.cyan('Found uncommitted changes:'));
 
                 // Show brief status
-                const files = statusOutput.trim().split('\n');
+                const files = statusOutput.stdout.trim().split('\n');
                 files.forEach(file => {
                     const [status, ...pathParts] = file.trim().split(/\s+/);
                     const path = pathParts.join(' ');
@@ -198,8 +197,8 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
             // Stage and commit changes
             const commitSpinner = !options.json ? yoctoSpinner({ text: 'Committing changes...' }).start() : null;
             try {
-                execSync('git add -A', { stdio: 'pipe' });
-                execSync(`git commit -m "${commitMessage}"`, { stdio: 'pipe' });
+                spawnSync('git', ['add', '-A'], { stdio: 'pipe' });
+                spawnSync('git', ['commit', '-m', commitMessage], { stdio: 'pipe' });
                 result.committed = true;
                 if (commitSpinner) {
                     commitSpinner.success('Changes committed');
@@ -219,9 +218,7 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
         // Push to remote
         const pushSpinner = !options.json ? yoctoSpinner({ text: `Pushing branch ${task.branchName} to remote...` }).start() : null;
         try {
-            const pushCommand = `git push origin ${task.branchName}`;
-
-            execSync(pushCommand, { stdio: 'pipe' });
+            spawnSync('git', ['push', 'origin', task.branchName], { stdio: 'pipe' });
             result.pushed = true;
             if (pushSpinner) {
                 pushSpinner.success(`Branch pushed successfully`);
@@ -240,7 +237,7 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
                     console.log(colors.yellow('\n⚠ Setting upstream branch and retrying...'));
                 }
                 try {
-                    execSync(`git push --set-upstream origin ${task.branchName}`, { stdio: 'pipe' });
+                    spawnSync('git', ['push', '--set-upstream', 'origin', task.branchName], { stdio: 'pipe' });
                     result.pushed = true;
                     if (!options.json) {
                         console.log(colors.green(`✓ Branch pushed successfully`));
@@ -268,7 +265,7 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
         // Check if this is a GitHub repo
         if (options.pr === true) {
             try {
-                const remoteUrl = execSync('git remote get-url origin', { encoding: 'utf8' }).trim();
+                const remoteUrl = spawnSync('git', ['remote', 'get-url', 'origin'], { encoding: 'utf8' }).stdout.trim();
                 const repoInfo = getGitHubRepoInfo(remoteUrl);
 
                 if (repoInfo) {
@@ -305,13 +302,12 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
                             try {
                                 // Create PR with task details
                                 const prBody = `## Task ${numericTaskId}\n\n${task.description}\n\n---\n*Created by Rover CLI*`;
-                                const { stdout } = await execAsync(
-                                    `gh pr create --title "${task.title}" --body "${prBody}" --head "${task.branchName}"`
-                                );
+                                const { stdout } = spawnSync(
+                                    'gh', ['pr', 'create', '--title', task.title, '--body', prBody, '--head', task.branchName]);
 
                                 result.pullRequest = {
                                     created: true,
-                                    url: stdout.trim().split('\n').pop()
+                                    url: stdout.toString().trim().split('\n').pop()
                                 };
 
                                 if (prSpinner) {
@@ -335,8 +331,8 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
 
                                     // Try to get existing PR URL
                                     try {
-                                        const { stdout } = await execAsync(`gh pr view ${task.branchName} --json url -q .url`);
-                                        result.pullRequest.url = stdout.trim();
+                                        const { stdout } = spawnSync('gh', ['pr', 'view', task.branchName, '--json', 'url', '-q',  '.url']);
+                                        result.pullRequest.url = stdout.toString().trim();
                                     } catch {
                                         // Couldn't get PR URL
                                     }
