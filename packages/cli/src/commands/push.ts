@@ -140,7 +140,7 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
         if (!hasChanges) {
             // Check if there are unpushed commits
             try {
-                const unpushedCommits = spawnSync('git', ['rev-list', '--count', 'origin/${task.branchName}..${task.branchName}'], {
+                const unpushedCommits = spawnSync('git', ['rev-list', '--count', `origin/${task.branchName}..${task.branchName}`], {
                     encoding: 'utf8',
                     stdio: ['inherit', 'inherit', 'ignore']
                 }).stdout.trim();

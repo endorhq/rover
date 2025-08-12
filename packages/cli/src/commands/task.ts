@@ -496,7 +496,7 @@ const fetchGitHubIssueViaAPI = async (owner: string, repo: string, issueNumber: 
 const fetchGitHubIssueViaCLI = async (owner: string, repo: string, issueNumber: string): Promise<{ title: string; body: string } | null> => {
     try {
         const { stdout } = spawnSync(
-            'gh', ['issue', 'view', `${issueNumber}`, '--repo', `${owner}/${repo}`, '--json', 'title,body']);
+            'gh', ['issue', 'view', issueNumber.toString(), '--repo', `${owner}/${repo}`, '--json', 'title,body']);
         const issue = JSON.parse(stdout.toString());
         return {
             title: issue.title || '',
@@ -513,7 +513,7 @@ const fetchGitHubIssueViaCLI = async (owner: string, repo: string, issueNumber: 
 const fetchGitHubIssue = async (issueNumber: string, json: boolean): Promise<{ title: string; body: string } | null> => {
     try {
         // Try to get repo info from git remote
-        const remoteUrl = spawnSync('git', ['remote', 'get-url', 'origin'], { encoding: 'utf8' }).toString().trim();
+        const remoteUrl = spawnSync('git', ['remote', 'get-url', 'origin'], { encoding: 'utf8' }).stdout.trim();
         const repoInfo = getGitHubRepoInfo(remoteUrl);
 
         if (!repoInfo) {
