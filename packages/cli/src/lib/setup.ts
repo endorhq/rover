@@ -483,14 +483,16 @@ write_status "initializing" "Starting task" 5
 
 # Read task data from mounted JSON file
 TASK_ID=$(jq -r '.id' /task/description.json)
+TASK_ITERATION=$(jq -r '.iteration' /task/description.json)
 TASK_TITLE=$(jq -r '.title' /task/description.json)
 TASK_DESCRIPTION=$(jq -r '.description' /task/description.json)
 
 echo "======================================="
 echo "🚀 Rover Task Execution Setup (${this.agent})"
 echo "======================================="
-echo "Task ID: $TASK_ID"
 echo "Task Title: $TASK_TITLE"
+echo "Task ID: $TASK_ID"
+echo "Task Iteration: $TASK_ITERATION"
 echo "======================================="
 
 write_status "initializing" "Load metadata" 5

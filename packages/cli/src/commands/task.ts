@@ -12,6 +12,7 @@ import { TaskDescription } from '../lib/description.js';
 import { PromptBuilder } from '../lib/prompt.js';
 import { SetupBuilder } from '../lib/setup.js';
 import { UserSettings, AI_AGENT } from '../lib/config.js';
+import { IterationConfig } from '../lib/iteration.js';
 import { generateBranchName } from '../utils/branch-name.js';
 import { request } from 'node:https';
 import { promisify } from 'node:util';
@@ -122,8 +123,8 @@ const updateTaskMetadata = (taskId: number, updates: any, jsonMode?: boolean) =>
 /**
  * Start environment using containers
  */
-export const startDockerExecution = async (taskId: number, task: any, worktreePath: string, iterationPath: string, selectedAiAgent: string, customTaskDescriptionPath?: string, followMode?: boolean, jsonMode?: boolean) => {
-    const containerName = `rover-task-${taskId}-${task.iterations || task.iterationNumber}`;
+export const startDockerExecution = async (taskId: number, task: TaskDescription, worktreePath: string, iterationPath: string, selectedAiAgent: string, followMode?: boolean, jsonMode?: boolean) => {
+    const containerName = `rover-task-${taskId}-${task.iterations}`;
 
     try {
         // Check if Docker is available
@@ -137,7 +138,8 @@ export const startDockerExecution = async (taskId: number, task: any, worktreePa
     }
 
     // Load task description
-    const taskDescriptionPath = customTaskDescriptionPath || join(process.cwd(), '.rover', 'tasks', taskId.toString(), 'description.json');;
+    const iterationJsonPath = join(iterationPath, 'iteration.json');
+    const iteration = IterationConfig.load(iterationPath);
 
     // Generate setup script using SetupBuilder
     const setupBuilder = new SetupBuilder(task, selectedAiAgent);
@@ -147,7 +149,7 @@ export const startDockerExecution = async (taskId: number, task: any, worktreePa
     // Generate prompts using PromptBuilder
     const promptsDir = join(process.cwd(), '.rover', 'tasks', taskId.toString(), 'iterations', task.iterations.toString(), 'prompts');
     const promptBuilder = new PromptBuilder(selectedAiAgent);
-    promptBuilder.generatePromptFiles(task, promptsDir);
+    promptBuilder.generatePromptFiles(iteration, promptsDir);
 
     // Check AI agent credentials based on selected agent
     let credentialsValid = true;
@@ -174,7 +176,7 @@ export const startDockerExecution = async (taskId: number, task: any, worktreePa
     }
 
     if (!jsonMode) {
-        console.log(colors.white.bold('\n🐳 Starting Docker container for task:'));
+        console.log(colors.white.bold('\n🐳 Starting Docker container:'));
         console.log(colors.gray('└── Container Name: ') + colors.white(containerName));
     }
 
@@ -216,7 +218,7 @@ export const startDockerExecution = async (taskId: number, task: any, worktreePa
             ...dockerMounts,
             '-v', `${setupScriptPath}:/setup.sh:ro`,
             '-v', `${setupMcpScriptPath}:/setup-mcp.sh:ro`,
-            '-v', `${taskDescriptionPath}:/task/description.json:ro`,
+            '-v', `${iterationJsonPath}:/task/description.json:ro`,
             '-v', `${promptsDir}:/prompts:ro`,
             '-w', '/workspace',
             'node:24-alpine',
@@ -788,6 +790,9 @@ export const taskCommand = async (initPrompt?: string, options: { fromGithub?: s
         const iterationPath = join(taskPath, 'iterations', task.iterations.toString());
         mkdirSync(iterationPath, { recursive: true });
 
+        // Create initial iteration.json for the first iteration
+        IterationConfig.createInitial(iterationPath, task.id, task.title, task.description);
+
         // Update task with workspace information
         task.setWorkspace(worktreePath, branchName);
         task.markInProgress();
@@ -801,7 +806,7 @@ export const taskCommand = async (initPrompt?: string, options: { fromGithub?: s
         }
 
         // Start Docker container for task execution
-        await startDockerExecution(taskId, task, worktreePath, iterationPath, selectedAiAgent, undefined, follow, json);
+        await startDockerExecution(taskId, task, worktreePath, iterationPath, selectedAiAgent, follow, json);
 
         if (json) {
             // Output final JSON after all operations are complete

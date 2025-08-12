@@ -11,6 +11,8 @@ export const formatTaskStatus = (status: string): string => {
             return 'In Progress';
         case 'COMPLETED':
             return 'Completed';
+        case 'RUNNING':
+            return 'Running';
         case 'FAILED':
             return 'Failed';
         case 'ITERATING':
@@ -28,6 +30,8 @@ export const statusColor = (status: string): StyleFunction => {
             return colors.yellow;
         case 'COMPLETED':
             return colors.green;
+        case 'RUNNING':
+            return colors.cyan;
         case 'ITERATING':
             return colors.magenta;
         case 'FAILED':

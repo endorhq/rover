@@ -1,6 +1,5 @@
 import colors from 'ansi-colors';
-import enquirer from 'enquirer';
-import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, mkdirSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { execSync } from 'node:child_process';
 import yoctoSpinner from 'yocto-spinner';
@@ -9,8 +8,7 @@ import { startDockerExecution } from './task.js';
 import { createAIProvider } from '../utils/ai-factory.js';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
 import { UserSettings, AI_AGENT } from '../lib/config.js';
-
-const { prompt } = enquirer;
+import { IterationConfig } from '../lib/iteration.js';
 
 interface IterateResult {
     success: boolean;
@@ -25,10 +23,16 @@ interface IterateResult {
     error?: string;
 }
 
+type IterationContext = {
+    plan?: string;
+    changes?: string;
+    iterationNumber?: number;
+}
+
 /**
  * Get the latest iteration context from previous executions
  */
-const getLatestIterationContext = (taskPath: string, jsonMode: boolean): { plan?: string, summary?: string, iterationNumber?: number } => {
+const getLatestIterationContext = (taskPath: string, jsonMode: boolean): IterationContext => {
     const iterationsPath = join(taskPath, 'iterations');
 
     if (!existsSync(iterationsPath)) {
@@ -50,7 +54,7 @@ const getLatestIterationContext = (taskPath: string, jsonMode: boolean): { plan?
         const latestIteration = iterations[0];
         const latestIterationPath = join(iterationsPath, latestIteration.toString());
 
-        let plan, summary;
+        let plan, changes;
 
         // Try to read plan.md
         const planPath = join(latestIterationPath, 'plan.md');
@@ -64,19 +68,19 @@ const getLatestIterationContext = (taskPath: string, jsonMode: boolean): { plan?
             }
         }
 
-        // Try to read summary.md
-        const summaryPath = join(latestIterationPath, 'summary.md');
-        if (existsSync(summaryPath)) {
+        // Try to read changes.md
+        const changesPath = join(latestIterationPath, 'changes.md');
+        if (existsSync(changesPath)) {
             try {
-                summary = readFileSync(summaryPath, 'utf8');
+                changes = readFileSync(changesPath, 'utf8');
             } catch (error) {
                 if (!jsonMode) {
-                    console.warn(colors.yellow('Warning: Could not read previous summary'));
+                    console.warn(colors.yellow('Warning: Could not read previous changes'));
                 }
             }
         }
 
-        return { plan, summary, iterationNumber: latestIteration };
+        return { plan, changes, iterationNumber: latestIteration };
 
     } catch (error) {
         if (!jsonMode) {
@@ -87,40 +91,25 @@ const getLatestIterationContext = (taskPath: string, jsonMode: boolean): { plan?
 };
 
 /**
- * Expand task with iteration refinements using AI
+ * Expand iteration instructions using AI
  */
-const expandTaskIteration = async (
-    originalTask: any,
+const expandIterationInstructions = async (
     refinements: string,
-    previousContext: { plan?: string, summary?: string, iterationNumber?: number },
+    previousContext: IterationContext,
     aiProvider: AIProvider,
     jsonMode: boolean
 ): Promise<TaskExpansion | null> => {
     try {
-        // Build context prompt for AI
-        let contextPrompt = `Original Task: "${originalTask.title}"\nDescription: ${originalTask.description}\n\n`;
-
-        if (previousContext.iterationNumber) {
-            contextPrompt += `Previous iteration (#${previousContext.iterationNumber}) context:\n\n`;
-
-            if (previousContext.plan) {
-                contextPrompt += `Previous Plan:\n${previousContext.plan}\n\n`;
-            }
-
-            if (previousContext.summary) {
-                contextPrompt += `Previous Summary:\n${previousContext.summary}\n\n`;
-            }
-        }
-
-        contextPrompt += `New requirements/refinements to incorporate:\n${refinements}\n\n`;
-        contextPrompt += `Please create an updated task that incorporates these refinements while building on previous work.`;
-
-        const expanded = await aiProvider.expandTask(contextPrompt, process.cwd());
+        const expanded = await aiProvider.expandIterationInstructions(
+            refinements,
+            previousContext.plan,
+            previousContext.changes
+        );
         return expanded;
 
     } catch (error) {
         if (!jsonMode) {
-            console.error(colors.red('Error expanding task iteration:'), error);
+            console.error(colors.red('Error expanding iteration instructions:'), error);
         }
         return null;
     }
@@ -148,6 +137,11 @@ export const iterateCommand = async (taskId: string, refinements: string, option
     }
 
     result.taskId = numericTaskId;
+
+    if (!options.json) {
+        console.log(`\n🤖 ${colors.green("Rover")}:`, "hey human! Let's iterate over this task");
+        console.log(`🤖 ${colors.green("Rover")}:`, 'I got your new instructions and will ask an agent to implement them\n');
+    }
 
     // Load AI agent selection from user settings
     let selectedAiAgent = 'claude'; // default
@@ -179,37 +173,27 @@ export const iterateCommand = async (taskId: string, refinements: string, option
         result.taskTitle = task.title;
 
         if (!options.json) {
-            console.log(colors.bold('\n🔄 Task Iteration\n'));
-            console.log(colors.gray('ID: ') + colors.cyan(task.id.toString()));
-            console.log(colors.gray('Title: ') + colors.white(task.title));
-            console.log(colors.gray('Current Status: ') + colors.yellow(task.status));
-            console.log(colors.gray('Current Iterations: ') + colors.cyan(task.iterations.toString()));
-            console.log(colors.gray('Refinements: ') + colors.white(refinements));
+            console.log(colors.white.bold('Task Details'));
+            console.log(colors.gray('├── ID: ') + colors.cyan(task.id.toString()));
+            console.log(colors.gray('├── Task Title: ') + colors.white(task.title));
+            console.log(colors.gray('├── Current Status: ') + colors.white(task.status));
+            console.log(colors.gray('└── Instructions: ') + colors.green(refinements));
         }
 
         // Get previous iteration context
-        if (!options.json) {
-            console.log(colors.gray('\n📖 Loading previous iteration context...'));
-        }
         const previousContext = getLatestIterationContext(taskPath, options.json === true);
 
+        // Expand task with AI
         if (!options.json) {
-            if (previousContext.iterationNumber) {
-                console.log(colors.gray('Found previous iteration: ') + colors.cyan(`#${previousContext.iterationNumber}`));
-                if (previousContext.plan) console.log(colors.gray('✓ Previous plan loaded'));
-                if (previousContext.summary) console.log(colors.gray('✓ Previous summary loaded'));
-            } else {
-                console.log(colors.gray('No previous iterations found, using original task only'));
-            }
+            console.log('');
         }
 
-        // Expand task with AI
-        const spinner = !options.json ? yoctoSpinner({ text: `Expanding task iteration with ${selectedAiAgent.charAt(0).toUpperCase() + selectedAiAgent.slice(1)}...` }).start() : null;
+        const spinner = !options.json ? yoctoSpinner({ text: `Expanding task instructions with ${selectedAiAgent.charAt(0).toUpperCase() + selectedAiAgent.slice(1)}...` }).start() : null;
 
         let expandedTask: TaskExpansion | null = null;
 
         try {
-            expandedTask = await expandTaskIteration(task.toJSON(), refinements, previousContext, aiProvider, options.json === true);
+            expandedTask = await expandIterationInstructions(refinements, previousContext, aiProvider, options.json === true);
 
             if (expandedTask) {
                 if (spinner) spinner.success('Task iteration expanded!');
@@ -238,6 +222,10 @@ export const iterateCommand = async (taskId: string, refinements: string, option
             };
         }
 
+        if (!options.json) {
+            console.log('');
+        }
+
         if (!expandedTask) {
             result.error = 'Could not create iteration';
             if (options.json) {
@@ -254,39 +242,9 @@ export const iterateCommand = async (taskId: string, refinements: string, option
         // Skip confirmation and refinements if --json flag is passed
         if (!options.json) {
             // Display the expanded iteration
-            console.log('\n' + colors.bold('Updated Task for Iteration:'));
-            console.log(colors.gray('Title: ') + colors.cyan(expandedTask.title));
-            console.log(colors.gray('Description: ') + colors.white(expandedTask.description));
-
-            // Ask for confirmation
-            const { confirm } = await prompt<{ confirm: string }>({
-                type: 'select',
-                name: 'confirm',
-                message: '\nProceed with this iteration?',
-                choices: [
-                    { name: 'yes', message: 'Yes, start iteration!' },
-                    { name: 'refine', message: 'No, let me add more details' },
-                    { name: 'cancel', message: 'Cancel iteration' }
-                ]
-            });
-
-            if (confirm === 'cancel') {
-                console.log(colors.yellow('\n⚠ Task iteration cancelled'));
-                return;
-            }
-
-            if (confirm === 'refine') {
-                const { additionalInfo } = await prompt<{ additionalInfo: string }>({
-                    type: 'input',
-                    name: 'additionalInfo',
-                    message: 'Provide additional refinements:',
-                    validate: (value) => value.trim().length > 0 || 'Please provide additional information'
-                });
-
-                // Recursively call with additional refinements
-                const combinedRefinements = `${refinements}\n\nAdditional refinements: ${additionalInfo}`;
-                return iterateCommand(taskId, combinedRefinements, options);
-            }
+            console.log(colors.white.bold('Iteration:'));
+            console.log(colors.gray('├── Instructions: ') + colors.cyan(expandedTask.title));
+            console.log(colors.gray('└── Details: ') + colors.white(expandedTask.description));
         }
 
         // Check if we're in a git repository and setup worktree
@@ -330,52 +288,18 @@ export const iterateCommand = async (taskId: string, refinements: string, option
         task.incrementIteration();
         task.markIterating();
 
-        // Save iteration metadata
-        const iterationMetadata = {
-            iterationNumber: newIterationNumber,
-            refinements: refinements,
-            expandedTitle: expandedTask.title,
-            expandedDescription: expandedTask.description,
-            createdAt: new Date().toISOString(),
-            previousContext: previousContext
-        };
-
-        writeFileSync(
-            join(iterationPath, 'iteration-metadata.json'),
-            JSON.stringify(iterationMetadata, null, 2)
+        // Create new iteration config
+        IterationConfig.createIteration(
+            iterationPath,
+            newIterationNumber,
+            task.id,
+            expandedTask.title,
+            expandedTask.description,
+            previousContext
         );
 
-        // Task data is automatically saved by TaskDescription methods
-
-        if (!options.json) {
-            console.log(colors.bold(`\n🚀 Starting Task Iteration #${newIterationNumber}\n`));
-            console.log(colors.gray('Updated Title: ') + colors.cyan(expandedTask.title));
-            console.log(colors.gray('Iteration Path: ') + colors.cyan(`/rover/tasks/${numericTaskId}/iterations/${newIterationNumber}/`));
-            console.log(colors.gray('Workspace: ') + colors.cyan(task.worktreePath));
-
-            // Start Docker execution for this iteration
-            console.log(colors.green('\n✓ Iteration prepared, starting Docker execution...'));
-        }
-
-        // Create a temporary task description file for this iteration
-        const iterationTaskDescriptionPath = join(iterationPath, 'task-description.json');
-        const iterationTaskData = {
-            id: task.id,
-            title: expandedTask.title,
-            description: expandedTask.description,
-            status: 'ITERATING',
-            iterationNumber: newIterationNumber,
-            originalTitle: task.title,
-            originalDescription: task.description,
-            refinements: refinements,
-            createdAt: task.createdAt,
-            iterationCreatedAt: new Date().toISOString()
-        };
-
-        writeFileSync(iterationTaskDescriptionPath, JSON.stringify(iterationTaskData, null, 2));
-
         // Start Docker container for task execution
-        await startDockerExecution(numericTaskId, iterationTaskData, task.worktreePath, iterationPath, selectedAiAgent, iterationTaskDescriptionPath, options.follow, options.json);
+        await startDockerExecution(numericTaskId, task, task.worktreePath, iterationPath, selectedAiAgent, options.follow, options.json);
 
         result.success = true;
         if (options.json) {

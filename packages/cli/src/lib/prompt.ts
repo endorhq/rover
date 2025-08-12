@@ -1,4 +1,4 @@
-import { TaskDescription } from "./description.js";
+import { IterationConfig } from "./iteration.js";
 
 /***
  * This library provides the foundation to build prompts for different AI agents.
@@ -14,7 +14,7 @@ export class PromptBuilder {
     /**
      * Generate and save all prompt files to the specified directory
      */
-    generatePromptFiles(task: TaskDescription, promptsDir: string): void {
+    generatePromptFiles(iteration: IterationConfig, promptsDir: string): void {
         const { mkdirSync, writeFileSync } = require('node:fs');
         const { join } = require('node:path');
 
@@ -23,12 +23,12 @@ export class PromptBuilder {
 
         // Generate each prompt and save to file
         const prompts = {
-            'context.txt': this.context(task),
-            'plan.txt': this.plan(task),
-            'implement.txt': this.implement(task),
-            'review.txt': this.review(task),
-            'apply_review.txt': this.apply_review(task),
-            'summary.txt': this.summary(task)
+            'context.txt': this.context(iteration),
+            'plan.txt': this.plan(iteration),
+            'implement.txt': this.implement(iteration),
+            'review.txt': this.review(iteration),
+            'apply_review.txt': this.apply_review(iteration),
+            'summary.txt': this.summary(iteration)
         };
 
         // Write each prompt to its respective file
@@ -41,14 +41,14 @@ export class PromptBuilder {
     /**
      * Provides a prompt that fetches the context to build a task.
      */
-    context(task: TaskDescription): string {
+    context(iteration: IterationConfig): string {
         return `
 You are preparing a technical analysis for this task implementation. Your goal is to gather preliminary research that will help another engineer plan and implement the task effectively.
 
 Task to analyze:
-Title: ${task.title}
+Title: ${iteration.title}
 Description:
-${task.description}
+${iteration.description}
 
 Your analysis should:
 1. Identify files that will be edited or affected by this task
@@ -143,14 +143,14 @@ Example output:
     /**
      * Provides a prompt to define a plan for a task
      */
-    plan(task: TaskDescription): string {
+    plan(iteration: IterationConfig): string {
         return `
 You are preparing an implementation plan for this task. Your goal is to create a clear, actionable plan that another engineer can follow to complete the implementation.
 
 Task to plan:
-Title: ${task.title}
+Title: ${iteration.title}
 Description:
-${task.description}
+${iteration.description}
 
 Your plan should:
 1. Define a clear objective for what will be accomplished
@@ -192,14 +192,14 @@ Reference the context.md file for technical details. Write your plan to plan.md 
     /**
      * Provides a prompt to implement the plan
      */
-    implement(task: TaskDescription): string {
+    implement(iteration: IterationConfig): string {
         return `
 You are implementing this task following the established plan. Your goal is to complete the implementation according to the plan specifications.
 
 Task to implement:
-Title: ${task.title}
+Title: ${iteration.title}
 Description:
-${task.description}
+${iteration.description}
 
 Your implementation should:
 
@@ -317,14 +317,14 @@ Implemented GitHub issue fetching functionality for the task command. Added a ne
     /**
      * Provides a prompt to review task changes
      */
-    review(task: TaskDescription): string {
+    review(iteration: IterationConfig): string {
         return `
 You are acting as a senior code reviewer examining the implementation of this task. Your goal is to ensure the implementation follows the original plan, maintains code quality, and identifies any issues that need to be addressed.
 
 Task reviewed:
-Title: ${task.title}
+Title: ${iteration.title}
 Description:
-${task.description}
+${iteration.description}
 
 Your review should:
 1. Compare the implementation against the original plan.md to identify deviations
@@ -435,14 +435,14 @@ Begin your review by examining plan.md, changes.md, and the actual code changes.
     /**
      * Provides a prompt to apply review feedback and fix identified issues
      */
-    apply_review(task: TaskDescription): string {
+    apply_review(iteration: IterationConfig): string {
         return `
 You are implementing fixes based on the code review feedback. Your goal is to address all the issues identified in review.md and update the implementation accordingly.
 
 Task being fixed:
-Title: ${task.title}
+Title: ${iteration.title}
 Description:
-${task.description}
+${iteration.description}
 
 Your implementation should:
 1. Read and understand all issues listed in review.md
@@ -502,16 +502,16 @@ Start by examining review.md to understand all the issues that need to be addres
     /**
      * Provides a prompt to elaborate a summary
      */
-    summary(task: TaskDescription): string {
+    summary(iteration: IterationConfig): string {
         return `
 You are creating a summary of the implemented changes for this task. Your goal is to document what was accomplished and provide key information for future reference.
 
 Check the context.md and changes.md file to gather information.
 
 Task completed:
-Title: ${task.title}
+Title: ${iteration.title}
 Description:
-${task.description}
+${iteration.description}
 
 Your summary should:
 1. Describe what was implemented in 1-2 sentences
