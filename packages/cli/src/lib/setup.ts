@@ -517,6 +517,8 @@ export TASK_ID TASK_TITLE TASK_DESCRIPTION
 # Run setup MCP script
 /setup-mcp.sh
 
+sleep infinity
+
 ${this.generateTaskExecutionWorkflow()}
 
 # Move all outputs to the right location

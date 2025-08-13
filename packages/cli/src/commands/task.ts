@@ -1,11 +1,12 @@
 import enquirer from 'enquirer';
 import colors from 'ansi-colors';
 import yoctoSpinner from 'yocto-spinner';
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { platform } from 'node:process';
 import type { TaskExpansion } from '../types.js';
 import { getNextTaskId } from '../utils/task-id.js';
-import { homedir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { createAIProvider } from '../utils/ai-factory.js';
 import { TaskDescription } from '../lib/description.js';
 import { PromptBuilder } from '../lib/prompt.js';
@@ -119,6 +120,12 @@ const updateTaskMetadata = (taskId: number, updates: any, jsonMode?: boolean) =>
     }
 };
 
+export const findKeychainCredentials = (key: string): string => {
+    return spawnSync('security', ['find-generic-password', '-s', key, '-w'], { stdio: 'pipe' })
+        .stdout.toString()
+}
+
+
 /**
  * Start environment using containers
  */
@@ -150,6 +157,8 @@ export const startDockerExecution = async (taskId: number, task: TaskDescription
     const promptBuilder = new PromptBuilder(selectedAiAgent);
     promptBuilder.generatePromptFiles(iteration, promptsDir);
 
+    let userCredentialsTempPath = undefined;
+    const tmpCredentialsDir = join(tmpdir(), 'rover-');
     // Check AI agent credentials based on selected agent
     let credentialsValid = true;
     const dockerMounts: string[] = [];
@@ -162,6 +171,12 @@ export const startDockerExecution = async (taskId: number, task: TaskDescription
 
         if (existsSync(claudeCreds)) {
             dockerMounts.push(`-v`, `${claudeCreds}:/.credentials.json:Z,ro`);
+        } else if (platform == 'darwin') {
+            const claudeCreds = findKeychainCredentials('Claude Code-credentials');
+            userCredentialsTempPath = mkdtempSync(tmpCredentialsDir);
+            const claudeCredsFile = join(userCredentialsTempPath, '.credentials.json');
+            writeFileSync(claudeCredsFile, claudeCreds);
+            dockerMounts.push(`-v`, `${claudeCredsFile}:/.credentials.json:Z,ro`)
         }
     } else if (selectedAiAgent === 'gemini') {
         // Gemini might use environment variables or other auth methods
@@ -349,6 +364,9 @@ export const startDockerExecution = async (taskId: number, task: TaskDescription
                         failedAt: new Date().toISOString(),
                         exitCode: code
                     }, jsonMode);
+                }
+                if (userCredentialsTempPath) {
+                    rmSync(userCredentialsTempPath, { recursive: true, force: true });
                 }
             });
 
