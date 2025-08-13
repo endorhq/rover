@@ -77,7 +77,8 @@ class Telemetry {
             this.writeUserId(CONFIG_DIR, USER_CONFIG_PATH, userId);
         }
 
-        return new Telemetry(userId, from, existsSync(DISABLE_TELEMETRY_PATH));
+        const isDisabled = existsSync(DISABLE_TELEMETRY_PATH) || process.env.ROVER_NO_TELEMETRY === 'true';
+        return new Telemetry(userId, from, isDisabled);
     }
 
     static disableTelemetry() {
