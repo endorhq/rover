@@ -18,7 +18,12 @@ export class RoverCLI {
 
     private getExecOptions() {
         return {
-            cwd: this.workspaceRoot || process.cwd()
+            cwd: this.workspaceRoot || process.cwd(),
+            env: {
+                ...process.env,
+                // For now, disable the CLI telemetry as we will add it to the extension
+                ROVER_NO_TELEMETRY: 'true'
+            }
         };
     }
 
