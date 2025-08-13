@@ -607,6 +607,10 @@ export const taskCommand = async (initPrompt?: string, options: { fromGithub?: s
             description = `${issueData.title}\n\n${issueData.body}`;
             skipExpansion = true;
 
+            if (!issueData.body || issueData.body.length == 0) {
+                console.log(colors.green('GitHub issue description is empty; creating a task with the Github issue title alone: task information might not be accurate'));
+            }
+
             taskData = {
                 title: issueData.title,
                 description
@@ -619,6 +623,7 @@ export const taskCommand = async (initPrompt?: string, options: { fromGithub?: s
             }
         } else {
             // If GitHub fetch failed, exit
+            console.error(colors.red('✗ Failed to fetch issue from GitHub'));
             process.exit(1);
         }
     }
