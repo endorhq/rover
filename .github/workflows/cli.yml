@@ -10,10 +10,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    defaults:
-      run:
-        working-directory: packages/cli
-
     strategy:
       matrix:
         node-version: [20.x, 22.x]
@@ -36,12 +32,14 @@ jobs:
 
     - name: Install dependencies
       run: npm install
+    
+    - name: Build the project
+      run: npm run build
 
     - name: Run TypeScript check
       run: npm run check
-
-    - name: Build CLI
-      run: npm run build
+      working-directory: packages/cli
 
     - name: Test CLI execution
       run: npm start --version
+      working-directory: packages/cli

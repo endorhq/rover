@@ -10,10 +10,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    defaults:
-      run:
-        working-directory: packages/extension
-
     steps:
     - uses: actions/checkout@v4
 
@@ -33,17 +29,24 @@ jobs:
     - name: Install dependencies
       run: npm install
 
+    - name: Build
+      run: npm run build
+
     - name: Run type checking
       run: npm run check-types
+      working-directory: packages/extension
 
     - name: Run linting
       run: npm run lint
+      working-directory: packages/extension
 
     - name: Compile extension
       run: npm run compile
+      working-directory: packages/extension
 
     - name: Package extension
       run: npm run package
+      working-directory: packages/extension
 
     - name: Upload VSIX artifact
       uses: actions/upload-artifact@v4
