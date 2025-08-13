@@ -70,11 +70,11 @@ class Telemetry {
                 userId = readFileSync(USER_CONFIG_PATH, 'utf-8').trim();
             } catch (error) {
                 userId = uuidv4();
-                this.writeUserId(CONFIG_DIR, USER_CONFIG_PATH, userId);
+                this.writeUserId(userId);
             }
         } else {
             userId = uuidv4();
-            this.writeUserId(CONFIG_DIR, USER_CONFIG_PATH, userId);
+            this.writeUserId(userId);
         }
 
         const isDisabled = existsSync(DISABLE_TELEMETRY_PATH) || process.env.ROVER_NO_TELEMETRY === 'true';
@@ -169,11 +169,11 @@ class Telemetry {
         return this.userId;
     }
 
-    private static writeUserId(configDir: string, userConfigPath: string, userId: string): void {
-        if (!existsSync(configDir)) {
-            mkdirSync(configDir, { recursive: true });
+    private static writeUserId(userId: string): void {
+        if (!existsSync(CONFIG_DIR)) {
+            mkdirSync(CONFIG_DIR, { recursive: true });
         }
-        writeFileSync(userConfigPath, userId);
+        writeFileSync(USER_CONFIG_PATH, userId);
     }
 
     // Send the capture event to PostHog
