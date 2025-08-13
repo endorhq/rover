@@ -10,6 +10,7 @@ import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
 import { UserSettings, AI_AGENT } from '../lib/config.js';
 import { IterationConfig } from '../lib/iteration.js';
 import { getTelemetry } from '../lib/telemetry.js';
+import { showRoverChat } from '../utils/display.js';
 
 interface IterateResult {
     success: boolean;
@@ -141,8 +142,12 @@ export const iterateCommand = async (taskId: string, refinements: string, option
     result.taskId = numericTaskId;
 
     if (!options.json) {
-        console.log(`\n🤖 ${colors.green("Rover")}:`, "hey human! Let's iterate over this task");
-        console.log(`🤖 ${colors.green("Rover")}:`, 'I got your new instructions and will ask an agent to implement them\n');
+        showRoverChat([
+            "hey human! Let's iterate over this task.",
+            "I got your new instructions and will ask an agent to implement them."
+        ], {
+            breaklineBefore: false
+        });
     }
 
     // Load AI agent selection from user settings

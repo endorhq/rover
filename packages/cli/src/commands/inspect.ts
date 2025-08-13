@@ -3,7 +3,7 @@ import { formatTaskStatus, statusColor } from '../utils/task-status.js';
 import { TaskDescription, TaskNotFoundError, type TaskStatus } from '../lib/description.js';
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import showTips from '../utils/tips.js';
+import { showTips } from '../utils/display.js';
 import { getTelemetry } from '../lib/telemetry.js';
 
 /**

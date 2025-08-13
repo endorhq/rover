@@ -7,8 +7,7 @@ import { detectEnvironment } from '../utils/environment.js';
 import type { Environment } from '../types.js';
 import { checkClaude, checkDocker, checkGemini, checkGit } from '../utils/system.js';
 import { AI_AGENT, ProjectConfig, UserSettings } from '../lib/config.js';
-import showTips, { TIP_TITLES } from '../utils/tips.js';
-import { roverBanner } from '../utils/banner.js';
+import { showRoverBanner, showRoverChat, showTips, TIP_TITLES } from '../utils/display.js';
 import { getTelemetry } from '../lib/telemetry.js';
 
 // Get the default prompt
@@ -58,12 +57,14 @@ const ensureGitignore = async (projectPath: string): Promise<void> => {
  */
 export const init = async (path: string = '.') => {
     // Intro
-    console.log(roverBanner());
+    showRoverBanner();
 
     const telemetry = getTelemetry();
 
-    console.log(`\n🤖 ${colors.green("Rover")}:`, "hey human! I'm Rover and I will help you managing AI agents.");
-    console.log(`🤖 ${colors.green("Rover")}:`, 'Let me first run some checks in your system.\n');
+    showRoverChat([
+        "hey human! I'm Rover and I will help you managing AI agents.",
+        "Let me first run some checks in your system."
+    ]);
 
     const reqSpinner = ora({ text: 'Checking prerequisites', spinner: 'dots2' }).start();
 

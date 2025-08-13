@@ -17,8 +17,7 @@ import { request } from 'node:https';
 import { spawn } from 'node:child_process';
 import { spawnSync } from '../lib/os.js';
 import { checkGitHubCLI } from '../utils/system.js';
-import { roverBanner } from '../utils/banner.js';
-import showTips from '../utils/tips.js';
+import { showRoverBanner, showRoverChat, showTips } from '../utils/display.js';
 import { userInfo } from 'node:os';
 import { getTelemetry } from '../lib/telemetry.js';
 import { NewTaskProvider } from 'rover-telemetry';
@@ -593,9 +592,11 @@ export const taskCommand = async (initPrompt?: string, options: { fromGithub?: s
     }
 
     if (!json) {
-        console.log(roverBanner());
-        console.log(`\n🤖 ${colors.green("Rover")}:`, 'hey human! Here you can assign new tasks to an agent');
-        console.log(`🤖 ${colors.green("Rover")}:`, 'Add detailed instructions for a better result\n');
+        showRoverBanner();
+        showRoverChat([
+            "hey human! Here you can assign new tasks to an agent.",
+            "Add detailed instructions for a better result."
+        ]);
     }
 
     let description = initPrompt?.trim() || '';

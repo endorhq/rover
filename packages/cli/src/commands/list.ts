@@ -1,7 +1,7 @@
 import colors from 'ansi-colors';
 import { getAllTaskStatuses, updateTaskWithStatus } from '../utils/status.js';
 import { formatTaskStatus, statusColor } from '../utils/task-status.js';
-import showTips from '../utils/tips.js';
+import { showTips } from '../utils/display.js';
 import { getTelemetry } from '../lib/telemetry.js';
 
 /**

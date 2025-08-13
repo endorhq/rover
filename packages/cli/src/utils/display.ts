@@ -1,5 +1,71 @@
 import colors from 'ansi-colors';
 
+export enum TIP_TITLES {
+    NEXT_STEPS = 'Next steps',
+    TIPS = 'Tips',
+}
+
+export interface TipsConfig {
+    title?: TIP_TITLES,
+    emoji?: string,
+    breakline?: boolean
+}
+
+const defaultTipsConfig: TipsConfig = {
+    title: TIP_TITLES.TIPS,
+    emoji: '💡',
+    breakline: true
+}
+
+/**
+ * Show tips on the CLI!
+ */
+export const showTips = (tips: string[], config: TipsConfig = {}) => {
+    const buildConfig: TipsConfig = {
+        ...defaultTipsConfig,
+        ...config
+    };
+
+    if (buildConfig.breakline) console.log('');
+
+    console.log(colors.white(`${buildConfig.emoji} ${buildConfig.title}:`));
+
+    for (const tip of tips) {
+        console.log(colors.gray(`   ${tip}`));
+    }
+};
+
+export interface RoverChatConfig {
+    breaklineAfter?: boolean,
+    breaklineBefore?: boolean
+}
+
+const defaultRoverChatConfig: RoverChatConfig = {
+    breaklineAfter: true,
+    breaklineBefore: true,
+}
+
+/**
+ * Show rover messages (like a robot) in the CLI for a more interactive
+ * experience
+ */
+export const showRoverChat = (messages: string[], config: RoverChatConfig = {}) => {
+    const buildConfig: RoverChatConfig = {
+        ...defaultRoverChatConfig,
+        ...config
+    };
+
+    if (buildConfig.breaklineBefore) console.log('');
+
+    for (const message of messages) {
+        console.log(`🤖 ${colors.green("Rover")}:`, message);
+    }
+
+    if (buildConfig.breaklineAfter) console.log('');
+}
+
+// Rover Banner
+
 // Check for true color support
 const supportsTrueColor = (): boolean => {
     return !!(
@@ -17,13 +83,15 @@ const rgb = (r: number, g: number, b: number, text: string): string => {
     return `\x1b[38;2;${r};${g};${b}m${text}\x1b[0m`;
 };
 
-export const roverBanner = () => {
+export const showRoverBanner = () => {
     const bannerText = [
         '▗▄▄▖  ▗▄▖ ▗▖  ▗▖▗▄▄▄▖▗▄▄▖ ',
         '▐▌ ▐▌▐▌ ▐▌▐▌  ▐▌▐▌   ▐▌ ▐▌',
         '▐▛▀▚▖▐▌ ▐▌▐▌  ▐▌▐▛▀▀▘▐▛▀▚▖',
         '▐▌ ▐▌▝▚▄▞▘ ▝▚▞▘ ▐▙▄▄▖▐▌ ▐▌'
     ];
+
+    let banner;
 
     if (supportsTrueColor()) {
         // True color green gradient from bright green to dark green
@@ -35,7 +103,7 @@ export const roverBanner = () => {
             [0, 100, 0]      // Dark green
         ];
 
-        return bannerText.map(line => {
+        banner = bannerText.map(line => {
             const chars = line.split('');
             const step = Math.ceil(chars.length / colorSteps.length);
 
@@ -47,7 +115,9 @@ export const roverBanner = () => {
         }).join('\n');
     } else {
         // Fallback to simple green
-        return bannerText.map(line => colors.white(line)).join('\n');
+        banner = bannerText.map(line => colors.white(line)).join('\n');
     }
+
+    console.log(banner);
 };
 
