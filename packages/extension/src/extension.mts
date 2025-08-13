@@ -1,5 +1,4 @@
 import * as vscode from 'vscode';
-import { promisify } from 'util';
 import * as path from 'path';
 import { TasksLitWebviewProvider } from './providers/TasksLitWebviewProvider.mjs';
 import { RoverCLI } from './rover/cli.js';

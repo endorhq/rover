@@ -4,7 +4,6 @@ import yoctoSpinner from 'yocto-spinner';
 import { spawnSync } from '../lib/os.js';
 import { existsSync, openSync } from 'node:fs';
 import { join } from 'node:path';
-import { promisify } from 'node:util';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
 const { prompt } = enquirer;
 

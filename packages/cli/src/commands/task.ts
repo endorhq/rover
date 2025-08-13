@@ -14,7 +14,6 @@ import { UserSettings, AI_AGENT } from '../lib/config.js';
 import { IterationConfig } from '../lib/iteration.js';
 import { generateBranchName } from '../utils/branch-name.js';
 import { request } from 'node:https';
-import { promisify } from 'node:util';
 import { spawn } from 'node:child_process';
 import { spawnSync } from '../lib/os.js';
 import { checkGitHubCLI } from '../utils/system.js';

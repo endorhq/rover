@@ -1,5 +1,4 @@
 import { spawn } from 'child_process';
-import { promisify } from 'util';
 import * as vscode from 'vscode';
 import { MergeResult, PushResult, RoverTask, TaskDetails, IterateResult } from './types.js';
 
