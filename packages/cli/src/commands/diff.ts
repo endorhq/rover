@@ -1,9 +1,9 @@
 import colors from 'ansi-colors';
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
-import { spawnSync } from '../lib/os.js';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
 import { getTelemetry } from '../lib/telemetry.js';
+import Git from '../lib/git.js';
+import { showTips } from '../utils/display.js';
 
 export const diffCommand = async (taskId: string, filePath?: string, options: { onlyFiles?: boolean, branch?: string } = {}) => {
     const telemetry = getTelemetry();
@@ -15,6 +15,8 @@ export const diffCommand = async (taskId: string, filePath?: string, options: { 
     }
 
     try {
+        const git = new Git();
+
         // Load task using TaskDescription
         const task = TaskDescription.load(numericTaskId);
 
@@ -26,61 +28,35 @@ export const diffCommand = async (taskId: string, filePath?: string, options: { 
         }
 
         // Check if we're in a git repository
-        try {
-            spawnSync('git', ['rev-parse', '--is-inside-work-tree'], { stdio: 'pipe' });
-        } catch (error) {
+        if (!git.isGitRepo()) {
             console.log(colors.red('✗ Not in a git repository'));
             return;
         }
 
-        console.log(colors.bold(`\n📊 Task ${numericTaskId} Changes\n`));
-        console.log(colors.gray('Title: ') + colors.white(task.title));
-        console.log(colors.gray('Workspace: ') + colors.cyan(task.worktreePath));
-        if (task.branchName) {
-            console.log(colors.gray('Branch: ') + colors.cyan(task.branchName));
+        console.log(colors.bold(`Task ${numericTaskId} Changes`));
+        console.log(colors.gray('├── Title: ') + colors.white(task.title));
+        console.log(colors.gray('├── Workspace: ') + colors.white(task.worktreePath));
+
+        if (options.branch) {
+            console.log(colors.gray('├── Task Branch: ') + colors.white(task.branchName));
+            console.log(colors.gray('└── Comparing with: ') + colors.cyan(options.branch));
+        } else {
+            console.log(colors.gray('└── Task Branch: ') + colors.white(task.branchName));
         }
 
         telemetry?.eventDiff();
 
-        // Build git diff command
-        const originalCwd = process.cwd();
-
         try {
-            // Change to worktree directory to run git diff
-            process.chdir(task.worktreePath);
-
-            let gitDiffArgs = ['diff'];
-
-            // Add only-files flag if specified
-            if (options.onlyFiles) {
-                gitDiffArgs.push('--name-only');
-            }
-
-            // Compare with main branch (or whatever the main branch is)
-            if (options.branch) {
-                gitDiffArgs.push(options.branch);
-
-                console.log(colors.gray(`\nComparing with: `) + colors.cyan(options.branch));
-            }
-
-            // Add specific file path if provided
-            if (filePath) {
-                gitDiffArgs.push('--', filePath);
-                console.log(colors.gray('File: ') + colors.cyan(filePath));
-            }
-
-            if (options.onlyFiles) {
-                console.log(colors.bold('\n📄 Changed Files:\n'));
-            } else {
-                console.log(colors.bold('\n📝 Diff:\n'));
-            }
-
             // Execute git diff command
             try {
-                const diffOutput = spawnSync('git', gitDiffArgs, {
-                    stdio: 'pipe',
-                    encoding: 'utf8'
-                }).stdout.toString();
+                const diffResult = git.diff({
+                    worktreePath: task.worktreePath,
+                    filePath: filePath,
+                    onlyFiles: options.onlyFiles,
+                    branch: options.branch
+                });
+
+                const diffOutput = diffResult.stdout.toString();
 
                 if (diffOutput.trim() === '') {
                     if (filePath) {
@@ -90,14 +66,17 @@ export const diffCommand = async (taskId: string, filePath?: string, options: { 
                     }
                 } else {
                     if (options.onlyFiles) {
+                        console.log(colors.bold.white('\nChanged Files'));
                         // Display file list with colors
                         const files = diffOutput.trim().split('\n');
-                        files.forEach(file => {
-                            console.log(colors.cyan(`  ${file}`));
-                        });
-                        console.log(colors.gray(`\nTotal changed files: ${files.length}`));
+
+                        for (let i = 0; i < files.length; i++) {
+                            const connector = i === files.length - 1 ? '└──' : '├──';
+                            console.log(colors.gray(`${connector}`), colors.cyan(files[i]));
+                        }
                     } else {
                         // Display full diff with syntax highlighting
+                        console.log('');
                         const lines = diffOutput.split('\n');
                         lines.forEach(line => {
                             if (line.startsWith('@@')) {
@@ -126,7 +105,7 @@ export const diffCommand = async (taskId: string, filePath?: string, options: { 
                         console.log(colors.yellow('No changes found in workspace'));
                     }
                 } else {
-                    console.error(colors.red('Error running git diff:'), gitError.message);
+                    console.error(colors.red('Error running git diff:'), gitError);
                     if (gitError.stderr) {
                         console.error(colors.red(gitError.stderr.toString()));
                     }
@@ -135,17 +114,26 @@ export const diffCommand = async (taskId: string, filePath?: string, options: { 
 
         } catch (error: any) {
             console.error(colors.red('Error accessing workspace:'), error.message);
-        } finally {
-            // Always restore original working directory
-            process.chdir(originalCwd);
         }
 
         // Show additional context if not showing only files
-        if (!options.onlyFiles && !filePath) {
-            console.log(colors.gray('\nTip: Use ') + colors.cyan(`rover diff ${numericTaskId} --only-files`) + colors.gray(' to see only changed filenames'));
-            console.log(colors.gray('     Use ') + colors.cyan(`rover diff ${numericTaskId} <file>`) + colors.gray(' to see diff for a specific file'));
+        const tips = [];
+
+        if (!options.onlyFiles) {
+            tips.push('Use ' + colors.cyan(`rover diff ${numericTaskId} --only-files`) + " to see only changed filenames");
         }
 
+        if (!filePath) {
+            tips.push('Use ' + colors.cyan(`rover diff ${numericTaskId} <file>`) + " to see diff for a specific file");
+        }
+
+        if (!options.branch) {
+            tips.push('Use ' + colors.cyan(`rover diff ${numericTaskId} --branch <branchName>`) + " to compare changes with a specific branch");
+        }
+
+        if (tips.length > 0) {
+            showTips(tips);
+        }
     } catch (error) {
         if (error instanceof TaskNotFoundError) {
             console.log(colors.red(`✗ ${error.message}`));

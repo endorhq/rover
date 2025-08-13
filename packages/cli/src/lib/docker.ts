@@ -109,3 +109,5 @@ export class Docker {
         return result.error == null;
     }
 }
+
+export default Docker;
