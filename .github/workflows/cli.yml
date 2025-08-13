@@ -41,5 +41,5 @@ jobs:
       working-directory: packages/cli
 
     - name: Test CLI execution
-      run: npm start --version
+      run: node dist/index.js --version
       working-directory: packages/cli
