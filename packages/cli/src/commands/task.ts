@@ -608,7 +608,7 @@ export const taskCommand = async (initPrompt?: string, options: { fromGithub?: s
             skipExpansion = true;
 
             if (!issueData.body || issueData.body.length == 0) {
-                console.log(colors.green('GitHub issue description is empty; creating a task with the Github issue title alone: task information might not be accurate'));
+                console.error(colors.yellow('GitHub issue description is empty; creating a task with the Github issue title alone: task information might not be accurate'));
             }
 
             taskData = {
