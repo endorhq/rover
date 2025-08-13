@@ -5,11 +5,15 @@ import { RoverCLI } from './rover/cli.js';
 import { TaskItem } from './providers/TaskItem.js';
 import { TaskDetailsPanel } from './panels/TaskDetailsPanel.js';
 import { spawn } from 'node:child_process';
+import { getTelemetry } from './lib/telemetry.mjs';
+import { NewTaskProvider } from 'rover-telemetry';
 
 let tasksWebviewProvider: TasksLitWebviewProvider;
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('Rover extension is now active!');
+
+    const telemetry = getTelemetry();
 
     // Initialize the CLI wrapper
     const cli = new RoverCLI();
@@ -83,6 +87,8 @@ export function activate(context: vscode.ExtensionContext) {
                     });
                     statusBarItem!.text = '$(loading~spin) Finalizing setup...';
                     await new Promise(resolve => setTimeout(resolve, 300)); // Brief pause for UX
+
+                    telemetry?.eventNewTask(NewTaskProvider.INPUT);
 
                     return createdTask;
                 });
@@ -159,6 +165,8 @@ export function activate(context: vscode.ExtensionContext) {
             if (!taskId) {
                 throw new Error('Task ID is undefined or empty');
             }
+
+            telemetry?.eventInspectTask();
 
             TaskDetailsPanel.createOrShow(context.extensionUri, taskId, taskTitle);
         } catch (error) {
@@ -291,6 +299,8 @@ export function activate(context: vscode.ExtensionContext) {
 
                 progress.report({ increment: 70, message: `Opening ${changes.length} file comparisons...` });
 
+                telemetry?.eventDiff();
+
                 try {
                     // Use vscode.changes command with the array of changes
                     await vscode.commands.executeCommand('vscode.changes', `Changes on task ${taskId}`, changes);
@@ -401,6 +411,8 @@ export function activate(context: vscode.ExtensionContext) {
 
                     return pushResult;
                 });
+
+                telemetry?.eventPushBranch();
 
                 if (pushResult.success) {
                     statusBarItem.text = `$(check) Task pushed successfully (Branch: ${pushResult.branchName})!`;
@@ -536,6 +548,8 @@ export function activate(context: vscode.ExtensionContext) {
                     return iterateResult;
                 });
 
+                telemetry?.eventIterateTask(iterateResult.iterationNumber);
+
                 if (iterateResult.success) {
                     statusBarItem.text = `$(check) Task iteration started!`;
                     statusBarItem.tooltip = `Task: ${iterateResult.taskTitle} (Iteration: ${iterateResult.iterationNumber})`;
@@ -630,7 +644,6 @@ export function activate(context: vscode.ExtensionContext) {
             let statusBarItem: vscode.StatusBarItem | undefined;
 
             try {
-
                 // Create status bar item for persistent progress indication
                 statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
                 statusBarItem.text = '$(loading~spin) Merging task...';
@@ -671,6 +684,8 @@ export function activate(context: vscode.ExtensionContext) {
 
                     return mergeResult;
                 });
+
+                telemetry?.eventMergeTask();
 
                 if (mergeResult.success) {
                     statusBarItem.text = `$(check) Task merged successfully!`;
@@ -730,6 +745,8 @@ export function activate(context: vscode.ExtensionContext) {
                 throw new Error('Invalid task item - missing task information');
             }
 
+            telemetry?.eventDeleteTask();
+
             const answer = await vscode.window.showWarningMessage(
                 `Are you sure you want to delete task "${taskTitle}"?`,
                 'Yes',
@@ -755,6 +772,8 @@ export function activate(context: vscode.ExtensionContext) {
             if (!taskId) {
                 throw new Error('Invalid task item - missing task ID');
             }
+            telemetry?.eventShell();
+
             cli.startShell(taskId);
         } catch (error) {
             console.error('Error in shell command:', error);
@@ -772,6 +791,8 @@ export function activate(context: vscode.ExtensionContext) {
             if (!taskId) {
                 throw new Error('Invalid task item - missing task ID');
             }
+
+            telemetry?.eventLogs();
 
             // Only follow logs for running tasks
             const shouldFollow = ['running', 'initializing', 'installing'].includes(taskStatus);
@@ -808,6 +829,8 @@ export function activate(context: vscode.ExtensionContext) {
             const success = await vscode.commands.executeCommand('vscode.openFolder', workspaceUri, {
                 forceNewWindow: true
             });
+
+            telemetry?.eventOpenWorkspace();
 
             if (success) {
                 vscode.window.showInformationMessage(`Opened workspace for task: ${taskTitle}`);
@@ -949,6 +972,9 @@ export function activate(context: vscode.ExtensionContext) {
                     // Create task with --from-github flag
                     const roverPath = vscode.workspace.getConfiguration('rover').get<string>('cliPath') || 'rover';
                     const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd();
+
+                    telemetry?.eventNewTask(NewTaskProvider.GITHUB);
+
                     const { stdout } = await spawn(
                         roverPath, ['task', '--from-github', issueNumber.toString(), '--yes', '--json'],
                         { cwd: workspaceRoot }

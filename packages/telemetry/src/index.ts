@@ -49,7 +49,9 @@ enum EVENT_IDS {
     // Reset current changes
     RESET = 'reset',
     // Open shell in container
-    SHELL = 'shell'
+    SHELL = 'shell',
+    // Open a workspace in the extension
+    OPEN_WORKSPACE = 'open_workspace'
 }
 
 class Telemetry {
@@ -157,6 +159,10 @@ class Telemetry {
 
     eventShell() {
         this.capture(EVENT_IDS.SHELL);
+    }
+
+    eventOpenWorkspace() {
+        this.capture(EVENT_IDS.OPEN_WORKSPACE);
     }
 
     // Other methods
