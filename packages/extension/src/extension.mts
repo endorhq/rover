@@ -1,13 +1,11 @@
 import * as vscode from 'vscode';
-import { exec } from 'child_process';
 import { promisify } from 'util';
 import * as path from 'path';
 import { TasksLitWebviewProvider } from './providers/TasksLitWebviewProvider.mjs';
 import { RoverCLI } from './rover/cli.js';
 import { TaskItem } from './providers/TaskItem.js';
 import { TaskDetailsPanel } from './panels/TaskDetailsPanel.js';
-
-const execAsync = promisify(exec);
+import { spawn } from 'node:child_process';
 
 let tasksWebviewProvider: TasksLitWebviewProvider;
 
@@ -232,8 +230,8 @@ export function activate(context: vscode.ExtensionContext) {
                 // Get list of changed files in the task workspace
                 let changedFiles: string[] = [];
                 try {
-                    const { stdout: statusOutput } = await execAsync('git status --porcelain -u', { cwd: taskWorkspacePath });
-                    changedFiles = statusOutput.split('\n')
+                    const { stdout: statusOutput } = await spawn('git', ['status', '--porcelain', '-u'], { cwd: taskWorkspacePath });
+                    changedFiles = statusOutput.toString().split('\n')
                         .filter(line => line.trim())
                         .map(line => line.substring(3).trim()) // Remove status flags (e.g., "M ", "A ", etc.)
                         .filter(file => file.length > 0);
@@ -844,8 +842,8 @@ export function activate(context: vscode.ExtensionContext) {
                 let repoInfo: { owner: string; repo: string } | null = null;
                 try {
                     const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd();
-                    const { stdout: remoteUrl } = await execAsync('git remote get-url origin', { cwd: workspaceRoot });
-                    const match = remoteUrl.match(/github\.com[:/]([^/]+)\/([^/.]+)(\.git)?/);
+                    const { stdout: remoteUrl } = await spawn('git', ['remote', 'get-url', 'origin'], { cwd: workspaceRoot });
+                    const match = remoteUrl.toString().match(/github\.com[:/]([^/]+)\/([^/.]+)(\.git)?/);
                     if (match) {
                         repoInfo = { owner: match[1], repo: match[2] };
                     }
@@ -886,8 +884,8 @@ export function activate(context: vscode.ExtensionContext) {
                 // Fall back to gh CLI
                 try {
                     const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd();
-                    const { stdout } = await execAsync('gh issue list --json number,title,assignees,labels --limit 100', { cwd: workspaceRoot });
-                    return JSON.parse(stdout);
+                    const { stdout } = await spawn('gh', ['issue', 'list', '--json', 'number,title,assignees,labels', '--limit', '100'], { cwd: workspaceRoot });
+                    return JSON.parse(stdout.toString());
                 } catch (error) {
                     console.warn('GitHub CLI failed:', error);
                     return null;
@@ -952,11 +950,11 @@ export function activate(context: vscode.ExtensionContext) {
                     // Create task with --from-github flag
                     const roverPath = vscode.workspace.getConfiguration('rover').get<string>('cliPath') || 'rover';
                     const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd();
-                    const { stdout } = await execAsync(
-                        `${roverPath} task --from-github ${issueNumber} --yes --json`,
+                    const { stdout } = await spawn(
+                        roverPath, ['task', '--from-github', issueNumber.toString(), '--yes', '--json'],
                         { cwd: workspaceRoot }
                     );
-                    return JSON.parse(stdout);
+                    return JSON.parse(stdout.toString());
                 });
 
                 statusBarItem.text = '$(check) Task created from GitHub issue';
