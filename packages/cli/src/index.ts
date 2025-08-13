@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { existsSync } from 'fs';
+import { join } from 'node:path';
 import { Command } from 'commander';
 import init from './commands/init.js';
 import { listCommand } from './commands/list.js';
@@ -14,8 +16,34 @@ import { deleteCommand } from './commands/delete.js';
 import { mergeCommand } from './commands/merge.js';
 import colors from 'ansi-colors';
 import { pushCommand } from './commands/push.js';
+import { showTips, TIP_TITLES } from './utils/display.js';
 
 const program = new Command();
+
+program
+  .hook('preAction', (thisCommand, actionCommand) => {
+    const commandName = actionCommand.name();
+    if (
+      commandName !== "init" &&
+        existsSync(join('.', 'rover.json')) &&
+        !existsSync(join('.', '.rover'))
+    ) {
+      console.log(colors.green(`Rover is not fully initialized in this directory. The command you requested (\`${commandName}\`) was not executed.`));
+      console.log(`├── ${colors.gray('Project config (exists):')} rover.json`);
+      console.log(`└── ${colors.gray('User settings (does not exist):')} .rover/settings.json`);
+
+      showTips(
+        [
+          'Run ' + colors.cyan('rover init') + ' in this directory to initialize user settings',
+        ],
+        {
+          title: TIP_TITLES.NEXT_STEPS
+        }
+      );
+
+      process.exit(1);
+    }
+  })
 
 program
 	.name('rover')

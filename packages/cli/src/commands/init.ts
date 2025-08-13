@@ -108,6 +108,8 @@ export const init = async (path: string = '.') => {
     if (ProjectConfig.exists() && UserSettings.exists()) {
         console.log(colors.cyan('\n✓ Rover is already initialized in this directory'));
         return;
+    } else if (!UserSettings.exists()) {
+        console.log(colors.green('\n✓ Rover is initialized in this directory. User settings will be initialized now.'));
     }
 
     // Ensure .rover/ is in .gitignore
