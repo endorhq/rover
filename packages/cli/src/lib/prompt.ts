@@ -57,7 +57,7 @@ Your analysis should:
 4. Identify the project's linting, formatting, and testing conventions
 5. Identify the mandatory OS package dependencies that this task needs in order to be implemented
 
-Write your analysis to context.md using this exact format:
+Write your analysis to /workspace/context.md using this exact format:
 
 # Context
 
@@ -158,7 +158,7 @@ Your plan should:
 3. Break down implementation into minimal, focused steps
 4. Provide validation criteria for completion
 
-Reference the context.md file for technical details. Write your plan to plan.md using this exact format:
+Reference the /workspace/context.md file for technical details. Write your plan to /workspace/plan.md using this exact format:
 
 # Implementation Plan
 
@@ -177,8 +177,8 @@ Reference the context.md file for technical details. Write your plan to plan.md 
 2. [Next action, keep minimal and focused]
 
 ## Validation Checklist
-- [ ] All tests pass if available (use commands from context.md)
-- [ ] Linting passes (use commands from context.md)
+- [ ] All tests pass if available (use commands from /workspace/context.md)
+- [ ] Linting passes (use commands from /workspace/context.md)
 - [ ] Feature works as described in the task
 - [ ] No regressions introduced
 
@@ -203,11 +203,11 @@ ${iteration.description}
 
 Your implementation should:
 
-1. Follow the steps outlined in plan.md exactly
-2. Reference context.md for technical details and constraints
+1. Follow the steps outlined in /workspace/plan.md exactly
+2. Reference /workspace/context.md for technical details and constraints
 3. Write clean, maintainable code following existing patterns
 4. Complete all validation checklist items from the plan if possible
-5. Document all changes in changes.md with detailed explanations
+5. Document all changes in /workspace/changes.md with detailed explanations
 
 Start implementing step 1 of the plan and work through each step sequentially.
 
@@ -217,9 +217,9 @@ Implementation guidelines:
 - Follow existing code conventions and patterns
 - Add appropriate error handling where needed
 - Update relevant tests if they exist
-- Run linting and formatting commands as specified in context.md
+- Run linting and formatting commands as specified in /workspace/context.md
 
-After completing the implementation, write detailed documentation to changes.md using this exact format:
+After completing the implementation, write detailed documentation to /workspace/changes.md using this exact format:
 
 # Implementation Changes
 
@@ -327,8 +327,8 @@ Description:
 ${iteration.description}
 
 Your review should:
-1. Compare the implementation against the original plan.md to identify deviations
-2. Examine changes.md to understand what was implemented
+1. Compare the implementation against the original /workspace/plan.md to identify deviations
+2. Examine /workspace/changes.md to understand what was implemented
 3. Review the actual code changes for quality, patterns, and potential issues
 4. Check if all validation checklist items from the plan were completed
 5. Look for security vulnerabilities, performance issues, or architectural concerns
@@ -343,9 +343,9 @@ Review criteria:
 - **Performance**: Are there any performance implications?
 - **Architecture**: Does the solution fit well with existing architecture?
 
-**IMPORTANT**: Only create a review.md file if you find issues that need to be addressed. If the implementation is satisfactory and follows the plan correctly, simply state "No review issues found - implementation approved" and do not create any file.
+**IMPORTANT**: Only create a /workspace/review.md file if you find issues that need to be addressed. If the implementation is satisfactory and follows the plan correctly, simply state "No review issues found - implementation approved" and do not create any file.
 
-If issues are found, create review.md with this exact format:
+If issues are found, create /workspace/review.md with this exact format:
 
 # Code Review
 
@@ -353,7 +353,7 @@ If issues are found, create review.md with this exact format:
 [Brief summary of the implementation quality and major concerns]
 
 ## Plan Adherence Issues
-### Deviations from plan.md:
+### Deviations from /workspace/plan.md:
 - [Specific deviation]: [Why this is problematic and what should be done]
 
 ### Missing requirements:
@@ -428,7 +428,7 @@ The GitHub integration feature is mostly well-implemented but has some security 
 - [ ] Add timeout handling for API calls
 - [ ] Add unit tests for error scenarios
 
-Begin your review by examining plan.md, changes.md, and the actual code changes.
+Begin your review by examining /workspace/plan.md, /workspace/changes.md, and the actual code changes.
 `
     }
 
@@ -437,7 +437,7 @@ Begin your review by examining plan.md, changes.md, and the actual code changes.
      */
     apply_review(iteration: IterationConfig): string {
         return `
-You are implementing fixes based on the code review feedback. Your goal is to address all the issues identified in review.md and update the implementation accordingly.
+You are implementing fixes based on the code review feedback. Your goal is to address all the issues identified in /workspace/review.md and update the implementation accordingly.
 
 Task being fixed:
 Title: ${iteration.title}
@@ -445,20 +445,20 @@ Description:
 ${iteration.description}
 
 Your implementation should:
-1. Read and understand all issues listed in review.md
+1. Read and understand all issues listed in /workspace/review.md
 2. Address each action item systematically, starting with "Must Fix" items
 3. Apply the recommended changes to the codebase
 4. Ensure fixes maintain existing functionality and don't introduce new issues
-5. Update changes.md to document the review fixes applied
+5. Update /workspace/changes.md to document the review fixes applied
 
 Implementation guidelines:
 - Follow the specific recommendations provided in the review
 - Maintain code quality and existing patterns while fixing issues
 - Test your fixes to ensure they work correctly
 - Prioritize fixes by severity: Must Fix → Should Fix → Could Fix
-- Reference the original plan.md and context.md for architectural guidance
+- Reference the original /workspace/plan.md and /workspace/context.md for architectural guidance
 
-After applying all fixes, update the changes.md file by adding a new section at the end:
+After applying all fixes, update the /workspace/changes.md file by adding a new section at the end:
 
 ## Review Fixes Applied
 
@@ -473,7 +473,7 @@ After applying all fixes, update the changes.md file by adding a new section at 
 - [ ] Tests still pass after fixes
 - [ ] No new issues introduced
 
-Example addition to changes.md:
+Example addition to /workspace/changes.md:
 ## Review Fixes Applied
 
 ### Issues Addressed
@@ -495,7 +495,7 @@ Example addition to changes.md:
 - [✓] Tests still pass after fixes
 - [✓] No new issues introduced
 
-Start by examining review.md to understand all the issues that need to be addressed, then work through them systematically.
+Start by examining /workspace/review.md to understand all the issues that need to be addressed, then work through them systematically.
 `
     }
 
@@ -506,7 +506,7 @@ Start by examining review.md to understand all the issues that need to be addres
         return `
 You are creating a summary of the implemented changes for this task. Your goal is to document what was accomplished and provide key information for future reference.
 
-Check the context.md and changes.md file to gather information.
+Check the /workspace/context.md and /workspace/changes.md file to gather information.
 
 Task completed:
 Title: ${iteration.title}
@@ -519,7 +519,7 @@ Your summary should:
 3. Note any important technical decisions made
 4. Highlight any remaining tasks or considerations
 
-Write your summary to summary.md using this exact format:
+Write your summary to /workspace/summary.md using this exact format:
 
 # Implementation Summary
 
