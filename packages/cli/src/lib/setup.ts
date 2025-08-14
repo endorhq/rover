@@ -517,8 +517,6 @@ export TASK_ID TASK_TITLE TASK_DESCRIPTION
 # Run setup MCP script
 /setup-mcp.sh
 
-sleep infinity
-
 ${this.generateTaskExecutionWorkflow()}
 
 # Move all outputs to the right location
@@ -527,6 +525,12 @@ mv /workspace/plan.md /output
 mv /workspace/changes.md /output
 mv /workspace/summary.md /output
 mv /workspace/review.md /output
+
+# Remove credentials: on certain environments such as Darwin,
+# credentials are stored in the Mac OS X Keychain and mounted from a
+# temporary file for this execution. Shred its content and unlink if
+# the file is mounted as RW; it will fail otherwise.
+shred -u /.credentials.json &> /dev/null
 
 # Recover permissions after task completion
 recover_permissions

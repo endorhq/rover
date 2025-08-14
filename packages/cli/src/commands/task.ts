@@ -125,7 +125,6 @@ export const findKeychainCredentials = (key: string): string => {
         .stdout.toString()
 }
 
-
 /**
  * Start environment using containers
  */
@@ -157,8 +156,6 @@ export const startDockerExecution = async (taskId: number, task: TaskDescription
     const promptBuilder = new PromptBuilder(selectedAiAgent);
     promptBuilder.generatePromptFiles(iteration, promptsDir);
 
-    let userCredentialsTempPath = undefined;
-    const tmpCredentialsDir = join(tmpdir(), 'rover-');
     // Check AI agent credentials based on selected agent
     let credentialsValid = true;
     const dockerMounts: string[] = [];
@@ -173,10 +170,12 @@ export const startDockerExecution = async (taskId: number, task: TaskDescription
             dockerMounts.push(`-v`, `${claudeCreds}:/.credentials.json:Z,ro`);
         } else if (platform == 'darwin') {
             const claudeCreds = findKeychainCredentials('Claude Code-credentials');
-            userCredentialsTempPath = mkdtempSync(tmpCredentialsDir);
+            const userCredentialsTempPath = mkdtempSync(join(tmpdir(), 'rover-'));
             const claudeCredsFile = join(userCredentialsTempPath, '.credentials.json');
             writeFileSync(claudeCredsFile, claudeCreds);
-            dockerMounts.push(`-v`, `${claudeCredsFile}:/.credentials.json:Z,ro`)
+            // Do not mount credentials as RO, as they will be
+            // shredded by the setup script when it finishes
+            dockerMounts.push(`-v`, `${claudeCredsFile}:/.credentials.json:Z`)
         }
     } else if (selectedAiAgent === 'gemini') {
         // Gemini might use environment variables or other auth methods
@@ -364,9 +363,6 @@ export const startDockerExecution = async (taskId: number, task: TaskDescription
                         failedAt: new Date().toISOString(),
                         exitCode: code
                     }, jsonMode);
-                }
-                if (userCredentialsTempPath) {
-                    rmSync(userCredentialsTempPath, { recursive: true, force: true });
                 }
             });
 
