@@ -147,7 +147,7 @@ Found a bug or have a feature request? Please [open an issue on GitHub](https://
 
 Connect with other Rover users and the development team:
 
-- **Discord**: [Join our Discord server](https://discord.gg/EndorHQ) for real-time discussions and help
+- **Discord**: [Join our Discord spaceship](https://discord.gg/EndorHQ) for real-time discussions and help
 - **Twitter/X**: Follow us [@EndorHQ](https://twitter.com/EndorHQ) for updates and announcements
 - **Mastodon**: Find us at [@EndorHQ@mastodon.social](https://mastodon.social/@EndorHQ)
 - **Bluesky**: Follow [@endorhq.bsky.social](https://bsky.app/profile/endorhq.bsky.social)
