@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { RoverCLI } from '../rover/cli.js';
+import { RoverCLI } from '../rover/cli.mjs';
 
 export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'roverTasks';
@@ -174,7 +174,7 @@ export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
       vscode.Uri.joinPath(this.extensionUri, 'dist', 'codicons', 'codicon.css')
     );
 
-    // Get the bundled tasks-webview component URI  
+    // Get the bundled tasks-webview component URI
     const tasksWebviewUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.extensionUri, 'dist', 'views', 'tasks-webview.js')
     );

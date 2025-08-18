@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { RoverCLI } from '../rover/cli.js';
+import { RoverCLI } from '../rover/cli.mjs';
 import { TaskDetails } from '../rover/types.js';
 
 export class TaskDetailsPanel {

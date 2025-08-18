@@ -1,9 +1,9 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { TasksLitWebviewProvider } from './providers/TasksLitWebviewProvider.mjs';
-import { RoverCLI } from './rover/cli.js';
-import { TaskItem } from './providers/TaskItem.js';
-import { TaskDetailsPanel } from './panels/TaskDetailsPanel.js';
+import { RoverCLI } from './rover/cli.mjs';
+import { TaskItem } from './providers/TaskItem.mjs';
+import { TaskDetailsPanel } from './panels/TaskDetailsPanel.mjs';
 import { spawn } from 'node:child_process';
 import { getTelemetry } from './lib/telemetry.mjs';
 import { NewTaskProvider } from 'rover-telemetry';
