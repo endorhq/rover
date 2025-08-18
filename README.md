@@ -1,10 +1,17 @@
 # Endor Rover - Manage AI Agents
 
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Version](https://img.shields.io/npm/v/@endorhq/rover.svg)](https://www.npmjs.com/package/@endorhq/rover)
+[![GitHub Actions](https://img.shields.io/github/actions/workflow/status/endorhq/rover/ci.yml?branch=main)](https://github.com/endorhq/rover/actions)
+[![Discord](https://img.shields.io/discord/1404714845995139192?color=7289da&label=Discord&logo=discord&logoColor=white)](https://discord.gg/EndorHQ)
+
 Launch and manage your AI Agents to complete tasks while you focus on the complex ones.
 
 ```sh
 npm install -g @endorhq/rover@latest && rover init .
 ```
+
+[PLACEHOLDER FOR A GIF / VIDEO]
 
 ## What is Rover?
 
@@ -43,9 +50,60 @@ npm install -g @endorhq/rover@latest
 
 1. Initialize Rover in your project:
 
-```sh
-cd PROJECT && rover init .
-```
+    ```sh
+    cd PROJECT && rover init .
+    ```
+
+2. Create your first task with Rover:
+
+    ```sh
+    rover task
+    ```
+
+3. Check the status of your task:
+
+    ```sh
+    rover ls --watch
+    ```
+
+4. Keep working on your own tasks 🤓
+
+5. After finishing, check the task result:
+
+    ```sh
+    rover inspect 1
+    rover inspect 1 --file changes.md
+    rover diff 1
+    ```
+
+6. If you want to apply more changes, create a second iteration with new instructions:
+
+    ```sh
+    rover iterate 1
+    ```
+
+7. If changes are fine, you can:
+
+    - Merge them:
+
+    ```sh
+    rover merge 1
+    ```
+
+    - Push the branch to the remote using your git configuration:
+
+    ```sh
+    rover push 1
+    ```
+
+    - Take control and do it on your own:
+
+    ```sh
+    cd .rover/tasks/1/workspace
+    git status
+    ```
+
+> 💡 TIP: You can run multiple tasks in parallel. Just take into account your AI agents limits.
 
 ## How it works
 
@@ -61,8 +119,39 @@ Once you are ready, you can merge changes or push the branch. That's it! 🚀
 
 ## Use cases
 
+1. 🔄 **Handle routine development tasks**
+
+    Let AI agents tackle repetitive work like writing tests, updating documentation, or refactoring code. You describe what needs to be done, and Rover ensures the agent works in isolation without affecting your current work.
+
+2. 🔀 **Explore multiple solutions in parallel**
+
+    Working on a performance issue? Spin up different agents to try various approaches simultaneously. Compare results, pick the best solution, or combine insights from multiple attempts.
+
+3. ⚡ **Maintain momentum during context switches**
+
+    When urgent bugs interrupt your feature work, delegate the investigation to an agent while you handle the critical issue. Return to a complete analysis and proposed fixes when you're ready.
+
+4. 🤝 **Get consistent results across your team and contributors**
+
+    Whether your team uses Claude, Gemini, or other AI agents, Rover's workflows ensure everyone produces the same quality output. External contributors can use their preferred AI tools while still getting valid results. No need to enforce specific subscriptions or tools.
+
 ## Get in touch
+
+We'd love to hear from you! Whether you have questions, feedback, or want to share what you're building with Rover, there are several ways to connect:
+
+### Report Issues
+
+Found a bug or have a feature request? Please [open an issue on GitHub](https://github.com/endorhq/rover/issues). We appreciate detailed bug reports and thoughtful feature suggestions.
+
+### Join the Community
+
+Connect with other Rover users and the development team:
+
+- **Discord**: [Join our Discord server](https://discord.gg/EndorHQ) for real-time discussions and help
+- **Twitter/X**: Follow us [@EndorHQ](https://twitter.com/EndorHQ) for updates and announcements
+- **Mastodon**: Find us at [@EndorHQ@mastodon.social](https://mastodon.social/@EndorHQ)
+- **Bluesky**: Follow [@endorhq.bsky.social](https://bsky.app/profile/endorhq.bsky.social)
 
 ## License
 
-
+Rover is open source software licensed under the Apache 2.0 License.
