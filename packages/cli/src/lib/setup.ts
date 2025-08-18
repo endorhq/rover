@@ -144,9 +144,9 @@ write_status() {
     }
 
     /**
-     * Generate permission recovery function
+     * Generate credential shredding and permission recovery function
      */
-    private generatePermissionRecoveryFunction(): string {
+    private generateCleanupFunctions(): string {
         const output = spawnSync('docker', ['info', '-f', 'json'], { encoding: 'utf8' }).stdout;
         const info = JSON.parse(output.toString());
         const isDockerRootless = (info?.SecurityOptions || []).some(
@@ -165,7 +165,19 @@ write_status() {
             `;
         }
 
-        return `# Function to recover permissions before exit
+        return `
+# Function to shred secrets before exit
+shred_secrets() {
+    # Remove credentials: on certain environments such as Darwin,
+    # credentials are stored in the Mac OS X Keychain and mounted from a
+    # temporary file for this execution. Shred its content and unlink if
+    # the file is mounted as RW. If it's not mounted as RW, this command
+    # will fail, but the failure is ignored.
+
+    shred -u /.credentials.json &> /dev/null
+}
+
+# Function to recover permissions before exit
 recover_permissions() {
     echo "🔧 Recovering permissions..."
 
@@ -185,6 +197,7 @@ safe_exit() {
     mv /workspace/summary.md /output
     mv /workspace/review.md /output
 
+    shred_secrets
     recover_permissions
 
     if [ -n "$error_message" ]; then
@@ -412,7 +425,7 @@ fi
     private generateCommonFunctions(): string {
         return `${this.generateWriteStatusFunction()}
 
-${this.generatePermissionRecoveryFunction()}
+${this.generateCleanupFunctions()}
 
 ${this.generatePromptExecutionFunctions()}
 
@@ -526,11 +539,8 @@ mv /workspace/changes.md /output
 mv /workspace/summary.md /output
 mv /workspace/review.md /output
 
-# Remove credentials: on certain environments such as Darwin,
-# credentials are stored in the Mac OS X Keychain and mounted from a
-# temporary file for this execution. Shred its content and unlink if
-# the file is mounted as RW; it will fail otherwise.
-shred -u /.credentials.json &> /dev/null
+# Shred secrets after task completion
+shred_secrets
 
 # Recover permissions after task completion
 recover_permissions
