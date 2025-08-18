@@ -1,18 +1,58 @@
 import { IterationConfig } from "./iteration.js";
 
-/***
- * This library provides the foundation to build prompts for different AI agents.
- * Most of the prompt messages are shared across different AI Agents, but some
- * parts might be customized for specific agents.
- *
- * This is a living library as models and tooling evolve over time.
+/**
+ * Interface representing a structured task with title and description.
+ * This is the expected format for AI responses when expanding task descriptions
+ * or iteration instructions.
+ */
+export interface IPromptTask {
+    /** A concise, action-oriented title for the task (typically max 10-12 words) */
+    title: string;
+    /** Detailed description explaining what needs to be done, why, and relevant context */
+    description: string;
+}
+
+/**
+ * PromptBuilder provides a centralized system for generating prompts for different AI agents.
+ * 
+ * This library serves two main purposes:
+ * 1. Generate structured prompts for task iteration workflows (context, plan, implement, etc.)
+ * 2. Provide standardized prompts for common AI operations (task expansion, commit messages, etc.)
+ * 
+ * The prompts are designed to be agent-agnostic, with some customization possible through
+ * the agent parameter. All prompt methods return strings that should be sent to AI agents
+ * for processing. For JSON responses, use the parseJsonResponse utility to handle the results.
+ * 
+ * @example
+ * ```typescript
+ * const builder = new PromptBuilder('claude');
+ * const taskPrompt = builder.expandTaskPrompt('add user authentication');
+ * const result = await aiAgent.invoke(taskPrompt, true);
+ * const parsed = parseJsonResponse<IPromptTask>(result);
+ * ```
  */
 export class PromptBuilder {
-    // Store the current agent we are writing prompts for
+    /**
+     * Create a new PromptBuilder instance
+     * @param agent - The AI agent identifier (e.g., 'claude', 'gemini')
+     */
     constructor(public agent: string = 'claude') { }
 
     /**
-     * Generate and save all prompt files to the specified directory
+     * Generate and save all iteration workflow prompt files to the specified directory.
+     * This method creates structured prompts for the complete task iteration lifecycle:
+     * context analysis, planning, implementation, review, and summary.
+     * 
+     * @param iteration - Configuration object containing task details and iteration info
+     * @param promptsDir - Directory path where prompt files will be saved
+     * 
+     * @example
+     * ```typescript
+     * const config = new IterationConfig(...);
+     * const builder = new PromptBuilder();
+     * builder.generatePromptFiles(config, '/workspace/prompts');
+     * // Creates: context.txt, plan.txt, implement.txt, review.txt, apply_review.txt, summary.txt
+     * ```
      */
     generatePromptFiles(iteration: IterationConfig, promptsDir: string): void {
         const { mkdirSync, writeFileSync } = require('node:fs');
@@ -555,5 +595,207 @@ Added rate limiting to the login endpoint using express-rate-limit middleware wi
 - Tests updated to verify rate limiting behavior
 - Documentation updated in auth section
 `
+    }
+
+    /**
+     * Generate a prompt for expanding a brief task description into a structured task
+     * with title and description. This method returns a prompt string that should be
+     * sent to an AI agent for processing.
+     * 
+     * @param briefDescription - A brief description of the task to be expanded
+     * @returns A formatted prompt string for AI processing
+     * 
+     * @example
+     * const builder = new PromptBuilder('claude');
+     * const prompt = builder.expandTaskPrompt('add dark mode');
+     * // Use with AI agent: const result = await aiAgent.invoke(prompt, true);
+     * // Then parse: const parsed = parseJsonResponse<IPromptTask>(result);
+     */
+    expandTaskPrompt(briefDescription: string): string {
+        return `Given this brief task description and project context, create a clear, actionable task title and expanded description.
+
+    Brief Description: ${briefDescription}
+
+    Respond ONLY with valid JSON in this exact format:
+    {
+    "title": "Concise, action-oriented title (max 10 words)",
+    "description": "Detailed description explaining what needs to be done, why, and any relevant context. Include specific steps if applicable. (2-4 sentences)"
+    }
+
+    Examples:
+    - Brief: "add dark mode"
+    Response: {"title": "Implement dark mode toggle", "description": "Add a dark mode toggle to the application's settings page. This should include creating a theme context provider, updating all components to use theme-aware styling, and persisting the user's preference in local storage. Consider accessibility requirements and ensure proper color contrast ratios."}
+
+    - Brief: "fix login bug"
+    Response: {"title": "Fix authentication error on login", "description": "Investigate and resolve the bug causing users to receive authentication errors during login. Check the JWT token validation, ensure proper error handling in the auth middleware, and verify the connection to the authentication service. Test with multiple user accounts to ensure the fix works universally."}`;
+    }
+
+    /**
+     * Generate a prompt for expanding iteration instructions based on previous work context.
+     * This method helps create focused iteration tasks that build upon previous implementations.
+     * 
+     * @param instructions - New user instructions for this iteration
+     * @param previousPlan - Optional previous plan from earlier iterations
+     * @param previousChanges - Optional description of changes made in previous iterations
+     * @returns A formatted prompt string for AI processing that incorporates context
+     * 
+     * @example
+     * const builder = new PromptBuilder('gemini');
+     * const prompt = builder.expandIterationInstructionsPrompt(
+     *   'add error handling',
+     *   'Previous plan: Implement user login',
+     *   'Previous changes: Added basic login form'
+     * );
+     */
+    expandIterationInstructionsPrompt(
+        instructions: string,
+        previousPlan?: string,
+        previousChanges?: string
+    ): string {
+        let contextSection = '';
+
+        if (previousPlan || previousChanges) {
+            contextSection += `\nPrevious iteration context:\n`;
+
+            if (previousPlan) {
+                contextSection += `\nPrevious Plan:\n${previousPlan}\n`;
+            }
+
+            if (previousChanges) {
+                contextSection += `\nPrevious Changes Made:\n${previousChanges}\n`;
+            }
+        }
+
+        return `You are helping iterate on a software development task. Based on new user instructions and previous iteration context, create a focused title and detailed description for this specific iteration.
+
+    ${contextSection}
+
+    New user instructions for this iteration:
+    ${instructions}
+
+    Create a clear, action-oriented title and comprehensive description that:
+    1. Incorporates the new user instructions
+    2. Builds upon the previous work (if any)
+    3. Focuses on what needs to be accomplished in this specific iteration
+    4. Is specific and actionable
+
+    Respond ONLY with valid JSON in this exact format:
+    {
+    "title": "Iteration-specific title focusing on the new requirements (max 12 words)",
+    "description": "Detailed description that explains what needs to be done in this iteration, building on previous work. Include specific steps, requirements, and context from previous iterations. (3-5 sentences)"
+    }
+
+    Examples:
+    - Instructions: "add error handling to the login form"
+    Previous: User login form was implemented
+    Response: {"title": "Add comprehensive error handling to login form", "description": "Enhance the existing login form by implementing comprehensive error handling for various failure scenarios. Add validation for network errors, authentication failures, and form validation errors. Display user-friendly error messages and ensure proper error state management. This builds on the previously implemented basic login form functionality."}
+
+    - Instructions: "improve the performance of the search feature"
+    Previous: Search functionality was added
+    Response: {"title": "Optimize search performance and add caching", "description": "Improve the performance of the existing search feature by implementing result caching, debounced input handling, and optimized database queries. Add loading states and pagination to handle large result sets efficiently. This enhancement builds on the previously implemented basic search functionality to provide a better user experience."}`;
+    }
+
+    /**
+     * Generate a prompt for creating git commit messages based on task information
+     * and recent commit history. The generated message will follow conventional
+     * commit formats and match the project's commit style.
+     * 
+     * @param taskTitle - The title of the completed task
+     * @param taskDescription - Detailed description of the task
+     * @param recentCommits - Array of recent commit messages for style consistency
+     * @param summaries - Array of iteration summaries describing work completed
+     * @returns A formatted prompt string for generating commit messages
+     * 
+     * @example
+     * const builder = new PromptBuilder();
+     * const prompt = builder.generateCommitMessagePrompt(
+     *   'Add user authentication',
+     *   'Implement login and signup functionality',
+     *   ['feat: add user profile page', 'fix: resolve validation bug'],
+     *   ['Iteration 1: Basic auth setup']
+     * );
+     */
+    generateCommitMessagePrompt(
+        taskTitle: string,
+        taskDescription: string,
+        recentCommits: string[],
+        summaries: string[]
+    ): string {
+        let prompt = `You are a git commit message generator. Generate a concise, clear commit message for the following task completion.
+        
+        Task Title: ${taskTitle}
+        Task Description: ${taskDescription}
+        
+        `;
+
+        if (recentCommits.length > 0) {
+            prompt += `Recent commit messages for context (to match style):
+        ${recentCommits.map((msg, i) => `${i + 1}. ${msg}`).join('\n')}
+        
+        `;
+        }
+
+        if (summaries.length > 0) {
+            prompt += `Work completed across iterations:
+        ${summaries.join('\n')}
+        
+        `;
+        }
+
+        prompt += `Generate a commit message that:
+        1. Follows conventional commit format if the recent commits do (feat:, fix:, chore:, etc.)
+        2. Is concise but descriptive (under 72 characters for the first line)
+        3. Captures the essence of what was accomplished
+        4. Matches the style/tone of recent commits
+        
+        Return ONLY the commit message text, nothing else.`;
+
+        return prompt;
+    }
+
+    /**
+     * Generate a prompt for AI-powered merge conflict resolution. This creates
+     * detailed instructions for resolving Git merge conflicts by analyzing
+     * conflict markers and recent commit context.
+     * 
+     * @param filePath - Path to the file containing merge conflicts
+     * @param diffContext - Recent commit history or diff context for better understanding
+     * @param conflictedContent - The full content of the file with conflict markers
+     * @returns A formatted prompt string for resolving merge conflicts
+     * 
+     * @example
+     * const builder = new PromptBuilder();
+     * const prompt = builder.resolveMergeConflictsPrompt(
+     *   'src/components/Header.tsx',
+     *   'Recent commits: feat: update header, fix: resolve styling',
+     *   '<<<<<<< HEAD\nconst title = "Old Title"\n=======\nconst title = "New Title"\n>>>>>>> feature-branch'
+     * );
+     */
+    resolveMergeConflictsPrompt(
+        filePath: string,
+        diffContext: string,
+        conflictedContent: string
+    ): string {
+        return `You are an expert software engineer tasked with resolving Git merge conflicts. 
+                
+                Analyze the following conflicted file and resolve the merge conflicts by choosing the best combination of changes from both sides or creating a solution that integrates both changes appropriately.
+
+                File: ${filePath}
+
+                Recent commit history for context:
+                ${diffContext}
+
+                Conflicted file content:
+                \`\`\`
+                ${conflictedContent}
+                \`\`\`
+
+                Please provide the resolved file content with:
+                1. All conflict markers (<<<<<<< HEAD, =======, >>>>>>> branch) removed
+                2. The best combination of changes from both sides
+                3. Proper code formatting and syntax
+                4. Logical integration of conflicting changes when possible
+
+                Respond with ONLY the resolved file content, no explanations or markdown formatting.`;
     }
 }

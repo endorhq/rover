@@ -3,9 +3,9 @@ import { existsSync, readFileSync, mkdirSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from '../lib/os.js';
 import yoctoSpinner from 'yocto-spinner';
-import type { TaskExpansion, AIProvider } from '../types.js';
 import { startDockerExecution } from './task.js';
-import { createAIProvider } from '../utils/ai-factory.js';
+import { getAIAgentTool, type AIAgentTool } from '../lib/agents/index.js';
+import type { IPromptTask } from '../lib/prompt.js';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
 import { UserSettings, AI_AGENT } from '../lib/config.js';
 import { IterationConfig } from '../lib/iteration.js';
@@ -98,11 +98,11 @@ const getLatestIterationContext = (taskPath: string, jsonMode: boolean): Iterati
 const expandIterationInstructions = async (
     refinements: string,
     previousContext: IterationContext,
-    aiProvider: AIProvider,
+    aiAgent: AIAgentTool,
     jsonMode: boolean
-): Promise<TaskExpansion | null> => {
+): Promise<IPromptTask | null> => {
     try {
-        const expanded = await aiProvider.expandIterationInstructions(
+        const expanded = await aiAgent.expandIterationInstructions(
             refinements,
             previousContext.plan,
             previousContext.changes
@@ -170,8 +170,8 @@ export const iterateCommand = async (taskId: string, refinements: string, option
         selectedAiAgent = AI_AGENT.Claude;
     }
 
-    // Create AI provider instance
-    const aiProvider = createAIProvider(selectedAiAgent);
+    // Create AI agent instance
+    const aiAgent = getAIAgentTool(selectedAiAgent);
 
     try {
         // Load task using TaskDescription
@@ -197,10 +197,10 @@ export const iterateCommand = async (taskId: string, refinements: string, option
 
         const spinner = !options.json ? yoctoSpinner({ text: `Expanding task instructions with ${selectedAiAgent.charAt(0).toUpperCase() + selectedAiAgent.slice(1)}...` }).start() : null;
 
-        let expandedTask: TaskExpansion | null = null;
+        let expandedTask: IPromptTask | null = null;
 
         try {
-            expandedTask = await expandIterationInstructions(refinements, previousContext, aiProvider, options.json === true);
+            expandedTask = await expandIterationInstructions(refinements, previousContext, aiAgent, options.json === true);
 
             if (expandedTask) {
                 if (spinner) spinner.success('Task iteration expanded!');

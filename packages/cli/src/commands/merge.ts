@@ -4,8 +4,7 @@ import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from '../lib/os.js';
 import yoctoSpinner from 'yocto-spinner';
-import { createAIProvider } from '../utils/ai-factory.js';
-import { AIProvider } from '../types.js';
+import { getAIAgentTool, type AIAgentTool } from '../lib/agents/index.js';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
 import { UserSettings, AI_AGENT } from '../lib/config.js';
 import { getTelemetry } from '../lib/telemetry.js';
@@ -106,9 +105,9 @@ const getTaskIterationSummaries = (taskId: string): string[] => {
 /**
  * Generate AI-powered commit message
  */
-const generateCommitMessage = async (taskTitle: string, taskDescription: string, recentCommits: string[], summaries: string[], aiProvider: AIProvider): Promise<string | null> => {
+const generateCommitMessage = async (taskTitle: string, taskDescription: string, recentCommits: string[], summaries: string[], aiAgent: AIAgentTool): Promise<string | null> => {
     try {
-        const commitMessage = await aiProvider.generateCommitMessage(
+        const commitMessage = await aiAgent.generateCommitMessage(
             taskTitle,
             taskDescription,
             recentCommits,
@@ -274,7 +273,7 @@ const getConflictedFiles = (): string[] => {
 /**
  * AI-powered merge conflict resolver
  */
-const resolveMergeConflicts = async (conflictedFiles: string[], aiProvider: AIProvider): Promise<boolean> => {
+const resolveMergeConflicts = async (conflictedFiles: string[], aiAgent: AIAgentTool): Promise<boolean> => {
     const spinner = yoctoSpinner({ text: 'Analyzing merge conflicts...' }).start();
 
     try {
@@ -302,7 +301,7 @@ const resolveMergeConflicts = async (conflictedFiles: string[], aiProvider: AIPr
             }
 
             try {
-                const resolvedContent = await aiProvider.resolveMergeConflicts(filePath, diffContext, conflictedContent);
+                const resolvedContent = await aiAgent.resolveMergeConflicts(filePath, diffContext, conflictedContent);
 
                 if (!resolvedContent) {
                     spinner.error(`Failed to resolve conflicts in ${filePath}`);
@@ -429,8 +428,8 @@ export const mergeCommand = async (taskId: string, options: MergeOptions = {}) =
         selectedAiAgent = AI_AGENT.Claude;
     }
 
-    // Create AI provider instance
-    const aiProvider = createAIProvider(selectedAiAgent);
+    // Create AI agent instance
+    const aiAgent = getAIAgentTool(selectedAiAgent);
 
     try {
         // Load task using TaskDescription
@@ -585,7 +584,7 @@ export const mergeCommand = async (taskId: string, options: MergeOptions = {}) =
                     task.description,
                     recentCommits,
                     summaries,
-                    aiProvider
+                    aiAgent
                 );
 
                 // Fallback commit message if AI fails
@@ -669,7 +668,7 @@ export const mergeCommand = async (taskId: string, options: MergeOptions = {}) =
                             console.log(colors.cyan('\n🤖 Starting AI-powered conflict resolution...\n'));
                         }
 
-                        const resolutionSuccessful = await resolveMergeConflicts(conflictedFiles, aiProvider);
+                        const resolutionSuccessful = await resolveMergeConflicts(conflictedFiles, aiAgent);
 
                         if (resolutionSuccessful) {
                             result.conflictsResolved = true;

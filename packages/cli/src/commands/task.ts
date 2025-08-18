@@ -4,10 +4,10 @@ import yoctoSpinner from 'yocto-spinner';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { platform } from 'node:process';
-import type { TaskExpansion } from '../types.js';
 import { getNextTaskId } from '../utils/task-id.js';
 import { homedir, tmpdir } from 'node:os';
-import { createAIProvider } from '../utils/ai-factory.js';
+import { getAIAgentTool, type AIAgentTool } from '../lib/agents/index.js';
+import type { IPromptTask } from '../lib/prompt.js';
 import { TaskDescription } from '../lib/description.js';
 import { PromptBuilder } from '../lib/prompt.js';
 import { SetupBuilder } from '../lib/setup.js';
@@ -619,7 +619,7 @@ export const taskCommand = async (initPrompt?: string, options: { fromGithub?: s
 
     let description = initPrompt?.trim() || '';
     let skipExpansion = false;
-    let taskData: TaskExpansion | null = null;
+    let taskData: IPromptTask | null = null;
 
     // Handle --from-github option
     if (fromGithub) {
@@ -677,8 +677,8 @@ export const taskCommand = async (initPrompt?: string, options: { fromGithub?: s
         const spinner = !json ? yoctoSpinner({ text: `Expanding task description with ${selectedAiAgent.charAt(0).toUpperCase() + selectedAiAgent.slice(1)}...` }).start() : null;
 
         try {
-            const aiProvider = createAIProvider(selectedAiAgent);
-            const expanded = await aiProvider.expandTask(
+            const aiAgent = getAIAgentTool(selectedAiAgent);
+            const expanded = await aiAgent.expandTask(
                 taskData ? `${taskData.title}: ${taskData.description}` : description,
                 process.cwd()
             );
