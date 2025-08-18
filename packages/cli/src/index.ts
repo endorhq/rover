@@ -26,7 +26,7 @@ program
     if (
       commandName !== "init" &&
         existsSync(join(process.cwd(), 'rover.json')) &&
-        !existsSync(join(process.cwd(), '.rover'))
+        !existsSync(join(process.cwd(), '.rover', 'settings.json'))
     ) {
       console.log(colors.green(`Rover is not fully initialized in this directory. The command you requested (\`${commandName}\`) was not executed.`));
       console.log(`├── ${colors.gray('Project config (exists):')} rover.json`);
