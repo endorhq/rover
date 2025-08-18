@@ -23,6 +23,10 @@ class ClaudeAI implements AIAgentTool {
         if (json) {
             claudeArgs.push('--output-format');
             claudeArgs.push('json');
+
+            prompt = `${prompt}
+
+You MUST output a valid JSON string as an output. Just output the JSON string and nothing else. If you had any error, still return a JSON string with an "error" property.`;
         }
 
         try {
