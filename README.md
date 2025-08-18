@@ -29,11 +29,11 @@ Rover is a CLI tool and VSCode extension that isolates AI Agents like Claude Cod
 
 ### Prerequisites
 
-* [NodeJS +22](https://nodejs.org/en/download)
+* [Node.js 22+](https://nodejs.org/en/download)
 * [Git](https://git-scm.com/downloads)
 * [Docker](https://docs.docker.com/engine/install/)
 
-You need at least one support AI Agent in your system:
+You need at least one supported AI Agent in your system:
 
 * [Claude Code](https://docs.anthropic.com/en/docs/claude-code/setup)
 * [Gemini CLI](https://github.com/google-gemini/gemini-cli?tab=readme-ov-file#-installation)
@@ -51,7 +51,7 @@ npm install -g @endorhq/rover@latest
 1. Initialize Rover in your project:
 
     ```sh
-    cd PROJECT && rover init .
+    cd your-project && rover init .
     ```
 
 2. Create your first task with Rover:
@@ -96,14 +96,14 @@ npm install -g @endorhq/rover@latest
     rover push 1
     ```
 
-    - Take control and do it on your own:
+    - Take manual control:
 
     ```sh
     cd .rover/tasks/1/workspace
     git status
     ```
 
-> 💡 TIP: You can run multiple tasks in parallel. Just take into account your AI agents limits.
+> 💡 TIP: You can run multiple tasks in parallel. Just take into account your AI agents' limits.
 
 ## How it works
 
@@ -111,7 +111,7 @@ Rover relies on the local tools you already have like Git, Docker and AI Agents.
 
 Once you create a task, Rover creates a separate _git worktree_ (`workspace`) for that task, starts a container, mounts the required files, installs tools, configures them, and lets your AI agent complete the workflow.
 
-Workflows provide a set of predefined steps to produce an output. Depending on the workflow, you might get a set of changes in the workspace or a document with research. We recommend you to explore the different workflows to get the maximum benefit from your AI Agents.
+Workflows provide a set of predefined steps to produce an output. Depending on the workflow, you might get a set of changes in the workspace or a document with research. We recommend exploring the different workflows to get the maximum benefit from your AI Agents.
 
 After an AI agent finishes the task, all the code changes and output documents are available in the task workspace. You can inspect those documents, check changes, iterate with an AI agent, or even take full control and start applying changes manually. Each of us has a different workflow, and Rover will honor all of them. 
 
@@ -147,7 +147,7 @@ Found a bug or have a feature request? Please [open an issue on GitHub](https://
 
 Connect with other Rover users and the development team:
 
-- **Discord**: [Join our Discord server](https://discord.gg/EndorHQ) for real-time discussions and help
+- **Discord**: [Join our Discord server](https://discord.gg/EndorHQ) for real-time discussions and support
 - **Twitter/X**: Follow us [@EndorHQ](https://twitter.com/EndorHQ) for updates and announcements
 - **Mastodon**: Find us at [@EndorHQ@mastodon.social](https://mastodon.social/@EndorHQ)
 - **Bluesky**: Follow [@endorhq.bsky.social](https://bsky.app/profile/endorhq.bsky.social)
