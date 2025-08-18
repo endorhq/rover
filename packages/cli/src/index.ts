@@ -25,8 +25,8 @@ program
     const commandName = actionCommand.name();
     if (
       commandName !== "init" &&
-        existsSync(join('.', 'rover.json')) &&
-        !existsSync(join('.', '.rover'))
+        existsSync(join(process.cwd(), 'rover.json')) &&
+        !existsSync(join(process.cwd(), '.rover'))
     ) {
       console.log(colors.green(`Rover is not fully initialized in this directory. The command you requested (\`${commandName}\`) was not executed.`));
       console.log(`├── ${colors.gray('Project config (exists):')} rover.json`);
@@ -59,7 +59,7 @@ program
 program
 	.command('init')
 	.description('Initialize your project')
-	.argument('[path]', 'Project path', '.')
+	.argument('[path]', 'Project path', process.cwd())
 	.action((path: string) => {
 		init(path);
 	});
