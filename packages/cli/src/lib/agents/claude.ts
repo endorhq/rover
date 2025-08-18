@@ -34,7 +34,20 @@ class ClaudeAI implements AIAgentTool {
                     CLAUDE_NON_INTERACTIVE: 'true'
                 },
             });
-            return stdout?.toString().trim() || '';
+
+            // Result
+            const result = stdout?.toString().trim() || '';
+
+            if (json) {
+                try {
+                    const parsed = JSON.parse(result);
+                    return `${parsed.result}`;
+                } catch (_err) {
+                    throw new InvokeAIAgentError(this.AGENT_BIN, 'Invalid JSON output');
+                }
+            } else {
+                return result;
+            }
         } catch (error) {
             throw new InvokeAIAgentError(this.AGENT_BIN, error);
         }
