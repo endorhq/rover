@@ -13,7 +13,7 @@ export async function spawn(
     } catch (error) {
         if (error instanceof ExecaError) {
             if (error.exitCode !== 0) {
-                throw `exit code for ${command} is ${error.exitCode}`;
+                throw `exit code for ${command} is ${error.exitCode} (stdout: ${error.stdout}; stderr: ${error.stderr})`;
             } else if (error.cause) {
                 throw `failed to execute ${command}: ${error.cause}`;
             } else {
@@ -209,6 +209,52 @@ export class RoverCLI {
             // Fallback: construct expected path
             const workspaceRoot = this.workspaceRoot || process.cwd();
             return `${workspaceRoot}/.rover/tasks/${taskId}`;
+        }
+    }
+
+    /**
+     * Check if Rover CLI is installed and accessible
+     */
+    async checkInstallation(): Promise<{ installed: boolean; version?: string; error?: string }> {
+        try {
+            const { stdout, exitCode } = await spawn(this.roverPath, ['--version'], this.getSpawnOptions());
+            if (exitCode !== 0 || !stdout) {
+                throw new Error('could not retrieve rover version')
+            }
+            const version = stdout.toString().trim();
+            return { installed: true, version };
+        } catch (error) {
+            return { installed: false, error: String(error) };
+        }
+    }
+
+    /**
+     * Check if Rover is initialized in the current workspace
+     */
+    async checkInitialization(): Promise<{ initialized: boolean; roverPath?: string }> {
+        if (!this.workspaceRoot) {
+            return { initialized: false };
+        }
+
+        const roverDir = `${this.workspaceRoot}/.rover`;
+        try {
+            await vscode.workspace.fs.stat(vscode.Uri.file(roverDir));
+            return { initialized: true, roverPath: roverDir };
+        } catch {
+            // Directory doesn't exist
+            return { initialized: false };
+        }
+    }
+
+    /**
+     * Initialize Rover in the current workspace
+     */
+    async initializeRover(): Promise<{ success: boolean; error?: string }> {
+        try {
+            const { stdout, stderr } = await spawn(this.roverPath, ['init', '--yes'], this.getSpawnOptions());
+            return { success: true };
+        } catch (error) {
+            return { success: false, error: String(error) };
         }
     }
 }

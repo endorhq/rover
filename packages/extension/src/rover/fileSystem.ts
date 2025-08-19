@@ -190,4 +190,27 @@ export class FileSystemHelper {
         const taskDir = this.getTaskDirectory(taskId);
         return taskDir ? fs.existsSync(taskDir) : false;
     }
+
+    /**
+     * Check if Rover is initialized in the workspace
+     */
+    isRoverInitialized(): boolean {
+        if (!this.workspaceRoot) {
+            return false;
+        }
+
+        const roverDir = path.join(this.workspaceRoot, '.rover');
+        return fs.existsSync(roverDir);
+    }
+
+    /**
+     * Get Rover directory path
+     */
+    getRoverDirectory(): string | undefined {
+        if (!this.workspaceRoot) {
+            return undefined;
+        }
+
+        return path.join(this.workspaceRoot, '.rover');
+    }
 }

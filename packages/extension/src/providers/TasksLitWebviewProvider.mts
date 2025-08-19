@@ -1,15 +1,18 @@
 import * as vscode from 'vscode';
 import { RoverCLI } from '../rover/cli.mjs';
+import { FileSystemHelper } from '../rover/fileSystem.js';
 
 export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'roverTasks';
 
   private _view?: vscode.WebviewView;
   private cli: RoverCLI;
+  private fileSystem: FileSystemHelper;
   private autoRefreshInterval: NodeJS.Timeout | undefined;
 
   constructor(private readonly extensionUri: vscode.Uri) {
     this.cli = new RoverCLI();
+    this.fileSystem = new FileSystemHelper();
   }
 
   public resolveWebviewView(
@@ -38,6 +41,15 @@ export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
         case 'refreshTasks':
           await this.refreshTasks();
           break;
+        case 'checkInitialization':
+          await this.checkInitializationStatus();
+          break;
+        case 'installCLI':
+          await this.handleInstallCLI();
+          break;
+        case 'initializeRover':
+          await this.handleInitializeRover();
+          break;
         case 'inspectTask':
           await this.handleInspectTask(data.taskId, data.taskTitle);
           break;
@@ -65,14 +77,14 @@ export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
         case 'openWorkspace':
           await this.handleOpenWorkspace(data.taskId);
           break;
+        case 'checkRoverInitialization':
+          await this.checkRoverInitializationFiles();
+          break;
       }
     });
 
-    // Start auto-refresh
-    this.startAutoRefresh();
-
-    // Load initial tasks
-    this.refreshTasks();
+    // Check initialization status first
+    this.checkInitializationStatus();
   }
 
   private async handleCreateTask(description: string) {
@@ -128,6 +140,57 @@ export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
     await vscode.commands.executeCommand('rover.openWorkspace', { id: taskId, task: { id: taskId } });
   }
 
+  private async checkInitializationStatus() {
+    if (!this._view) {
+      return;
+    }
+
+    try {
+      const cliStatus = await this.cli.checkInstallation();
+      const roverStatus = await this.cli.checkInitialization();
+
+      const status = {
+        cliInstalled: cliStatus.installed,
+        cliVersion: cliStatus.version,
+        roverInitialized: roverStatus.initialized,
+        error: cliStatus.error
+      };
+
+      this._view.webview.postMessage({
+        command: 'updateInitializationStatus',
+        status: status
+      });
+
+      // If everything is initialized, start auto-refresh and load tasks
+      if (status.cliInstalled && status.roverInitialized) {
+        this.startAutoRefresh();
+        this.refreshTasks();
+      }
+    } catch (error) {
+      console.error('Failed to check initialization status:', error);
+      this._view.webview.postMessage({
+        command: 'updateInitializationStatus',
+        status: {
+          cliInstalled: false,
+          roverInitialized: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        }
+      });
+    }
+  }
+
+  private async handleInstallCLI() {
+    await vscode.commands.executeCommand('rover.install');
+    // Check status again after installation attempt
+    setTimeout(() => this.checkInitializationStatus(), 2000);
+  }
+
+  private async handleInitializeRover() {
+    await vscode.commands.executeCommand('rover.init');
+    // Check status again after initialization attempt
+    setTimeout(() => this.checkInitializationStatus(), 2000);
+  }
+
   private async refreshTasks() {
     if (!this._view) {
       return;
@@ -165,7 +228,49 @@ export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
   }
 
   public refresh(): void {
-    this.refreshTasks();
+    this.checkInitializationStatus();
+  }
+
+  private async checkRoverInitializationFiles() {
+    if (!this._view) {
+      return;
+    }
+
+    try {
+      const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri;
+      if (!workspaceRoot) {
+        return;
+      }
+
+      // Check if .rover directory exists
+      const roverDirUri = vscode.Uri.joinPath(workspaceRoot, '.rover');
+      let roverDirExists = false;
+      try {
+        const stat = await vscode.workspace.fs.stat(roverDirUri);
+        roverDirExists = stat.type === vscode.FileType.Directory;
+      } catch (error) {
+        roverDirExists = false;
+      }
+
+      // Check if rover.json file exists
+      const roverJsonUri = vscode.Uri.joinPath(workspaceRoot, 'rover.json');
+      let roverJsonExists = false;
+      try {
+        const stat = await vscode.workspace.fs.stat(roverJsonUri);
+        roverJsonExists = stat.type === vscode.FileType.File;
+      } catch (error) {
+        roverJsonExists = false;
+      }
+
+      const isInitialized = roverDirExists && roverJsonExists;
+
+      this._view.webview.postMessage({
+        command: 'roverInitializationChecked',
+        isInitialized: isInitialized
+      });
+    } catch (error) {
+      console.error('Failed to check rover initialization files:', error);
+    }
   }
 
   private _getHtmlForWebview(webview: vscode.Webview) {

@@ -55,7 +55,7 @@ const ensureGitignore = async (projectPath: string): Promise<void> => {
 /**
  * Init the project
  */
-export const init = async (path: string = '.') => {
+export const initCommand = async (path: string = '.', options: { yes?: boolean }) => {
     // Intro
     showRoverBanner();
 
@@ -137,7 +137,7 @@ export const init = async (path: string = '.') => {
         }
 
         // If multiple AI agents are available, ask user to select one
-        if (availableAgents.length > 1) {
+        if (availableAgents.length > 1 && !options.yes) {
             try {
                 const result = await prompt({
                     type: 'select',
@@ -154,8 +154,10 @@ export const init = async (path: string = '.') => {
                 console.log(colors.yellow(`\n⚠ No AI agent selected, defaulting to ${availableAgents[0]}`));
                 defaultAIAgent = availableAgents[0];
             }
-        } else if (availableAgents.length === 1) {
-            // If only one AI agent is available, use it automatically
+        } else if (availableAgents.length > 0) {
+            // If only one AI agent is available or if more than one
+            // AI agent is available, but "--yes" option was provided,
+            // use it automatically.
             defaultAIAgent = availableAgents[0];
         }
 
@@ -224,5 +226,3 @@ export const init = async (path: string = '.') => {
         process.exit(1);
     }
 };
-
-export default init;

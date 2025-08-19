@@ -2,7 +2,7 @@
 import { existsSync } from 'fs';
 import { join } from 'node:path';
 import { Command } from 'commander';
-import init from './commands/init.js';
+import { initCommand } from './commands/init.js';
 import { listCommand } from './commands/list.js';
 import { getVersion } from './utils/version.js';
 import { taskCommand } from './commands/task.js';
@@ -59,10 +59,9 @@ program
 program
 	.command('init')
 	.description('Initialize your project')
+	.option('-y, --yes', 'Skip all confirmations and run non-interactively')
 	.argument('[path]', 'Project path', process.cwd())
-	.action((path: string) => {
-		init(path);
-	});
+	.action(initCommand);
 
 program
 	.commandsGroup(colors.cyan("Create and manage tasks:"));

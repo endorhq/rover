@@ -33,7 +33,7 @@ const validations = (selectedAiAgent?: string, isJsonMode?: boolean, followMode?
     // Check if we're in a git repository
     try {
         const git = new Git();
-        
+
         if (!git.isGitRepo()) {
             if (!isJsonMode) {
                 console.log(colors.red('✗ Not in a git repository'));

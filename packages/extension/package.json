@@ -121,6 +121,24 @@
         "title": "Create Task from GitHub Issue",
         "icon": "$(github)",
         "category": "Rover"
+      },
+      {
+        "command": "rover.install",
+        "title": "Install Rover CLI",
+        "icon": "$(cloud-download)",
+        "category": "Rover"
+      },
+      {
+        "command": "rover.init",
+        "title": "Initialize Rover",
+        "icon": "$(rocket)",
+        "category": "Rover"
+      },
+      {
+        "command": "rover.showSetupGuide",
+        "title": "Show Setup Guide",
+        "icon": "$(question)",
+        "category": "Rover"
       }
     ],
     "menus": {
