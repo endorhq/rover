@@ -30,6 +30,11 @@ export class Git {
         return result.status === 0;
     }
 
+    hasCommits(): boolean {
+        const result = spawnSync('git', ['rev-list', '--count', 'HEAD'], { stdio: 'pipe' });
+        return result.status === 0;
+    }
+
     diff(options: GitDiffOptions = {}): SpawnSyncReturns<Buffer | string> {
         const args = ['diff'];
 

@@ -22,6 +22,7 @@ import { showRoverBanner, showRoverChat, showTips } from '../utils/display.js';
 import { userInfo } from 'node:os';
 import { getTelemetry } from '../lib/telemetry.js';
 import { NewTaskProvider } from 'rover-telemetry';
+import { Git } from '../lib/git.js';
 
 const { prompt } = enquirer;
 
@@ -31,11 +32,28 @@ const { prompt } = enquirer;
 const validations = (selectedAiAgent?: string, isJsonMode?: boolean, followMode?: boolean): boolean => {
     // Check if we're in a git repository
     try {
-        spawnSync('git', ['rev-parse', '--is-inside-work-tree'], { stdio: 'pipe' });
+        const git = new Git();
+        
+        if (!git.isGitRepo()) {
+            if (!isJsonMode) {
+                console.log(colors.red('✗ Not in a git repository'));
+                console.log(colors.gray('  Git worktree requires the project to be in a git repository'));
+            }
+            return false;
+        }
+
+        // Check if git repository has at least one commit
+        if (!git.hasCommits()) {
+            if (!isJsonMode) {
+                console.log(colors.red('✗ No commits found in git repository'));
+                console.log(colors.gray('  Git worktree requires at least one commit in the repository'));
+            }
+            return false;
+        }
     } catch (error) {
         if (!isJsonMode) {
-            console.log(colors.red('✗ Not in a git repository'));
-            console.log(colors.gray('  Git worktree requires the project to be in a git repository'));
+            console.log(colors.red('✗ Git repository validation failed'));
+            console.log(colors.gray('  Please ensure git is installed and the repository is properly initialized'));
         }
         return false;
     }
