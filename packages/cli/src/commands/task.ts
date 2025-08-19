@@ -743,10 +743,7 @@ export const taskCommand = async (initPrompt?: string, options: { fromGithub?: s
                 satisfied = true;
             }
         } catch (error) {
-            if (spinner) spinner.error('Failed to expand task');
-            if (!json) {
-                console.error(colors.red('Error:'), error);
-            }
+            if (spinner) spinner.error('Failed to expand task. Continuing with original values');
 
             // Fallback to manual task creation
             taskData = {

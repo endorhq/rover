@@ -217,10 +217,7 @@ export const iterateCommand = async (taskId: string, refinements: string, option
                 };
             }
         } catch (error) {
-            if (spinner) spinner.error('Failed to expand task iteration');
-            if (!options.json) {
-                console.error(colors.red('Error:'), error);
-            }
+            if (spinner) spinner.error('Failed to expand iteration instructions. Continuing with original values');
 
             // Fallback approach
             expandedTask = {
