@@ -192,9 +192,7 @@ export class InitializationGuide extends LitElement {
 
     private handleInstallCLI() {
         this.isInstalling = true;
-        this.dispatchEvent(new CustomEvent('install-cli', {
-            detail: { source: 'guide' },
-        }));
+        this.dispatchEvent(new CustomEvent('install-cli'));
 
         // Reset installing state after timeout
         setTimeout(() => {
@@ -204,9 +202,7 @@ export class InitializationGuide extends LitElement {
 
     private handleInitializeRover() {
         this.isInitializing = true;
-        this.dispatchEvent(new CustomEvent('initialize-rover', {
-            detail: { source: 'guide' },
-        }));
+        this.dispatchEvent(new CustomEvent('initialize-rover'));
 
         // Reset initializing state after timeout
         setTimeout(() => {
@@ -215,9 +211,7 @@ export class InitializationGuide extends LitElement {
     }
 
     private handleRetryCheck() {
-        this.dispatchEvent(new CustomEvent('retry-check', {
-            detail: { source: 'guide' },
-        }));
+        this.dispatchEvent(new CustomEvent('retry-check'));
     }
 
     // Update status when component receives new status
