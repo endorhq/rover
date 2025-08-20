@@ -5,6 +5,7 @@ import { spawn } from 'node:child_process';
 import { spawnSync } from '../lib/os.js';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
 import { getTelemetry } from '../lib/telemetry.js';
+import { showTips, TIP_TITLES } from '../utils/display.js';
 
 /**
  * Get available iterations for a task
@@ -52,7 +53,9 @@ const getContainerIdForIteration = (taskId: number, iterationNumber: number): st
 };
 
 export const logsCommand = async (taskId: string, iterationNumber?: string, options: { follow?: boolean } = {}) => {
+    // Init telemetry
     const telemetry = getTelemetry();
+
     // Convert string taskId to number
     const numericTaskId = parseInt(taskId, 10);
     if (isNaN(numericTaskId)) {
@@ -79,7 +82,13 @@ export const logsCommand = async (taskId: string, iterationNumber?: string, opti
 
         if (availableIterations.length === 0) {
             console.log(colors.yellow(`⚠ No iterations found for task '${numericTaskId}'`));
-            console.log(colors.gray('  Run ') + colors.cyan(`rover task ${numericTaskId}`) + colors.gray(' to start the task'));
+
+            showTips([
+                'Run ' + colors.cyan(`rover task ${numericTaskId}`) + ' to start the task'
+            ], {
+                title: TIP_TITLES.NEXT_STEPS
+            });
+
             return;
         }
 
@@ -88,7 +97,7 @@ export const logsCommand = async (taskId: string, iterationNumber?: string, opti
 
         // Check if specific iteration exists (if requested)
         if (targetIteration && !availableIterations.includes(targetIteration)) {
-            console.log(colors.red(`✗ Iteration ${targetIteration} not found for task '${numericTaskId}'`));
+            console.log(colors.red(`✗ Iteration ${targetIteration} not found for task '${numericTaskId}'\n`));
             console.log(colors.gray('Available iterations: ') + colors.cyan(availableIterations.join(', ')));
             return;
         }
@@ -98,25 +107,19 @@ export const logsCommand = async (taskId: string, iterationNumber?: string, opti
 
         if (!containerId) {
             console.log(colors.yellow(`⚠ No container found for task '${numericTaskId}'`));
-            console.log(colors.gray('  Logs are only available for recently executed tasks'));
-            console.log(colors.gray('  Run ') + colors.cyan(`rover task ${numericTaskId}`) + colors.gray(' to start the task'));
+            console.log(colors.gray('Logs are only available for recently executed tasks'));
             return;
         }
 
         // Display header
-        console.log(colors.bold(`📋 Task ${numericTaskId} Logs`));
-        console.log(colors.gray('Title: ') + colors.white(task.title));
-        console.log(colors.gray('Iteration: ') + colors.cyan(`#${actualIteration}`));
-        console.log(colors.gray('Container ID: ') + colors.cyan(containerId.substring(0, 12)));
+        console.log(colors.white.bold(`Task ${numericTaskId} Logs`));
+        console.log(colors.gray('├── Title: ') + colors.white(task.title));
+        console.log(colors.gray('└── Iteration: ') + colors.cyan(`#${actualIteration}`));
 
         telemetry?.eventLogs();
 
-        if (availableIterations.length > 1) {
-            console.log(colors.gray('Available iterations: ') + colors.cyan(availableIterations.join(', ')));
-        }
-
         console.log('');
-        console.log(colors.bold('📝 Docker Execution Log:'));
+        console.log(colors.white.bold('Execution Log\n'));
 
         if (options.follow) {
             // Follow logs in real-time
@@ -159,7 +162,7 @@ export const logsCommand = async (taskId: string, iterationNumber?: string, opti
                 });
             } catch (error: any) {
                 if (error.message.includes('No such container')) {
-                    console.log(colors.yellow('Container no longer exists'));
+                    console.log(colors.yellow('⚠ Container no longer exists'));
                     console.log(colors.gray('Cannot follow logs for a non-existent container'));
                 } else {
                     console.log(colors.red('Error following Docker logs:'));
@@ -193,7 +196,7 @@ export const logsCommand = async (taskId: string, iterationNumber?: string, opti
 
             } catch (dockerError: any) {
                 if (dockerError.message.includes('No such container')) {
-                    console.log(colors.yellow('Container no longer exists'));
+                    console.log(colors.yellow('⚠ Container no longer exists'));
                     console.log(colors.gray('Docker containers are removed after completion'));
                     console.log(colors.gray('Logs are only available while the container is running or recently stopped'));
                 } else {
@@ -205,21 +208,21 @@ export const logsCommand = async (taskId: string, iterationNumber?: string, opti
 
         // Only show tips if not in follow mode (since follow mode blocks)
         if (!options.follow) {
-            console.log('');
+            const tips = [];
 
             // Show tips
             if (availableIterations.length > 1) {
                 const otherIterations = availableIterations.filter(i => i !== actualIteration);
                 if (otherIterations.length > 0) {
                     console.log(colors.gray('💡 Tips:'));
-                    console.log(colors.gray('   Use ') + colors.cyan(`rover logs ${numericTaskId} <iteration>`) + colors.gray(' to view specific iteration (if container exists)'));
-                    console.log(colors.gray('   Available: ') + colors.cyan(otherIterations.join(', ')));
+                    tips.push('Use ' + colors.cyan(`rover logs ${numericTaskId} <iteration>`) + ' to view specific iteration (if container exists)');
                 }
             }
-            console.log(colors.gray('   Use ') + colors.cyan(`rover logs ${numericTaskId} --follow`) + colors.gray(' to follow logs in real-time'));
-            console.log(colors.gray('   Use ') + colors.cyan(`rover diff ${numericTaskId}`) + colors.gray(' to see code changes'));
-            console.log(colors.gray('   Use ') + colors.cyan(`rover task ${numericTaskId} --follow`) + colors.gray(' to follow live logs during execution'));
-            console.log(colors.gray('   Note: Logs are only available while containers exist (recent executions)'));
+
+            tips.push('Use ' + colors.cyan(`rover logs ${numericTaskId} --follow`) + ' to follow logs in real-time');
+            tips.push('Use ' + colors.cyan(`rover diff ${numericTaskId}`) + ' to see code changes');
+
+            showTips(tips);
         }
 
     } catch (error) {
