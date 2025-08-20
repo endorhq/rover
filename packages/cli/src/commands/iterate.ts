@@ -1,3 +1,4 @@
+import enquirer from 'enquirer';
 import colors from 'ansi-colors';
 import { existsSync, readFileSync, mkdirSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -11,6 +12,9 @@ import { UserSettings, AI_AGENT } from '../lib/config.js';
 import { IterationConfig } from '../lib/iteration.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { showRoverChat } from '../utils/display.js';
+import { readFromStdin, hasStdinData } from '../utils/stdin.js';
+
+const { prompt } = enquirer;
 
 interface IterateResult {
     success: boolean;
@@ -117,14 +121,14 @@ const expandIterationInstructions = async (
     }
 };
 
-export const iterateCommand = async (taskId: string, refinements: string, options: { follow?: boolean; json?: boolean } = {}): Promise<void> => {
+export const iterateCommand = async (taskId: string, refinements?: string, options: { follow?: boolean; json?: boolean } = {}): Promise<void> => {
     const telemetry = getTelemetry();
     const result: IterateResult = {
         success: false,
         taskId: 0,
         taskTitle: '',
         iterationNumber: 0,
-        refinements: refinements
+        refinements: refinements || ''
     };
 
     // Convert string taskId to number
@@ -140,6 +144,43 @@ export const iterateCommand = async (taskId: string, refinements: string, option
     }
 
     result.taskId = numericTaskId;
+
+    // Handle missing refinements - try stdin first, then prompt
+    let finalRefinements = refinements?.trim() || '';
+    
+    if (!finalRefinements) {
+        // Try to read from stdin first
+        if (hasStdinData()) {
+            const stdinInput = await readFromStdin();
+            if (stdinInput) {
+                finalRefinements = stdinInput;
+                if (!options.json) {
+                    console.log(colors.gray('✓ Read refinements from stdin'));
+                }
+            }
+        }
+
+        // If still no refinements and not in JSON mode, prompt user
+        if (!finalRefinements) {
+            if (options.json) {
+                result.error = 'Refinements are required in JSON mode';
+                console.log(JSON.stringify(result, null, 2));
+                return;
+            }
+
+            // Interactive prompt for refinements
+            const { input } = await prompt<{ input: string }>({
+                type: 'input',
+                name: 'input',
+                message: 'Describe the refinements or new requirements for this task:',
+                validate: (value) => value.trim().length > 0 || 'Please provide refinements'
+            });
+
+            finalRefinements = input;
+        }
+    }
+
+    result.refinements = finalRefinements;
 
     if (!options.json) {
         showRoverChat([
@@ -184,7 +225,7 @@ export const iterateCommand = async (taskId: string, refinements: string, option
             console.log(colors.gray('├── ID: ') + colors.cyan(task.id.toString()));
             console.log(colors.gray('├── Task Title: ') + colors.white(task.title));
             console.log(colors.gray('├── Current Status: ') + colors.white(task.status));
-            console.log(colors.gray('└── Instructions: ') + colors.green(refinements));
+            console.log(colors.gray('└── Instructions: ') + colors.green(finalRefinements));
         }
 
         // Get previous iteration context
@@ -200,7 +241,7 @@ export const iterateCommand = async (taskId: string, refinements: string, option
         let expandedTask: IPromptTask | null = null;
 
         try {
-            expandedTask = await expandIterationInstructions(refinements, previousContext, aiAgent, options.json === true);
+            expandedTask = await expandIterationInstructions(finalRefinements, previousContext, aiAgent, options.json === true);
 
             if (expandedTask) {
                 if (spinner) spinner.success('Task iteration expanded!');
@@ -213,7 +254,7 @@ export const iterateCommand = async (taskId: string, refinements: string, option
                 // Fallback: create simple iteration based on refinements
                 expandedTask = {
                     title: `${task.title} - Iteration Refinement`,
-                    description: `${task.description}\n\nAdditional requirements:\n${refinements}`
+                    description: `${task.description}\n\nAdditional requirements:\n${finalRefinements}`
                 };
             }
         } catch (error) {
@@ -222,7 +263,7 @@ export const iterateCommand = async (taskId: string, refinements: string, option
             // Fallback approach
             expandedTask = {
                 title: `${task.title} - Iteration Refinement`,
-                description: `${task.description}\n\nAdditional requirements:\n${refinements}`
+                description: `${task.description}\n\nAdditional requirements:\n${finalRefinements}`
             };
         }
 

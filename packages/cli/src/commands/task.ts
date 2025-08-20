@@ -23,6 +23,7 @@ import { userInfo } from 'node:os';
 import { getTelemetry } from '../lib/telemetry.js';
 import { NewTaskProvider } from 'rover-telemetry';
 import { Git } from '../lib/git.js';
+import { readFromStdin, hasStdinData } from '../utils/stdin.js';
 
 const { prompt } = enquirer;
 
@@ -667,25 +668,39 @@ export const taskCommand = async (initPrompt?: string, options: { fromGithub?: s
         }
     }
 
-    // Get initial task description
+    // Get initial task description - try stdin first if no description provided
     if (!fromGithub && (typeof description !== 'string' || description.length == 0)) {
-        if (yes) {
-            // In non-interactive mode, we must have a description
-            if (!json) {
-                console.error(colors.red('✗ Task description is required in non-interactive mode'));
-                console.error(colors.gray('  Please provide a description as an argument: rover task "your task description" --yes'));
+        // Try to read from stdin first
+        if (hasStdinData()) {
+            const stdinInput = await readFromStdin();
+            if (stdinInput) {
+                description = stdinInput;
+                if (!json) {
+                    console.log(colors.gray('✓ Read task description from stdin'));
+                }
             }
-            process.exit(1);
         }
 
-        const { input } = await prompt<{ input: string }>({
-            type: 'input',
-            name: 'input',
-            message: 'Describe the task you want to assign:',
-            validate: (value) => value.trim().length > 0 || 'Please provide a description'
-        });
+        // If still no description
+        if (typeof description !== 'string' || description.length == 0) {
+            if (yes) {
+                // In non-interactive mode, we must have a description
+                if (!json) {
+                    console.error(colors.red('✗ Task description is required in non-interactive mode'));
+                    console.error(colors.gray('  Please provide a description as an argument: rover task "your task description" --yes'));
+                }
+                process.exit(1);
+            }
 
-        description = input;
+            const { input } = await prompt<{ input: string }>({
+                type: 'input',
+                name: 'input',
+                message: 'Describe the task you want to assign:',
+                validate: (value) => value.trim().length > 0 || 'Please provide a description'
+            });
+
+            description = input;
+        }
     }
 
     let satisfied = skipExpansion;

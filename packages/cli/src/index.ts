@@ -125,7 +125,7 @@ program
 	.alias('iter')
 	.description('Add refinements to a task and start new iteration')
 	.argument('<taskId>', 'Task ID to iterate on')
-	.argument('<refinements>', 'New requirements or refinements to apply')
+	.argument('[refinements]', 'New requirements or refinements to apply (will prompt if not provided)')
 	.option('-f, --follow', 'Follow execution logs in real-time')
 	.option('--json', 'Output JSON and skip confirmation prompts')
 	.action(iterateCommand);
