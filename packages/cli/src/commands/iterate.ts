@@ -12,7 +12,7 @@ import { UserSettings, AI_AGENT } from '../lib/config.js';
 import { IterationConfig } from '../lib/iteration.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { showRoverChat } from '../utils/display.js';
-import { readFromStdin, hasStdinData } from '../utils/stdin.js';
+import { readFromStdin, stdinIsAvailable } from '../utils/stdin.js';
 
 const { prompt } = enquirer;
 
@@ -147,10 +147,10 @@ export const iterateCommand = async (taskId: string, refinements?: string, optio
 
     // Handle missing refinements - try stdin first, then prompt
     let finalRefinements = refinements?.trim() || '';
-    
+
     if (!finalRefinements) {
         // Try to read from stdin first
-        if (hasStdinData()) {
+        if (stdinIsAvailable()) {
             const stdinInput = await readFromStdin();
             if (stdinInput) {
                 finalRefinements = stdinInput;

@@ -23,7 +23,7 @@ import { userInfo } from 'node:os';
 import { getTelemetry } from '../lib/telemetry.js';
 import { NewTaskProvider } from 'rover-telemetry';
 import { Git } from '../lib/git.js';
-import { readFromStdin, hasStdinData } from '../utils/stdin.js';
+import { readFromStdin, stdinIsAvailable } from '../utils/stdin.js';
 
 const { prompt } = enquirer;
 
@@ -34,7 +34,7 @@ const validations = (selectedAiAgent?: string, isJsonMode?: boolean, followMode?
     // Check if we're in a git repository
     try {
         const git = new Git();
-        
+
         if (!git.isGitRepo()) {
             if (!isJsonMode) {
                 console.log(colors.red('✗ Not in a git repository'));
@@ -671,7 +671,7 @@ export const taskCommand = async (initPrompt?: string, options: { fromGithub?: s
     // Get initial task description - try stdin first if no description provided
     if (!fromGithub && (typeof description !== 'string' || description.length == 0)) {
         // Try to read from stdin first
-        if (hasStdinData()) {
+        if (stdinIsAvailable()) {
             const stdinInput = await readFromStdin();
             if (stdinInput) {
                 description = stdinInput;
