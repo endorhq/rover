@@ -17,36 +17,36 @@ export const readFromStdin = async (): Promise<string | null> => {
             return;
         }
 
-        // Set up timeout to avoid hanging
-        const timeout = setTimeout(() => {
-            resolve(null);
-        }, 1000); // 1 second timeout
-
         process.stdin.setEncoding('utf8');
-
-        process.stdin.on('readable', () => {
-            let chunk;
-            while ((chunk = process.stdin.read()) !== null) {
-                input += chunk;
-            }
-        });
-
-        process.stdin.on('end', () => {
-            clearTimeout(timeout);
-            resolve(input.trim() || null);
-        });
-
-        process.stdin.on('error', (err) => {
-            clearTimeout(timeout);
-            resolve(null);
-        });
-
-        // Try to read immediately in case data is already available
+        
+        // Check if the data is available already
         const chunk = process.stdin.read();
-        if (chunk !== null) {
-            input += chunk;
-            clearTimeout(timeout);
-            resolve(input.trim() || null);
+        
+        if (chunk != null) {
+            // Return the data instantly
+            resolve(chunk.trim() || null);
+        } else {
+            // Wait for the event with a timeout
+            const timeout = setTimeout(() => {
+                resolve(null);
+            }, 200); // ms timeout
+
+            process.stdin.once('readable', () => {
+                let chunk;
+                while ((chunk = process.stdin.read()) !== null) {
+                    input += chunk;
+                }
+            });
+
+            process.stdin.on('end', () => {
+                clearTimeout(timeout);
+                resolve(input.trim() || null);
+            });
+
+            process.stdin.on('error', (err) => {
+                clearTimeout(timeout);
+                resolve(null);
+            });
         }
     });
 };
