@@ -54,6 +54,6 @@ export const readFromStdin = async (): Promise<string | null> => {
 /**
  * Checks if stdin has data available (piped input)
  */
-export const hasStdinData = (): boolean => {
+export const stdinIsAvailable = (): boolean => {
     return !process.stdin.isTTY;
 };
