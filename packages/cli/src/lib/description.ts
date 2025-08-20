@@ -375,12 +375,6 @@ export class TaskDescription {
      * Update iteration metadata
      */
     updateIteration(metadata: IterationMetadata): void {
-        if (metadata.title) {
-            this.data.title = metadata.title;
-        }
-        if (metadata.description) {
-            this.data.description = metadata.description;
-        }
         if (metadata.timestamp) {
             this.data.lastIterationAt = metadata.timestamp;
         }
