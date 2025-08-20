@@ -998,7 +998,7 @@ export function activate(context: vscode.ExtensionContext) {
     });
     context.subscriptions.push(createTaskFromGitHubCommand);
 
-    const runCommandInTerminal = ({ terminalTitle, command, informationMessage, errorMessage, autoExecute = true }: { terminalTitle: string, command: string, informationMessage: string, errorMessage: string, autoExecute?: boolean }) => {
+    const runCommandInTerminal = ({ terminalTitle, command, errorMessage, autoExecute = true }: { terminalTitle: string, command: string, errorMessage: string, autoExecute?: boolean }) => {
         try {
             const terminal = vscode.window.createTerminal({
                 name: terminalTitle,
@@ -1007,8 +1007,6 @@ export function activate(context: vscode.ExtensionContext) {
 
             terminal.show();
             terminal.sendText(command, autoExecute);
-
-            vscode.window.showInformationMessage(informationMessage);
         } catch (error) {
             vscode.window.showErrorMessage(`${errorMessage}: ${error}`);
         }
@@ -1016,13 +1014,13 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Register the install CLI command
     const installCommand = vscode.commands.registerCommand('rover.install', async () => {
-        runCommandInTerminal({ terminalTitle: 'Rover Installation', command: 'npm install -g @endorhq/rover', informationMessage: 'Rover was installed successfully', errorMessage: 'Could not install Rover' });
+        runCommandInTerminal({ terminalTitle: 'Rover Installation', command: 'npm install -g @endorhq/rover', errorMessage: 'Could not install Rover' });
     });
     context.subscriptions.push(installCommand);
 
     // Register the initialize Rover command
     const initCommand = vscode.commands.registerCommand('rover.init', async () => {
-        runCommandInTerminal({ terminalTitle: 'Rover Initialization', command: 'rover init', informationMessage: 'Command "rover init" executed successfully in terminal', errorMessage: 'Terminal tried to execute "rover init", but it failed; could not initialize rover in this directory' });
+        runCommandInTerminal({ terminalTitle: 'Rover Initialization', command: 'rover init', errorMessage: 'Terminal tried to execute "rover init", but it failed; could not initialize rover in this directory' });
     });
     context.subscriptions.push(initCommand);
 
