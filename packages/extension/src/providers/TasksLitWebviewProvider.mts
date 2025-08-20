@@ -243,13 +243,13 @@ export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
       }
 
       // Check if .rover directory exists
-      const roverDirUri = vscode.Uri.joinPath(workspaceRoot, '.rover');
-      let roverDirExists = false;
+      const roverUserSettingsUri = vscode.Uri.joinPath(workspaceRoot, '.rover', 'settings.json');
+      let roverUserSettingsExists = false;
       try {
-        const stat = await vscode.workspace.fs.stat(roverDirUri);
-        roverDirExists = stat.type === vscode.FileType.Directory;
+        const stat = await vscode.workspace.fs.stat(roverUserSettingsUri);
+        roverUserSettingsExists = stat.type === vscode.FileType.File;
       } catch (error) {
-        roverDirExists = false;
+        roverUserSettingsExists = false;
       }
 
       // Check if rover.json file exists
@@ -262,7 +262,7 @@ export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
         roverJsonExists = false;
       }
 
-      const isInitialized = roverDirExists && roverJsonExists;
+      const isInitialized = roverUserSettingsExists && roverJsonExists;
 
       this._view.webview.postMessage({
         command: 'roverInitializationChecked',
