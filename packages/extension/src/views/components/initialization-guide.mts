@@ -333,8 +333,8 @@ export class InitializationGuide extends LitElement {
                     </div>
 
                     <!-- Step 3: Ready to Use -->
-                    <div class="setup-step ${roverInitialized ? 'completed' : ''}">
-                        <div class="step-icon ${roverInitialized ? 'completed' : 'pending'}">
+                    <div class="setup-step ${cliInstalled && roverInitialized ? 'completed' : ''}">
+                        <div class="step-icon ${cliInstalled && roverInitialized ? 'completed' : 'pending'}">
                             ${roverInitialized ? '✓' : '3'}
                         </div>
                         <div class="step-content">
@@ -345,7 +345,7 @@ export class InitializationGuide extends LitElement {
                                     : 'Once initialized, you\'ll be able to create tasks and start collaborating with AI agents.'}
                             </div>
 
-                            ${roverInitialized ? html`
+                            ${cliInstalled && roverInitialized ? html`
                                 <div class="status-indicator status-success">
                                     <span>✓</span>
                                     <span>Ready to create your first task!</span>

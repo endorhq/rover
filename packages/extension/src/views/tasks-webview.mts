@@ -220,10 +220,6 @@ export class TasksWebview extends LitElement {
     if (this.vscode) {
       window.addEventListener('message', this.handleMessage.bind(this));
       window.addEventListener('keydown', this.handleKeyDown.bind(this));
-      // Add event listeners for initialization guide events
-      this.addEventListener('install-cli', this.handleInstallCLI.bind(this));
-      this.addEventListener('initialize-rover', this.handleInitializeRover.bind(this));
-      this.addEventListener('retry-check', this.handleRetryCheck.bind(this));
       this.vscode.postMessage({ command: 'checkInitialization' });
     }
   }
@@ -232,9 +228,6 @@ export class TasksWebview extends LitElement {
     super.disconnectedCallback();
     window.removeEventListener('message', this.handleMessage.bind(this));
     window.removeEventListener('keydown', this.handleKeyDown.bind(this));
-    this.removeEventListener('install-cli', this.handleInstallCLI.bind(this));
-    this.removeEventListener('initialize-rover', this.handleInitializeRover.bind(this));
-    this.removeEventListener('retry-check', this.handleRetryCheck.bind(this));
     this.stopInitializationPolling();
   }
 
@@ -249,14 +242,14 @@ export class TasksWebview extends LitElement {
         this.initializationStatus = message.status;
         this.showingSetupGuide = !message.status.cliInstalled || !message.status.roverInitialized;
         this.loading = false;
-        
+
         // Start polling for rover initialization if CLI is installed but rover is not initialized
         if (message.status.cliInstalled && !message.status.roverInitialized) {
           this.startInitializationPolling();
         } else {
           this.stopInitializationPolling();
         }
-        
+
         if (message.status.cliInstalled && message.status.roverInitialized) {
           this.vscode.postMessage({ command: 'refreshTasks' });
         }
@@ -455,7 +448,7 @@ export class TasksWebview extends LitElement {
     // Show initialization guide if CLI not installed or Rover not initialized
     if (this.showingSetupGuide && this.initializationStatus) {
       return html`
-        <initialization-guide @initialize-rover=${this.handleInitializeRover} .status=${this.initializationStatus}></initialization-guide>
+        <initialization-guide @install-cli=${this.handleInstallCLI} @initialize-rover=${this.handleInitializeRover} @retry-check=${this.handleRetryCheck} .status=${this.initializationStatus}></initialization-guide>
       `;
     }
 
@@ -519,16 +512,16 @@ export class TasksWebview extends LitElement {
           `;
     })}
       </div>
-      
+
       <div class="create-form">
-        <textarea 
+        <textarea
           class="form-textarea"
           placeholder="Describe what you want Rover to accomplish..."
           .value=${this.taskInput}
           @input=${(e: InputEvent) => this.taskInput = (e.target as HTMLTextAreaElement).value}
         ></textarea>
-        <button 
-          class="form-button" 
+        <button
+          class="form-button"
           @click=${this.createTask}
           ?disabled=${this.creatingTask}
         >

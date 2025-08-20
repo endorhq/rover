@@ -998,55 +998,31 @@ export function activate(context: vscode.ExtensionContext) {
     });
     context.subscriptions.push(createTaskFromGitHubCommand);
 
+    const runCommandInTerminal = ({ terminalTitle, command, informationMessage, errorMessage, autoExecute = true }: { terminalTitle: string, command: string, informationMessage: string, errorMessage: string, autoExecute?: boolean }) => {
+        try {
+            const terminal = vscode.window.createTerminal({
+                name: terminalTitle,
+                cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
+            });
+
+            terminal.show();
+            terminal.sendText(command, autoExecute);
+
+            vscode.window.showInformationMessage(informationMessage);
+        } catch (error) {
+            vscode.window.showErrorMessage(`${errorMessage}: ${error}`);
+        }
+    };
+
     // Register the install CLI command
     const installCommand = vscode.commands.registerCommand('rover.install', async () => {
-        const terminal = vscode.window.createTerminal({
-            name: 'Rover Installation',
-            cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
-        });
-
-        // Show terminal and run installation command
-        terminal.show();
-
-        // Determine OS and provide appropriate installation command
-        const platform = process.platform;
-        let installCmd = '';
-
-        if (platform === 'darwin') {
-            // macOS
-            installCmd = 'curl -sSL https://get-rover.ai/install.sh | sh';
-        } else if (platform === 'linux') {
-            // Linux
-            installCmd = 'curl -sSL https://get-rover.ai/install.sh | sh';
-        } else if (platform === 'win32') {
-            // Windows
-            installCmd = 'irm https://get-rover.ai/install.ps1 | iex';
-        } else {
-            installCmd = 'echo "Please visit https://get-rover.ai for installation instructions"';
-        }
-
-        terminal.sendText(installCmd);
-
-        vscode.window.showInformationMessage('Running Rover CLI installation. Check the terminal for progress.');
+        runCommandInTerminal({ terminalTitle: 'Rover Installation', command: 'npm install -g @endorhq/rover', informationMessage: 'Rover was installed successfully', errorMessage: 'Could not install Rover' });
     });
     context.subscriptions.push(installCommand);
 
     // Register the initialize Rover command
     const initCommand = vscode.commands.registerCommand('rover.init', async () => {
-        try {
-            const terminal = vscode.window.createTerminal({
-                name: 'Rover Initialization',
-                cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
-            });
-
-            // Show terminal and pre-fill with rover init command
-            terminal.show();
-            terminal.sendText('rover init', false); // false means don't auto-execute
-            
-            vscode.window.showInformationMessage('Terminal opened with "rover init" command. Press Enter to initialize Rover.');
-        } catch (error) {
-            vscode.window.showErrorMessage(`Failed to open terminal for Rover initialization: ${error}`);
-        }
+        runCommandInTerminal({ terminalTitle: 'Rover Initialization', command: 'rover init', informationMessage: 'Command "rover init" executed successfully in terminal', errorMessage: 'Terminal tried to execute "rover init", but it failed; could not initialize rover in this directory' });
     });
     context.subscriptions.push(initCommand);
 
