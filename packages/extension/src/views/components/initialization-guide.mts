@@ -197,7 +197,7 @@ export class InitializationGuide extends LitElement {
         // Reset installing state after timeout
         setTimeout(() => {
             this.isInstalling = false;
-        }, 10000);
+        }, 60000);
     }
 
     private handleInitializeRover() {
@@ -207,7 +207,7 @@ export class InitializationGuide extends LitElement {
         // Reset initializing state after timeout
         setTimeout(() => {
             this.isInitializing = false;
-        }, 5000);
+        }, 10000);
     }
 
     private handleRetryCheck() {
