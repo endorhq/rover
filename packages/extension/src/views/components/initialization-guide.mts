@@ -62,7 +62,6 @@ export class InitializationGuide extends LitElement {
 
         .setup-step.current {
             border-color: var(--vscode-focusBorder);
-            background-color: var(--vscode-badge-background);
         }
 
         .step-icon {
@@ -104,7 +103,7 @@ export class InitializationGuide extends LitElement {
         }
 
         .step-description {
-            color: var(--vscode-descriptionForeground);
+            color: var(--vscode-foreground);
             font-size: 0.9em;
             margin-bottom: 12px;
         }
