@@ -78,11 +78,7 @@ const discoverIterationFiles = (taskId: number, iterationId: number): string[] =
                 return a.name.localeCompare(b.name);
             });
 
-            entries.forEach((entry, index) => {
-                const isLast = index === entries.length - 1;
-                // const connector = isLast ? '└── ' : '├── ';
-                // const newPrefix = prefix + (isLast ? '    ' : '│   ');
-
+            entries.forEach((entry) => {
                 if (entry.name.endsWith('.md')) {
                     files.push(entry.name);
                 }
