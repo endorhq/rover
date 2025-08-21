@@ -121,43 +121,6 @@ Key architectural decisions:
    - Project files (package.json, tsconfig.json, etc.) are created to test environment detection
    - File system operations use real files, not mocks
 
-### Testing Implementation (CLI Package)
-
-```typescript
-// Example: Real environment detection testing
-it('should detect Python environment correctly', async () => {
-  // Create real project files
-  writeFileSync('pyproject.toml', `
-[tool.poetry]
-name = "test-project"
-version = "0.1.0"
-  `);
-  writeFileSync('poetry.lock', '');
-  
-  await initCommand('.', { yes: true });
-  
-  // Test real behavior
-  const roverConfig = JSON.parse(readFileSync('rover.json', 'utf8'));
-  expect(roverConfig.languages).toContain('python');
-  expect(roverConfig.packageManagers).toContain('poetry');
-});
-```
-
-### What to Mock vs. What to Keep Real
-
-**Mock These** (external dependencies):
-- Docker commands and container execution  
-- AI agent API calls (Claude, Gemini)
-- External CLI tools (`gh`, `security` keychain)
-- Telemetry/analytics calls
-
-**Keep Real** (core functionality):
-- Git operations (repos, branches, worktrees, commits)
-- File system operations (reading, writing, directory creation)  
-- Environment detection logic
-- Configuration file parsing
-- All TypeScript compilation and validation
-
 ### Running Tests
 
 ```bash
