@@ -40,6 +40,10 @@ jobs:
       run: npm run check
       working-directory: packages/cli
 
-    - name: Test CLI execution
+    - name: Test CLI
+      run: npm run test
+      working-directory: packages/cli
+
+    - name: Test Build Artifact
       run: node dist/index.js --version
       working-directory: packages/cli

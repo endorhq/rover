@@ -10,7 +10,7 @@ const LANGUAGE_FILES = {
     [LANGUAGE.TypeScript]: ['tsconfig.json', 'tsconfig.node.json'],
     [LANGUAGE.Javascript]: ['package.json', '.node-version'],
     [LANGUAGE.PHP]: ['composer.json', 'index.php', 'phpunit.xml'],
-    [LANGUAGE.Rust]: ['cargo.toml'],
+    [LANGUAGE.Rust]: ['Cargo.toml'],
     [LANGUAGE.Go]: ['go.mod', 'go.sum'],
     [LANGUAGE.Ruby]: ['.ruby-version', 'Procfile.dev', 'Procfile.test', 'Gemfile', 'config.ru'],
     [LANGUAGE.Python]: ['pyproject.toml', 'uv.lock', 'setup.py', 'setup.cfg']
@@ -24,7 +24,7 @@ const PACKAGE_MANAGER_FILES = {
     [PACKAGE_MANAGER.PNPM]: ['pnpm-lock.yaml'],
     [PACKAGE_MANAGER.Yarn]: ['yarn.lock'],
     [PACKAGE_MANAGER.Composer]: ['composer.lock'],
-    [PACKAGE_MANAGER.Cargo]: ['cargo.toml', 'cargo.lock'],
+    [PACKAGE_MANAGER.Cargo]: ['Cargo.toml', 'Cargo.lock'],
     [PACKAGE_MANAGER.Gomod]: ['go.mod', 'go.sum'],
     [PACKAGE_MANAGER.PIP]: ['pyproject.toml', '!poetry.lock', '!uv.lock'],
     [PACKAGE_MANAGER.Poetry]: ['poetry.lock'],

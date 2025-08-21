@@ -16,7 +16,11 @@
     "dev": "TSUP_DEV=true tsdown --watch src/ src/index.ts",
     "start": "node dist/index.js",
     "clean": "rm -rf dist",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "test": "vitest --run --silent",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest --coverage"
   },
   "keywords": [],
   "author": "The Endor team",
@@ -33,7 +37,9 @@
   "devDependencies": {
     "@types/node": "^24.1.0",
     "@types/react": "^19.1.8",
+    "@vitest/ui": "^2.1.8",
     "tsdown": "^0.13.0",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "vitest": "^2.1.8"
   }
 }
