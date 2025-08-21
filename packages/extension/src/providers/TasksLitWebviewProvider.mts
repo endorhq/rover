@@ -239,7 +239,7 @@ export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
     try {
       this._view.webview.postMessage({
         command: 'roverInitializationChecked',
-        isInitialized: this.cli.checkInitialization()
+        isInitialized: await this.cli.checkInitialization()
       });
     } catch (error) {
       console.error('Failed to check rover initialization files:', error);
