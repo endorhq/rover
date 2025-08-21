@@ -78,7 +78,7 @@ export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
           await this.handleOpenWorkspace(data.taskId);
           break;
         case 'checkRoverInitialization':
-          await this.checkRoverInitializationFiles();
+          await this.checkRoverInitialized();
           break;
       }
     });
@@ -147,12 +147,12 @@ export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
 
     try {
       const cliStatus = await this.cli.checkInstallation();
-      const roverStatus = await this.cli.checkInitialization();
+      const roverInitialized = await this.cli.checkInitialization();
 
       const status = {
         cliInstalled: cliStatus.installed,
         cliVersion: cliStatus.version,
-        roverInitialized: roverStatus.initialized,
+        roverInitialized,
         error: cliStatus.error
       };
 
@@ -231,42 +231,15 @@ export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
     this.checkInitializationStatus();
   }
 
-  private async checkRoverInitializationFiles() {
+  private async checkRoverInitialized() {
     if (!this._view) {
       return;
     }
 
     try {
-      const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri;
-      if (!workspaceRoot) {
-        return;
-      }
-
-      // Check if .rover directory exists
-      const roverUserSettingsUri = vscode.Uri.joinPath(workspaceRoot, '.rover', 'settings.json');
-      let roverUserSettingsExists = false;
-      try {
-        const stat = await vscode.workspace.fs.stat(roverUserSettingsUri);
-        roverUserSettingsExists = stat.type === vscode.FileType.File;
-      } catch (error) {
-        roverUserSettingsExists = false;
-      }
-
-      // Check if rover.json file exists
-      const roverJsonUri = vscode.Uri.joinPath(workspaceRoot, 'rover.json');
-      let roverJsonExists = false;
-      try {
-        const stat = await vscode.workspace.fs.stat(roverJsonUri);
-        roverJsonExists = stat.type === vscode.FileType.File;
-      } catch (error) {
-        roverJsonExists = false;
-      }
-
-      const isInitialized = roverUserSettingsExists && roverJsonExists;
-
       this._view.webview.postMessage({
         command: 'roverInitializationChecked',
-        isInitialized: isInitialized
+        isInitialized: this.cli.checkInitialization()
       });
     } catch (error) {
       console.error('Failed to check rover initialization files:', error);

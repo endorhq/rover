@@ -52,7 +52,7 @@ export class FileSystemHelper {
             for (const iterationDir of iterationDirs) {
                 const iterationPath = path.join(taskDir, iterationDir.name);
                 const iterationNumber = parseInt(iterationDir.name);
-                
+
                 const iteration = await this.parseIteration(iterationPath, iterationNumber);
                 iterations.push(iteration);
             }
@@ -70,7 +70,7 @@ export class FileSystemHelper {
         // Common files to look for
         const commonFiles = [
             'summary.md',
-            'validation.md', 
+            'validation.md',
             'planning.md',
             'execution.md',
             'output.md',
@@ -82,7 +82,7 @@ export class FileSystemHelper {
         for (const fileName of commonFiles) {
             const filePath = path.join(iterationPath, fileName);
             const exists = fs.existsSync(filePath);
-            
+
             let lastModified: Date | undefined;
             let size: number | undefined;
 
@@ -189,28 +189,5 @@ export class FileSystemHelper {
     taskExists(taskId: string): boolean {
         const taskDir = this.getTaskDirectory(taskId);
         return taskDir ? fs.existsSync(taskDir) : false;
-    }
-
-    /**
-     * Check if Rover is initialized in the workspace
-     */
-    isRoverInitialized(): boolean {
-        if (!this.workspaceRoot) {
-            return false;
-        }
-
-        const roverDir = path.join(this.workspaceRoot, '.rover');
-        return fs.existsSync(roverDir);
-    }
-
-    /**
-     * Get Rover directory path
-     */
-    getRoverDirectory(): string | undefined {
-        if (!this.workspaceRoot) {
-            return undefined;
-        }
-
-        return path.join(this.workspaceRoot, '.rover');
     }
 }
