@@ -248,6 +248,16 @@ export const mergeCommand = async (taskId: string, options: MergeOptions = {}) =
             console.log(colors.gray('└── Status: ') + colors.white(task.status));
         }
 
+        if (task.isPushed()) {
+            console.log(colors.yellow('\nThe task is already merged and pushed.'))
+            process.exit(1);
+        }
+
+        if (task.isMerged()) {
+            console.log(colors.yellow('\nThe task is already merged.'))
+            process.exit(1);
+        }
+
         if (!task.isCompleted()) {
             console.log(colors.yellow('\nThe task is not completed yet.'))
 
@@ -276,25 +286,27 @@ export const mergeCommand = async (taskId: string, options: MergeOptions = {}) =
         result.currentBranch = git.getCurrentBranch();
 
         // Check for uncommitted changes in main repo
-        if (git.hasUncommitedChanges()) {
-            result.error = 'Current branch has uncommitted changes';
+        if (git.hasUncommittedChanges()) {
+            result.error = `Current branch (${git.getCurrentBranch()}) has uncommitted changes`;
             if (options.json) {
                 console.log(JSON.stringify(result, null, 2));
             } else {
                 console.log('');
-                console.log(colors.red('✗ Current branch has uncommitted changes'));
+                console.log(colors.red(`✗ Current branch (${git.getCurrentBranch()}) has uncommitted changes`));
                 console.log(colors.gray('  Please commit or stash your changes before merging'));
             }
             return;
         }
 
         // Check if worktree has changes to commit or if there are unmerged commits
-        const hasWorktreeChanges = git.hasUncommitedChanges({ worktreePath: task.worktreePath });
+        const hasWorktreeChanges = git.hasUncommittedChanges({ worktreePath: task.worktreePath });
         const taskBranch = task.branchName;
         const hasUnmerged = git.hasUnmergedCommits(taskBranch);
 
         result.hasWorktreeChanges = hasWorktreeChanges;
         result.hasUnmergedCommits = hasUnmerged;
+
+        task.markMerged(); // Set status to MERGED
 
         if (!hasWorktreeChanges && !hasUnmerged) {
             result.success = true;
@@ -312,7 +324,7 @@ export const mergeCommand = async (taskId: string, options: MergeOptions = {}) =
             // Show what will happen
             console.log('');
             console.log(colors.cyan('The merge process will'));
-            if (hasWorktreeChanges) {
+            if (hasWorktreeChanges) {4
                 console.log(colors.cyan('├── Commit changes in the task worktree'));
             }
             console.log(colors.cyan('├── Merge the task branch into the current branch'));
@@ -399,11 +411,12 @@ export const mergeCommand = async (taskId: string, options: MergeOptions = {}) =
             telemetry?.eventMergeTask();
 
             const merge = git.mergeBranch(taskBranch, `merge: ${task.title}`);
-
+                task.markMerged(); // Set status to MERGED
             if (merge) {
                 // Update status
                 mergeSuccessful = true;
                 result.merged = true;
+                task.markMerged(); // Set status to MERGED
 
                 spinner?.success('Task merged successfully');
             } else {

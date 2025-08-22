@@ -8,6 +8,10 @@ import { getTelemetry } from '../lib/telemetry.js';
  * Format duration from start to now or completion
  */
 const formatDuration = (startTime: string, endTime?: string): string => {
+    if (!startTime) {
+        return "never";
+    }
+
     const start = new Date(startTime);
     const end = endTime ? new Date(endTime) : new Date();
     const diffMs = end.getTime() - start.getTime();
@@ -37,7 +41,7 @@ const formatProgress = (step?: string, progress?: number): string => {
 
     if (step === 'failed') {
         return colors.red(bar);
-    } else if (step === 'completed') {
+    } else if (['completed', 'merged', 'pushed'].includes(step)) {
         return colors.green(bar);
     } else {
         return colors.cyan(bar);
@@ -61,19 +65,7 @@ export const listCommand = async (options: { watch?: boolean; verbose?: boolean;
             telemetry?.eventListTasks();
         }
 
-        // Filter out tasks without active status or recent activity
-        const activeStatuses = allStatuses.filter(({ status, taskData }) => {
-            if (!status) return false;
-
-            // Show running, recent completed/failed tasks, or tasks with containers
-            if (status.status === 'running' || status.status === 'initializing' || status.status === 'installing' || status.status === 'completed' || status.status === 'failed') {
-                return true;
-            }
-
-            return false;
-        });
-
-        if (activeStatuses.length === 0) {
+        if (allStatuses.length === 0) {
             if (options.json) {
                 console.log(JSON.stringify([]));
             } else {
@@ -85,9 +77,8 @@ export const listCommand = async (options: { watch?: boolean; verbose?: boolean;
             }
             return;
         }
-
         // Update task metadata with latest status information
-        for (const { taskId, status } of activeStatuses) {
+        for (const { taskId, status } of allStatuses) {
             if (status) {
                 updateTaskWithStatus(taskId, status);
             }
@@ -95,7 +86,7 @@ export const listCommand = async (options: { watch?: boolean; verbose?: boolean;
 
         // JSON output mode
         if (options.json) {
-            const jsonOutput = activeStatuses.map(({ taskId, status, taskData }) => ({
+            const jsonOutput = allStatuses.map(({ taskId, status, taskData }) => ({
                 id: taskId,
                 title: taskData?.title || 'Unknown Task',
                 status: status?.status || 'unknown',
@@ -127,26 +118,33 @@ export const listCommand = async (options: { watch?: boolean; verbose?: boolean;
         });
         console.log(colors.gray(separatorRow));
 
-        // Print rows
-        for (const { taskId, status, taskData } of activeStatuses) {
-            if (!status) continue;
+        const lastIterationOrTaskProperty = ({status, taskData, attribute, defaultValue} : {status?: any, taskData: any, attribute: string, defaultValue?: any }): any => {
+            if (status && status[attribute]) {
+                return status[attribute];
+            }
+            if (taskData && taskData[attribute]) {
+                return taskData[attribute];
+            }
+            return defaultValue;
+        };
 
+        // Print rows
+        for (const { taskId, status, taskData } of allStatuses) {
             const title = taskData?.title || 'Unknown Task';
-            const duration = formatDuration(status.startedAt, status.completedAt);
-            const colorFunc = statusColor(status.status);
+            const duration = formatDuration(lastIterationOrTaskProperty({status, taskData, attribute: 'startedAt'}));
+            const colorFunc = statusColor(lastIterationOrTaskProperty({status, taskData, attribute: 'status'}));
 
             let row = '';
             row += colors.cyan(taskId.padEnd(columnWidths[0]));
             row += colors.white(truncateText(title, columnWidths[1] - 1).padEnd(columnWidths[1]));
-            row += colorFunc(formatTaskStatus(status.status).padEnd(columnWidths[2])); // +10 for ANSI codes
-            row += formatProgress(status.status, status.progress).padEnd(columnWidths[3] + 10);
-            row += colors.gray(truncateText(status.currentStep, columnWidths[4] - 1).padEnd(columnWidths[4]));
-            row += colors.gray(duration);
-
+            row += colorFunc(formatTaskStatus(lastIterationOrTaskProperty({status, taskData, attribute: 'status'})).padEnd(columnWidths[2])); // +10 for ANSI codes
+            row += formatProgress(lastIterationOrTaskProperty({status, taskData, attribute: 'status'}), status?.progress || 0).padEnd(columnWidths[3] + 10);
+            row += colors.gray(truncateText(status?.currentStep || '-', columnWidths[4] - 1).padEnd(columnWidths[4]));
+            row += colors.gray(status ? duration : '-');
             console.log(row);
 
             // Show error in verbose mode
-            if (options.verbose && status.error) {
+            if (options.verbose && status?.error) {
                 console.log(colors.red(`    Error: ${status.error}`));
             }
         }

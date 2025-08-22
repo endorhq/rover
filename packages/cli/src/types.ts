@@ -22,12 +22,14 @@ export interface Task {
 
 export interface TaskStatus {
     taskId: string;
-    status: 'initializing' | 'installing' | 'running' | 'completed' | 'failed';
+    status: 'new' | 'initializing' | 'installing' | 'running' | 'completed' | 'merged' | 'pushed' | 'failed';
     currentStep: string;
     progress?: number;
     startedAt: string;
     updatedAt: string;
     completedAt?: string;
+    mergedAt?: string;
+    pushedAt?: string;
     error?: string;
 }
 

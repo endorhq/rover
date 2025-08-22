@@ -105,7 +105,7 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
         }
 
         // Check for changes
-        const fileChanges = git.uncommitedChanges({
+        const fileChanges = git.uncommittedChanges({
             worktreePath: task.worktreePath
         });
         const hasChanges = fileChanges.length > 0;
@@ -180,6 +180,7 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
                 worktreePath: task.worktreePath
             });
             result.pushed = true;
+            task.markPushed(); // Set status to PUSHED
             if (pushSpinner) {
                 pushSpinner.success(`Branch pushed successfully`);
             }
@@ -197,6 +198,10 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
                     });
                     result.pushed = true;
                     pushSpinner?.success('Branch pushed successfully')
+                    task.markPushed(); // Set status to PUSHED
+                    if (!options.json) {
+                        console.log(colors.green(`✓ Branch pushed successfully`));
+                    }
                 } catch (retryError: any) {
                     pushSpinner?.error('Failed to push branch');
                     result.error = `Failed to push branch: ${retryError.message}`;

@@ -24,7 +24,7 @@ export type GitRecentCommitOptions = {
     worktreePath?: string
 }
 
-export type GitUncommitedChangesOptions = {
+export type GitUncommittedChangesOptions = {
     skipUntracked?: boolean,
     worktreePath?: string;
 }
@@ -189,7 +189,7 @@ export class Git {
     }
 
     /**
-     * Prune worktrees that are no longer available in 
+     * Prune worktrees that are no longer available in
      * the filesystem
      */
     pruneWorktree(): boolean {
@@ -234,9 +234,9 @@ export class Git {
     }
 
     /**
-     * Check if the given worktree path has uncommited changes
+     * Check if the given worktree path has uncommitted changes
      */
-    uncommitedChanges(options: GitUncommitedChangesOptions = {}): string[] {
+    uncommittedChanges(options: GitUncommittedChangesOptions = {}): string[] {
         try {
             const args = ['status', '--porcelain'];
 
@@ -250,6 +250,10 @@ export class Git {
                 cwd: options.worktreePath
             }).stdout.toString().trim();
 
+            if (status.length == 0) {
+                return [];
+            }
+
             return status.split('\n');
         } catch {
             // For now, no changes. We will add debug logs
@@ -258,12 +262,12 @@ export class Git {
     }
 
     /**
-     * Check if the given worktree path has uncommited changes
+     * Check if the given worktree path has uncommitted changes
      */
-    hasUncommitedChanges(options: GitUncommitedChangesOptions = {}): boolean {
+    hasUncommittedChanges(options: GitUncommittedChangesOptions = {}): boolean {
         try {
-            const uncommitedFiles = this.uncommitedChanges(options);
-            return uncommitedFiles.length > 0;
+            const uncommittedFiles = this.uncommittedChanges(options);
+            return uncommittedFiles.length > 0;
         } catch {
             return false;
         }

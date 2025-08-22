@@ -445,12 +445,18 @@ export const startDockerExecution = async (taskId: number, task: TaskDescription
                     console.error(colors.red('Error starting Docker container:'), error.message);
                 }
 
-                // Update task metadata
+                // Reset task to NEW status when container fails to start
                 updateTaskMetadata(taskId, {
+                    status: 'NEW',
                     executionStatus: 'error',
                     error: error.message,
                     errorAt: new Date().toISOString()
                 }, jsonMode);
+
+                if (!jsonMode) {
+                    console.log(colors.yellow('✓ Task reset to NEW status'));
+                    console.log(colors.gray('  Use ') + colors.cyan(`rover start ${taskId}`) + colors.gray(' to retry execution'));
+                }
             }
         }
 
@@ -458,6 +464,19 @@ export const startDockerExecution = async (taskId: number, task: TaskDescription
         if (spinner) spinner.error('Failed to start container');
         if (!jsonMode) {
             console.error(colors.red('Error starting Docker container:'), error);
+        }
+
+        // Reset task to NEW status when Docker startup fails
+        updateTaskMetadata(taskId, {
+            status: 'NEW',
+            executionStatus: 'error',
+            error: error instanceof Error ? error.message : String(error),
+            errorAt: new Date().toISOString()
+        }, jsonMode);
+
+        if (!jsonMode) {
+            console.log(colors.yellow('✓ Task reset to NEW status'));
+            console.log(colors.gray('  Use ') + colors.cyan(`rover start ${taskId}`) + colors.gray(' to retry execution'));
         }
     }
 }
@@ -881,7 +900,17 @@ export const taskCommand = async (initPrompt?: string, options: { fromGithub?: s
         telemetry?.eventNewTask(options.fromGithub != null ? NewTaskProvider.GITHUB : NewTaskProvider.INPUT);
 
         // Start Docker container for task execution
-        await startDockerExecution(taskId, task, worktreePath, iterationPath, selectedAiAgent, follow, json, debug);
+        try {
+            await startDockerExecution(taskId, task, worktreePath, iterationPath, selectedAiAgent, follow, json, debug);
+        } catch (error) {
+            // If Docker execution fails to start, reset task to NEW status
+            task.resetToNew();
+            if (!json) {
+                console.log(colors.yellow('✓ Task reset to NEW status due to execution failure'));
+                console.log(colors.gray('  Use ') + colors.cyan(`rover start ${taskId}`) + colors.gray(' to retry execution'));
+            }
+            throw error;
+        }
 
         if (json) {
             // Output final JSON after all operations are complete

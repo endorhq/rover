@@ -5,8 +5,8 @@ import { randomUUID } from 'node:crypto';
 // Schema version for migrations
 const CURRENT_SCHEMA_VERSION = '1.0';
 
-// Status enum with ITERATING added
-export type TaskStatus = 'NEW' | 'IN_PROGRESS' | 'ITERATING' | 'COMPLETED' | 'FAILED';
+// Status enum with additional status types
+export type TaskStatus = 'NEW' | 'IN_PROGRESS' | 'ITERATING' | 'COMPLETED' | 'FAILED' | 'MERGED' | 'PUSHED';
 
 // Complete unified schema
 export interface TaskDescriptionSchema {
@@ -252,6 +252,8 @@ export class TaskDescription {
             case 'iterating': return 'ITERATING';
             case 'completed': return 'COMPLETED';
             case 'failed': return 'FAILED';
+            case 'merged': return 'MERGED';
+            case 'pushed': return 'PUSHED';
             default: return 'NEW';
         }
     }
@@ -324,6 +326,13 @@ export class TaskDescription {
                     this.data.error = metadata.error;
                 }
                 break;
+            case 'MERGED':
+            case 'PUSHED':
+                // Mark as completed when merged or pushed
+                if (!this.data.completedAt) {
+                    this.data.completedAt = timestamp;
+                }
+                break;
         }
 
         this.data.lastStatusCheck = timestamp;
@@ -356,6 +365,27 @@ export class TaskDescription {
      */
     markIterating(timestamp?: string): void {
         this.setStatus('ITERATING', { timestamp });
+    }
+
+    /**
+     * Mark task as merged
+     */
+    markMerged(timestamp?: string): void {
+        this.setStatus('MERGED', { timestamp });
+    }
+
+    /**
+     * Mark task as pushed
+     */
+    markPushed(timestamp?: string): void {
+        this.setStatus('PUSHED', { timestamp });
+    }
+
+    /**
+     * Reset task back to NEW status (for container start failures or user reset)
+     */
+    resetToNew(timestamp?: string): void {
+        this.setStatus('NEW', { timestamp });
     }
 
     // Iteration Management
@@ -515,6 +545,20 @@ export class TaskDescription {
     }
 
     /**
+     * Check if task is merged
+     */
+    isMerged(): boolean {
+        return this.data.status === 'MERGED';
+    }
+
+    /**
+     * Check if task is pushed
+     */
+    isPushed(): boolean {
+        return this.data.status === 'PUSHED';
+    }
+
+    /**
      * Get task duration in milliseconds
      */
     getDuration(): number | null {
@@ -548,7 +592,7 @@ export class TaskDescription {
         if (this.data.iterations < 1) errors.push('iterations must be at least 1');
 
         // Status enum validation
-        const validStatuses: TaskStatus[] = ['NEW', 'IN_PROGRESS', 'ITERATING', 'COMPLETED', 'FAILED'];
+        const validStatuses: TaskStatus[] = ['NEW', 'IN_PROGRESS', 'ITERATING', 'COMPLETED', 'FAILED', 'MERGED', 'PUSHED'];
         if (!validStatuses.includes(this.data.status)) {
             errors.push(`status must be one of: ${validStatuses.join(', ')}`);
         }

@@ -21,7 +21,7 @@ export class Docker {
 
     /**
      * Starts a container based on the given arguments
-     * 
+     *
      * @param name Container name
      * @param image Container image
      * @param mounts Array of mount commands
@@ -52,7 +52,7 @@ export class Docker {
 
     /**
      * Stop the given container
-     * 
+     *
      * @param name Container name
      */
     stopContainer(name: string): boolean {
@@ -63,7 +63,7 @@ export class Docker {
 
     /**
      * Returns the container logs (just one shot)
-     * 
+     *
      * @param name Container name
      */
     logsContainer(name: string): string {
@@ -85,7 +85,7 @@ export class Docker {
 
     /**
      * Returns a process to follow the container logs
-     * 
+     *
      * @param name Container name
      */
     logsFollowContainer(name: string): ChildProcessByStdio<null, Stream.Readable, Stream.Readable> {
@@ -99,7 +99,7 @@ export class Docker {
 
     /**
      * Clean up any existing container with the given name
-     * 
+     *
      * @param name Container name
      * @returns True when the docker command does not return any error
      */

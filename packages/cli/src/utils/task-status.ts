@@ -17,6 +17,10 @@ export const formatTaskStatus = (status: string): string => {
             return 'Failed';
         case 'ITERATING':
             return 'Iterating';
+        case 'MERGED':
+            return 'Merged';
+        case 'PUSHED':
+            return 'Pushed';
         default:
             return status;
     }
@@ -36,6 +40,10 @@ export const statusColor = (status: string): StyleFunction => {
             return colors.magenta;
         case 'FAILED':
             return colors.red;
+        case 'MERGED':
+            return colors.green;
+        case 'PUSHED':
+            return colors.green;
         default:
             return colors.gray;
     }
