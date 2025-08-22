@@ -52,20 +52,25 @@ export const deleteCommand = async (taskId: string, options: { json?: boolean, y
             console.log(colors.gray('├── Title: ') + colors.white(task.title));
             console.log(colors.gray('└── Status: ') + colorFunc(task.status) + '\n');
 
-            console.log(colors.white('\nThis action will delete the task metadata and workspace (git worktree)'));
+            console.log(colors.white('This action will delete the task metadata and workspace (git worktree)'));
         }
 
         // Confirm deletion
         let confirmDeletion = true;
 
         if (!skipConfirmation) {
-            const { confirm } = await prompt<{ confirm: boolean }>({
-                type: 'confirm',
-                name: 'confirm',
-                message: 'Are you sure you want to delete this task?',
-                initial: false
-            });
-            confirmDeletion = confirm;
+            try {
+                const { confirm } = await prompt<{ confirm: boolean }>({
+                    type: 'confirm',
+                    name: 'confirm',
+                    message: 'Are you sure you want to delete this task?',
+                    initial: false
+                });
+                confirmDeletion = confirm;
+            } catch (_err) {
+                jsonOutput.error = 'Task deletion cancelled';
+                exitWithWarn('Task deletion cancelled', jsonOutput, json);
+            }
         }
 
         if (confirmDeletion) {

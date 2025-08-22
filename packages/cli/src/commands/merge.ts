@@ -440,15 +440,22 @@ export const mergeCommand = async (taskId: string, options: MergeOptions = {}) =
                                 "The merge conflicts are fixed. You can check the file content to confirm it."
                             ]);
 
-                            // Ask user to review and confirm
-                            const { confirmResolution } = await prompt<{ confirmResolution: boolean }>({
-                                type: 'confirm',
-                                name: 'confirmResolution',
-                                message: 'Do you want to continue with the merge?',
-                                initial: false
-                            });
+                            let applyChanges = false;
 
-                            if (!confirmResolution) {
+                            // Ask user to review and confirm
+                            try {
+                                const { confirmResolution } = await prompt<{ confirmResolution: boolean }>({
+                                    type: 'confirm',
+                                    name: 'confirmResolution',
+                                    message: 'Do you want to continue with the merge?',
+                                    initial: false
+                                });
+                                applyChanges = confirmResolution;
+                            } catch (error) {
+                                // Ignore the error as it's a regular CTRL+C
+                            }
+
+                            if (!applyChanges) {
                                 console.log(colors.yellow('\n⚠ User rejected AI resolution. Aborting merge...'));
                                 git.abortMerge();
                                 return;

@@ -692,14 +692,19 @@ export const taskCommand = async (initPrompt?: string, options: { fromGithub?: s
                 process.exit(1);
             }
 
-            const { input } = await prompt<{ input: string }>({
-                type: 'input',
-                name: 'input',
-                message: 'Describe the task you want to assign:',
-                validate: (value) => value.trim().length > 0 || 'Please provide a description'
-            });
+            try {
+                const { input } = await prompt<{ input: string }>({
+                    type: 'input',
+                    name: 'input',
+                    message: 'Describe the task you want to assign:',
+                    validate: (value) => value.trim().length > 0 || 'Please provide a description'
+                });
 
-            description = input;
+                description = input;
+            } catch (err) {
+                console.log(colors.yellow('\n⚠ Task creation cancelled'));
+                process.exit(1);
+            }
         }
     }
 
@@ -732,30 +737,43 @@ export const taskCommand = async (initPrompt?: string, options: { fromGithub?: s
                     }
 
                     // Ask for confirmation
-                    const { confirm } = await prompt<{ confirm: string }>({
-                        type: 'select',
-                        name: 'confirm',
-                        message: '\nAre you satisfied with this task?',
-                        choices: [
-                            { name: 'yes', message: 'Yes, looks good!' },
-                            { name: 'refine', message: 'No, I want to add more details' },
-                            { name: 'cancel', message: 'Cancel task creation' }
-                        ]
-                    });
-
-                    if (confirm === 'yes') {
-                        satisfied = true;
-                    } else if (confirm === 'refine') {
-                        // Get additional details
-                        const { additionalInfo } = await prompt<{ additionalInfo: string }>({
-                            type: 'input',
-                            name: 'additionalInfo',
-                            message: 'Provide additional instructions:',
-                            validate: (value) => value.trim().length > 0 || 'Please provide additional information'
+                    let confirmValue = 'cancel';
+                    try {
+                        const { confirm } = await prompt<{ confirm: string }>({
+                            type: 'select',
+                            name: 'confirm',
+                            message: '\nAre you satisfied with this task?',
+                            choices: [
+                                { name: 'yes', message: 'Yes, looks good!' },
+                                { name: 'refine', message: 'No, I want to add more details' },
+                                { name: 'cancel', message: 'Cancel task creation' }
+                            ]
                         });
+                        confirmValue = confirm;
+                    } catch (err) {
+                        // Just cancel it
+                        confirmValue = 'cancel';
+                    }
 
-                        // Update the description for next iteration
-                        taskData.description = `${taskData.description}. Additional instructions: ${additionalInfo}`;
+                    if (confirmValue === 'yes') {
+                        satisfied = true;
+                    } else if (confirmValue === 'refine') {
+                        // Get additional details
+                        try {
+                            const { additionalInfo } = await prompt<{ additionalInfo: string }>({
+                                type: 'input',
+                                name: 'additionalInfo',
+                                message: 'Provide additional instructions:',
+                                validate: (value) => value.trim().length > 0 || 'Please provide additional information'
+                            });
+
+                            // Update the description for next iteration
+                            taskData.description = `${taskData.description}. Additional instructions: ${additionalInfo}`;
+                        } catch (err) {
+                            if (!json) {
+                                console.log(colors.yellow('\n⚠ Task creation cancelled'));
+                            }
+                        }
                     } else {
                         // Cancel
                         if (!json) {

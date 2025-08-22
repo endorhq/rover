@@ -13,11 +13,13 @@ import { IterationConfig } from '../lib/iteration.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { showRoverChat } from '../utils/display.js';
 import { readFromStdin, stdinIsAvailable } from '../utils/stdin.js';
+import { CLIJsonOutput } from '../types.js';
+import { exitWithError, exitWithWarn } from '../utils/exit.js';
+import { fa } from 'zod/locales';
 
 const { prompt } = enquirer;
 
-interface IterateResult {
-    success: boolean;
+interface IterateResult extends CLIJsonOutput {
     taskId: number;
     taskTitle: string;
     iterationNumber: number;
@@ -26,7 +28,6 @@ interface IterateResult {
     instructions: string;
     worktreePath?: string;
     iterationPath?: string;
-    error?: string;
 }
 
 type IterationContext = {
@@ -123,6 +124,7 @@ const expandIterationInstructions = async (
 
 export const iterateCommand = async (taskId: string, instructions?: string, options: { follow?: boolean; json?: boolean } = {}): Promise<void> => {
     const telemetry = getTelemetry();
+    const json = options.json === true;
     const result: IterateResult = {
         success: false,
         taskId: 0,
@@ -162,27 +164,31 @@ export const iterateCommand = async (taskId: string, instructions?: string, opti
 
         // If still no instructions and not in JSON mode, prompt user
         if (!finalInstructions) {
-            if (options.json) {
+            if (json) {
                 result.error = 'Instructions are required in JSON mode';
-                console.log(JSON.stringify(result, null, 2));
+                exitWithError(result, json);
                 return;
             }
 
             // Interactive prompt for instructions
-            const { input } = await prompt<{ input: string }>({
-                type: 'input',
-                name: 'input',
-                message: 'Describe the refinement instructions or new requirements for this task:',
-                validate: (value) => value.trim().length > 0 || 'Please provide refinement instructions'
-            });
-
-            finalInstructions = input;
+            try {
+                const { input } = await prompt<{ input: string }>({
+                    type: 'input',
+                    name: 'input',
+                    message: 'Describe the refinement instructions or new requirements for this task:',
+                    validate: (value) => value.trim().length > 0 || 'Please provide refinement instructions'
+                });
+                finalInstructions = input;
+            } catch (_err) {
+                exitWithWarn('Task deletion cancelled', result, json);
+                return;
+            }
         }
     }
 
     result.instructions = finalInstructions;
 
-    if (!options.json) {
+    if (!json) {
         showRoverChat([
             "hey human! Let's iterate over this task.",
             "I got your new instructions and will ask an agent to implement them."

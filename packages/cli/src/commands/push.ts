@@ -184,13 +184,18 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
                 if (options.json) {
                     commitMessage = defaultMessage;
                 } else {
-                    const { message } = await prompt<{ message: string }>({
-                        type: 'input',
-                        name: 'message',
-                        message: 'Commit message:',
-                        initial: defaultMessage
-                    });
-                    commitMessage = message;
+                    try {
+                        const { message } = await prompt<{ message: string }>({
+                            type: 'input',
+                            name: 'message',
+                            message: 'Commit message:',
+                            initial: defaultMessage
+                        });
+                        commitMessage = message;
+                    } catch (err) {
+                        console.log(colors.yellow('\n⚠ Commit message skipped. Using default message.'));
+                        commitMessage = defaultMessage;
+                    }
                 }
             }
 
@@ -292,13 +297,18 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
                         // Prompt to create PR (skip in JSON mode and auto-create)
                         let createPR = true;
                         if (!options.json) {
-                            const response = await prompt<{ createPR: boolean }>({
-                                type: 'confirm',
-                                name: 'createPR',
-                                message: 'Would you like to create a GitHub Pull Request?',
-                                initial: true
-                            });
-                            createPR = response.createPR;
+                            try {
+                                const response = await prompt<{ createPR: boolean }>({
+                                    type: 'confirm',
+                                    name: 'createPR',
+                                    message: 'Would you like to create a GitHub Pull Request?',
+                                    initial: true
+                                });
+                                createPR = response.createPR;
+                            } catch (_err) {
+                                // Just cancel it
+                                createPR = false;
+                            }
                         }
 
                         if (createPR) {
