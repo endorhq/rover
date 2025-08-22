@@ -25,6 +25,27 @@ program
 		const commandName = actionCommand.name();
 		if (
 			commandName !== "init" &&
+			!existsSync(join(process.cwd(), 'rover.json'))
+		) {
+			console.log(colors.green(`Rover is not initialized in this directory. The command you requested (\`${commandName}\`) was not executed.`));
+			console.log(`└── ${colors.gray('Project config (does not exist):')} rover.json`);
+
+			showTips(
+				[
+					'Run ' + colors.cyan('rover init') + ' in this directory to initialize project config and user settings',
+				],
+				{
+					title: TIP_TITLES.NEXT_STEPS
+				}
+			);
+
+			process.exit(1);
+		}
+	})
+	.hook('preAction', (thisCommand, actionCommand) => {
+		const commandName = actionCommand.name();
+		if (
+			commandName !== "init" &&
 			existsSync(join(process.cwd(), 'rover.json')) &&
 			!existsSync(join(process.cwd(), '.rover', 'settings.json'))
 		) {
