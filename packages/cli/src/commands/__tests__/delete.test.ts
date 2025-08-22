@@ -47,6 +47,7 @@ describe('delete command', () => {
     execSync('git init', { stdio: 'pipe' });
     execSync('git config user.email "test@test.com"', { stdio: 'pipe' });
     execSync('git config user.name "Test User"', { stdio: 'pipe' });
+    execSync('git config commit.gpgsign false', { stdio: 'pipe' });
 
     // Create initial commit
     writeFileSync('README.md', '# Test');

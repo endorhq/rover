@@ -6,6 +6,15 @@ import { spawnSync } from '../lib/os.js';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { showTips, TIP_TITLES } from '../utils/display.js';
+import { CLIJsonOutput } from '../types.js';
+import { exitWithError, exitWithWarn } from '../utils/exit.js';
+
+/**
+ * Interface for JSON output
+ */
+interface TaskLogsOutput extends CLIJsonOutput {
+    logs: string;
+}
 
 /**
  * Get available iterations for a task
@@ -32,34 +41,22 @@ const getAvailableIterations = (taskId: string): number[] => {
     }
 };
 
-/**
- * Get container ID for a specific iteration
- */
-const getContainerIdForIteration = (taskId: number, iterationNumber: number): string | null => {
-    try {
-        if (!TaskDescription.exists(taskId)) {
-            return null;
-        }
-
-        const task = TaskDescription.load(taskId);
-
-        // For now, we'll use the current container ID as we don't store per-iteration container IDs
-        // This is a limitation - we can only show logs for the most recent execution
-        return task.containerId || null;
-
-    } catch (error) {
-        return null;
-    }
-};
-
-export const logsCommand = async (taskId: string, iterationNumber?: string, options: { follow?: boolean } = {}) => {
+export const logsCommand = async (taskId: string, iterationNumber?: string, options: { follow?: boolean, json?: boolean } = {}) => {
     // Init telemetry
     const telemetry = getTelemetry();
+
+    // Json config
+    const json = options.json === true;
+    const jsonOutput: TaskLogsOutput = {
+        logs: '',
+        success: false
+    };
 
     // Convert string taskId to number
     const numericTaskId = parseInt(taskId, 10);
     if (isNaN(numericTaskId)) {
-        console.log(colors.red(`✗ Invalid task ID '${taskId}' - must be a number`));
+        jsonOutput.error = `Invalid task ID '${taskId}' - must be a number`;
+        exitWithError(jsonOutput, json);
         return;
     }
 
@@ -72,7 +69,8 @@ export const logsCommand = async (taskId: string, iterationNumber?: string, opti
         if (iterationNumber) {
             targetIteration = parseInt(iterationNumber, 10);
             if (isNaN(targetIteration)) {
-                console.log(colors.red(`✗ Invalid iteration number: '${iterationNumber}'`));
+                jsonOutput.error = `Invalid iteration number: '${iterationNumber}'`;
+                exitWithError(jsonOutput, json);
                 return;
             }
         }
@@ -81,14 +79,7 @@ export const logsCommand = async (taskId: string, iterationNumber?: string, opti
         const availableIterations = getAvailableIterations(numericTaskId.toString());
 
         if (availableIterations.length === 0) {
-            console.log(colors.yellow(`⚠ No iterations found for task '${numericTaskId}'`));
-
-            showTips([
-                'Run ' + colors.cyan(`rover task ${numericTaskId}`) + ' to start the task'
-            ], {
-                title: TIP_TITLES.NEXT_STEPS
-            });
-
+            exitWithWarn(`No iterations found for task '${numericTaskId}'`, jsonOutput, json);
             return;
         }
 
@@ -97,31 +88,38 @@ export const logsCommand = async (taskId: string, iterationNumber?: string, opti
 
         // Check if specific iteration exists (if requested)
         if (targetIteration && !availableIterations.includes(targetIteration)) {
-            console.log(colors.red(`✗ Iteration ${targetIteration} not found for task '${numericTaskId}'\n`));
-            console.log(colors.gray('Available iterations: ') + colors.cyan(availableIterations.join(', ')));
+            jsonOutput.error = `Iteration ${targetIteration} not found for task '${numericTaskId}'. Available iterations: ${availableIterations.join(', ')}`;
+            exitWithError(jsonOutput, json);
             return;
         }
 
         // Get container ID (limitation: only works for most recent execution)
-        const containerId = getContainerIdForIteration(numericTaskId, actualIteration);
+        const containerId = task.containerId;
 
         if (!containerId) {
-            console.log(colors.yellow(`⚠ No container found for task '${numericTaskId}'`));
-            console.log(colors.gray('Logs are only available for recently executed tasks'));
+            exitWithWarn(
+                `No container found for task '${numericTaskId}'. Logs are only available for recent tasks`,
+                jsonOutput,
+                json
+            );
             return;
         }
 
         // Display header
-        console.log(colors.white.bold(`Task ${numericTaskId} Logs`));
-        console.log(colors.gray('├── Title: ') + colors.white(task.title));
-        console.log(colors.gray('└── Iteration: ') + colors.cyan(`#${actualIteration}`));
+        if (!json) {
+            console.log(colors.white.bold(`Task ${numericTaskId} Logs`));
+            console.log(colors.gray('├── Title: ') + colors.white(task.title));
+            console.log(colors.gray('└── Iteration: ') + colors.cyan(`#${actualIteration}`));
+        }
 
         telemetry?.eventLogs();
 
-        console.log('');
-        console.log(colors.white.bold('Execution Log\n'));
+        if (!json) {
+            console.log('');
+            console.log(colors.white.bold('Execution Log\n'));
+        }
 
-        if (options.follow) {
+        if (options.follow && !json) {
             // Follow logs in real-time
             console.log(colors.gray('Following logs... (Press Ctrl+C to exit)'));
             console.log('');
@@ -179,35 +177,47 @@ export const logsCommand = async (taskId: string, iterationNumber?: string, opti
                 }).stdout.toString();
 
                 if (logs.trim() === '') {
-                    console.log(colors.yellow('No logs available for this container'));
+                    exitWithWarn(
+                        'No logs available for this container. Logs are only available for recent tasks',
+                        jsonOutput,
+                        json
+                    );
+                    return;
                 } else {
-                    // Display logs with basic formatting
-                    const logLines = logs.split('\n');
+                    if (json) {
+                        // Store logs
+                        jsonOutput.logs = logs;
+                    } else {
+                        const logLines = logs.split('\n');
+                        // Display logs with basic formatting
+                        for (const line of logLines) {
+                            if (line.trim() === '') {
+                                console.log('');
+                                continue;
+                            }
 
-                    for (const line of logLines) {
-                        if (line.trim() === '') {
-                            console.log('');
-                            continue;
+                            console.log(line);
                         }
-
-                        console.log(line);
                     }
                 }
-
             } catch (dockerError: any) {
                 if (dockerError.message.includes('No such container')) {
-                    console.log(colors.yellow('⚠ Container no longer exists'));
-                    console.log(colors.gray('Docker containers are removed after completion'));
-                    console.log(colors.gray('Logs are only available while the container is running or recently stopped'));
+                    exitWithWarn(
+                        'No logs available for this container. Logs are only available for recent tasks',
+                        jsonOutput,
+                        json
+                    );
+                    return;
                 } else {
-                    console.log(colors.red('Error retrieving Docker logs:'));
-                    console.log(colors.red(dockerError.message));
+                    jsonOutput.error = `Error retrieving container logs: ${dockerError.message}`;
+                    exitWithError(jsonOutput, json);
+                    return;
                 }
             }
         }
 
-        // Only show tips if not in follow mode (since follow mode blocks)
-        if (!options.follow) {
+        // Only show tips if not in follow mode nor json (since follow mode blocks)
+        if (!options.follow && !json) {
             const tips = [];
 
             // Show tips
@@ -227,9 +237,11 @@ export const logsCommand = async (taskId: string, iterationNumber?: string, opti
 
     } catch (error) {
         if (error instanceof TaskNotFoundError) {
-            console.log(colors.red(`✗ ${error.message}`));
+            jsonOutput.error = `The task with ID ${numericTaskId} was not found`;
+            exitWithError(jsonOutput, json);
         } else {
-            console.error(colors.red('Error reading task logs:'), error);
+            jsonOutput.error = `There was an error reading task logs: ${error}`;
+            exitWithError(jsonOutput, json);
         }
     } finally {
         await telemetry?.shutdown();

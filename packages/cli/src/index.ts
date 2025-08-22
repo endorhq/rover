@@ -124,6 +124,7 @@ program
 	.argument('<taskId>', 'Task ID to show logs for')
 	.argument('[iterationNumber]', 'Specific iteration number (defaults to latest)')
 	.option('-f, --follow', 'Follow log output in real-time')
+	.option('--json', 'Output the result in JSON format')
 	.action(logsCommand);
 
 // TODO: Improve the reset process by adding a way to start / stop tasks
