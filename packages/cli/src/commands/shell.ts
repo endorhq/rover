@@ -3,19 +3,30 @@ import { existsSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { spawnSync } from '../lib/os.js';
 import yoctoSpinner from 'yocto-spinner';
-import { formatTaskStatus } from '../utils/task-status.js';
+import { formatTaskStatus, statusColor } from '../utils/task-status.js';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
 import { getTelemetry } from '../lib/telemetry.js';
+import { CLIJsonOutput } from '../types.js';
+import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
+import { generateRandomId } from '../utils/branch-name.js';
 
 /**
  * Start an interactive shell for testing task changes
  */
 export const shellCommand = async (taskId: string, options: { container?: boolean }) => {
     const telemetry = getTelemetry();
+
+    // Add the JSON flag to use some utilities. However, this command is interactive
+    // so it always be false.
+    const json = false;
+    // Fake JSON output
+    const jsonOutput: CLIJsonOutput = { success: false };
+
     // Convert string taskId to number
     const numericTaskId = parseInt(taskId, 10);
     if (isNaN(numericTaskId)) {
-        console.log(colors.red(`✗ Invalid task ID '${taskId}' - must be a number`));
+        jsonOutput.error = `Invalid task ID '${taskId}' - must be a number`;
+        exitWithError(jsonOutput, json);
         return;
     }
 
@@ -23,27 +34,20 @@ export const shellCommand = async (taskId: string, options: { container?: boolea
         // Load task using TaskDescription
         const task = TaskDescription.load(numericTaskId);
 
-        console.log(colors.bold('\n🐚 Task Shell\n'));
-        console.log(colors.gray('ID: ') + colors.cyan(task.id.toString()));
-        console.log(colors.gray('Title: ') + colors.white(task.title));
-        console.log(colors.gray('Status: ') + colors.yellow(formatTaskStatus(task.status)));
+        const colorFunc = statusColor(task.status);
 
-        // Check if task is already merged/completed
-        if (task.status === 'COMPLETED') {
-            console.log('');
-            console.log(colors.yellow(`⚠ This task is already ${formatTaskStatus('COMPLETED').toLowerCase()}`));
-            console.log(colors.gray('  The shell will show the final state of the task'));
-        }
+        console.log(colors.white.bold('Task details'));;
+        console.log(colors.gray('├── ID: ') + colors.cyan(task.id.toString()));
+        console.log(colors.gray('├── Title: ') + colors.white(task.title));
+        console.log(colors.gray('└── Status: ') + colorFunc(task.status) + '\n');
 
         // Check if worktree exists
         if (!task.worktreePath || !existsSync(task.worktreePath)) {
-            console.log(colors.red('\n✗ No worktree found for this task'));
+            jsonOutput.error = `No worktree found for this task`;
+            exitWithError(jsonOutput, json);
             return;
         }
 
-        console.log(colors.gray('Worktree: ') + colors.cyan(task.worktreePath));
-        console.log(colors.gray('Branch: ') + colors.cyan(task.branchName));
-        
         telemetry?.eventShell();
 
         if (options.container) {
@@ -51,35 +55,14 @@ export const shellCommand = async (taskId: string, options: { container?: boolea
             try {
                 spawnSync('docker', ['--version'], { stdio: 'pipe' });
             } catch (error) {
-                console.log('');
-                console.log(colors.red('✗ Docker is not available'));
-                console.log(colors.gray('  Please install Docker to use the interactive shell'));
+                jsonOutput.error = `Docker is not available. Please install it.`;
+                exitWithError(jsonOutput, json);
                 return;
             }
         }
 
-        // Check if we're in a git repository
-        try {
-            spawnSync('git', ['rev-parse', '--is-inside-work-tree'], { stdio: 'pipe' });
-        } catch (error) {
-            console.log('');
-            console.log(colors.red('✗ Not in a git repository'));
-            return;
-        }
-
-        console.log('');
-        console.log(colors.green('✓ Starting interactive shell for task testing'));
-        console.log('');
-        console.log(colors.cyan('📋 In the shell you can:'));
-        console.log(colors.gray('  • Test your changes by running the application'));
-        console.log(colors.gray('  • Run tests and verify functionality'));
-        console.log(colors.gray('  • Install additional packages if needed'));
-        console.log(colors.gray('  • Make temporary modifications for testing'));
-        console.log('');
-        console.log(colors.yellow('⚠ Note: Changes made in the shell are temporary'));
-        console.log(colors.gray('  To persist changes, exit the shell and commit them in the worktree'));
-        console.log('');
-        console.log(colors.magenta('💡 Type "exit" to leave the shell'));
+        console.log(colors.green('✓ Starting interactive shell in the task workspace'));
+        console.log(colors.gray('Type') + colors.cyan(' "exit" ') + colors.gray('to leave the shell'));
         console.log('');
 
         const spinner = yoctoSpinner({ text: 'Starting shell...' }).start();
@@ -87,14 +70,7 @@ export const shellCommand = async (taskId: string, options: { container?: boolea
         let shellProcess = undefined;
         if (options.container) {
             try {
-                const containerName = `rover-shell-${numericTaskId}`;
-
-                // Clean up any existing container with same name
-                try {
-                    spawnSync('docker', ['rm', '-f', containerName], { stdio: 'pipe' });
-                } catch (error) {
-                    // Container doesn't exist, which is fine
-                }
+                const containerName = `rover-shell-${numericTaskId}-${generateRandomId()}`;
 
                 // Build Docker run command for interactive shell
                 const dockerArgs = [
@@ -108,16 +84,12 @@ export const shellCommand = async (taskId: string, options: { container?: boolea
                     '/bin/sh'
                 ];
 
-                spinner.success('Shell started');
-                console.log(colors.cyan('🚀 Starting interactive shell in Docker container...'));
-                console.log(colors.gray(`   Working directory: /workspace`));
-                console.log(colors.gray(`   Container: ${containerName}`));
-                console.log('');
-
                 // Start Docker container with direct stdio inheritance for true interactivity
                 shellProcess = spawn('docker', dockerArgs, {
                     stdio: 'inherit' // This gives full control to the user
                 });
+
+                spinner.success(`Shell started. Container name: ${containerName}`);
 
                 // Handle process interruption (Ctrl+C)
                 process.on('SIGINT', () => {
@@ -126,52 +98,54 @@ export const shellCommand = async (taskId: string, options: { container?: boolea
                         spawnSync('docker', ['stop', containerName], { stdio: 'pipe' });
                         console.log(colors.green('✓ Container stopped'));
                     } catch (error) {
-                        console.log(colors.red('✗ Failed to stop container'));
+                        jsonOutput.error = 'Failed to stop container';
+                        exitWithError(jsonOutput, json);
+                        return;
                     }
                     process.exit(0);
                 });
             } catch (error) {
-                spinner.error('Failed to start shell');
-                console.error(colors.red('Error starting Docker shell:'), error);
+                jsonOutput.error = 'Failed to start container: ' + error;
+                exitWithError(jsonOutput, json);
+                return;
             }
         } else {
-            try {
-                shellProcess = spawn(process.env.SHELL || '/bin/sh', [], { cwd: task.worktreePath, stdio: 'inherit' });
+            const shell = process.env.SHELL || '/bin/sh';
 
-                spinner.success('Shell started');
-                console.log(colors.cyan('🚀 Starting interactive shell in workspace...'));
-                console.log(colors.gray(`   Working directory: ${task.worktreePath}`));
+            try {
+                shellProcess = spawn(shell, [], { cwd: task.worktreePath, stdio: 'inherit' });
+
+                spinner.success(`Shell started using ${shell}`);
             } catch (error) {
-                spinner.error('Failed to start shell');
-                console.error(colors.red('Error starting shell:'), error);
+                spinner.error(`Failed to start shell ${shell}`);
+                jsonOutput.error = 'Failed to start shell: ' + error;
+                exitWithError(jsonOutput, json);
+                return;
             }
         }
 
         if (shellProcess) {
             // Handle process completion
             shellProcess.on('close', (code) => {
-                console.log('');
                 if (code === 0) {
-                    console.log(colors.green('✓ Shell session ended'));
+                    exitWithSuccess('Shell session ended', jsonOutput, json);
                 } else {
-                    console.log(colors.yellow(`⚠ Shell session ended with code ${code}`));
+                    exitWithWarn(`Shell session ended with code ${code}`, jsonOutput, json);
                 }
-                console.log('');
-                console.log(colors.cyan('💡 Your worktree is preserved at: ') + colors.white(task.worktreePath));
-                console.log(colors.gray('   Use ') + colors.cyan(`rover diff ${numericTaskId}`) + colors.gray(' to see any changes you made'));
-                console.log(colors.gray('   Use ') + colors.cyan(`rover merge ${numericTaskId}`) + colors.gray(' to merge when ready'));
             });
 
             shellProcess.on('error', (error) => {
-                console.log('');
-                console.error(colors.red('Error running shell:'), error);
+                jsonOutput.error = 'Error running shell: ' + error;
+                exitWithError(jsonOutput, json);
             });
         }
     } catch (error) {
         if (error instanceof TaskNotFoundError) {
-            console.log(colors.red(`✗ ${error.message}`));
+            jsonOutput.error = `The task with ID ${numericTaskId} was not found`;
+            exitWithError(jsonOutput, json);
         } else {
-            console.error(colors.red('Error opening task shell:'), error);
+            jsonOutput.error = `There was an error starting the shell: ${error}`;
+            exitWithError(jsonOutput, json);
         }
     } finally {
         await telemetry?.shutdown();

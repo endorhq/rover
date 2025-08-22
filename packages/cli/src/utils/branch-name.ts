@@ -3,7 +3,7 @@ import { customAlphabet } from 'nanoid';
 const CUSTOM_ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-';
 const NANOID_SIZE = 12;
 
-const generateRandomId = customAlphabet(CUSTOM_ALPHABET, NANOID_SIZE);
+export const generateRandomId = customAlphabet(CUSTOM_ALPHABET, NANOID_SIZE);
 
 /**
  * Generate a unique branch name for a task
