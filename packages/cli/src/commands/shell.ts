@@ -17,7 +17,7 @@ export const shellCommand = async (taskId: string, options: { container?: boolea
     const telemetry = getTelemetry();
 
     // Add the JSON flag to use some utilities. However, this command is interactive
-    // so it always be false.
+    // so it is always false.
     const json = false;
     // Fake JSON output
     const jsonOutput: CLIJsonOutput = { success: false };
