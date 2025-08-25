@@ -50,11 +50,11 @@ Create a GitHub Pull Request based on the changes between the current branch and
 
     ## Notes
 
-    Temporarlily removed the _Pull Request_ push feature to improve the overall process.
+    Temporarily removed the _Pull Request_ push feature to improve the overall process.
     </good-example>
 
     <good-example>
-    Simplify the merge command by remove unused console messages that might confuse the user. Centralize all git operations in a git class for better maintanibility.
+    Simplify the merge command by removing unused console messages that might confuse the user. Centralize all git operations in a git class for better maintainability.
 
     ## Changes
     - Removed interactive conflict resolution prompts and manual resolution flow
