@@ -443,9 +443,9 @@ check_command() {
 ensure_jq() {
     if ! check_command jq; then
         echo "📦 Installing jq for JSON parsing..."
-        write_status "initializing" "Installing jq for JSON parsing" 5
-        apk add --no-cache jq
-        if [ $? -ne 0 ]; then
+        if apk add --no-cache jq; then
+            write_status "initializing" "Installed jq for JSON parsing" 5
+        else
             echo "❌ Failed to install jq"
             safe_exit 1 "apk add jq failed"
         fi
