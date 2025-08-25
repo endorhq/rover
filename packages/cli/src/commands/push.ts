@@ -6,6 +6,11 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
 import { getTelemetry } from '../lib/telemetry.js';
+import { CLIJsonOutput } from '../types.js';
+import { exitWithError, exitWithWarn } from '../utils/exit.js';
+import { showRoverChat } from '../utils/display.js';
+import { statusColor } from '../utils/task-status.js';
+import Git from '../lib/git.js';
 
 const { prompt } = enquirer;
 
@@ -51,8 +56,7 @@ const getGitHubRepoInfo = (remoteUrl: string): { owner: string; repo: string } |
     return null;
 };
 
-interface PushResult {
-    success: boolean;
+interface PushResult extends CLIJsonOutput {
     taskId: number;
     taskTitle: string;
     branchName: string;
@@ -65,7 +69,6 @@ interface PushResult {
         url?: string;
         exists?: boolean;
     };
-    error?: string;
 }
 
 /**
@@ -73,6 +76,8 @@ interface PushResult {
  */
 export const pushCommand = async (taskId: string, options: PushOptions) => {
     const telemetry = getTelemetry();
+    const json = options.json === true;
+    const git = new Git();
     const result: PushResult = {
         success: false,
         taskId: 0,
@@ -87,74 +92,58 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
     const numericTaskId = parseInt(taskId, 10);
     if (isNaN(numericTaskId)) {
         result.error = `Invalid task ID '${taskId}' - must be a number`;
-        if (options.json) {
-            console.log(JSON.stringify(result, null, 2));
-        } else {
-            console.log(colors.red(`✗ ${result.error}`));
-        }
-        process.exit(1);
+        exitWithError(result, json);
+        return;
     }
 
+    // Store the task ID!
     result.taskId = numericTaskId;
-
-    // Check if rover is initialized
-    const roverPath = join(process.cwd(), '.rover');
-    if (!existsSync(roverPath)) {
-        result.error = 'Rover is not initialized in this directory';
-        if (options.json) {
-            console.log(JSON.stringify(result, null, 2));
-        } else {
-            console.log(colors.red('✗ Rover is not initialized in this directory'));
-            console.log(colors.gray('  Run ') + colors.cyan('rover init') + colors.gray(' first'));
-        }
-        process.exit(1);
-    }
 
     try {
         // Load task using TaskDescription
         const task = TaskDescription.load(numericTaskId);
+
         result.taskTitle = task.title;
         result.branchName = task.branchName;
 
         if (!task.worktreePath || !existsSync(task.worktreePath)) {
             result.error = 'Task workspace not found';
-            if (options.json) {
-                console.log(JSON.stringify(result, null, 2));
-            } else {
-                console.log(colors.red(`✗ Task workspace not found`));
-                console.log(colors.gray('  The task may need to be reinitialized'));
-            }
-            process.exit(1);
+            exitWithError(result, json);
+            return;
         }
 
-        if (!options.json) {
-            console.log(colors.bold(`\n📤 Pushing changes for task ${numericTaskId}\n`));
-        }
+        if (!json) {
+            showRoverChat([
+                "We are good to go. Let's push the changes."
+            ]);
 
-        // Change to worktree directory
-        process.chdir(task.worktreePath);
+            const colorFunc = statusColor(task.status);
+
+            console.log(colors.white.bold('Push task changes'));
+            console.log(colors.gray('├── ID: ') + colors.cyan(task.id.toString()));
+            console.log(colors.gray('├── Title: ') + colors.white(task.title));
+            console.log(colors.gray('├── Branch: ') + colors.white(task.branchName));
+            console.log(colors.gray('└── Status: ') + colorFunc(task.status) + '\n');
+        }
 
         // Check for changes
-        const statusOutput = spawnSync('git', ['status', '--porcelain'], { encoding: 'utf8' });
-        const hasChanges = statusOutput.stdout.toString().trim().length > 0;
+        const fileChanges = git.uncommitedChanges({
+            worktreePath: task.worktreePath
+        });
+        const hasChanges = fileChanges.length > 0;
         result.hasChanges = hasChanges;
 
         if (!hasChanges) {
             // Check if there are unpushed commits
             try {
-                const unpushedCommits = spawnSync('git', ['rev-list', '--count', `origin/${task.branchName}..${task.branchName}`], {
-                    encoding: 'utf8',
-                    stdio: ['inherit', 'inherit', 'ignore']
-                }).stdout.toString().trim();
+                const unpushedCommits = git.hasUnmergedCommits(task.branchName, {
+                    targetBranch: `origin/${task.branchName}`,
+                    worktreePath: task.worktreePath
+                });
 
-                if (unpushedCommits === '0') {
+                if (!unpushedCommits) {
                     result.success = true;
-                    if (options.json) {
-                        console.log(JSON.stringify(result, null, 2));
-                    } else {
-                        console.log(colors.yellow('⚠ No changes to push'));
-                        console.log(colors.gray('  Working directory is clean and up to date with remote'));
-                    }
+                    exitWithWarn('No changes to push', result, json);
                     return;
                 }
             } catch {
@@ -164,19 +153,6 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
 
         // If there are changes, commit them
         if (hasChanges) {
-            if (!options.json) {
-                console.log(colors.cyan('Found uncommitted changes:'));
-
-                // Show brief status
-                const files = statusOutput.stdout.toString().trim().split('\n');
-                files.forEach(file => {
-                    const [status, ...pathParts] = file.trim().split(/\s+/);
-                    const path = pathParts.join(' ');
-                    const statusSymbol = status.includes('M') ? '±' : status.includes('A') ? '+' : status.includes('D') ? '-' : '?';
-                    console.log(colors.gray(`  ${statusSymbol} ${path}`));
-                });
-            }
-
             // Get commit message
             let commitMessage = options.message;
             if (!commitMessage) {
@@ -204,21 +180,16 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
             // Stage and commit changes
             const commitSpinner = !options.json ? yoctoSpinner({ text: 'Committing changes...' }).start() : null;
             try {
-                spawnSync('git', ['add', '-A'], { stdio: 'pipe' });
-                spawnSync('git', ['commit', '-m', commitMessage], { stdio: 'pipe' });
+                git.addAndCommit(commitMessage, {
+                    worktreePath: task.worktreePath
+                })
                 result.committed = true;
-                if (commitSpinner) {
-                    commitSpinner.success('Changes committed');
-                }
+                commitSpinner?.success('Changes committed');
             } catch (error: any) {
                 result.error = `Failed to commit changes: ${error.message}`;
-                if (options.json) {
-                    console.log(JSON.stringify(result, null, 2));
-                } else {
-                    if (commitSpinner) commitSpinner.error('Failed to commit changes');
-                    console.error(colors.red('Error:'), error.message);
-                }
-                process.exit(1);
+                commitSpinner?.error('Failed to commit changes');
+                exitWithError(result, json);
+                return;
             }
         }
 

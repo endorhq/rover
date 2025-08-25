@@ -40,12 +40,12 @@ export const deleteCommand = async (taskId: string, options: { json?: boolean, y
         const task = TaskDescription.load(numericTaskId);
         const taskPath = join(process.cwd(), '.rover', 'tasks', numericTaskId.toString());
 
-        const colorFunc = statusColor(task.status);
-
         if (!json) {
             showRoverChat([
                 "It's time to cleanup some tasks!"
-            ])
+            ]);
+
+            const colorFunc = statusColor(task.status);
 
             console.log(colors.white.bold('Task to delete'));
             console.log(colors.gray('├── ID: ') + colors.cyan(task.id.toString()));

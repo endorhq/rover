@@ -34,6 +34,11 @@ export type GitUnmergedCommits = {
     worktreePath?: string
 }
 
+export type GitPushOptions = {
+    setUpstream?: boolean;
+    worktreePath?: string;
+}
+
 /**
  * A class to manage and run docker commands
  */
@@ -208,7 +213,7 @@ export class Git {
     /**
      * Check if the given worktree path has uncommited changes
      */
-    hasUncommitedChanges(options: GitUncommitedChangesOptions = {}): boolean {
+    uncommitedChanges(options: GitUncommitedChangesOptions = {}): string[] {
         try {
             const args = ['status', '--porcelain'];
 
@@ -222,7 +227,20 @@ export class Git {
                 cwd: options.worktreePath
             }).stdout.toString().trim();
 
-            return status.length > 0;
+            return status.split('\n');
+        } catch {
+            // For now, no changes. We will add debug logs
+            return [];
+        }
+    }
+
+    /**
+     * Check if the given worktree path has uncommited changes
+     */
+    hasUncommitedChanges(options: GitUncommitedChangesOptions = {}): boolean {
+        try {
+            const uncommitedFiles = this.uncommitedChanges(options);
+            return uncommitedFiles.length > 0;
         } catch {
             return false;
         }
