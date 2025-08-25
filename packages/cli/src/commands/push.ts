@@ -182,7 +182,7 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
             try {
                 git.addAndCommit(commitMessage, {
                     worktreePath: task.worktreePath
-                })
+                });
                 result.committed = true;
                 commitSpinner?.success('Changes committed');
             } catch (error: any) {
@@ -198,47 +198,38 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
 
         const pushSpinner = !options.json ? yoctoSpinner({ text: `Pushing branch ${task.branchName} to remote...` }).start() : null;
         try {
-            spawnSync('git', ['push', 'origin', task.branchName], { stdio: 'pipe' });
+            git.push(task.branchName, {
+                worktreePath: task.worktreePath
+            });
             result.pushed = true;
             if (pushSpinner) {
                 pushSpinner.success(`Branch pushed successfully`);
             }
-            if (!options.json) {
-                console.log(colors.green(`\n✓ Pushed branch: `) + colors.cyan(task.branchName));
-            }
         } catch (error: any) {
-            if (pushSpinner) {
-                pushSpinner.error('Failed to push branch');
-            }
-
             // Check if it's because the remote branch doesn't exist
             if (error.message.includes('has no upstream branch')) {
-                if (!options.json) {
-                    console.log(colors.yellow('\n⚠ Setting upstream branch and retrying...'));
+                if (pushSpinner) {
+                    pushSpinner.text = 'Branch does not exist in remote. Setting upstream branch';
                 }
+
                 try {
-                    spawnSync('git', ['push', '--set-upstream', 'origin', task.branchName], { stdio: 'pipe' });
+                    git.push(task.branchName, {
+                        setUpstream: true,
+                        worktreePath: task.worktreePath
+                    });
                     result.pushed = true;
-                    if (!options.json) {
-                        console.log(colors.green(`✓ Branch pushed successfully`));
-                    }
+                    pushSpinner?.success('Branch pushed successfully')
                 } catch (retryError: any) {
+                    pushSpinner?.error('Failed to push branch');
                     result.error = `Failed to push branch: ${retryError.message}`;
-                    if (options.json) {
-                        console.log(JSON.stringify(result, null, 2));
-                    } else {
-                        console.error(colors.red('Error:'), retryError.message);
-                    }
-                    process.exit(1);
+                    exitWithError(result, json);
+                    return;
                 }
             } else {
+                pushSpinner?.error('Failed to push branch');
                 result.error = `Failed to push branch: ${error.message}`;
-                if (options.json) {
-                    console.log(JSON.stringify(result, null, 2));
-                } else {
-                    console.error(colors.red('Error:'), error.message);
-                }
-                process.exit(1);
+                exitWithError(result, json);
+                return;
             }
         }
 

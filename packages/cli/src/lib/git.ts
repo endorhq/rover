@@ -329,6 +329,38 @@ export class Git {
 
         return commits.split('\n').filter(line => line.trim() !== '');
     }
+
+    /**
+     * Push branch to remote
+     */
+    push(branch: string, options: GitPushOptions = {}): void {
+        const args = ['push'];
+        
+        if (options.setUpstream) {
+            args.push('--set-upstream');
+        }
+        
+        args.push('origin', branch);
+        
+        const result = spawnSync('git', args, {
+            stdio: 'pipe',
+            encoding: 'utf8',
+            cwd: options.worktreePath
+        });
+        
+        if (result.status !== 0) {
+            const stderr = result.stderr?.toString() || '';
+            const stdout = result.stdout?.toString() || '';
+            const errorMessage = stderr || stdout || 'Unknown error';
+            
+            // Check if it's because the remote branch doesn't exist
+            if (errorMessage.includes('has no upstream branch')) {
+                throw new GitError(`Branch '${branch}' has no upstream branch`);
+            }
+            
+            throw new GitError(errorMessage);
+        }
+    }
 }
 
 export default Git;
