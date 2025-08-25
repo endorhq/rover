@@ -1,14 +1,12 @@
 import colors from 'ansi-colors';
 import enquirer from 'enquirer';
 import yoctoSpinner from 'yocto-spinner';
-import { spawnSync } from '../lib/os.js';
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { CLIJsonOutput } from '../types.js';
-import { exitWithError, exitWithWarn } from '../utils/exit.js';
-import { showRoverChat } from '../utils/display.js';
+import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
+import { showRoverChat, TIP_TITLES } from '../utils/display.js';
 import { statusColor } from '../utils/task-status.js';
 import Git from '../lib/git.js';
 
@@ -17,23 +15,8 @@ const { prompt } = enquirer;
 interface PushOptions {
     message?: string;
     pr?: boolean;
-    force?: boolean;
     json?: boolean;
 }
-
-// Removed TaskData interface - using TaskDescription class instead
-
-/**
- * Check if a command exists
- */
-const commandExists = (cmd: string): boolean => {
-    try {
-        spawnSync('which', [cmd], { stdio: 'pipe' });
-        return true;
-    } catch {
-        return false;
-    }
-};
 
 /**
  * Get GitHub repo info from remote URL
@@ -64,11 +47,6 @@ interface PushResult extends CLIJsonOutput {
     committed: boolean;
     commitMessage?: string;
     pushed: boolean;
-    pullRequest?: {
-        created: boolean;
-        url?: string;
-        exists?: boolean;
-    };
 }
 
 /**
@@ -233,141 +211,116 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
             }
         }
 
+        // TODO: Skip PR feature for now until we improve the process
         // Check if this is a GitHub repo
-        if (options.pr === true) {
-            try {
-                const remoteUrl = spawnSync('git', ['remote', 'get-url', 'origin'], { encoding: 'utf8' }).stdout.toString().trim();
-                const repoInfo = getGitHubRepoInfo(remoteUrl);
+        // if (options.pr === true) {
+        //     try {
+        //         const remoteUrl = git.remoteUrl();
+        //         const repoInfo = getGitHubRepoInfo(remoteUrl);
 
-                if (repoInfo) {
-                    if (!options.json) {
-                        console.log(colors.gray(`\n📍 GitHub repository detected: ${repoInfo.owner}/${repoInfo.repo}`));
-                    }
+        //         if (repoInfo) {
+        //             const ghCli = await checkGitHubCLI();
+        //             // Check if gh CLI is available
+        //             if (!ghCli) {
+        //                 result.pullRequest = {
+        //                     created: false
+        //                 };
+        //                 if (!options.json) {
+        //                     console.log(colors.yellow('\n⚠ GitHub CLI (gh) not found'));
+        //                     console.log(colors.gray('  Install it from: https://cli.github.com'));
+        //                     console.log(colors.gray('  Then you can create a PR with: ') +
+        //                         colors.cyan(`gh pr create --title "${task.title}" --body "..."`));
+        //                 }
+        //             } else {
+        //                 const prSpinner = !options.json ? yoctoSpinner({ text: 'Creating pull request...' }).start() : null;
+        //                 try {
+        //                     // Create PR with task details
+        //                     // TODO: Improve it by creating a custom body based on the task changes.
+        //                     const prBody = `## Task ${numericTaskId}\n\n${task.description}\n\n---\n*Created by Rover CLI*`;
+        //                     const { stdout } = spawnSync(
+        //                         'gh', ['pr', 'create', '--title', task.title, '--body', prBody, '--head', task.branchName]);
 
-                    // Check if gh CLI is available
-                    if (!commandExists('gh')) {
-                        result.pullRequest = {
-                            created: false
-                        };
-                        if (!options.json) {
-                            console.log(colors.yellow('\n⚠ GitHub CLI (gh) not found'));
-                            console.log(colors.gray('  Install it from: https://cli.github.com'));
-                            console.log(colors.gray('  Then you can create a PR with: ') +
-                                colors.cyan(`gh pr create --title "${task.title}" --body "${task.description}"`));
-                        }
-                    } else {
-                        // Prompt to create PR (skip in JSON mode and auto-create)
-                        let createPR = true;
-                        if (!options.json) {
-                            try {
-                                const response = await prompt<{ createPR: boolean }>({
-                                    type: 'confirm',
-                                    name: 'createPR',
-                                    message: 'Would you like to create a GitHub Pull Request?',
-                                    initial: true
-                                });
-                                createPR = response.createPR;
-                            } catch (_err) {
-                                // Just cancel it
-                                createPR = false;
-                            }
-                        }
+        //                     result.pullRequest = {
+        //                         created: true,
+        //                         url: stdout.toString().trim().split('\n').pop()
+        //                     };
 
-                        if (createPR) {
-                            const prSpinner = !options.json ? yoctoSpinner({ text: 'Creating pull request...' }).start() : null;
-                            try {
-                                // Create PR with task details
-                                const prBody = `## Task ${numericTaskId}\n\n${task.description}\n\n---\n*Created by Rover CLI*`;
-                                const { stdout } = spawnSync(
-                                    'gh', ['pr', 'create', '--title', task.title, '--body', prBody, '--head', task.branchName]);
+        //                     prSpinner?.success('Pull request created');
 
-                                result.pullRequest = {
-                                    created: true,
-                                    url: stdout.toString().trim().split('\n').pop()
-                                };
+        //                     if (!options.json) {
+        //                         console.log(colors.green('\n✓ Pull Request created: ') + colors.cyan(result.pullRequest.url || 'Not available'));
+        //                     }
+        //                 } catch (error: any) {
+        //                     prSpinner?.error('Failed to create pull request');
 
-                                if (prSpinner) {
-                                    prSpinner.success('Pull request created');
-                                }
+        //                     // Check if PR already exists
+        //                     if (error.message.includes('already exists')) {
+        //                         result.pullRequest = {
+        //                             created: false,
+        //                             exists: true
+        //                         };
 
-                                if (!options.json) {
-                                    console.log(colors.green('\n✓ Pull Request created: ') + colors.cyan(result.pullRequest.url || 'Not available'));
-                                }
-                            } catch (error: any) {
-                                if (prSpinner) {
-                                    prSpinner.error('Failed to create pull request');
-                                }
+        //                         // Try to get existing PR URL
+        //                         try {
+        //                             const { stdout } = spawnSync('gh', ['pr', 'view', task.branchName, '--json', 'url', '-q', '.url']);
+        //                             result.pullRequest.url = stdout.toString().trim();
+        //                         } catch {
+        //                             // Couldn't get PR URL
+        //                         }
 
-                                // Check if PR already exists
-                                if (error.message.includes('already exists')) {
-                                    result.pullRequest = {
-                                        created: false,
-                                        exists: true
-                                    };
+        //                         if (!options.json) {
+        //                             console.log(colors.yellow('⚠ A pull request already exists for this branch'));
+        //                             if (result.pullRequest.url) {
+        //                                 console.log(colors.gray('  Existing PR: ') + colors.cyan(result.pullRequest.url));
+        //                             }
+        //                         }
+        //                     } else {
+        //                         result.pullRequest = {
+        //                             created: false
+        //                         };
+        //                         if (!options.json) {
+        //                             console.error(colors.red('Error:'), error.message);
+        //                             console.log(colors.gray('\n  You can manually create a PR at:'));
+        //                             console.log(colors.cyan(`  https://github.com/${repoInfo.owner}/${repoInfo.repo}/pull/new/${task.branchName}`));
+        //                         }
+        //                     }
+        //                 }
+        //             }
+        //         }
+        //     } catch (error) {
+        //         // Not a GitHub repo or couldn't determine, skip PR creation
+        //     }
+        // }
 
-                                    // Try to get existing PR URL
-                                    try {
-                                        const { stdout } = spawnSync('gh', ['pr', 'view', task.branchName, '--json', 'url', '-q', '.url']);
-                                        result.pullRequest.url = stdout.toString().trim();
-                                    } catch {
-                                        // Couldn't get PR URL
-                                    }
+        let repoInfo;
 
-                                    if (!options.json) {
-                                        console.log(colors.yellow('⚠ A pull request already exists for this branch'));
-                                        if (result.pullRequest.url) {
-                                            console.log(colors.gray('  Existing PR: ') + colors.cyan(result.pullRequest.url));
-                                        }
-                                    }
-                                } else {
-                                    result.pullRequest = {
-                                        created: false
-                                    };
-                                    if (!options.json) {
-                                        console.error(colors.red('Error:'), error.message);
-                                        console.log(colors.gray('\n  You can manually create a PR at:'));
-                                        console.log(colors.cyan(`  https://github.com/${repoInfo.owner}/${repoInfo.repo}/pull/new/${task.branchName}`));
-                                    }
-                                }
-                            }
-                        } else {
-                            result.pullRequest = {
-                                created: false
-                            };
-                        }
-                    }
-                }
-            } catch (error) {
-                // Not a GitHub repo or couldn't determine, skip PR creation
-            }
+        try {
+            const remoteUrl = git.remoteUrl();
+            repoInfo = getGitHubRepoInfo(remoteUrl);
+        } catch (_err) {
+            // Ignore the error
         }
 
         result.success = true;
 
-        if (options.json) {
-            console.log(JSON.stringify(result, null, 2));
-        } else {
-            console.log(colors.green('\n✨ Push completed successfully!'));
+        const tips = [];
+        if (repoInfo != null) {
+            tips.push('You can open a new PR on ' + colors.cyan(`https://github.com/${repoInfo.owner}/${repoInfo.repo}/pull/new/${task.branchName}`));
         }
 
+        exitWithSuccess('Push completed successfully!', result, json, {
+            tips,
+            tipsConfig: {
+                title: TIP_TITLES.NEXT_STEPS
+            }
+        });
     } catch (error: any) {
         if (error instanceof TaskNotFoundError) {
-            result.error = error.message;
-            if (options.json) {
-                console.log(JSON.stringify(result, null, 2));
-            } else {
-                console.log(colors.red(`✗ ${error.message}`));
-                console.log(colors.gray('  Use ') + colors.cyan('rover list') + colors.gray(' to see available tasks'));
-            }
-            process.exit(1);
+            result.error = `The task with ID ${numericTaskId} was not found`;
+            exitWithError(result, json);
         } else {
-            result.error = `Unexpected error: ${error.message}`;
-            if (options.json) {
-                console.log(JSON.stringify(result, null, 2));
-            } else {
-                console.error(colors.red('\n✗ Unexpected error:'), error.message);
-            }
-            process.exit(1);
+            result.error = `There was an error deleting the task: ${error}`;
+            exitWithError(result, json);
         }
     } finally {
         await telemetry?.shutdown();
