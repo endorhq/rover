@@ -21,8 +21,8 @@ vi.mock('../../utils/display.js', () => ({
 
 // Spy on console methods to verify output
 const consoleSpy = {
-  log: vi.spyOn(console, 'log').mockImplementation(() => {}),
-  error: vi.spyOn(console, 'error').mockImplementation(() => {})
+  log: vi.spyOn(console, 'log').mockImplementation(() => { }),
+  error: vi.spyOn(console, 'error').mockImplementation(() => { })
 };
 
 describe('diff command', () => {
@@ -43,7 +43,7 @@ describe('diff command', () => {
 
     // Create initial commit
     writeFileSync('README.md', '# Test Project\n');
-    writeFileSync('.gitignore', 'node_modules/\n*.log\n');
+    writeFileSync('.gitignore', 'node_modules/\n*.log\n.rover\n');
     execSync('git add .', { stdio: 'pipe' });
     execSync('git commit -m "Initial commit"', { stdio: 'pipe' });
 
@@ -135,7 +135,7 @@ describe('diff command', () => {
       // Verify output includes the changes
       const logCalls = consoleSpy.log.mock.calls.map(call => call.join(' '));
       const output = logCalls.join('\n');
-      
+
       expect(output).toContain('Task 2 Changes');
       expect(output).toContain('+## New Section');
       expect(output).toContain('+This is new content.');
@@ -153,7 +153,7 @@ describe('diff command', () => {
 
       const logCalls = consoleSpy.log.mock.calls.map(call => call.join(' '));
       const output = logCalls.join('\n');
-      
+
       // Staged files show up in HEAD diff comparison
       expect(output).toContain('Task 3 Changes');
       // Git diff won't show staged changes without HEAD comparison
@@ -177,7 +177,7 @@ describe('diff command', () => {
 
       const logCalls = consoleSpy.log.mock.calls.map(call => call.join(' '));
       const output = logCalls.join('\n');
-      
+
       // Unstaged changes should be visible
       expect(output).toContain('README.md');
       expect(output).toContain('+Unstaged modification');
@@ -199,7 +199,7 @@ describe('diff command', () => {
 
       const logCalls = consoleSpy.log.mock.calls.map(call => call.join(' '));
       const output = logCalls.join('\n');
-      
+
       // Check that untracked files are shown
       expect(output).toContain('untracked1.txt');
       expect(output).toContain('+First untracked file');
@@ -221,11 +221,11 @@ describe('diff command', () => {
 
       const logCalls = consoleSpy.log.mock.calls.map(call => call.join(' '));
       const output = logCalls.join('\n');
-      
+
       // Should show non-ignored file
       expect(output).toContain('important.txt');
       expect(output).toContain('+This should show');
-      
+
       // Should NOT show ignored files
       expect(output).not.toContain('debug.log');
       expect(output).not.toContain('node_modules');
@@ -250,7 +250,7 @@ describe('diff command', () => {
 
       const logCalls = consoleSpy.log.mock.calls.map(call => call.join(' '));
       const output = logCalls.join('\n');
-      
+
       // Check for modified tracked files
       expect(output).toContain('README.md');
       expect(output).toContain('+Modified content');
@@ -276,11 +276,11 @@ describe('diff command', () => {
 
       const logCalls = consoleSpy.log.mock.calls.map(call => call.join(' '));
       const output = logCalls.join('\n');
-      
+
       // Should only show README.md changes
       expect(output).toContain('README.md');
       expect(output).toContain('+README change');
-      
+
       // Should not show other files
       expect(output).not.toContain('file1.txt');
       expect(output).not.toContain('file2.txt');
@@ -306,7 +306,7 @@ describe('diff command', () => {
 
       const logCalls = consoleSpy.log.mock.calls.map(call => call.join(' '));
       const output = logCalls.join('\n');
-      
+
       // Untracked files might not show when specific file is requested
       // This is expected behavior as git diff with file path won't show untracked
       expect(output).toContain('No changes found for file: new-untracked.js');
@@ -328,14 +328,14 @@ describe('diff command', () => {
 
       const logCalls = consoleSpy.log.mock.calls.map(call => call.join(' '));
       const output = logCalls.join('\n');
-      
+
       // Should show file names
       expect(output).toContain('Changed Files');
       expect(output).toContain('README.md');
       // Untracked files should be included
       expect(output).toContain('new1.txt');
       expect(output).toContain('new2.txt');
-      
+
       // Should NOT show file contents
       expect(output).not.toContain('+Change');
       expect(output).not.toContain('+Content 1');
@@ -354,6 +354,7 @@ describe('diff command', () => {
   });
 
   describe('Branch comparison', () => {
+    // TODO: Review this specific test as it's failing on the CI
     it('should compare with specified branch', async () => {
       const { worktreePath } = createTestTask(13, 'Branch Compare Task');
 
@@ -372,11 +373,10 @@ describe('diff command', () => {
 
       const logCalls = consoleSpy.log.mock.calls.map(call => call.join(' '));
       const output = logCalls.join('\n');
-      
+
       // Should show branch comparison info
       expect(output).toContain('Comparing with:');
       expect(output).toContain('main');
-      
       // Should show committed differences between task branch and main
       expect(output).toContain('README.md');
       expect(output).toContain('+## Task specific change');
@@ -391,7 +391,7 @@ describe('diff command', () => {
 
       const logCalls = consoleSpy.log.mock.calls.map(call => call.join(' '));
       const output = logCalls.join('\n');
-      
+
       // May show error or no changes depending on git behavior
       expect(output).toBeDefined();
     });
@@ -413,7 +413,7 @@ describe('diff command', () => {
 
       const logCalls = consoleSpy.log.mock.calls.map(call => call.join(' '));
       const output = logCalls.join('\n');
-      
+
       // Git should show rename information
       expect(output.toLowerCase()).toMatch(/rename|old-name.*new-name|new-name.*old-name/);
     });
@@ -433,7 +433,7 @@ describe('diff command', () => {
 
       const logCalls = consoleSpy.log.mock.calls.map(call => call.join(' '));
       const output = logCalls.join('\n');
-      
+
       // Staged deletion won't show in basic diff
       expect(output).toContain('No changes found in workspace');
     });
@@ -449,7 +449,7 @@ describe('diff command', () => {
 
       const logCalls = consoleSpy.log.mock.calls.map(call => call.join(' '));
       const output = logCalls.join('\n');
-      
+
       // Binary files show up as untracked
       expect(output).toContain('image.png');
       // May show binary file indication or full diff
@@ -467,7 +467,7 @@ describe('diff command', () => {
 
       const logCalls = consoleSpy.log.mock.calls.map(call => call.join(' '));
       const output = logCalls.join('\n');
-      
+
       // Should list all files
       for (let i = 1; i <= 10; i++) {
         expect(output).toContain(`file${i}.txt`);
@@ -506,29 +506,29 @@ describe('diff command', () => {
       // Create a new temp dir with empty git repo
       const emptyDir = mkdtempSync(join(tmpdir(), 'rover-empty-diff-'));
       process.chdir(emptyDir);
-      
+
       execSync('git init', { stdio: 'pipe' });
       execSync('git config user.email "test@test.com"', { stdio: 'pipe' });
       execSync('git config user.name "Test User"', { stdio: 'pipe' });
-      
+
       mkdirSync('.rover/tasks', { recursive: true });
-      
+
       const task = TaskDescription.create({
         id: 1,
         title: 'Empty Repo Task',
         description: 'Test'
       });
-      
+
       const worktreePath = join('.rover', 'tasks', '1', 'workspace');
       const branchName = 'rover-task-1';
-      
+
       // Create orphan branch for worktree since there's no commits
       execSync('git checkout --orphan temp-branch', { stdio: 'pipe' });
       writeFileSync('temp.txt', 'temp');
       execSync('git add .', { stdio: 'pipe' });
       execSync('git commit -m "temp"', { stdio: 'pipe' });
       execSync(`git worktree add ${worktreePath} -b ${branchName}`, { stdio: 'pipe' });
-      
+
       task.setWorkspace(join(emptyDir, worktreePath), branchName);
 
       await diffCommand('1');
@@ -561,7 +561,7 @@ describe('diff command', () => {
 
       const logCalls = consoleSpy.log.mock.calls.map(call => call.join(' '));
       const output = logCalls.join('\n');
-      
+
       // Untracked files in nested directories should be included
       expect(output).toContain('very/deeply/nested/directory/structure/file.txt');
       expect(output).toContain('+Deep file content');
@@ -579,7 +579,7 @@ describe('diff command', () => {
 
       const logCalls = consoleSpy.log.mock.calls.map(call => call.join(' '));
       const output = logCalls.join('\n');
-      
+
       expect(output).toContain('file with spaces.txt');
       expect(output).toContain('file-with-dashes.txt');
       expect(output).toContain('file_with_underscores.txt');
@@ -590,7 +590,7 @@ describe('diff command', () => {
     it('should track diff event', async () => {
       const { getTelemetry } = await import('../../lib/telemetry.js');
       const mockTelemetry = getTelemetry();
-      
+
       createTestTask(23, 'Telemetry Task');
 
       await diffCommand('23');
