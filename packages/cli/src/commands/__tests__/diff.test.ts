@@ -357,7 +357,7 @@ describe('diff command', () => {
     it('should compare with specified branch', async () => {
       const { worktreePath } = createTestTask(13, 'Branch Compare Task');
 
-      // Make changes in the worktree
+      // Make changes in the worktree and commit them
       appendFileSync(join(worktreePath, 'README.md'), '## Task specific change\n');
       writeFileSync(join(worktreePath, 'task-file.txt'), 'Task branch content\n');
       execSync('git add .', { cwd: worktreePath, stdio: 'pipe' });
@@ -373,11 +373,15 @@ describe('diff command', () => {
       const logCalls = consoleSpy.log.mock.calls.map(call => call.join(' '));
       const output = logCalls.join('\n');
       
+      // Should show branch comparison info
       expect(output).toContain('Comparing with:');
       expect(output).toContain('main');
+      
+      // Should show committed differences between task branch and main
       expect(output).toContain('README.md');
       expect(output).toContain('+## Task specific change');
       expect(output).toContain('task-file.txt');
+      expect(output).toContain('+Task branch content');
     });
 
     it('should handle invalid branch name', async () => {
