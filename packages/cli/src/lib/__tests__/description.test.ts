@@ -81,33 +81,42 @@ describe('TaskDescription', () => {
       for (const status of newStatuses) {
         task.setStatus(status);
         expect(task.status).toBe(status);
-        
+
         // Should not throw validation errors
         expect(() => task.save()).not.toThrow();
       }
     });
 
-    it('should set completedAt when marking as MERGED or PUSHED', () => {
+    it('should not set completedAt when marking as MERGED', () => {
       const task = TaskDescription.create({
         id: 5,
         title: 'Test Task',
         description: 'Test description'
       });
 
-      const beforeTime = Date.now();
-      
-      task.markMerged();
-      expect(task.completedAt).toBeDefined();
-      expect(new Date(task.completedAt!).getTime()).toBeGreaterThanOrEqual(beforeTime);
+      task.markCompleted();
+      const beforeTime = task.completedAt;
 
-      // Reset and test PUSHED
-      task.resetToNew();
-      const beforeTime2 = Date.now();
-      
-      task.markPushed();
-      expect(task.completedAt).toBeDefined();
-      expect(new Date(task.completedAt!).getTime()).toBeGreaterThanOrEqual(beforeTime2);
+      // Marking as merged should not change `completedAt` timestamp; the task was already complete
+      task.markMerged();
+      expect(task.completedAt!).toEqual(beforeTime);
     });
+  });
+
+  it('should not set completedAt when marking as PUSHED', () => {
+      const task = TaskDescription.create({
+        id: 5,
+        title: 'Test Task',
+        description: 'Test description'
+      });
+
+      task.markCompleted();
+      task.markMerged();
+      const beforeTime = task.completedAt;
+
+      // Marking as pushed should not change `completedAt` timestamp; the task was already complete
+      task.markPushed();
+      expect(task.completedAt!).toEqual(beforeTime);
   });
 
   describe('status migration', () => {
@@ -122,7 +131,7 @@ describe('TaskDescription', () => {
       // Test MERGED migration
       task.setStatus('MERGED' as TaskStatus);
       task.save();
-      
+
       const reloadedTask = TaskDescription.load(6);
       expect(reloadedTask.status).toBe('MERGED');
       expect(reloadedTask.isMerged()).toBe(true);
