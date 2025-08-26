@@ -71,7 +71,7 @@ export const startCommand = async (taskId: string, options: { follow?: boolean, 
         }
 
         if (!json) {
-            console.log(colors.bold.white('\n🚀 Starting Task'));
+            console.log(colors.bold.white('Starting Task'));
             console.log(colors.gray('├── ID: ') + colors.cyan(task.id.toString()));
             console.log(colors.gray('├── Title: ') + colors.white(task.title));
             console.log(colors.gray('└── Status: ') + colors.yellow(task.status));
@@ -171,14 +171,16 @@ export const startCommand = async (taskId: string, options: { follow?: boolean, 
             branch: task.branchName
         };
         exitWithSuccess('Task started succesfully!', jsonOutput, json);
-
+        return;
     } catch (error) {
         if (error instanceof TaskNotFoundError) {
             jsonOutput.error = `The task with ID ${numericTaskId} was not found`;
             exitWithError(jsonOutput, json);
+            return;
         } else {
             jsonOutput.error = `There was an error starting the task: ${error}`;
             exitWithError(jsonOutput, json);
+            return;
         }
     } finally {
         await telemetry?.shutdown();

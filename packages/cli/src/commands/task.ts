@@ -454,7 +454,8 @@ export const startDockerExecution = async (taskId: number, task: TaskDescription
                 }, jsonMode);
 
                 if (!jsonMode) {
-                    console.log(colors.yellow('✓ Task reset to NEW status'));
+                    console.log(colors.yellow('⚠ There was an error during container creation'));
+                    console.log(colors.gray('  Resetting the task status to "New"'));
                     console.log(colors.gray('  Use ') + colors.cyan(`rover start ${taskId}`) + colors.gray(' to retry execution'));
                 }
             }
