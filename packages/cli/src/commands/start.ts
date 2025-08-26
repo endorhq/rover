@@ -4,6 +4,8 @@ import { existsSync, mkdirSync } from 'node:fs';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
 import { spawnSync } from '../lib/os.js';
 import { generateBranchName } from '../utils/branch-name.js';
+import { exitWithError, exitWithSuccess } from '../utils/exit.js';
+import { CLIJsonOutput } from '../types.js';
 import { IterationConfig } from '../lib/iteration.js';
 import { startDockerExecution } from './task.js';
 import { UserSettings, AI_AGENT } from '../lib/config.js';
@@ -11,17 +13,34 @@ import { getTelemetry } from '../lib/telemetry.js';
 import yoctoSpinner from 'yocto-spinner';
 
 /**
+ * Interface for JSON output
+ */
+interface TaskStartOutput extends CLIJsonOutput {
+    taskId?: number;
+    title?: string;
+    description?: string;
+    status?: string;
+    startedAt?: string;
+    workspace?: string;
+    branch?: string;
+};
+
+/**
  * Start a task that is in NEW status
  */
 export const startCommand = async (taskId: string, options: { follow?: boolean, json?: boolean, debug?: boolean } = {}) => {
     const telemetry = getTelemetry();
-    
+
+    const json = options.json === true;
+    let jsonOutput: TaskStartOutput = {
+        success: false
+    };
+
     // Convert string taskId to number
     const numericTaskId = parseInt(taskId, 10);
     if (isNaN(numericTaskId)) {
-        if (!options.json) {
-            console.log(colors.red(`✗ Invalid task ID '${taskId}' - must be a number`));
-        }
+        jsonOutput.error = `Invalid task ID '${taskId}' - must be a number`;
+        exitWithError(jsonOutput, json);
         return;
     }
 
@@ -31,11 +50,8 @@ export const startCommand = async (taskId: string, options: { follow?: boolean, 
 
         // Check if task is in NEW status
         if (!task.isNew()) {
-            if (!options.json) {
-                console.log(colors.red(`✗ Task ${taskId} is not in NEW status (current: ${task.status})`));
-                console.log(colors.gray('  Only tasks in NEW status can be started using this command'));
-                console.log(colors.gray('  Use ') + colors.cyan(`rover task "${task.title}"`) + colors.gray(' to create a new task'));
-            }
+            jsonOutput.error = `Task ${taskId} is not in NEW status (current: ${task.status})`;
+            exitWithError(jsonOutput, json, { tips: ['Use ' + colors.cyan(`rover task "${task.title}"`) + colors.gray(' to create a new task')] });
             return;
         }
 
@@ -48,13 +64,13 @@ export const startCommand = async (taskId: string, options: { follow?: boolean, 
                 selectedAiAgent = userSettings.defaultAiAgent || AI_AGENT.Claude;
             }
         } catch (error) {
-            if (!options.json) {
+            if (!json) {
                 console.log(colors.yellow('⚠ Could not load user settings, defaulting to Claude'));
             }
             selectedAiAgent = AI_AGENT.Claude;
         }
 
-        if (!options.json) {
+        if (!json) {
             console.log(colors.bold.white('\n🚀 Starting Task'));
             console.log(colors.gray('├── ID: ') + colors.cyan(task.id.toString()));
             console.log(colors.gray('├── Title: ') + colors.white(task.title));
@@ -71,7 +87,7 @@ export const startCommand = async (taskId: string, options: { follow?: boolean, 
             worktreePath = join(taskPath, 'workspace');
             branchName = generateBranchName(numericTaskId);
 
-            const spinner = !options.json ? yoctoSpinner({ text: 'Setting up workspace...' }).start() : null;
+            const spinner = !json ? yoctoSpinner({ text: 'Setting up workspace...' }).start() : null;
 
             try {
                 // Check if branch already exists
@@ -97,7 +113,7 @@ export const startCommand = async (taskId: string, options: { follow?: boolean, 
                 if (spinner) spinner.success('Workspace setup complete');
             } catch (error) {
                 if (spinner) spinner.error('Failed to setup workspace');
-                if (!options.json) {
+                if (!json) {
                     console.error(colors.red('Error creating git workspace:'), error);
                 }
                 // Mark task back to NEW status due to setup failure
@@ -119,7 +135,7 @@ export const startCommand = async (taskId: string, options: { follow?: boolean, 
         // Mark task as in progress
         task.markInProgress();
 
-        if (!options.json) {
+        if (!json) {
             console.log(colors.gray('└── Workspace: ') + colors.cyan(worktreePath));
             console.log(colors.gray('└── Branch: ') + colors.cyan(branchName));
         }
@@ -127,13 +143,13 @@ export const startCommand = async (taskId: string, options: { follow?: boolean, 
         // Start Docker container for task execution
         try {
             await startDockerExecution(
-                numericTaskId, 
-                task, 
-                worktreePath, 
-                iterationPath, 
-                selectedAiAgent, 
-                options.follow, 
-                options.json, 
+                numericTaskId,
+                task,
+                worktreePath,
+                iterationPath,
+                selectedAiAgent,
+                options.follow,
+                json,
                 options.debug
             );
         } catch (error) {
@@ -142,30 +158,27 @@ export const startCommand = async (taskId: string, options: { follow?: boolean, 
             throw error;
         }
 
-        if (options.json) {
-            // Output final JSON after all operations are complete
-            const finalJsonOutput = {
-                success: true,
-                taskId: task.id,
-                title: task.title,
-                description: task.description,
-                status: task.status,
-                startedAt: task.startedAt,
-                workspace: task.worktreePath,
-                branch: task.branchName
-            };
-            console.log(JSON.stringify(finalJsonOutput, null, 2));
-        }
+        // Output final JSON after all operations are complete
+        jsonOutput = {
+            ...jsonOutput,
+            success: true,
+            taskId: task.id,
+            title: task.title,
+            description: task.description,
+            status: task.status,
+            startedAt: task.startedAt,
+            workspace: task.worktreePath,
+            branch: task.branchName
+        };
+        exitWithSuccess('Task started succesfully!', jsonOutput, json);
 
     } catch (error) {
         if (error instanceof TaskNotFoundError) {
-            if (!options.json) {
-                console.log(colors.red(`✗ ${error.message}`));
-            }
+            jsonOutput.error = `The task with ID ${numericTaskId} was not found`;
+            exitWithError(jsonOutput, json);
         } else {
-            if (!options.json) {
-                console.error(colors.red('Error starting task:'), error);
-            }
+            jsonOutput.error = `There was an error starting the task: ${error}`;
+            exitWithError(jsonOutput, json);
         }
     } finally {
         await telemetry?.shutdown();
