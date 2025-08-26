@@ -117,6 +117,7 @@ export class Git {
             spawnSync('git', ['commit', '-m', message], {
                 stdio: 'pipe',
                 encoding: 'utf8',
+                cwd: options.worktreePath
             });
 
             return true;
