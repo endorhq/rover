@@ -92,7 +92,7 @@ export class Git {
         if (options.includeUntracked && !options.filePath) {
             // Use git ls-files to get the actual untracked files (not just directories)
             let untrackedFiles: string[] = [];
-            const lsFilesResult = spawnSync('git', ['ls-files', '--others', '--exclude-standard'], {
+            const lsFilesResult = spawnSync('git', ['ls-files', '--others'], {
                 stdio: 'pipe',
                 encoding: 'utf8',
                 cwd: options.worktreePath
