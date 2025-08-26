@@ -412,6 +412,7 @@ export const startDockerExecution = async (taskId: number, task: TaskDescription
                         console.log(colors.red('✗ Failed to stop container'));
                     }
                 }
+                // TODO: use exitWithSuccess
                 process.exit(0);
             });
         } else {
@@ -438,7 +439,6 @@ export const startDockerExecution = async (taskId: number, task: TaskDescription
                     executionStatus: 'running',
                     runningAt: new Date().toISOString()
                 }, jsonMode);
-
             } catch (error: any) {
                 if (spinner) spinner.error('Failed to start container in background');
                 if (!jsonMode) {
@@ -458,6 +458,9 @@ export const startDockerExecution = async (taskId: number, task: TaskDescription
                     console.log(colors.gray('  Resetting the task status to "New"'));
                     console.log(colors.gray('  Use ') + colors.cyan(`rover start ${taskId}`) + colors.gray(' to retry execution'));
                 }
+
+                // TODO: use exitWithError
+                process.exit(1);
             }
         }
 
@@ -479,6 +482,9 @@ export const startDockerExecution = async (taskId: number, task: TaskDescription
             console.log(colors.yellow('✓ Task reset to NEW status'));
             console.log(colors.gray('  Use ') + colors.cyan(`rover start ${taskId}`) + colors.gray(' to retry execution'));
         }
+
+        // TODO: use exitWithError
+        process.exit(1);
     }
 }
 
@@ -625,6 +631,7 @@ export const taskCommand = async (initPrompt?: string, options: { fromGithub?: s
             console.log(colors.red('✗ Rover is not initialized in this directory'));
             console.log(colors.gray('  Run ') + colors.cyan('rover init') + colors.gray(' first'));
         }
+        // TODO: use exitWithError
         process.exit(1);
     }
 
@@ -645,6 +652,7 @@ export const taskCommand = async (initPrompt?: string, options: { fromGithub?: s
 
     // Run initial validations
     if (!validations(selectedAiAgent, json, follow)) {
+        // TODO: use exitWithError
         process.exit(1);
     }
 
@@ -684,6 +692,7 @@ export const taskCommand = async (initPrompt?: string, options: { fromGithub?: s
         } else {
             // If GitHub fetch failed, exit
             console.error(colors.red('✗ Failed to fetch issue from GitHub'));
+            // TODO: use exitWithError
             process.exit(1);
         }
     }
@@ -709,6 +718,7 @@ export const taskCommand = async (initPrompt?: string, options: { fromGithub?: s
                     console.error(colors.red('✗ Task description is required in non-interactive mode'));
                     console.error(colors.gray('  Please provide a description as an argument: rover task "your task description" --yes'));
                 }
+                // TODO: use exitWithError
                 process.exit(1);
             }
 
@@ -723,6 +733,7 @@ export const taskCommand = async (initPrompt?: string, options: { fromGithub?: s
                 description = input;
             } catch (err) {
                 console.log(colors.yellow('\n⚠ Task creation cancelled'));
+                // TODO: use exitWithError
                 process.exit(1);
             }
         }
