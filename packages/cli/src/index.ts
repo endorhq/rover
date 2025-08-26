@@ -107,7 +107,7 @@ program
 	.argument('<taskId>', 'Task ID to start')
 	.option('-f, --follow', 'Follow execution logs in real-time')
 	.option('--json', 'Output the result in JSON format')
-	.option('--debug', 'Show debug information like running commands')
+	// .option('--debug', 'Show debug information like running commands')
 	.action(startCommand);
 
 // Add the ps command for monitoring tasks
