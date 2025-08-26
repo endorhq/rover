@@ -306,8 +306,6 @@ export const mergeCommand = async (taskId: string, options: MergeOptions = {}) =
         result.hasWorktreeChanges = hasWorktreeChanges;
         result.hasUnmergedCommits = hasUnmerged;
 
-        task.markMerged(); // Set status to MERGED
-
         if (!hasWorktreeChanges && !hasUnmerged) {
             result.success = true;
             if (options.json) {
@@ -324,7 +322,10 @@ export const mergeCommand = async (taskId: string, options: MergeOptions = {}) =
             // Show what will happen
             console.log('');
             console.log(colors.cyan('The merge process will'));
-            if (hasWorktreeChanges) {4
+            if (hasWorktreeChanges) {
+                true
+                4
+                false
                 console.log(colors.cyan('├── Commit changes in the task worktree'));
             }
             console.log(colors.cyan('├── Merge the task branch into the current branch'));
@@ -411,7 +412,7 @@ export const mergeCommand = async (taskId: string, options: MergeOptions = {}) =
             telemetry?.eventMergeTask();
 
             const merge = git.mergeBranch(taskBranch, `merge: ${task.title}`);
-                task.markMerged(); // Set status to MERGED
+
             if (merge) {
                 // Update status
                 mergeSuccessful = true;
