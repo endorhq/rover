@@ -28,7 +28,7 @@ program
 			commandName !== "init" &&
 			!existsSync(join(process.cwd(), 'rover.json'))
 		) {
-			console.log(colors.white(`Rover is not initialized in this directory. The command you requested (\`${commandName}\`) was not executedd.`));
+			console.log(colors.white(`Rover is not initialized in this directory. The command you requested (\`${commandName}\`) was not executed.`));
 			console.log(`└── ${colors.gray('Project config (does not exist):')} rover.json`);
 
 			showTips(
@@ -50,7 +50,7 @@ program
 			existsSync(join(process.cwd(), 'rover.json')) &&
 			!existsSync(join(process.cwd(), '.rover', 'settings.json'))
 		) {
-			console.log(colors.white(`Rover is not fully initialized in this directory. The command you requested (\`${commandName}\`) was not executedd.`));
+			console.log(colors.white(`Rover is not fully initialized in this directory. The command you requested (\`${commandName}\`) was not executed.`));
 			console.log(`├── ${colors.gray('Project config (exists):')} rover.json`);
 			console.log(`└── ${colors.gray('User settings (does not exist):')} .rover/settings.json`);
 
