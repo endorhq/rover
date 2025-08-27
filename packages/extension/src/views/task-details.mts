@@ -413,6 +413,7 @@ export class TaskDetailsView extends LitElement {
     }
 
     const isRunning = ['running', 'in_progress'].includes(this.taskData.status?.toLowerCase());
+    const isCompleted = this.taskData.status?.toLowerCase() == 'completed';
 
     return html`
       <div class="header">
@@ -484,7 +485,7 @@ export class TaskDetailsView extends LitElement {
             <button class="action-button secondary" @click=${() => this.executeAction('logs')}>
               View Logs
             </button>
-            <button class="action-button secondary" @click=${() => this.executeAction('shell')} ?disabled=${!isRunning}>
+            <button class="action-button secondary" @click=${() => this.executeAction('shell')} ?disabled=${!isRunning && !isCompleted}>
               Open Shell
             </button>
             <button class="action-button secondary" @click=${() => this.executeAction('openWorkspace')}>
@@ -576,15 +577,15 @@ export class TaskDetailsView extends LitElement {
 if (typeof window !== 'undefined') {
   // Acquire VS Code API
   const vscode = typeof window.acquireVsCodeApi !== 'undefined' ? window.acquireVsCodeApi() : null;
-  
+
   // Create and configure the component
   const component = document.createElement('task-details-view');
-  
+
   // Set VS Code API
   if (vscode) {
     (component as any).vscode = vscode;
   }
-  
+
   // Mount the component when DOM is ready
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {

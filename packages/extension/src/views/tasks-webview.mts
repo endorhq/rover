@@ -496,7 +496,7 @@ export class TasksWebview extends LitElement {
                 <button class="action-btn" @click=${(e: Event) => this.executeTaskAction(e, 'viewLogs', task.id, undefined, task.status)} title="View Logs">
                   <i class="codicon codicon-file"></i>
                 </button>
-                ${isRunning ? html`
+                ${isRunning || isCompleted ? html`
                   <button class="action-btn" @click=${(e: Event) => this.executeTaskAction(e, 'openShell', task.id)} title="Open Shell">
                     <i class="codicon codicon-terminal"></i>
                   </button>
