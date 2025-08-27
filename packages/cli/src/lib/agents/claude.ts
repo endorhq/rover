@@ -1,6 +1,6 @@
 import { spawn, spawnSync } from "../os.js";
 import { AIAgentTool, InvokeAIAgentError, MissingAIAgentError } from "./index.js";
-import { PromptBuilder, IPromptTask } from "../prompt.js";
+import { PromptBuilder, IPromptTask } from "../prompts/index.js";
 import { parseJsonResponse } from "../../utils/json-parser.js";
 
 class ClaudeAI implements AIAgentTool {

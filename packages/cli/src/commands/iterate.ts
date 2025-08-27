@@ -6,7 +6,7 @@ import { spawnSync } from '../lib/os.js';
 import yoctoSpinner from 'yocto-spinner';
 import { startDockerExecution } from './task.js';
 import { getAIAgentTool, type AIAgentTool } from '../lib/agents/index.js';
-import type { IPromptTask } from '../lib/prompt.js';
+import type { IPromptTask } from '../lib/prompts/index.js';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
 import { UserSettings, AI_AGENT } from '../lib/config.js';
 import { IterationConfig } from '../lib/iteration.js';

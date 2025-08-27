@@ -1,6 +1,6 @@
 import ClaudeAI from './claude.js';
 import GeminiAI from './gemini.js';
-import type { IPromptTask } from '../prompt.js';
+import type { IPromptTask } from '../prompts/index.js';
 
 export interface AIAgentTool {
     // Invoke the CLI tool using the SDK / direct mode with the given prompt

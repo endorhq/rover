@@ -119,6 +119,8 @@ write_status() {
     local progress="$3"
     local error="$4"
 
+    echo "[STATUS]: $status $step ($progress%) - $(date -u +%Y-%m-%dT%H:%M:%S%z)"
+
     # Create base JSON object using jq
     jq -n \\
         --arg taskId "$TASK_ID" \\
