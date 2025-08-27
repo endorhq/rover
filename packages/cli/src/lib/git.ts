@@ -1,4 +1,4 @@
-import { SpawnSyncReturns, spawnSync } from 'node:child_process';
+import { spawnSync, SpawnSyncReturns } from './os.js';
 
 export class GitError extends Error {
     constructor(reason: string) {

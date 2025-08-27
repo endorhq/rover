@@ -4,7 +4,7 @@ import { TasksLitWebviewProvider } from './providers/TasksLitWebviewProvider.mjs
 import { RoverCLI } from './rover/cli.mjs';
 import { TaskItem } from './providers/TaskItem.mjs';
 import { TaskDetailsPanel } from './panels/TaskDetailsPanel.mjs';
-import { spawn } from 'node:child_process';
+import { spawnSync } from './lib/os.mjs';
 import { getTelemetry } from './lib/telemetry.mjs';
 import { NewTaskProvider } from 'rover-telemetry';
 
@@ -237,7 +237,7 @@ export function activate(context: vscode.ExtensionContext) {
                 // Get list of changed files in the task workspace
                 let changedFiles: string[] = [];
                 try {
-                    const { stdout: statusOutput } = await spawn('git', ['status', '--porcelain', '-u'], { cwd: taskWorkspacePath });
+                    const { stdout: statusOutput } = spawnSync('git', ['status', '--porcelain', '-u'], { cwd: taskWorkspacePath });
                     changedFiles = statusOutput.toString().split('\n')
                         .filter(line => line.trim())
                         .map(line => line.substring(3).trim()) // Remove status flags (e.g., "M ", "A ", etc.)
@@ -864,7 +864,7 @@ export function activate(context: vscode.ExtensionContext) {
                 let repoInfo: { owner: string; repo: string } | null = null;
                 try {
                     const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd();
-                    const { stdout: remoteUrl } = await spawn('git', ['remote', 'get-url', 'origin'], { cwd: workspaceRoot });
+                    const { stdout: remoteUrl } = spawnSync('git', ['remote', 'get-url', 'origin'], { cwd: workspaceRoot });
                     const match = remoteUrl.toString().match(/github\.com[:/]([^/]+)\/([^/.]+)(\.git)?/);
                     if (match) {
                         repoInfo = { owner: match[1], repo: match[2] };
@@ -906,7 +906,7 @@ export function activate(context: vscode.ExtensionContext) {
                 // Fall back to gh CLI
                 try {
                     const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd();
-                    const { stdout } = await spawn('gh', ['issue', 'list', '--json', 'number,title,assignees,labels', '--limit', '100'], { cwd: workspaceRoot });
+                    const { stdout } = spawnSync('gh', ['issue', 'list', '--json', 'number,title,assignees,labels', '--limit', '100'], { cwd: workspaceRoot });
                     return JSON.parse(stdout.toString());
                 } catch (error) {
                     console.warn('GitHub CLI failed:', error);
@@ -975,7 +975,7 @@ export function activate(context: vscode.ExtensionContext) {
 
                     telemetry?.eventNewTask(NewTaskProvider.GITHUB);
 
-                    const { stdout } = await spawn(
+                    const { stdout } = spawnSync(
                         roverPath, ['task', '--from-github', issueNumber.toString(), '--yes', '--json'],
                         { cwd: workspaceRoot }
                     );

@@ -1,6 +1,8 @@
 import { spawnSync as spawnSync_, SpawnSyncOptions, SpawnSyncReturns } from 'child_process';
 import { execa, ExecaError, Options, Result } from 'execa';
 
+export { SpawnSyncReturns };
+
 export function spawnSync(
     command: string,
     args?: ReadonlyArray<string>,
