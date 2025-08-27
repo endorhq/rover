@@ -479,7 +479,7 @@ export const startDockerExecution = async (taskId: number, task: TaskDescription
         }, jsonMode);
 
         if (!jsonMode) {
-            console.log(colors.yellow('✓ Task reset to NEW status'));
+            console.log(colors.yellow('⚠ Task reset to NEW status'));
             console.log(colors.gray('  Use ') + colors.cyan(`rover start ${taskId}`) + colors.gray(' to retry execution'));
         }
 
@@ -866,22 +866,8 @@ export const taskCommand = async (initPrompt?: string, options: { fromGithub?: s
         const branchName = generateBranchName(taskId);
 
         try {
-            // Check if branch already exists
-            let branchExists = false;
-            try {
-                spawnSync('git', ['show-ref', '--verify', '--quiet', `refs/heads/${branchName}`], { stdio: 'pipe' });
-                branchExists = true;
-            } catch (error) {
-                // Branch doesn't exist, which is fine for new worktree
-            }
-
-            if (branchExists) {
-                // Create worktree from existing branch
-                spawnSync('git', ['worktree', 'add', worktreePath, branchName], { stdio: 'pipe' });
-            } else {
-                // Create new worktree with a new branch
-                spawnSync('git', ['worktree', 'add', worktreePath, '-b', branchName], { stdio: 'pipe' });
-            }
+            const git = new Git();
+            git.createWorktree(worktreePath, branchName);
         } catch (error) {
             if (!json) {
                 console.error(colors.red('Error creating git workspace:'), error);
@@ -918,7 +904,7 @@ export const taskCommand = async (initPrompt?: string, options: { fromGithub?: s
             // If Docker execution fails to start, reset task to NEW status
             task.resetToNew();
             if (!json) {
-                console.log(colors.yellow('✓ Task reset to NEW status due to execution failure'));
+                console.log(colors.yellow('⚠ Task reset to NEW status due to execution failure'));
                 console.log(colors.gray('  Use ') + colors.cyan(`rover start ${taskId}`) + colors.gray(' to retry execution'));
             }
             throw error;

@@ -309,6 +309,27 @@ export class Git {
     }
 
     /**
+     * Check if a given branch exists
+     */
+    branchExists(branch: string): boolean {
+        try {
+            return spawnSync('git', ['show-ref', '--verify', '--quiet', `refs/heads/${branch}`], { stdio: 'pipe' }).status === 0;
+        } catch (error) {
+            return false;
+        }
+    }
+
+    /**
+     * Create worktree
+     */
+    createWorktree(path: string, branchName: string): boolean {
+        if (this.branchExists(branchName)) {
+            return spawnSync('git', ['worktree', 'add', path, branchName], { stdio: 'pipe' }).status == 0;
+        }
+        return spawnSync('git', ['worktree', 'add', path, '-b', branchName], { stdio: 'pipe' }).status == 0;
+    }
+
+    /**
      * Identify the main / master branch for the given repository.
      */
     getMainBranch(): string {

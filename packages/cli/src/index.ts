@@ -103,7 +103,7 @@ program
 // Start a task in NEW status
 program
 	.command('start')
-	.description('Start a task that is in NEW status (e.g., after container failure or reset)')
+	.description('Start a task that could not be automatically started when created')
 	.argument('<taskId>', 'Task ID to start')
 	.option('-f, --follow', 'Follow execution logs in real-time')
 	.option('--json', 'Output the result in JSON format')

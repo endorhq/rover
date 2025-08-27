@@ -10,6 +10,7 @@ import { IterationConfig } from '../lib/iteration.js';
 import { startDockerExecution } from './task.js';
 import { UserSettings, AI_AGENT } from '../lib/config.js';
 import { getTelemetry } from '../lib/telemetry.js';
+import { Git } from '../lib/git.js';
 import yoctoSpinner from 'yocto-spinner';
 
 /**
@@ -90,22 +91,8 @@ export const startCommand = async (taskId: string, options: { follow?: boolean, 
             const spinner = !json ? yoctoSpinner({ text: 'Setting up workspace...' }).start() : null;
 
             try {
-                // Check if branch already exists
-                let branchExists = false;
-                try {
-                    spawnSync('git', ['show-ref', '--verify', '--quiet', `refs/heads/${branchName}`], { stdio: 'pipe' });
-                    branchExists = true;
-                } catch (error) {
-                    // Branch doesn't exist, which is fine for new worktree
-                }
-
-                if (branchExists) {
-                    // Create worktree from existing branch
-                    spawnSync('git', ['worktree', 'add', worktreePath, branchName], { stdio: 'pipe' });
-                } else {
-                    // Create new worktree with a new branch
-                    spawnSync('git', ['worktree', 'add', worktreePath, '-b', branchName], { stdio: 'pipe' });
-                }
+                const git = new Git();
+                git.createWorktree(worktreePath, branchName);
 
                 // Update task with workspace information
                 task.setWorkspace(worktreePath, branchName);
