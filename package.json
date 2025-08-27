@@ -11,9 +11,11 @@
     ],
     "scripts": {
         "dev": "run-p -l dev:*",
+        "dev:common": "npm run dev --workspace=./packages/common",
         "dev:telemetry": "npm run dev --workspace=./packages/telemetry",
         "dev:cli": "npm run dev --workspace=./packages/cli",
         "build": "run-s -l build:*",
+        "build:common": "npm run build --workspace=./packages/common",
         "build:telemetry": "npm run build --workspace=./packages/telemetry",
         "build:extension": "npm run build --workspace=./packages/extension",
         "build:cli": "npm run build --workspace=./packages/cli",

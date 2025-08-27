@@ -16,7 +16,7 @@ import { IterationConfig } from '../lib/iteration.js';
 import { generateBranchName } from '../utils/branch-name.js';
 import { request } from 'node:https';
 import { spawn } from 'node:child_process';
-import { spawnSync } from '../lib/os.js';
+import { launch, launchSync } from 'rover-common';
 import { checkGitHubCLI } from '../utils/system.js';
 import { showRoverBanner, showRoverChat, showTips } from '../utils/display.js';
 import { userInfo } from 'node:os';
@@ -140,8 +140,12 @@ const updateTaskMetadata = (taskId: number, updates: any, jsonMode?: boolean) =>
 };
 
 export const findKeychainCredentials = (key: string): string => {
-    return spawnSync('security', ['find-generic-password', '-s', key, '-w'], { stdio: 'pipe' })
-        .stdout.toString()
+    const result = launchSync('security', ['find-generic-password', '-s', key, '-w'])
+        .stdout?.toString();
+            if (result === undefined) {
+                throw new Error('could not find keychain credentials');
+        }
+        return result
 }
 
 /**
@@ -152,7 +156,7 @@ export const startDockerExecution = async (taskId: number, task: TaskDescription
 
     try {
         // Check if Docker is available
-        spawnSync('docker', ['--version'], { stdio: 'pipe' });
+        launchSync('docker', ['--version']);
     } catch (error) {
         if (!jsonMode) {
             console.log(colors.red('\n✗ Docker is not available'));
@@ -214,7 +218,7 @@ export const startDockerExecution = async (taskId: number, task: TaskDescription
 
     // Clean up any existing container with same name
     try {
-        spawnSync('docker', ['rm', '-f', containerName], { stdio: 'pipe' });
+        launchSync('docker', ['rm', '-f', containerName]);
     } catch (error) {
         // Container doesn't exist, which is fine
     }
@@ -403,7 +407,7 @@ export const startDockerExecution = async (taskId: number, task: TaskDescription
                     console.log(colors.yellow('\n\n⚠ Stopping task execution...'));
                 }
                 try {
-                    spawnSync('docker', ['stop', containerName], { stdio: 'pipe' });
+                    launchSync('docker', ['stop', containerName]);
                     if (!jsonMode) {
                         console.log(colors.green('✓ Container stopped'));
                     }
@@ -418,10 +422,7 @@ export const startDockerExecution = async (taskId: number, task: TaskDescription
         } else {
             // Background mode execution
             try {
-                const containerId = spawnSync('docker', dockerArgs, {
-                    stdio: 'pipe',
-                    encoding: 'utf8'
-                }).stdout.toString().trim();
+                const containerId = launchSync('docker', dockerArgs).stdout?.toString().trim();
 
                 if (spinner) spinner.success('Container started in background');
                 if (!jsonMode) {
@@ -561,8 +562,11 @@ const fetchGitHubIssueViaAPI = async (owner: string, repo: string, issueNumber: 
  */
 const fetchGitHubIssueViaCLI = async (owner: string, repo: string, issueNumber: string): Promise<{ title: string; body: string } | null> => {
     try {
-        const { stdout } = spawnSync(
+        const { stdout } = launchSync(
             'gh', ['issue', 'view', issueNumber.toString(), '--repo', `${owner}/${repo}`, '--json', 'title,body']);
+        if (!stdout) {
+            return null;
+        }
         const issue = JSON.parse(stdout.toString());
         return {
             title: issue.title || '',
@@ -579,7 +583,12 @@ const fetchGitHubIssueViaCLI = async (owner: string, repo: string, issueNumber: 
 const fetchGitHubIssue = async (issueNumber: string, json: boolean): Promise<{ title: string; body: string } | null> => {
     try {
         // Try to get repo info from git remote
-        const remoteUrl = spawnSync('git', ['remote', 'get-url', 'origin'], { encoding: 'utf8' }).stdout.toString().trim();
+        const remoteUrl = launchSync('git', ['remote', 'get-url', 'origin']).stdout?.toString().trim();
+
+        if (!remoteUrl) {
+            throw new Error('could not get origin remote URL');
+        }
+
         const repoInfo = getGitHubRepoInfo(remoteUrl);
 
         if (!repoInfo) {
@@ -874,7 +883,6 @@ export const taskCommand = async (initPrompt?: string, options: { fromGithub?: s
             }
             return;
         }
-
 
         const iterationPath = join(taskPath, 'iterations', task.iterations.toString());
         mkdirSync(iterationPath, { recursive: true });

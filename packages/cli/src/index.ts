@@ -18,10 +18,15 @@ import { mergeCommand } from './commands/merge.js';
 import colors from 'ansi-colors';
 import { pushCommand } from './commands/push.js';
 import { showTips, TIP_TITLES } from './utils/display.js';
+import { launch, setVerbose } from 'rover-common';
 
 const program = new Command();
 
 program
+	.option('-v, --verbose', 'Log verbose information like running commands')
+  .hook('preAction', (thisCommand, actionCommand) => {
+    setVerbose(thisCommand.opts().verbose);
+  })
 	.hook('preAction', (thisCommand, actionCommand) => {
 		const commandName = actionCommand.name();
 		if (
@@ -115,7 +120,6 @@ program
 	.command('list')
 	.alias('ls')
 	.description('Show tasks and their status')
-	.option('-v, --verbose', 'Show detailed information including errors')
 	.option('-w, --watch', 'Watch for changes and refresh every 5 seconds')
 	.option('--json', 'Output in JSON format')
 	.action(listCommand);
