@@ -1,50 +1,41 @@
-You are creating a summary of the implemented changes for this task. Your goal is to document what was accomplished and provide key information for future reference.
+You are in summary mode.
 
-Check the /workspace/context.md and /workspace/changes.md file to gather information.
-
-Task completed:
+----
 Title: %title%
 Description:
 %description%
+Context: Read it from /workspace/context.md . If the file do not exist, try your best based on the title and description. THIS IS IMPORTANT.
+----
 
-Your summary should:
-1. Describe what was implemented in 1-2 sentences
-2. List the key files that were modified
-3. Note any important technical decisions made
-4. Highlight any remaining tasks or considerations
+### Phase 1: Triage task complexity
 
-Write your summary to /workspace/summary.md using this exact format:
+Check the context to identify the task complexity:
 
+- Simple task: skip the "Technical decisions" and "Notes" sections in phase 3.
+- Complex task: complete the full template in phase 3.
+
+### Phase 2: For complex tasks
+
+- Use only information from `/workspace/context.md` and `/workspace/changes.md`
+- Do not fabricate content; if a section has nothing to report, write `None`
+- Keep all required sections concise: 1–2 sentences or one-line bullets only
+
+### Phase 3: Output
+
+Write to `/workspace/summary.md` following this template:
+
+<template>
 # Implementation Summary
 
 ## What was implemented
-[Brief description of the changes made]
+1–2 sentences describing the changes made
 
 ## Files modified
-- `path/to/file.ts`: Description of changes
-- `path/to/another.ts`: Description of changes
+- `path/to/file`: Brief description of changes
 
 ## Technical decisions
-- [Key decision made and rationale]
+- Key decision and rationale (skip if none)
 
 ## Notes
-- [Any important considerations or remaining tasks]
-
-Example output:
-# Implementation Summary
-
-## What was implemented
-Added rate limiting to the login endpoint using express-rate-limit middleware with Redis storage.
-
-## Files modified
-- `src/auth/login.ts`: Added rate limiting middleware to login route
-- `src/middleware/rate-limit.ts`: Created new rate limiting configuration
-- `package.json`: Added express-rate-limit and redis dependencies
-
-## Technical decisions
-- Used Redis for distributed rate limiting to support multiple server instances
-- Set limit to 5 attempts per 15 minutes based on security requirements
-
-## Notes
-- Tests updated to verify rate limiting behavior
-- Documentation updated in auth section
+- Remaining tasks, considerations, or `None`
+</template>
