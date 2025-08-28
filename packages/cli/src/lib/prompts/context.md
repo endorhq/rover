@@ -21,7 +21,7 @@ Follow these rules to complete the research:
 - Just output the template. Skip any text before and after
 - Use globs when a change affects multiple files
 
-Then, write your structured analysis to /workspace/context.md following this template:
+Then, write your structured analysis to `/workspace/context.md` following this template. This is mandatory.
 
 <template>
 # Context

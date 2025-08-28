@@ -30,7 +30,7 @@ Context: Read it from /workspace/context.md . If the file do not exist, try your
 - Follow the template strictly
 - Just output the template. Skip any text before and after
 
-Write `/workspace/changes.md` following this template:
+Write `/workspace/changes.md` following this template. This is mandatory.
 
 <template>
 # Implementation Changes

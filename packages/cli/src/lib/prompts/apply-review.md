@@ -22,7 +22,7 @@ Context: Read it from /workspace/context.md . If the file do not exist, try your
 5. Reference `/workspace/plan.md` and `/workspace/context.md` for consistency
 
 ### Phase 3: Output
-Update `/workspace/changes.md` by appending a new section in this exact format:
+Update `/workspace/changes.md` by appending a new section following this template. This is mandatory.
 
 <template>
 ## Review Fixes Applied

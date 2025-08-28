@@ -34,7 +34,7 @@ Adapt the details depending on the task complexity, objectives and scope:
 - Follow the template strictly
 - Just output the template. Skip any text before and after
 
-Write your plan to /workspace/plan.md following this template:
+Write your plan to `/workspace/plan.md` following this template. This is mandatory.
 
 <template>
 # Implementation Plan

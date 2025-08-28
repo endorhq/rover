@@ -22,7 +22,7 @@ Check the context to identify the task complexity:
 
 ### Phase 3: Output
 
-Write to `/workspace/summary.md` following this template:
+Write to `/workspace/summary.md` following this template. This is mandatory.
 
 <template>
 # Implementation Summary
