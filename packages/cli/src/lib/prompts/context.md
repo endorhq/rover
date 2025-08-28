@@ -1,94 +1,97 @@
-You are preparing a technical analysis for this task implementation. Your goal is to gather preliminary research that will help another engineer plan and implement the task effectively.
+You are preparing a technical context for this task implementation:
 
-Task to analyze:
-Title: %title%
-Description:
-%description%
+Task title: %title%
+Task description: %description%
 
-Your analysis should:
-1. Identify files that will be edited or affected by this task
-2. Identify required domain knowledge including libraries and design patterns
-3. Identify relevant code blocks and their relationships
-4. Identify the project's linting, formatting, and testing conventions
-5. Identify the mandatory OS package dependencies that this task needs in order to be implemented
+Follow these steps to complete it. Do not move to the next phase until to complete the previous one.
 
-Write your analysis to /workspace/context.md using this exact format:
+1. Phase 1: Triage the task complexity.
+    - Identify the task complexity by analyze the affected files and the complexity of the task. Categorize it on: 
+        - Simple task: affects ≤1–2 files. No complex changes involved. The changes are straightforward and a plan might not be required.
+        - Complex task: affects multiple files. It requires to introduce new libraries or create them. To properly implement them, it is recommended to first write a plan.
+2. Phase 2: Adapt your analysis depth:
+    - For simple tasks: Fill only the "Task Complexity", "Relevant Code" and "Extra OS packages" sections. Skip all other sections
+    - For complex tasks: complete all sections.
 
+Follow these rules to complete the research:
+
+- Use 1-line bullets wherever possible. Do not fabricate content; if information is unavailable or irrelevant, skip it
+- Find the main file or files affected by these changes. Then, identify other secondary files. Focus mostly on main files and avoid a deep research in the secondary ones
+- Follow the template strictly
+- Just output the template. Skip any text before and after
+- Use globs when a change affects multiple files
+
+Then, write your structured analysis to /workspace/context.md following this template:
+
+<template>
 # Context
 
-## Affected files
-- Path: Brief description of why this file is relevant to the task
+## Task complexity
+simple|complex
+
+## Relevant code
+- path/to/file:start-end: 1-line description (include line numbers only if code is accessible)
+
+## Extra OS packages
+Identify missing OS packages to accomplish this task and install them using the tools provided by the `package-manager` MCP. Return a list of new installed packages or "No additional packages required".
+
+## Relevant knowledge
+Skip this entire section and title for simple tasks
+
+### Patterns
+- pattern: brief description (only if non-standard)
+
+### Dependencies
+- library name: 1-line description about why this library is relevant
+
+</template>
+
+Examples:
+
+**Simple task**
+
+Title: Fix typo in error message
+Description: In src/auth/login.ts, the login failure error message has a typo: “Invlaid credentials” should be “Invalid credentials.”
+
+<good-example>
+# Context
+
+## Task complexity
+simple
+
+## Relevant code
+- src/auth/login.ts:42-45: Error handling block with the incorrect error message
+
+## New OS packages
+No additional packages required
+</good-example>
+
+**Complex task**
+
+Title: Add rate limiting to login endpoint
+Description: Implement request rate limiting for the login endpoint using express-rate-limit with Redis as the store. Integrate it into the authentication middleware.
+
+<good-example>
+# Context
+
+## Task complexity
+complex
+
+## Relevant code
+- src/auth/login.ts:23-45: Login endpoint logic currently without rate limiting
+- src/middleware/auth.ts:12-18: Middleware chain setup for authentication
+- src/config/redis.ts:5-20: Redis client connection configuration
+
+## New OS packages
+No additional packages required
 
 ## Relevant knowledge
 
-### Libraries
-- Library name, language
-
 ### Patterns
-- Pattern name: Brief description (only needed for non-standard patterns)
+- Middleware pattern: Express request pipeline
+- Token bucket: Common rate-limiting algorithm
 
-## Relevant code
-- path/to/file.ts:start_line-end_line: Description of this code block's purpose and relevance. You must include the relevant line numbers
-
-## Component dependencies
-- List any tasks or components this work depends on
-- List any tasks that might be blocked by this work
-
-## Review strategy
-- Linting: Commands and configuration used in this project
-- Formatting: Commands and tools (if none exist, note the language's standard formatter)
-- Testing: Test framework and relevant test files
-
-## Installed OS packages
-- Refresh repositories before trying to install or update a package
-- List of all installed OS packages, provided by the `package-manager` MCP
-
-Example output:
-# Context
-
-## Affected files
-- src/auth/login.ts: Contains authentication logic that needs rate limiting
-- src/middleware/auth.ts: Middleware that will integrate the new rate limiter
-
-## Relevant knowledge
-
-### Libraries
-- express-rate-limit, NodeJS
-- redis, NodeJS
-
-### Patterns
-- Middleware pattern: Express middleware chain for request processing
-- Token bucket: Rate limiting algorithm implementation
-
-## Relevant code
-- src/auth/login.ts:23-45: Current login endpoint without rate limiting
-- src/middleware/auth.ts:12-18: Authentication middleware setup
-
-## Dependencies
-- Requires Redis connection to be configured
-- No blocking dependencies identified
-
-## Review strategy
-- Linting: npm run lint (ESLint configuration)
-- Formatting: npm run format (Prettier)
-- Testing: npm test (Jest framework, see src/__tests__/)
-
-## Installed OS packages
-- alpine-baselayout-3.7.0-r0
-- alpine-baselayout-data-3.7.0-r0
-- alpine-keys-2.5-r0
-- alpine-release-3.22.1-r0
-- apk-tools-2.14.9-r2
-- busybox-1.37.0-r18
-- busybox-binsh-1.37.0-r18
-- ca-certificates-bundle-20250619-r0
-- libapk2-2.14.9-r2
-- libcrypto3-3.5.1-r0
-- libgcc-14.2.0-r6
-- libssl3-3.5.1-r0
-- libstdc++-14.2.0-r6
-- musl-1.2.5-r10
-- musl-utils-1.2.5-r10
-- scanelf-1.3.8-r1
-- ssl_client-1.37.0-r18
-- zlib-1.3.1-r2
+### Dependencies
+- express-rate-limit: Required for implementing rate limiting
+- redis: Required for storing rate limit state
+</good-example>
