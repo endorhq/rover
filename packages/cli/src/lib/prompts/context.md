@@ -10,7 +10,7 @@ Follow these steps to complete it. Do not move to the next phase until to comple
         - Simple task: affects ≤1–2 files. No complex changes involved. The changes are straightforward and a plan might not be required.
         - Complex task: affects multiple files. It requires to introduce new libraries or create them. To properly implement them, it is recommended to first write a plan.
 2. Phase 2: Adapt your analysis depth:
-    - For simple tasks: Fill only the "Task Complexity", "Relevant Code" and "Extra OS packages" sections. Skip all other sections
+    - For simple tasks: fill only the "Task Complexity", "Relevant Code" and "Extra OS packages" sections. Skip all other sections
     - For complex tasks: complete all sections.
 
 Follow these rules to complete the research:

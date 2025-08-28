@@ -1,41 +1,52 @@
-You are preparing an implementation plan for this task. Your goal is to create a clear, actionable plan that another engineer can follow to complete the implementation.
+You are preparing an implementation plan for this task: 
 
-Task to plan:
+----
 Title: %title%
 Description:
 %description%
+Context: Read it from /workspace/context.md . If the file do not exist, try your best based on the title and description. THIS IS IMPORTANT.
 
-Your plan should:
-1. Define a clear objective for what will be accomplished
-2. Specify the scope (what's included and excluded)
-3. Break down implementation into minimal, focused steps
-4. Provide validation criteria for completion
+----
 
-Reference the /workspace/context.md file for technical details. Write your plan to /workspace/plan.md using this exact format:
+Provide a clear, concise and actionable plan that another engineer can follow to complete the task.
 
+Follow these steps to complete it. Do not move to the next phase until to complete the previous one.
+
+1. Phase 1: Evaluate task requirements
+    - Read the provided context
+    - Identify the complexity of the given task
+    - Define a clear and concise objective for the plan
+    - Specify the scope, focusing on the task objective
+    - Identify files that will be affected by the changes
+2. Phase 2: Write a plan based on the task requirements. Adapt the details depending on the task complexity, objectives and scope:
+    - Simple task: ≤3 steps max, short objective, scope limited to 1–3 files. Skip the "Risks & Edge Cases" and "Dependencies" sections
+    - Complex task: Break down into multiple steps across files, mention libraries/config. Complete all sections
+
+Follow these rules to complete the plan:
+
+- Do not fabricate content; if information is unavailable or irrelevant, skip it
+- Only list in-scope changes. Do not mention out-of-scope items.
+- Break down implementation into small, clear and concise steps. Do not overengineer, focus on the changes to complete the task and clear side effects.
+- Follow the template strictly
+- Just output the template. Skip any text before and after
+
+Write your plan to /workspace/plan.md following this template:
+
+<template>
 # Implementation Plan
 
 ## Objective
-[One sentence describing what will be accomplished]
+1–2 sentences describing the task objective
 
 ## Scope
-### In scope:
-- [Specific change or feature to implement]
-
-### Out of scope:
-- [What won't be changed or added]
+- In-scope changes (one line each)
 
 ## Implementation Steps
-1. [First concrete action with specific file/component]
-2. [Next action, keep minimal and focused]
+- [ ] One line each, start with a verb, always include filenames, keep concise and actionable.
 
-## Validation Checklist
-- [ ] All tests pass if available (use commands from /workspace/context.md)
-- [ ] Linting passes (use commands from /workspace/context.md)
-- [ ] Feature works as described in the task
-- [ ] No regressions introduced
+## Risks & Edge Cases
+- Potential pitfalls in 1 line each (skip if none)
 
-## Technical Diagram
-```mermaid
-[Only include if the workflow is complex enough to benefit from visualization]
-```
+## Dependencies
+- Prerequisite libraries, configs, or tasks (skip if none)
+</template>
