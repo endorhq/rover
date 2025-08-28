@@ -13,5 +13,8 @@ export default defineConfig({
 	platform: 'node',
 	minify: isProd,
 	bundle: true,
-	sourcemap: !isProd
+	sourcemap: !isProd,
+	loader: {
+		'.md': 'text'
+	}
 });

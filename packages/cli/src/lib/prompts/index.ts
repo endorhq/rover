@@ -3,6 +3,47 @@ import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// Import templates to include them in the dist.
+import contextPrompt from './context.md';
+import planPrompt from './plan.md';
+import implementPrompt from './implement.md';
+import reviewPrompt from './review.md';
+import applyReviewPrompt from './apply-review.md';
+import summaryPrompt from './summary.md';
+
+// Other templates
+import expandIterationPrompt from './expand-iteration-instructions.md';
+import expandTaskPrompt from './expand-task.md';
+import generateCommitPrompt from './generate-commit-message.md'
+import resolveMergePrompt from './resolve-merge-conflicts.md';
+
+enum PROMPT_ID {
+    Context = 'Context',
+    Plan = 'Plan',
+    Implement = 'Implement',
+    Review = 'Review',
+    ApplyReview = 'ApplyReview',
+    Summary = 'Summary',
+    // Others
+    ExpandIteration = 'ExpandIteration',
+    ExpandTask = 'ExpandTask',
+    GenerateCommit = 'GenerateCommit',
+    ResolveMerge = 'ResolveMerge'
+};
+
+const PROMPT_CONTENT: Record<PROMPT_ID, string> = {
+    [PROMPT_ID.Context]: contextPrompt,
+    [PROMPT_ID.Plan]: planPrompt,
+    [PROMPT_ID.Implement]: implementPrompt,
+    [PROMPT_ID.Review]: reviewPrompt,
+    [PROMPT_ID.ApplyReview]: applyReviewPrompt,
+    [PROMPT_ID.Summary]: summaryPrompt,
+    [PROMPT_ID.ExpandIteration]: expandIterationPrompt,
+    [PROMPT_ID.ExpandTask]: expandTaskPrompt,
+    [PROMPT_ID.GenerateCommit]: generateCommitPrompt,
+    [PROMPT_ID.ResolveMerge]: resolveMergePrompt
+}
+
 /**
  * Interface representing a structured task with title and description.
  * This is the expected format for AI responses when expanding task descriptions
@@ -54,9 +95,8 @@ export class PromptBuilder {
      * @param replacements - Object containing placeholder replacements
      * @returns The processed prompt string
      */
-    private loadTemplate(templateName: string, replacements: Record<string, string>): string {
-        const templatePath = join(this.promptsDir, `${templateName}.md`);
-        let template = readFileSync(templatePath, 'utf8');
+    private loadTemplate(templateId: PROMPT_ID, replacements: Record<string, string>): string {
+        let template = `${PROMPT_CONTENT[templateId]}`;
 
         // Replace all placeholders with their values
         for (const [key, value] of Object.entries(replacements)) {
@@ -108,7 +148,7 @@ export class PromptBuilder {
      * Provides a prompt that fetches the context to build a task.
      */
     context(iteration: IterationConfig): string {
-        return this.loadTemplate('context', {
+        return this.loadTemplate(PROMPT_ID.Context, {
             title: iteration.title,
             description: iteration.description
         });
@@ -118,7 +158,7 @@ export class PromptBuilder {
      * Provides a prompt to define a plan for a task
      */
     plan(iteration: IterationConfig): string {
-        return this.loadTemplate('plan', {
+        return this.loadTemplate(PROMPT_ID.Plan, {
             title: iteration.title,
             description: iteration.description
         });
@@ -128,7 +168,7 @@ export class PromptBuilder {
      * Provides a prompt to implement the plan
      */
     implement(iteration: IterationConfig): string {
-        return this.loadTemplate('implement', {
+        return this.loadTemplate(PROMPT_ID.Implement, {
             title: iteration.title,
             description: iteration.description
         });
@@ -138,7 +178,7 @@ export class PromptBuilder {
      * Provides a prompt to review task changes
      */
     review(iteration: IterationConfig): string {
-        return this.loadTemplate('review', {
+        return this.loadTemplate(PROMPT_ID.Review, {
             title: iteration.title,
             description: iteration.description
         });
@@ -148,7 +188,7 @@ export class PromptBuilder {
      * Provides a prompt to apply review feedback and fix identified issues
      */
     apply_review(iteration: IterationConfig): string {
-        return this.loadTemplate('apply-review', {
+        return this.loadTemplate(PROMPT_ID.ApplyReview, {
             title: iteration.title,
             description: iteration.description
         });
@@ -158,7 +198,7 @@ export class PromptBuilder {
      * Provides a prompt to elaborate a summary
      */
     summary(iteration: IterationConfig): string {
-        return this.loadTemplate('summary', {
+        return this.loadTemplate(PROMPT_ID.Summary, {
             title: iteration.title,
             description: iteration.description
         });
@@ -179,7 +219,7 @@ export class PromptBuilder {
      * // Then parse: const parsed = parseJsonResponse<IPromptTask>(result);
      */
     expandTaskPrompt(briefDescription: string): string {
-        return this.loadTemplate('expand-task', {
+        return this.loadTemplate(PROMPT_ID.ExpandTask, {
             briefDescription
         });
     }
@@ -220,7 +260,7 @@ export class PromptBuilder {
             }
         }
 
-        return this.loadTemplate('expand-iteration-instructions', {
+        return this.loadTemplate(PROMPT_ID.ExpandIteration, {
             contextSection,
             instructions
         });
@@ -262,7 +302,7 @@ ${summaries.join('\n')}
 
         const recentCommitsFormatted = recentCommits.map((msg, i) => `${i + 1}. ${msg}`).join('\n');
 
-        return this.loadTemplate('generate-commit-message', {
+        return this.loadTemplate(PROMPT_ID.GenerateCommit, {
             taskTitle,
             taskDescription,
             summariesSection,
@@ -293,7 +333,7 @@ ${summaries.join('\n')}
         diffContext: string,
         conflictedContent: string
     ): string {
-        return this.loadTemplate('resolve-merge-conflicts', {
+        return this.loadTemplate(PROMPT_ID.ResolveMerge, {
             filePath,
             diffContext,
             conflictedContent
