@@ -45,16 +45,16 @@ describe('PromptBuilder', () => {
             const result = builder.context(testIteration);
             
             // Check that placeholders are replaced
-            expect(result).toContain('Title: Test Task Title');
-            expect(result).toContain('Test task description with multiple lines');
+            expect(result).toContain('Task title: Test Task Title');
+            expect(result).toContain('Task description: Test task description with multiple lines');
             expect(result).not.toContain('%title%');
             expect(result).not.toContain('%description%');
             
             // Check that key sections are present
             expect(result).toContain('# Context');
-            expect(result).toContain('## Affected files');
-            expect(result).toContain('## Relevant knowledge');
-            expect(result).toContain('## Installed OS packages');
+            expect(result).toContain('## Task complexity');
+            expect(result).toContain('## Relevant code');
+            expect(result).toContain('## Extra OS packages');
         });
 
         it('should load and process plan template', () => {
@@ -66,10 +66,8 @@ describe('PromptBuilder', () => {
             expect(result).not.toContain('%description%');
             
             expect(result).toContain('# Implementation Plan');
-            expect(result).toContain('## Objective');
-            expect(result).toContain('## Scope');
             expect(result).toContain('## Implementation Steps');
-            expect(result).toContain('## Validation Checklist');
+            expect(result).toContain('## Risks & Edge Cases');
         });
 
         it('should load and process implement template', () => {
@@ -87,10 +85,9 @@ describe('PromptBuilder', () => {
             
             expect(result).toContain('Title: Test Task Title');
             expect(result).toContain('Test task description with multiple lines');
-            expect(result).toContain('Review criteria:');
-            expect(result).toContain('Plan adherence');
-            expect(result).toContain('Code quality');
-            expect(result).toContain('Security');
+            expect(result).toContain('# Code Review');
+            expect(result).toContain('## Overall Assessment');
+            expect(result).toContain('## Plan Adherence Issues');
         });
 
         it('should load and process apply_review template', () => {
@@ -99,8 +96,7 @@ describe('PromptBuilder', () => {
             expect(result).toContain('Title: Test Task Title');
             expect(result).toContain('Test task description with multiple lines');
             expect(result).toContain('## Review Fixes Applied');
-            expect(result).toContain('Must Fix');
-            expect(result).toContain('Should Fix');
+            expect(result).toContain('### Issues Addressed');
         });
 
         it('should load and process summary template', () => {
@@ -353,8 +349,8 @@ describe('PromptBuilder', () => {
             const minimalIteration = IterationConfig.createInitial(tempDir, 1, ' ', ' ');
             const result = builder.context(minimalIteration);
             
-            expect(result).toContain('Title:  '); // Single space title
-            expect(result).toContain('Description:\n '); // Single space description
+            expect(result).toContain('Task title:  '); // Single space title
+            expect(result).toContain('Task description:  '); // Single space description
         });
 
         it('should handle special characters in templates', () => {

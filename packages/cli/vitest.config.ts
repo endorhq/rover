@@ -1,6 +1,20 @@
 import { defineConfig } from 'vitest/config';
+import { readFileSync } from 'node:fs';
 
 export default defineConfig({
+  plugins: [
+    {
+      name: 'markdown-loader',
+      transform(_src, id) {
+        if (id.endsWith('.md')) {
+          const content = readFileSync(id, 'utf-8');
+          return {
+            code: `export default ${JSON.stringify(content)};`
+          };
+        }
+      }
+    }
+  ],
   test: {
     globals: true,
     environment: 'node',
