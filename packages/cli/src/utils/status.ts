@@ -97,8 +97,8 @@ export const getAllTaskStatuses = (): { taskId: string; status: TaskStatus | nul
                 // Ignore task data read errors
             }
 
-            if (['MERGED', 'PUSHED'].includes(taskData.status)) {
-                latestStatus = taskData.status
+            if (['MERGED', 'PUSHED'].includes(taskData?.status)) {
+                latestStatus = taskData.status;
             } else {
                 if (existsSync(iterationsPath)) {
                     try {
