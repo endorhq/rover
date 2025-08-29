@@ -207,11 +207,11 @@ export class RoverCLI {
 
             // Fallback: construct expected path
             const workspaceRoot = this.workspaceRoot || process.cwd();
-            return `${workspaceRoot}/.rover/tasks/${taskId}`;
+            return `${workspaceRoot}/.rover/tasks/${taskId}/workspace`;
         } catch (error) {
             // Fallback: construct expected path
             const workspaceRoot = this.workspaceRoot || process.cwd();
-            return `${workspaceRoot}/.rover/tasks/${taskId}`;
+            return `${workspaceRoot}/.rover/tasks/${taskId}/workspace`;
         }
     }
 
