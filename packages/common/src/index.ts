@@ -4,4 +4,4 @@ export const setVerbose = (verbose: boolean) => {
     VERBOSE = verbose;
 }
 
-export { launch, launchSync, setVerbose } from './os.js';
+export { launch, launchSync } from './os.js';
