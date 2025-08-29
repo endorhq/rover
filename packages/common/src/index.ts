@@ -1,6 +1,6 @@
 export let VERBOSE = false;
 
-export function setVerbose(verbose: boolean) {
+export const setVerbose = (verbose: boolean) => {
     VERBOSE = verbose;
 }
 

@@ -18,7 +18,7 @@ import { mergeCommand } from './commands/merge.js';
 import colors from 'ansi-colors';
 import { pushCommand } from './commands/push.js';
 import { showTips, TIP_TITLES } from './utils/display.js';
-import { launch, setVerbose } from 'rover-common';
+import { launch } from 'rover-common';
 
 const program = new Command();
 
