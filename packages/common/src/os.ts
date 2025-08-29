@@ -26,6 +26,7 @@ const log = (stream: string) => {
       } else {
           console.error(`${now.toISOString()} ${stream} ${data}`);
       }
+      yield data
   }
 }
 
