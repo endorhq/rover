@@ -140,12 +140,11 @@ const updateTaskMetadata = (taskId: number, updates: any, jsonMode?: boolean) =>
 };
 
 export const findKeychainCredentials = (key: string): string => {
-    const result = launchSync('security', ['find-generic-password', '-s', key, '-w'])
-        .stdout?.toString();
-            if (result === undefined) {
-                throw new Error('could not find keychain credentials');
-        }
-        return result
+    const result = launchSync('security', ['find-generic-password', '-s', key, '-w']).stdout as string;
+    if (result === undefined) {
+        throw new Error('could not find keychain credentials');
+    }
+    return result
 }
 
 /**
