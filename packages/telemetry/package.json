@@ -9,7 +9,8 @@
     "dev": "TSUP_DEV=true tsdown --env.TSUP_DEV=true --watch src/ src/index.ts",
     "start": "node dist/index.js",
     "clean": "rm -rf dist",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "format": "prettier --write \"src/**/*.{ts,js,json}\""
   },
   "author": "The Endor team",
   "dependencies": {

@@ -22,9 +22,14 @@
         "test": "run-p -l test:*",
         "test:extension": "npm run test --workspace=./packages/extension",
         "test:cli": "npm run test --workspace=./packages/cli",
+        "format": "run-p -l format:*",
+        "format:cli": "npm run format --workspace=./packages/cli",
+        "format:extension": "npm run format --workspace=./packages/extension",
+        "format:telemetry": "npm run format --workspace=./packages/telemetry",
         "postinstall": "run-s -l build:common build:telemetry"
     },
     "devDependencies": {
-        "npm-run-all": "^4.1.5"
+        "npm-run-all": "^4.1.5",
+        "prettier": "^3.2.5"
     }
 }

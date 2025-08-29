@@ -200,6 +200,7 @@
     "watch-tests": "tsc -p . -w --outDir out",
     "pretest": "npm run compile-tests && npm run compile && npm run lint",
     "check-types": "tsc --noEmit",
+    "format": "prettier --write \"src/**/*.{ts,mts,js,json}\"",
     "lint": "eslint src",
     "test": "vscode-test"
   },
