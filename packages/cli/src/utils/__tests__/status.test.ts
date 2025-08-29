@@ -22,13 +22,15 @@ describe('getAllTaskStatuses', () => {
     it('should sort task IDs numerically, not alphabetically', () => {
         // Mock the rover tasks directory exists
         vi.mocked(existsSync).mockImplementation((path) => {
-            if (path.toString().endsWith('.rover/tasks')) return true;
+            const pathStr = path.toString();
+            if (pathStr.includes(`/.rover/tasks`)) return true;
             return false;
         });
 
         // Mock directory listing with mixed single and double-digit task IDs
         vi.mocked(readdirSync).mockImplementation((path, options?: any) => {
-            if (path.toString().endsWith('.rover/tasks') && options?.withFileTypes) {
+            const pathStr = path.toString();
+            if (pathStr === `${process.cwd()}/.rover/tasks` && options?.withFileTypes) {
                 return [
                     { name: '1', isDirectory: () => true },
                     { name: '10', isDirectory: () => true },
@@ -52,7 +54,7 @@ describe('getAllTaskStatuses', () => {
         // Verify tasks are returned in correct numerical order
         const taskIds = results.map(r => r.taskId);
         expect(taskIds).toEqual(['1', '2', '3', '9', '10', '11', '20']);
-        
+
         // Verify non-numeric entries were filtered out
         expect(taskIds).not.toContain('non-numeric');
         expect(taskIds).not.toContain('README.md');
@@ -61,12 +63,14 @@ describe('getAllTaskStatuses', () => {
     it('should handle empty tasks directory', () => {
         // Mock the rover tasks directory exists but is empty
         vi.mocked(existsSync).mockImplementation((path) => {
-            if (path.toString().endsWith('.rover/tasks')) return true;
+            const pathStr = path.toString();
+            if (pathStr.includes(`/.rover/tasks`)) return true;
             return false;
         });
 
         vi.mocked(readdirSync).mockImplementation((path, options?: any) => {
-            if (options?.withFileTypes) {
+            const pathStr = path.toString();
+            if (pathStr === `${process.cwd()}/.rover/tasks` && options?.withFileTypes) {
                 return [];
             }
             return [];
@@ -86,12 +90,14 @@ describe('getAllTaskStatuses', () => {
 
     it('should sort large numbers correctly', () => {
         vi.mocked(existsSync).mockImplementation((path) => {
-            if (path.toString().endsWith('.rover/tasks')) return true;
+            const pathStr = path.toString();
+            if (pathStr.includes(`/.rover/tasks`)) return true;
             return false;
         });
 
         vi.mocked(readdirSync).mockImplementation((path, options?: any) => {
-            if (path.toString().endsWith('.rover/tasks') && options?.withFileTypes) {
+            const pathStr = path.toString();
+            if (pathStr === `${process.cwd()}/.rover/tasks` && options?.withFileTypes) {
                 return [
                     { name: '100', isDirectory: () => true },
                     { name: '99', isDirectory: () => true },
@@ -107,7 +113,7 @@ describe('getAllTaskStatuses', () => {
 
         const results = getAllTaskStatuses();
         const taskIds = results.map(r => r.taskId);
-        
+
         expect(taskIds).toEqual(['9', '99', '100', '999', '1000']);
     });
 });
