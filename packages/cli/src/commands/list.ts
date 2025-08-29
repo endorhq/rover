@@ -131,14 +131,25 @@ export const listCommand = async (options: { watch?: boolean; verbose?: boolean;
         // Print rows
         for (const { taskId, status, taskData } of allStatuses) {
             const title = taskData?.title || 'Unknown Task';
-            const duration = formatDuration(lastIterationOrTaskProperty({status, taskData, attribute: 'startedAt'}));
-            const colorFunc = statusColor(lastIterationOrTaskProperty({status, taskData, attribute: 'status'}));
+            const taskStatus = lastIterationOrTaskProperty({status, taskData, attribute: 'status'});
+            const startedAt = lastIterationOrTaskProperty({status, taskData, attribute: 'startedAt'});
+            
+            // Determine end time based on task status
+            let endTime: string | undefined;
+            if (taskStatus === 'failed') {
+                endTime = lastIterationOrTaskProperty({status, taskData, attribute: 'failedAt'});
+            } else if (['completed', 'merged', 'pushed'].includes(taskStatus)) {
+                endTime = lastIterationOrTaskProperty({status, taskData, attribute: 'completedAt'});
+            }
+            
+            const duration = formatDuration(startedAt, endTime);
+            const colorFunc = statusColor(taskStatus);
 
             let row = '';
             row += colors.cyan(taskId.padEnd(columnWidths[0]));
             row += colors.white(truncateText(title, columnWidths[1] - 1).padEnd(columnWidths[1]));
-            row += colorFunc(formatTaskStatus(lastIterationOrTaskProperty({status, taskData, attribute: 'status'})).padEnd(columnWidths[2])); // +10 for ANSI codes
-            row += formatProgress(lastIterationOrTaskProperty({status, taskData, attribute: 'status'}), status?.progress || 0).padEnd(columnWidths[3] + 10);
+            row += colorFunc(formatTaskStatus(taskStatus).padEnd(columnWidths[2])); // +10 for ANSI codes
+            row += formatProgress(taskStatus, status?.progress || 0).padEnd(columnWidths[3] + 10);
             row += colors.gray(truncateText(status?.currentStep || '-', columnWidths[4] - 1).padEnd(columnWidths[4]));
             row += colors.gray(status ? duration : '-');
             console.log(row);
