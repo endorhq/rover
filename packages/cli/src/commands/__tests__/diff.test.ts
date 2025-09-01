@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync, appendFileSync } from 'node:fs';
+import {
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+  mkdirSync,
+  appendFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execSync } from 'node:child_process';
@@ -10,19 +16,19 @@ import { TaskDescription } from '../../lib/description.js';
 vi.mock('../../lib/telemetry.js', () => ({
   getTelemetry: vi.fn().mockReturnValue({
     eventDiff: vi.fn(),
-    shutdown: vi.fn().mockResolvedValue(undefined)
-  })
+    shutdown: vi.fn().mockResolvedValue(undefined),
+  }),
 }));
 
 // Mock display utilities to suppress output during tests
 vi.mock('../../utils/display.js', () => ({
-  showTips: vi.fn()
+  showTips: vi.fn(),
 }));
 
 // Spy on console methods to verify output
 const consoleSpy = {
-  log: vi.spyOn(console, 'log').mockImplementation(() => { }),
-  error: vi.spyOn(console, 'error').mockImplementation(() => { })
+  log: vi.spyOn(console, 'log').mockImplementation(() => {}),
+  error: vi.spyOn(console, 'error').mockImplementation(() => {}),
 };
 
 describe('diff command', () => {
@@ -66,14 +72,16 @@ describe('diff command', () => {
     const task = TaskDescription.create({
       id,
       title,
-      description: 'Test task description'
+      description: 'Test task description',
     });
 
     // Create a git worktree for the task
     const worktreePath = join('.rover', 'tasks', id.toString(), 'workspace');
     const branchName = `rover-task-${id}`;
 
-    execSync(`git worktree add ${worktreePath} -b ${branchName}`, { stdio: 'pipe' });
+    execSync(`git worktree add ${worktreePath} -b ${branchName}`, {
+      stdio: 'pipe',
+    });
     task.setWorkspace(join(testDir, worktreePath), branchName);
 
     return { task, worktreePath, branchName };
@@ -84,7 +92,9 @@ describe('diff command', () => {
       await diffCommand('invalid');
 
       expect(consoleSpy.log).toHaveBeenCalledWith(
-        expect.stringContaining("✗ Invalid task ID 'invalid' - must be a number")
+        expect.stringContaining(
+          "✗ Invalid task ID 'invalid' - must be a number"
+        )
       );
     });
 
@@ -101,7 +111,7 @@ describe('diff command', () => {
       const task = TaskDescription.create({
         id: 1,
         title: 'No Workspace Task',
-        description: 'Test'
+        description: 'Test',
       });
 
       await diffCommand('1');
@@ -190,10 +200,16 @@ describe('diff command', () => {
       const { worktreePath } = createTestTask(5, 'Untracked Files Task');
 
       // Create untracked files
-      writeFileSync(join(worktreePath, 'untracked1.txt'), 'First untracked file\n');
+      writeFileSync(
+        join(worktreePath, 'untracked1.txt'),
+        'First untracked file\n'
+      );
       writeFileSync(join(worktreePath, 'untracked2.js'), 'const x = 42;\n');
       mkdirSync(join(worktreePath, 'new-dir'), { recursive: true });
-      writeFileSync(join(worktreePath, 'new-dir', 'nested.txt'), 'Nested untracked file\n');
+      writeFileSync(
+        join(worktreePath, 'new-dir', 'nested.txt'),
+        'Nested untracked file\n'
+      );
 
       await diffCommand('5');
 
@@ -213,9 +229,15 @@ describe('diff command', () => {
 
       // Create files, some matching .gitignore patterns
       writeFileSync(join(worktreePath, 'important.txt'), 'This should show\n');
-      writeFileSync(join(worktreePath, 'debug.log'), 'This should be ignored\n');
+      writeFileSync(
+        join(worktreePath, 'debug.log'),
+        'This should be ignored\n'
+      );
       mkdirSync(join(worktreePath, 'node_modules'), { recursive: true });
-      writeFileSync(join(worktreePath, 'node_modules', 'package.json'), 'Should be ignored\n');
+      writeFileSync(
+        join(worktreePath, 'node_modules', 'package.json'),
+        'Should be ignored\n'
+      );
 
       await diffCommand('6');
 
@@ -244,7 +266,10 @@ describe('diff command', () => {
 
       // Untracked files
       writeFileSync(join(worktreePath, 'untracked.txt'), 'Untracked content\n');
-      writeFileSync(join(worktreePath, 'another-untracked.md'), '# Another untracked\n');
+      writeFileSync(
+        join(worktreePath, 'another-untracked.md'),
+        '# Another untracked\n'
+      );
 
       await diffCommand('7');
 
@@ -300,7 +325,10 @@ describe('diff command', () => {
       const { worktreePath } = createTestTask(10, 'Untracked Specific Task');
 
       // Create untracked file
-      writeFileSync(join(worktreePath, 'new-untracked.js'), 'function test() { return 42; }\n');
+      writeFileSync(
+        join(worktreePath, 'new-untracked.js'),
+        'function test() { return 42; }\n'
+      );
 
       await diffCommand('10', 'new-untracked.js');
 
@@ -322,7 +350,10 @@ describe('diff command', () => {
       writeFileSync(join(worktreePath, 'new1.txt'), 'Content 1\n');
       writeFileSync(join(worktreePath, 'new2.txt'), 'Content 2\n');
       mkdirSync(join(worktreePath, 'src'), { recursive: true });
-      writeFileSync(join(worktreePath, 'src', 'index.js'), 'console.log("test");\n');
+      writeFileSync(
+        join(worktreePath, 'src', 'index.js'),
+        'console.log("test");\n'
+      );
 
       await diffCommand('11', undefined, { onlyFiles: true });
 
@@ -360,10 +391,19 @@ describe('diff command', () => {
       const { worktreePath } = createTestTask(13, 'Branch Compare Task');
 
       // Make changes in the worktree and commit them
-      appendFileSync(join(worktreePath, 'README.md'), '## Task specific change\n');
-      writeFileSync(join(worktreePath, 'task-file.txt'), 'Task branch content\n');
+      appendFileSync(
+        join(worktreePath, 'README.md'),
+        '## Task specific change\n'
+      );
+      writeFileSync(
+        join(worktreePath, 'task-file.txt'),
+        'Task branch content\n'
+      );
       execSync('git add .', { cwd: worktreePath, stdio: 'pipe' });
-      execSync('git commit -m "Task changes"', { cwd: worktreePath, stdio: 'pipe' });
+      execSync('git commit -m "Task changes"', {
+        cwd: worktreePath,
+        stdio: 'pipe',
+      });
 
       // Make different changes in main branch
       writeFileSync('main-only.txt', 'Main branch file\n');
@@ -405,10 +445,16 @@ describe('diff command', () => {
       // Create and commit a file first
       writeFileSync(join(worktreePath, 'old-name.txt'), 'File content\n');
       execSync('git add .', { cwd: worktreePath, stdio: 'pipe' });
-      execSync('git commit -m "Add file"', { cwd: worktreePath, stdio: 'pipe' });
+      execSync('git commit -m "Add file"', {
+        cwd: worktreePath,
+        stdio: 'pipe',
+      });
 
       // Rename the file
-      execSync('git mv old-name.txt new-name.txt', { cwd: worktreePath, stdio: 'pipe' });
+      execSync('git mv old-name.txt new-name.txt', {
+        cwd: worktreePath,
+        stdio: 'pipe',
+      });
 
       await diffCommand('15');
 
@@ -416,7 +462,9 @@ describe('diff command', () => {
       const output = logCalls.join('\n');
 
       // Git should show rename information
-      expect(output.toLowerCase()).toMatch(/rename|old-name.*new-name|new-name.*old-name/);
+      expect(output.toLowerCase()).toMatch(
+        /rename|old-name.*new-name|new-name.*old-name/
+      );
     });
 
     it('should handle deleted files', async () => {
@@ -425,7 +473,10 @@ describe('diff command', () => {
       // Create and commit a file
       writeFileSync(join(worktreePath, 'to-delete.txt'), 'Will be deleted\n');
       execSync('git add .', { cwd: worktreePath, stdio: 'pipe' });
-      execSync('git commit -m "Add file to delete"', { cwd: worktreePath, stdio: 'pipe' });
+      execSync('git commit -m "Add file to delete"', {
+        cwd: worktreePath,
+        stdio: 'pipe',
+      });
 
       // Delete the file
       execSync('git rm to-delete.txt', { cwd: worktreePath, stdio: 'pipe' });
@@ -443,7 +494,9 @@ describe('diff command', () => {
       const { worktreePath } = createTestTask(17, 'Binary Task');
 
       // Create a binary file (small image simulation)
-      const binaryContent = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+      const binaryContent = Buffer.from([
+        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+      ]);
       writeFileSync(join(worktreePath, 'image.png'), binaryContent);
 
       await diffCommand('17');
@@ -461,7 +514,10 @@ describe('diff command', () => {
 
       // Create many files
       for (let i = 1; i <= 10; i++) {
-        writeFileSync(join(worktreePath, `file${i}.txt`), `Content of file ${i}\n`);
+        writeFileSync(
+          join(worktreePath, `file${i}.txt`),
+          `Content of file ${i}\n`
+        );
       }
 
       await diffCommand('18', undefined, { onlyFiles: true });
@@ -517,7 +573,7 @@ describe('diff command', () => {
       const task = TaskDescription.create({
         id: 1,
         title: 'Empty Repo Task',
-        description: 'Test'
+        description: 'Test',
       });
 
       const worktreePath = join('.rover', 'tasks', '1', 'workspace');
@@ -528,7 +584,9 @@ describe('diff command', () => {
       writeFileSync('temp.txt', 'temp');
       execSync('git add .', { stdio: 'pipe' });
       execSync('git commit -m "temp"', { stdio: 'pipe' });
-      execSync(`git worktree add ${worktreePath} -b ${branchName}`, { stdio: 'pipe' });
+      execSync(`git worktree add ${worktreePath} -b ${branchName}`, {
+        stdio: 'pipe',
+      });
 
       task.setWorkspace(join(emptyDir, worktreePath), branchName);
 
@@ -554,7 +612,14 @@ describe('diff command', () => {
       const { worktreePath } = createTestTask(21, 'Long Path Task');
 
       // Create deeply nested directory
-      const deepPath = join(worktreePath, 'very', 'deeply', 'nested', 'directory', 'structure');
+      const deepPath = join(
+        worktreePath,
+        'very',
+        'deeply',
+        'nested',
+        'directory',
+        'structure'
+      );
       mkdirSync(deepPath, { recursive: true });
       writeFileSync(join(deepPath, 'file.txt'), 'Deep file content\n');
 
@@ -564,7 +629,9 @@ describe('diff command', () => {
       const output = logCalls.join('\n');
 
       // Untracked files in nested directories should be included
-      expect(output).toContain('very/deeply/nested/directory/structure/file.txt');
+      expect(output).toContain(
+        'very/deeply/nested/directory/structure/file.txt'
+      );
       expect(output).toContain('+Deep file content');
     });
 
@@ -574,7 +641,10 @@ describe('diff command', () => {
       // Create files with special characters
       writeFileSync(join(worktreePath, 'file with spaces.txt'), 'Content\n');
       writeFileSync(join(worktreePath, 'file-with-dashes.txt'), 'Content\n');
-      writeFileSync(join(worktreePath, 'file_with_underscores.txt'), 'Content\n');
+      writeFileSync(
+        join(worktreePath, 'file_with_underscores.txt'),
+        'Content\n'
+      );
 
       await diffCommand('22', undefined, { onlyFiles: true });
 

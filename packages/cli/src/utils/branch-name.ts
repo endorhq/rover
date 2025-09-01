@@ -1,6 +1,7 @@
 import { customAlphabet } from 'nanoid';
 
-const CUSTOM_ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-';
+const CUSTOM_ALPHABET =
+  '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-';
 const NANOID_SIZE = 12;
 
 export const generateRandomId = customAlphabet(CUSTOM_ALPHABET, NANOID_SIZE);
@@ -10,6 +11,6 @@ export const generateRandomId = customAlphabet(CUSTOM_ALPHABET, NANOID_SIZE);
  * Format: rover/task-{TASK_ID}-{NANOID_RANDOM_STRING}
  */
 export function generateBranchName(taskId: number): string {
-    const randomId = generateRandomId();
-    return `rover/task-${taskId}-${randomId}`;
+  const randomId = generateRandomId();
+  return `rover/task-${taskId}-${randomId}`;
 }

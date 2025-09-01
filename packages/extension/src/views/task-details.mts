@@ -357,7 +357,7 @@ export class TaskDetailsView extends LitElement {
     if (this.vscode) {
       this.vscode.postMessage({
         command: 'openFile',
-        filePath: filePath
+        filePath: filePath,
       });
     }
   }
@@ -367,18 +367,22 @@ export class TaskDetailsView extends LitElement {
       this.vscode.postMessage({
         command: 'executeAction',
         action: action,
-        taskId: this.taskData?.id
+        taskId: this.taskData?.id,
       });
     }
   }
 
   private getStatusClass(status?: string): string {
     switch (status?.toLowerCase()) {
-      case 'completed': return 'status-completed';
-      case 'failed': return 'status-failed';
+      case 'completed':
+        return 'status-completed';
+      case 'failed':
+        return 'status-failed';
       case 'in_progress':
-      case 'running': return 'status-running';
-      default: return 'status-new';
+      case 'running':
+        return 'status-running';
+      default:
+        return 'status-new';
     }
   }
 
@@ -398,9 +402,7 @@ export class TaskDetailsView extends LitElement {
 
     if (this.error) {
       return html`
-        <div class="error">
-          Error loading task details: ${this.error}
-        </div>
+        <div class="error">Error loading task details: ${this.error}</div>
       `;
     }
 
@@ -412,7 +414,9 @@ export class TaskDetailsView extends LitElement {
       `;
     }
 
-    const isRunning = ['running', 'in_progress'].includes(this.taskData.status?.toLowerCase());
+    const isRunning = ['running', 'in_progress'].includes(
+      this.taskData.status?.toLowerCase()
+    );
     const isCompleted = this.taskData.status?.toLowerCase() == 'completed';
 
     return html`
@@ -432,27 +436,41 @@ export class TaskDetailsView extends LitElement {
           <div class="field-row">
             <span class="field-label">Status:</span>
             <span class="field-value">
-              <span class="status-badge ${this.getStatusClass(this.taskData.status)}">
+              <span
+                class="status-badge ${this.getStatusClass(
+                  this.taskData.status
+                )}"
+              >
                 ${this.taskData.formattedStatus || this.taskData.status || '-'}
               </span>
             </span>
           </div>
           <div class="field-row">
             <span class="field-label">Created:</span>
-            <span class="field-value">${this.formatDate(this.taskData.createdAt)}</span>
+            <span class="field-value"
+              >${this.formatDate(this.taskData.createdAt)}</span
+            >
           </div>
-          ${this.taskData.completedAt ? html`
-            <div class="field-row">
-              <span class="field-label">Completed:</span>
-              <span class="field-value">${this.formatDate(this.taskData.completedAt)}</span>
-            </div>
-          ` : ''}
-          ${this.taskData.failedAt ? html`
-            <div class="field-row">
-              <span class="field-label">Failed:</span>
-              <span class="field-value">${this.formatDate(this.taskData.failedAt)}</span>
-            </div>
-          ` : ''}
+          ${this.taskData.completedAt
+            ? html`
+                <div class="field-row">
+                  <span class="field-label">Completed:</span>
+                  <span class="field-value"
+                    >${this.formatDate(this.taskData.completedAt)}</span
+                  >
+                </div>
+              `
+            : ''}
+          ${this.taskData.failedAt
+            ? html`
+                <div class="field-row">
+                  <span class="field-label">Failed:</span>
+                  <span class="field-value"
+                    >${this.formatDate(this.taskData.failedAt)}</span
+                  >
+                </div>
+              `
+            : ''}
         </div>
       </div>
 
@@ -467,11 +485,23 @@ export class TaskDetailsView extends LitElement {
       </div>
 
       <div class="section">
-        <div class="section-header" @click=${() => this.toggleSection('iterations')}>
+        <div
+          class="section-header"
+          @click=${() => this.toggleSection('iterations')}
+        >
           <span>Iterations</span>
-          <span class="expand-icon ${this.expandedSections.has('iterations') ? 'expanded' : ''}">▶</span>
+          <span
+            class="expand-icon ${this.expandedSections.has('iterations')
+              ? 'expanded'
+              : ''}"
+            >▶</span
+          >
         </div>
-        <div class="section-content ${!this.expandedSections.has('iterations') ? 'collapsed' : ''}">
+        <div
+          class="section-content ${!this.expandedSections.has('iterations')
+            ? 'collapsed'
+            : ''}"
+        >
           ${this.renderIterations()}
         </div>
       </div>
@@ -482,19 +512,36 @@ export class TaskDetailsView extends LitElement {
         </div>
         <div class="section-content">
           <div class="action-buttons">
-            <button class="action-button secondary" @click=${() => this.executeAction('logs')}>
+            <button
+              class="action-button secondary"
+              @click=${() => this.executeAction('logs')}
+            >
               View Logs
             </button>
-            <button class="action-button secondary" @click=${() => this.executeAction('shell')} ?disabled=${!isRunning && !isCompleted}>
+            <button
+              class="action-button secondary"
+              @click=${() => this.executeAction('shell')}
+              ?disabled=${!isRunning && !isCompleted}
+            >
               Open Shell
             </button>
-            <button class="action-button secondary" @click=${() => this.executeAction('openWorkspace')}>
+            <button
+              class="action-button secondary"
+              @click=${() => this.executeAction('openWorkspace')}
+            >
               Open Workspace
             </button>
-            <button class="action-button secondary" @click=${() => this.executeAction('refresh')}>
+            <button
+              class="action-button secondary"
+              @click=${() => this.executeAction('refresh')}
+            >
               Refresh
             </button>
-            <button class="action-button secondary" @click=${() => this.executeAction('delete')} style="color: var(--vscode-errorForeground);">
+            <button
+              class="action-button secondary"
+              @click=${() => this.executeAction('delete')}
+              style="color: var(--vscode-errorForeground);"
+            >
               Delete Task
             </button>
           </div>
@@ -508,7 +555,8 @@ export class TaskDetailsView extends LitElement {
       return '';
     }
 
-    const latestIteration = this.taskData.iterations[this.taskData.iterations.length - 1];
+    const latestIteration =
+      this.taskData.iterations[this.taskData.iterations.length - 1];
     if (!latestIteration.summaryContent) {
       return '';
     }
@@ -530,37 +578,65 @@ export class TaskDetailsView extends LitElement {
       <div id="iterationsList">
         ${this.taskData.iterations.map((iteration: any, index: number) => {
           const iterationId = `${index}`;
-          const isExpanded = !this.expandedSections.has(`iteration-${iterationId}`);
+          const isExpanded = !this.expandedSections.has(
+            `iteration-${iterationId}`
+          );
 
           return html`
             <div class="iteration">
-              <div class="iteration-header" @click=${() => this.toggleIteration(iterationId)}>
-                <span class="iteration-title">Iteration ${iteration.number || (index + 1)}</span>
-                <span class="status-badge ${this.getStatusClass(iteration.status)}">
+              <div
+                class="iteration-header"
+                @click=${() => this.toggleIteration(iterationId)}
+              >
+                <span class="iteration-title"
+                  >Iteration ${iteration.number || index + 1}</span
+                >
+                <span
+                  class="status-badge ${this.getStatusClass(iteration.status)}"
+                >
                   ${iteration.status || 'Unknown'}
                 </span>
-                <span class="expand-icon ${isExpanded ? 'expanded' : ''}">▶</span>
+                <span class="expand-icon ${isExpanded ? 'expanded' : ''}"
+                  >▶</span
+                >
               </div>
               <div class="iteration-content ${!isExpanded ? 'collapsed' : ''}">
                 <div class="field-row">
                   <span class="field-label">Started:</span>
-                  <span class="field-value">${this.formatDate(iteration.startedAt)}</span>
+                  <span class="field-value"
+                    >${this.formatDate(iteration.startedAt)}</span
+                  >
                 </div>
-                ${iteration.completedAt ? html`
-                  <div class="field-row">
-                    <span class="field-label">Completed:</span>
-                    <span class="field-value">${this.formatDate(iteration.completedAt)}</span>
-                  </div>
-                ` : ''}
+                ${iteration.completedAt
+                  ? html`
+                      <div class="field-row">
+                        <span class="field-label">Completed:</span>
+                        <span class="field-value"
+                          >${this.formatDate(iteration.completedAt)}</span
+                        >
+                      </div>
+                    `
+                  : ''}
                 <div class="field-row">
                   <span class="field-label">Files:</span>
                   <div class="field-value">
                     <div class="file-buttons">
-                      ${iteration.files?.length ? iteration.files.map((file: any) => html`
-                        <button class="file-button" @click=${() => this.openFile(file.path)} ?disabled=${!file.exists}>
-                          ${file.name}
-                        </button>
-                      `) : html`<span style="color: var(--vscode-descriptionForeground);">No files available</span>`}
+                      ${iteration.files?.length
+                        ? iteration.files.map(
+                            (file: any) => html`
+                              <button
+                                class="file-button"
+                                @click=${() => this.openFile(file.path)}
+                                ?disabled=${!file.exists}
+                              >
+                                ${file.name}
+                              </button>
+                            `
+                          )
+                        : html`<span
+                            style="color: var(--vscode-descriptionForeground);"
+                            >No files available</span
+                          >`}
                     </div>
                   </div>
                 </div>
@@ -576,7 +652,10 @@ export class TaskDetailsView extends LitElement {
 // Initialize the component when the DOM is ready
 if (typeof window !== 'undefined') {
   // Acquire VS Code API
-  const vscode = typeof window.acquireVsCodeApi !== 'undefined' ? window.acquireVsCodeApi() : null;
+  const vscode =
+    typeof window.acquireVsCodeApi !== 'undefined'
+      ? window.acquireVsCodeApi()
+      : null;
 
   // Create and configure the component
   const component = document.createElement('task-details-view');

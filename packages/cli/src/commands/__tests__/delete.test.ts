@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtempSync, rmSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
+import {
+  mkdtempSync,
+  rmSync,
+  existsSync,
+  writeFileSync,
+  mkdirSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execSync } from 'node:child_process';
@@ -10,27 +16,27 @@ import { TaskDescription } from '../../lib/description.js';
 vi.mock('../../lib/telemetry.js', () => ({
   getTelemetry: vi.fn().mockReturnValue({
     eventDeleteTask: vi.fn(),
-    shutdown: vi.fn().mockResolvedValue(undefined)
-  })
+    shutdown: vi.fn().mockResolvedValue(undefined),
+  }),
 }));
 
 // Mock enquirer at the top level
 vi.mock('enquirer', () => ({
   default: {
-    prompt: vi.fn()
-  }
+    prompt: vi.fn(),
+  },
 }));
 
 // Mock exit utilities to prevent process.exit
 vi.mock('../../utils/exit.js', () => ({
-  exitWithError: vi.fn().mockImplementation(() => { }),
-  exitWithSuccess: vi.fn().mockImplementation(() => { }),
-  exitWithWarn: vi.fn().mockImplementation(() => { })
+  exitWithError: vi.fn().mockImplementation(() => {}),
+  exitWithSuccess: vi.fn().mockImplementation(() => {}),
+  exitWithWarn: vi.fn().mockImplementation(() => {}),
 }));
 
 // Mock display utilities to suppress output
 vi.mock('../../utils/display.js', () => ({
-  showRoverChat: vi.fn()
+  showRoverChat: vi.fn(),
 }));
 
 describe('delete command', () => {
@@ -69,14 +75,16 @@ describe('delete command', () => {
     const task = TaskDescription.create({
       id,
       title,
-      description: 'Test task description'
+      description: 'Test task description',
     });
 
     // Create a git worktree for the task
     const worktreePath = join('.rover', 'tasks', id.toString(), 'workspace');
     const branchName = `rover-task-${id}`;
 
-    execSync(`git worktree add ${worktreePath} -b ${branchName}`, { stdio: 'pipe' });
+    execSync(`git worktree add ${worktreePath} -b ${branchName}`, {
+      stdio: 'pipe',
+    });
     task.setWorkspace(join(testDir, worktreePath), branchName);
 
     return task;
@@ -90,7 +98,7 @@ describe('delete command', () => {
 
       expect(exitWithError).toHaveBeenCalledWith(
         expect.objectContaining({
-          error: "Invalid task ID 'invalid' - must be a number"
+          error: "Invalid task ID 'invalid' - must be a number",
         }),
         false
       );
@@ -103,7 +111,7 @@ describe('delete command', () => {
 
       expect(exitWithError).toHaveBeenCalledWith(
         expect.objectContaining({
-          error: "Invalid task ID '' - must be a number"
+          error: "Invalid task ID '' - must be a number",
         }),
         false
       );
@@ -117,7 +125,7 @@ describe('delete command', () => {
       // parseInt('1.5') = 1, so this should try to delete task 1
       expect(exitWithError).toHaveBeenCalledWith(
         expect.objectContaining({
-          error: 'The task with ID 1 was not found'
+          error: 'The task with ID 1 was not found',
         }),
         false
       );
@@ -132,7 +140,7 @@ describe('delete command', () => {
 
       expect(exitWithError).toHaveBeenCalledWith(
         expect.objectContaining({
-          error: 'The task with ID 999 was not found'
+          error: 'The task with ID 999 was not found',
         }),
         false
       );
@@ -145,7 +153,7 @@ describe('delete command', () => {
 
       expect(exitWithError).toHaveBeenCalledWith(
         expect.objectContaining({
-          error: 'The task with ID -1 was not found'
+          error: 'The task with ID -1 was not found',
         }),
         false
       );
@@ -386,7 +394,7 @@ describe('delete command', () => {
 
       expect(exitWithError).toHaveBeenCalledWith(
         expect.objectContaining({
-          error: 'The task with ID 0 was not found'
+          error: 'The task with ID 0 was not found',
         }),
         false
       );
@@ -399,7 +407,7 @@ describe('delete command', () => {
 
       expect(exitWithError).toHaveBeenCalledWith(
         expect.objectContaining({
-          error: 'The task with ID 999999999 was not found'
+          error: 'The task with ID 999999999 was not found',
         }),
         false
       );

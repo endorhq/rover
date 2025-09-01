@@ -27,7 +27,7 @@ describe('TaskDescription', () => {
       const task = TaskDescription.create({
         id: 1,
         title: 'Test Task',
-        description: 'Test description'
+        description: 'Test description',
       });
 
       task.markMerged();
@@ -41,7 +41,7 @@ describe('TaskDescription', () => {
       const task = TaskDescription.create({
         id: 2,
         title: 'Test Task',
-        description: 'Test description'
+        description: 'Test description',
       });
 
       task.markPushed();
@@ -55,7 +55,7 @@ describe('TaskDescription', () => {
       const task = TaskDescription.create({
         id: 3,
         title: 'Test Task',
-        description: 'Test description'
+        description: 'Test description',
       });
 
       // Mark as in progress first
@@ -72,7 +72,7 @@ describe('TaskDescription', () => {
       const task = TaskDescription.create({
         id: 4,
         title: 'Test Task',
-        description: 'Test description'
+        description: 'Test description',
       });
 
       // Test all new status types
@@ -91,7 +91,7 @@ describe('TaskDescription', () => {
       const task = TaskDescription.create({
         id: 5,
         title: 'Test Task',
-        description: 'Test description'
+        description: 'Test description',
       });
 
       task.markCompleted();
@@ -104,19 +104,19 @@ describe('TaskDescription', () => {
   });
 
   it('should not set completedAt when marking as PUSHED', () => {
-      const task = TaskDescription.create({
-        id: 5,
-        title: 'Test Task',
-        description: 'Test description'
-      });
+    const task = TaskDescription.create({
+      id: 5,
+      title: 'Test Task',
+      description: 'Test description',
+    });
 
-      task.markCompleted();
-      task.markMerged();
-      const beforeTime = task.completedAt;
+    task.markCompleted();
+    task.markMerged();
+    const beforeTime = task.completedAt;
 
-      // Marking as pushed should not change `completedAt` timestamp; the task was already complete
-      task.markPushed();
-      expect(task.completedAt!).toEqual(beforeTime);
+    // Marking as pushed should not change `completedAt` timestamp; the task was already complete
+    task.markPushed();
+    expect(task.completedAt!).toEqual(beforeTime);
   });
 
   describe('status migration', () => {
@@ -125,7 +125,7 @@ describe('TaskDescription', () => {
       const task = TaskDescription.create({
         id: 6,
         title: 'Migration Test',
-        description: 'Test description'
+        description: 'Test description',
       });
 
       // Test MERGED migration
@@ -143,7 +143,7 @@ describe('TaskDescription', () => {
       const task = TaskDescription.create({
         id: 7,
         title: 'Utility Test',
-        description: 'Test description'
+        description: 'Test description',
       });
 
       // Test NEW status

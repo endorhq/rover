@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtempSync, rmSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
+import {
+  mkdtempSync,
+  rmSync,
+  existsSync,
+  writeFileSync,
+  mkdirSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execSync } from 'node:child_process';
@@ -10,41 +16,41 @@ import { TaskDescription } from '../../lib/description.js';
 vi.mock('../../lib/telemetry.js', () => ({
   getTelemetry: vi.fn().mockReturnValue({
     eventLogs: vi.fn(),
-    shutdown: vi.fn().mockResolvedValue(undefined)
-  })
+    shutdown: vi.fn().mockResolvedValue(undefined),
+  }),
 }));
 
 // Mock enquirer (not used in logs but imported indirectly)
 vi.mock('enquirer', () => ({
   default: {
-    prompt: vi.fn()
-  }
+    prompt: vi.fn(),
+  },
 }));
 
 // Mock exit utilities to prevent process.exit
 vi.mock('../../utils/exit.js', () => ({
-  exitWithError: vi.fn().mockImplementation(() => { }),
-  exitWithSuccess: vi.fn().mockImplementation(() => { }),
-  exitWithWarn: vi.fn().mockImplementation(() => { })
+  exitWithError: vi.fn().mockImplementation(() => {}),
+  exitWithSuccess: vi.fn().mockImplementation(() => {}),
+  exitWithWarn: vi.fn().mockImplementation(() => {}),
 }));
 
 // Mock display utilities to suppress output
 vi.mock('../../utils/display.js', () => ({
   showRoverChat: vi.fn(),
   showTips: vi.fn(),
-  TIP_TITLES: {}
+  TIP_TITLES: {},
 }));
 
 // Mock the OS utilities for Docker commands
 vi.mock('../../lib/os.js', () => ({
   spawnSync: vi.fn(),
-  spawn: vi.fn()
+  spawn: vi.fn(),
 }));
 
 // Mock child_process spawn for follow mode
 vi.mock('node:child_process', () => ({
   spawn: vi.fn(),
-  execSync: vi.fn()
+  execSync: vi.fn(),
 }));
 
 describe('logs command', () => {
@@ -79,18 +85,24 @@ describe('logs command', () => {
   });
 
   // Helper to create a test task with container ID
-  const createTestTaskWithContainer = (id: number, title: string = 'Test Task', containerId?: string) => {
+  const createTestTaskWithContainer = (
+    id: number,
+    title: string = 'Test Task',
+    containerId?: string
+  ) => {
     const task = TaskDescription.create({
       id,
       title,
-      description: 'Test task description'
+      description: 'Test task description',
     });
 
     // Create a git worktree for the task
     const worktreePath = join('.rover', 'tasks', id.toString(), 'workspace');
     const branchName = `rover-task-${id}`;
 
-    execSync(`git worktree add ${worktreePath} -b ${branchName}`, { stdio: 'pipe' });
+    execSync(`git worktree add ${worktreePath} -b ${branchName}`, {
+      stdio: 'pipe',
+    });
     task.setWorkspace(join(testDir, worktreePath), branchName);
 
     // Set container ID if provided
@@ -120,7 +132,7 @@ describe('logs command', () => {
 
       expect(exitWithError).toHaveBeenCalledWith(
         expect.objectContaining({
-          error: "Invalid task ID 'invalid' - must be a number"
+          error: "Invalid task ID 'invalid' - must be a number",
         }),
         false
       );
@@ -133,7 +145,7 @@ describe('logs command', () => {
 
       expect(exitWithError).toHaveBeenCalledWith(
         expect.objectContaining({
-          error: "Invalid task ID '' - must be a number"
+          error: "Invalid task ID '' - must be a number",
         }),
         false
       );
@@ -147,7 +159,7 @@ describe('logs command', () => {
       // parseInt('1.5') = 1, so this should try to load task 1
       expect(exitWithError).toHaveBeenCalledWith(
         expect.objectContaining({
-          error: 'The task with ID 1 was not found'
+          error: 'The task with ID 1 was not found',
         }),
         false
       );
@@ -162,7 +174,7 @@ describe('logs command', () => {
 
       expect(exitWithError).toHaveBeenCalledWith(
         expect.objectContaining({
-          error: 'The task with ID 999 was not found'
+          error: 'The task with ID 999 was not found',
         }),
         false
       );
@@ -175,7 +187,7 @@ describe('logs command', () => {
 
       expect(exitWithError).toHaveBeenCalledWith(
         expect.objectContaining({
-          error: 'The task with ID -1 was not found'
+          error: 'The task with ID -1 was not found',
         }),
         false
       );
@@ -193,7 +205,7 @@ describe('logs command', () => {
 
       expect(exitWithError).toHaveBeenCalledWith(
         expect.objectContaining({
-          error: "Invalid iteration number: 'invalid'"
+          error: "Invalid iteration number: 'invalid'",
         }),
         false
       );
@@ -209,7 +221,8 @@ describe('logs command', () => {
 
       expect(exitWithError).toHaveBeenCalledWith(
         expect.objectContaining({
-          error: 'Iteration 5 not found for task \'2\'. Available iterations: 1, 2'
+          error:
+            "Iteration 5 not found for task '2'. Available iterations: 1, 2",
         }),
         false
       );
@@ -228,7 +241,7 @@ describe('logs command', () => {
         "No iterations found for task '3'",
         expect.objectContaining({
           logs: '',
-          success: false
+          success: false,
         }),
         false
       );
@@ -245,7 +258,7 @@ describe('logs command', () => {
         "No iterations found for task '4'",
         expect.objectContaining({
           logs: '',
-          success: false
+          success: false,
         }),
         true
       );
@@ -265,7 +278,7 @@ describe('logs command', () => {
         "No container found for task '5'. Logs are only available for recent tasks",
         expect.objectContaining({
           logs: '',
-          success: false
+          success: false,
         }),
         false
       );
@@ -283,7 +296,7 @@ describe('logs command', () => {
         "No container found for task '6'. Logs are only available for recent tasks",
         expect.objectContaining({
           logs: '',
-          success: false
+          success: false,
         }),
         true
       );
@@ -302,15 +315,19 @@ describe('logs command', () => {
         status: 0,
         signal: null,
         error: undefined,
-        pid: 1234
+        pid: 1234,
       } as any);
 
       await logsCommand('7');
 
-      expect(spawnSync).toHaveBeenCalledWith('docker', ['logs', 'container123'], {
-        encoding: 'utf8',
-        stdio: 'pipe'
-      });
+      expect(spawnSync).toHaveBeenCalledWith(
+        'docker',
+        ['logs', 'container123'],
+        {
+          encoding: 'utf8',
+          stdio: 'pipe',
+        }
+      );
     });
 
     it('should print logs to console output', async () => {
@@ -318,28 +335,37 @@ describe('logs command', () => {
       createIterations(21, [1]);
 
       const { spawnSync } = await import('../../lib/os.js');
-      
+
       // Mock console.log to capture output
       const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      
-      const testLogs = 'Starting application...\nProcessing data...\nTask completed successfully!\n\nFinal status: OK';
-      
+
+      const testLogs =
+        'Starting application...\nProcessing data...\nTask completed successfully!\n\nFinal status: OK';
+
       vi.mocked(spawnSync).mockReturnValue({
         stdout: testLogs,
         stderr: '',
         status: 0,
         signal: null,
         error: undefined,
-        pid: 1234
+        pid: 1234,
       } as any);
 
       await logsCommand('21');
 
       // Verify header information is printed
-      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Task 21 Logs'));
-      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Console Output Task'));
-      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Iteration:'));
-      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Execution Log'));
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Task 21 Logs')
+      );
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Console Output Task')
+      );
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Iteration:')
+      );
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Execution Log')
+      );
 
       // Verify each log line is printed
       expect(consoleSpy).toHaveBeenCalledWith('Starting application...');
@@ -356,19 +382,20 @@ describe('logs command', () => {
       createIterations(22, [1]);
 
       const { spawnSync } = await import('../../lib/os.js');
-      
+
       // Mock console.log to capture output
       const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      
-      const testLogs = '[ERROR] Failed to connect\n→ Retrying...\n✓ Connected!\n{ "status": "ok" }\nTab\there';
-      
+
+      const testLogs =
+        '[ERROR] Failed to connect\n→ Retrying...\n✓ Connected!\n{ "status": "ok" }\nTab\there';
+
       vi.mocked(spawnSync).mockReturnValue({
         stdout: testLogs,
         stderr: '',
         status: 0,
         signal: null,
         error: undefined,
-        pid: 1234
+        pid: 1234,
       } as any);
 
       await logsCommand('22');
@@ -388,10 +415,10 @@ describe('logs command', () => {
       createIterations(23, [1]);
 
       const { spawnSync } = await import('../../lib/os.js');
-      
+
       // Mock console.log to capture output
       const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      
+
       const testLogs = `Line 1
 Line 2
 
@@ -400,24 +427,24 @@ Line 4 (after empty line)
 
 Line 7 (after two empty lines)
 Last line`;
-      
+
       vi.mocked(spawnSync).mockReturnValue({
         stdout: testLogs,
         stderr: '',
         status: 0,
         signal: null,
         error: undefined,
-        pid: 1234
+        pid: 1234,
       } as any);
 
       await logsCommand('23');
 
       // Verify empty lines are preserved
       const logCalls = consoleSpy.mock.calls.map(call => call[0]);
-      
+
       // Find the index where actual logs start (after headers)
       const line1Index = logCalls.findIndex(line => line === 'Line 1');
-      
+
       expect(logCalls[line1Index]).toBe('Line 1');
       expect(logCalls[line1Index + 1]).toBe('Line 2');
       expect(logCalls[line1Index + 2]).toBe(''); // Empty line
@@ -441,15 +468,19 @@ Last line`;
         status: 0,
         signal: null,
         error: undefined,
-        pid: 1234
+        pid: 1234,
       } as any);
 
       await logsCommand('8', undefined, { json: true });
 
-      expect(spawnSync).toHaveBeenCalledWith('docker', ['logs', 'container456'], {
-        encoding: 'utf8',
-        stdio: 'pipe'
-      });
+      expect(spawnSync).toHaveBeenCalledWith(
+        'docker',
+        ['logs', 'container456'],
+        {
+          encoding: 'utf8',
+          stdio: 'pipe',
+        }
+      );
     });
 
     it('should handle empty logs', async () => {
@@ -465,7 +496,7 @@ Last line`;
         status: 0,
         signal: null,
         error: undefined,
-        pid: 1234
+        pid: 1234,
       } as any);
 
       await logsCommand('9');
@@ -474,7 +505,7 @@ Last line`;
         'No logs available for this container. Logs are only available for recent tasks',
         expect.objectContaining({
           logs: '',
-          success: false
+          success: false,
         }),
         false
       );
@@ -483,7 +514,11 @@ Last line`;
 
   describe('Docker error scenarios', () => {
     it('should handle "No such container" error', async () => {
-      createTestTaskWithContainer(10, 'Missing Container Task', 'nonexistent123');
+      createTestTaskWithContainer(
+        10,
+        'Missing Container Task',
+        'nonexistent123'
+      );
       createIterations(10, [1]);
 
       const { spawnSync } = await import('../../lib/os.js');
@@ -499,7 +534,7 @@ Last line`;
         'No logs available for this container. Logs are only available for recent tasks',
         expect.objectContaining({
           logs: '',
-          success: false
+          success: false,
         }),
         false
       );
@@ -520,7 +555,7 @@ Last line`;
 
       expect(exitWithError).toHaveBeenCalledWith(
         expect.objectContaining({
-          error: 'Error retrieving container logs: Docker daemon not running'
+          error: 'Error retrieving container logs: Docker daemon not running',
         }),
         false
       );
@@ -534,14 +569,17 @@ Last line`;
       const { exitWithError } = await import('../../utils/exit.js');
 
       vi.mocked(spawnSync).mockImplementation(() => {
-        throw new Error('permission denied while trying to connect to the Docker daemon socket');
+        throw new Error(
+          'permission denied while trying to connect to the Docker daemon socket'
+        );
       });
 
       await logsCommand('12');
 
       expect(exitWithError).toHaveBeenCalledWith(
         expect.objectContaining({
-          error: 'Error retrieving container logs: permission denied while trying to connect to the Docker daemon socket'
+          error:
+            'Error retrieving container logs: permission denied while trying to connect to the Docker daemon socket',
         }),
         false
       );
@@ -558,7 +596,7 @@ Last line`;
         stdout: { on: vi.fn() },
         stderr: { on: vi.fn() },
         on: vi.fn(),
-        kill: vi.fn()
+        kill: vi.fn(),
       };
 
       const { spawn } = await import('node:child_process');
@@ -566,15 +604,31 @@ Last line`;
 
       await logsCommand('13', undefined, { follow: true });
 
-      expect(spawn).toHaveBeenCalledWith('docker', ['logs', '-f', 'follow123'], {
-        stdio: ['inherit', 'pipe', 'pipe']
-      });
+      expect(spawn).toHaveBeenCalledWith(
+        'docker',
+        ['logs', '-f', 'follow123'],
+        {
+          stdio: ['inherit', 'pipe', 'pipe'],
+        }
+      );
 
       // Verify event listeners are set up
-      expect(mockProcess.stdout.on).toHaveBeenCalledWith('data', expect.any(Function));
-      expect(mockProcess.stderr.on).toHaveBeenCalledWith('data', expect.any(Function));
-      expect(mockProcess.on).toHaveBeenCalledWith('close', expect.any(Function));
-      expect(mockProcess.on).toHaveBeenCalledWith('error', expect.any(Function));
+      expect(mockProcess.stdout.on).toHaveBeenCalledWith(
+        'data',
+        expect.any(Function)
+      );
+      expect(mockProcess.stderr.on).toHaveBeenCalledWith(
+        'data',
+        expect.any(Function)
+      );
+      expect(mockProcess.on).toHaveBeenCalledWith(
+        'close',
+        expect.any(Function)
+      );
+      expect(mockProcess.on).toHaveBeenCalledWith(
+        'error',
+        expect.any(Function)
+      );
     });
 
     it('should stream logs in follow mode to stdout and stderr', async () => {
@@ -582,25 +636,29 @@ Last line`;
       createIterations(24, [1]);
 
       // Mock process.stdout and stderr
-      const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
-      const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+      const stdoutSpy = vi
+        .spyOn(process.stdout, 'write')
+        .mockImplementation(() => true);
+      const stderrSpy = vi
+        .spyOn(process.stderr, 'write')
+        .mockImplementation(() => true);
 
       let stdoutCallback: any;
       let stderrCallback: any;
 
       const mockProcess = {
-        stdout: { 
+        stdout: {
           on: vi.fn((event, callback) => {
             if (event === 'data') stdoutCallback = callback;
-          })
+          }),
         },
-        stderr: { 
+        stderr: {
           on: vi.fn((event, callback) => {
             if (event === 'data') stderrCallback = callback;
-          })
+          }),
         },
         on: vi.fn(),
-        kill: vi.fn()
+        kill: vi.fn(),
       };
 
       const { spawn } = await import('node:child_process');
@@ -629,7 +687,9 @@ Last line`;
       createIterations(25, [1]);
 
       const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleErrorSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
 
       let closeCallback: any;
       let errorCallback: any;
@@ -641,7 +701,7 @@ Last line`;
           if (event === 'close') closeCallback = callback;
           if (event === 'error') errorCallback = callback;
         }),
-        kill: vi.fn()
+        kill: vi.fn(),
       };
 
       const { spawn } = await import('node:child_process');
@@ -651,12 +711,17 @@ Last line`;
 
       // Test successful completion
       closeCallback(0);
-      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('✓ Log following completed'));
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('✓ Log following completed')
+      );
 
       // Test error scenario
       const testError = new Error('Connection lost');
       errorCallback(testError);
-      expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('Error following logs:'), 'Connection lost');
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Error following logs:'),
+        'Connection lost'
+      );
 
       consoleSpy.mockRestore();
       consoleErrorSpy.mockRestore();
@@ -670,7 +735,7 @@ Last line`;
         stdout: { on: vi.fn() },
         stderr: { on: vi.fn() },
         on: vi.fn(),
-        kill: vi.fn()
+        kill: vi.fn(),
       };
 
       const { spawn } = await import('node:child_process');
@@ -678,9 +743,13 @@ Last line`;
 
       await logsCommand('14', '2', { follow: true });
 
-      expect(spawn).toHaveBeenCalledWith('docker', ['logs', '-f', 'follow456'], {
-        stdio: ['inherit', 'pipe', 'pipe']
-      });
+      expect(spawn).toHaveBeenCalledWith(
+        'docker',
+        ['logs', '-f', 'follow456'],
+        {
+          stdio: ['inherit', 'pipe', 'pipe'],
+        }
+      );
     });
 
     it('should skip follow mode in JSON mode', async () => {
@@ -696,16 +765,20 @@ Last line`;
         status: 0,
         signal: null,
         error: undefined,
-        pid: 1234
+        pid: 1234,
       } as any);
 
       await logsCommand('15', undefined, { follow: true, json: true });
 
       // Should use spawnSync instead of spawn for JSON mode
-      expect(spawnSync).toHaveBeenCalledWith('docker', ['logs', 'jsonfollow123'], {
-        encoding: 'utf8',
-        stdio: 'pipe'
-      });
+      expect(spawnSync).toHaveBeenCalledWith(
+        'docker',
+        ['logs', 'jsonfollow123'],
+        {
+          encoding: 'utf8',
+          stdio: 'pipe',
+        }
+      );
       expect(spawn).not.toHaveBeenCalled();
     });
   });
@@ -722,14 +795,14 @@ Last line`;
         status: 0,
         signal: null,
         error: undefined,
-        pid: 1234
+        pid: 1234,
       } as any);
 
       await logsCommand('16');
 
       expect(spawnSync).toHaveBeenCalledWith('docker', ['logs', 'latest123'], {
         encoding: 'utf8',
-        stdio: 'pipe'
+        stdio: 'pipe',
       });
     });
 
@@ -744,15 +817,19 @@ Last line`;
         status: 0,
         signal: null,
         error: undefined,
-        pid: 1234
+        pid: 1234,
       } as any);
 
       await logsCommand('17', '2');
 
-      expect(spawnSync).toHaveBeenCalledWith('docker', ['logs', 'specific123'], {
-        encoding: 'utf8',
-        stdio: 'pipe'
-      });
+      expect(spawnSync).toHaveBeenCalledWith(
+        'docker',
+        ['logs', 'specific123'],
+        {
+          encoding: 'utf8',
+          stdio: 'pipe',
+        }
+      );
     });
   });
 
@@ -768,14 +845,14 @@ Last line`;
         status: 0,
         signal: null,
         error: undefined,
-        pid: 1234
+        pid: 1234,
       } as any);
 
       await logsCommand('18');
 
       expect(spawnSync).toHaveBeenCalledWith('docker', ['logs', 'single123'], {
         encoding: 'utf8',
-        stdio: 'pipe'
+        stdio: 'pipe',
       });
     });
 
@@ -790,14 +867,14 @@ Last line`;
         status: 0,
         signal: null,
         error: undefined,
-        pid: 1234
+        pid: 1234,
       } as any);
 
       await logsCommand('19', '5');
 
       expect(spawnSync).toHaveBeenCalledWith('docker', ['logs', 'many123'], {
         encoding: 'utf8',
-        stdio: 'pipe'
+        stdio: 'pipe',
       });
     });
   });
@@ -817,7 +894,7 @@ Last line`;
         status: 0,
         signal: null,
         error: undefined,
-        pid: 1234
+        pid: 1234,
       } as any);
 
       await logsCommand('20');

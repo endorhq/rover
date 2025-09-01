@@ -8,233 +8,241 @@ import { FileNotFoundError, InvalidFormatError } from '../errors.js';
 
 // Supported languages
 export enum LANGUAGE {
-    Javascript = 'javascript',
-    TypeScript = 'typescript',
-    PHP = 'php',
-    Rust = 'rust',
-    Go = 'go',
-    Python = 'python',
-    Ruby = 'ruby',
+  Javascript = 'javascript',
+  TypeScript = 'typescript',
+  PHP = 'php',
+  Rust = 'rust',
+  Go = 'go',
+  Python = 'python',
+  Ruby = 'ruby',
 }
 
 export enum PACKAGE_MANAGER {
-    PNPM = 'pnpm',
-    NPM = 'npm',
-    Yarn = 'yarn',
-    Composer = 'composer',
-    Cargo = 'cargo',
-    Gomod = 'gomod',
-    PIP = 'pip',
-    Poetry = 'poetry',
-    UV = 'uv',
-    Rubygems = 'rubygems'
+  PNPM = 'pnpm',
+  NPM = 'npm',
+  Yarn = 'yarn',
+  Composer = 'composer',
+  Cargo = 'cargo',
+  Gomod = 'gomod',
+  PIP = 'pip',
+  Poetry = 'poetry',
+  UV = 'uv',
+  Rubygems = 'rubygems',
 }
 
 export enum TASK_MANAGER {
-    Just = 'just',
-    Make = 'make',
-    Task = 'task'
+  Just = 'just',
+  Make = 'make',
+  Task = 'task',
 }
 
 // Schema version for migrations
 const CURRENT_PROJECT_SCHEMA_VERSION = '1.0';
 
 export interface ProjectConfigSchema {
-    // Common values
-    version: string;
+  // Common values
+  version: string;
 
-    // Environment
-    languages: LANGUAGE[];
-    packageManagers: PACKAGE_MANAGER[];
-    taskManagers: TASK_MANAGER[];
+  // Environment
+  languages: LANGUAGE[];
+  packageManagers: PACKAGE_MANAGER[];
+  taskManagers: TASK_MANAGER[];
 }
 
 const PROJECT_CONFIG_FILE = 'rover.json';
 
 /**
- * Project-wide configuration. Useful to add context and constraints. We 
+ * Project-wide configuration. Useful to add context and constraints. We
  * expect users to commit this file to the repo.
  */
 export class ProjectConfig {
-    constructor(private data: ProjectConfigSchema) { };
+  constructor(private data: ProjectConfigSchema) {}
 
-    /**
-     * Load an existing configuration from disk
-     */
-    static load(): ProjectConfig {
-        const filePath = join(process.cwd(), PROJECT_CONFIG_FILE);
+  /**
+   * Load an existing configuration from disk
+   */
+  static load(): ProjectConfig {
+    const filePath = join(process.cwd(), PROJECT_CONFIG_FILE);
 
-        if (!existsSync(filePath)) {
-            throw new FileNotFoundError(filePath);
-        }
-
-        try {
-            const rawData = readFileSync(filePath, 'utf8');
-            const parsedData = JSON.parse(rawData);
-
-            // Migrate if necessary
-            const migratedData = ProjectConfig.migrate(parsedData);
-
-            const instance = new ProjectConfig(migratedData);
-
-            // If migration occurred, save the updated data
-            if (migratedData.version !== parsedData.version) {
-                instance.save();
-            }
-
-            return instance;
-        } catch (error) {
-            if (error instanceof SyntaxError) {
-                throw new InvalidFormatError(filePath);
-            } else {
-                throw new Error('Failed to load the project configuration.');
-            }
-        }
+    if (!existsSync(filePath)) {
+      throw new FileNotFoundError(filePath);
     }
 
-    /**
-     * Create a new project configuration with defaults
-     */
-    static create(): ProjectConfig {
-        const schema: ProjectConfigSchema = {
-            version: CURRENT_PROJECT_SCHEMA_VERSION,
-            languages: [],
-            packageManagers: [],
-            taskManagers: []
-        };
+    try {
+      const rawData = readFileSync(filePath, 'utf8');
+      const parsedData = JSON.parse(rawData);
 
-        const instance = new ProjectConfig(schema);
+      // Migrate if necessary
+      const migratedData = ProjectConfig.migrate(parsedData);
+
+      const instance = new ProjectConfig(migratedData);
+
+      // If migration occurred, save the updated data
+      if (migratedData.version !== parsedData.version) {
         instance.save();
-        return instance;
+      }
+
+      return instance;
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        throw new InvalidFormatError(filePath);
+      } else {
+        throw new Error('Failed to load the project configuration.');
+      }
+    }
+  }
+
+  /**
+   * Create a new project configuration with defaults
+   */
+  static create(): ProjectConfig {
+    const schema: ProjectConfigSchema = {
+      version: CURRENT_PROJECT_SCHEMA_VERSION,
+      languages: [],
+      packageManagers: [],
+      taskManagers: [],
+    };
+
+    const instance = new ProjectConfig(schema);
+    instance.save();
+    return instance;
+  }
+
+  /**
+   * Check if a project configuration exists
+   */
+  static exists(): boolean {
+    const filePath = join(process.cwd(), PROJECT_CONFIG_FILE);
+    return existsSync(filePath);
+  }
+
+  /**
+   * Migrate old configuration to current schema version
+   */
+  private static migrate(data: any): ProjectConfigSchema {
+    // If already current version, return as-is
+    if (data.version === CURRENT_PROJECT_SCHEMA_VERSION) {
+      return data as ProjectConfigSchema;
     }
 
-    /**
-     * Check if a project configuration exists
-     */
-    static exists(): boolean {
-        const filePath = join(process.cwd(), PROJECT_CONFIG_FILE);
-        return existsSync(filePath);
+    // For now, just ensure all required fields exist
+    const migrated: ProjectConfigSchema = {
+      version: CURRENT_PROJECT_SCHEMA_VERSION,
+      languages: data.languages || [],
+      packageManagers: data.packageManagers || [],
+      taskManagers: data.taskManagers || [],
+    };
+
+    return migrated;
+  }
+
+  /**
+   * Save current configuration to disk
+   */
+  save(): void {
+    const filePath = join(process.cwd(), PROJECT_CONFIG_FILE);
+    try {
+      const json = JSON.stringify(this.data, null, 2);
+      writeFileSync(filePath, json, 'utf8');
+    } catch (error) {
+      throw new Error(`Failed to save project configuration: ${error}`);
     }
+  }
 
-    /**
-     * Migrate old configuration to current schema version
-     */
-    private static migrate(data: any): ProjectConfigSchema {
-        // If already current version, return as-is
-        if (data.version === CURRENT_PROJECT_SCHEMA_VERSION) {
-            return data as ProjectConfigSchema;
-        }
+  /**
+   * Reload configuration from disk
+   */
+  reload(): void {
+    const reloaded = ProjectConfig.load();
+    this.data = reloaded.data;
+  }
 
-        // For now, just ensure all required fields exist
-        const migrated: ProjectConfigSchema = {
-            version: CURRENT_PROJECT_SCHEMA_VERSION,
-            languages: data.languages || [],
-            packageManagers: data.packageManagers || [],
-            taskManagers: data.taskManagers || []
-        };
+  // Data Access (Getters)
+  get version(): string {
+    return this.data.version;
+  }
+  get languages(): LANGUAGE[] {
+    return this.data.languages;
+  }
+  get packageManagers(): PACKAGE_MANAGER[] {
+    return this.data.packageManagers;
+  }
+  get taskManagers(): TASK_MANAGER[] {
+    return this.data.taskManagers;
+  }
 
-        return migrated;
+  // Data Modification (Setters)
+  addLanguage(language: LANGUAGE): void {
+    if (!this.data.languages.includes(language)) {
+      this.data.languages.push(language);
+      this.save();
     }
+  }
 
-    /**
-     * Save current configuration to disk
-     */
-    save(): void {
-        const filePath = join(process.cwd(), PROJECT_CONFIG_FILE);
-        try {
-            const json = JSON.stringify(this.data, null, 2);
-            writeFileSync(filePath, json, 'utf8');
-        } catch (error) {
-            throw new Error(`Failed to save project configuration: ${error}`);
-        }
+  removeLanguage(language: LANGUAGE): void {
+    const index = this.data.languages.indexOf(language);
+    if (index > -1) {
+      this.data.languages.splice(index, 1);
+      this.save();
     }
+  }
 
-    /**
-     * Reload configuration from disk
-     */
-    reload(): void {
-        const reloaded = ProjectConfig.load();
-        this.data = reloaded.data;
+  addPackageManager(packageManager: PACKAGE_MANAGER): void {
+    if (!this.data.packageManagers.includes(packageManager)) {
+      this.data.packageManagers.push(packageManager);
+      this.save();
     }
+  }
 
-    // Data Access (Getters)
-    get version(): string { return this.data.version; }
-    get languages(): LANGUAGE[] { return this.data.languages; }
-    get packageManagers(): PACKAGE_MANAGER[] { return this.data.packageManagers; }
-    get taskManagers(): TASK_MANAGER[] { return this.data.taskManagers; }
-
-    // Data Modification (Setters)
-    addLanguage(language: LANGUAGE): void {
-        if (!this.data.languages.includes(language)) {
-            this.data.languages.push(language);
-            this.save();
-        }
+  removePackageManager(packageManager: PACKAGE_MANAGER): void {
+    const index = this.data.packageManagers.indexOf(packageManager);
+    if (index > -1) {
+      this.data.packageManagers.splice(index, 1);
+      this.save();
     }
+  }
 
-    removeLanguage(language: LANGUAGE): void {
-        const index = this.data.languages.indexOf(language);
-        if (index > -1) {
-            this.data.languages.splice(index, 1);
-            this.save();
-        }
+  addTaskManager(taskManager: TASK_MANAGER): void {
+    if (!this.data.taskManagers.includes(taskManager)) {
+      this.data.taskManagers.push(taskManager);
+      this.save();
     }
+  }
 
-    addPackageManager(packageManager: PACKAGE_MANAGER): void {
-        if (!this.data.packageManagers.includes(packageManager)) {
-            this.data.packageManagers.push(packageManager);
-            this.save();
-        }
+  removeTaskManager(taskManager: TASK_MANAGER): void {
+    const index = this.data.taskManagers.indexOf(taskManager);
+    if (index > -1) {
+      this.data.taskManagers.splice(index, 1);
+      this.save();
     }
+  }
 
-    removePackageManager(packageManager: PACKAGE_MANAGER): void {
-        const index = this.data.packageManagers.indexOf(packageManager);
-        if (index > -1) {
-            this.data.packageManagers.splice(index, 1);
-            this.save();
-        }
-    }
-
-    addTaskManager(taskManager: TASK_MANAGER): void {
-        if (!this.data.taskManagers.includes(taskManager)) {
-            this.data.taskManagers.push(taskManager);
-            this.save();
-        }
-    }
-
-    removeTaskManager(taskManager: TASK_MANAGER): void {
-        const index = this.data.taskManagers.indexOf(taskManager);
-        if (index > -1) {
-            this.data.taskManagers.splice(index, 1);
-            this.save();
-        }
-    }
-
-    /**
-     * Get raw JSON data
-     */
-    toJSON(): ProjectConfigSchema {
-        return { ...this.data };
-    }
+  /**
+   * Get raw JSON data
+   */
+  toJSON(): ProjectConfigSchema {
+    return { ...this.data };
+  }
 }
 
 export enum AI_AGENT {
-    Claude = 'claude',
-    Gemini = 'gemini'
+  Claude = 'claude',
+  Gemini = 'gemini',
 }
 
 const CURRENT_USER_SCHEMA_VERSION = '1.0';
 
 export interface UserSettingsSchema {
-    // Common values
-    version: string;
+  // Common values
+  version: string;
 
-    // Local tools
-    aiAgents: AI_AGENT[];
+  // Local tools
+  aiAgents: AI_AGENT[];
 
-    // User preferences
-    defaults: {
-        aiAgent?: AI_AGENT
-    }
+  // User preferences
+  defaults: {
+    aiAgent?: AI_AGENT;
+  };
 }
 
 /**
@@ -242,160 +250,169 @@ export interface UserSettingsSchema {
  * We do not expect users commiting this file to the repo.
  */
 export class UserSettings {
-    constructor(private data: UserSettingsSchema) { };
+  constructor(private data: UserSettingsSchema) {}
 
-    /**
-     * Load user settings from disk
-     */
-    static load(): UserSettings {
-        const filePath = UserSettings.getSettingsPath();
+  /**
+   * Load user settings from disk
+   */
+  static load(): UserSettings {
+    const filePath = UserSettings.getSettingsPath();
 
-        if (!existsSync(filePath)) {
-            // Return default settings if file doesn't exist
-            return UserSettings.createDefault();
-        }
-
-        try {
-            const rawData = readFileSync(filePath, 'utf8');
-            const parsedData = JSON.parse(rawData);
-
-            // Migrate if necessary
-            const migratedData = UserSettings.migrate(parsedData);
-
-            const instance = new UserSettings(migratedData);
-
-            // If migration occurred, save the updated data
-            if (migratedData.version !== parsedData.version) {
-                instance.save();
-            }
-
-            return instance;
-        } catch (error) {
-            if (error instanceof SyntaxError) {
-                throw new InvalidFormatError(filePath);
-            } else {
-                throw new Error('Failed to load user settings.');
-            }
-        }
+    if (!existsSync(filePath)) {
+      // Return default settings if file doesn't exist
+      return UserSettings.createDefault();
     }
 
-    /**
-     * Create default user settings
-     */
-    static createDefault(): UserSettings {
-        const schema: UserSettingsSchema = {
-            version: CURRENT_USER_SCHEMA_VERSION,
-            aiAgents: [],
-            defaults: {}
-        };
+    try {
+      const rawData = readFileSync(filePath, 'utf8');
+      const parsedData = JSON.parse(rawData);
 
-        const instance = new UserSettings(schema);
+      // Migrate if necessary
+      const migratedData = UserSettings.migrate(parsedData);
+
+      const instance = new UserSettings(migratedData);
+
+      // If migration occurred, save the updated data
+      if (migratedData.version !== parsedData.version) {
         instance.save();
-        return instance;
+      }
+
+      return instance;
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        throw new InvalidFormatError(filePath);
+      } else {
+        throw new Error('Failed to load user settings.');
+      }
+    }
+  }
+
+  /**
+   * Create default user settings
+   */
+  static createDefault(): UserSettings {
+    const schema: UserSettingsSchema = {
+      version: CURRENT_USER_SCHEMA_VERSION,
+      aiAgents: [],
+      defaults: {},
+    };
+
+    const instance = new UserSettings(schema);
+    instance.save();
+    return instance;
+  }
+
+  /**
+   * Check if user settings exist
+   */
+  static exists(): boolean {
+    const filePath = UserSettings.getSettingsPath();
+    return existsSync(filePath);
+  }
+
+  /**
+   * Get the path to the settings file
+   */
+  private static getSettingsPath(): string {
+    return join(process.cwd(), '.rover', 'settings.json');
+  }
+
+  /**
+   * Migrate old settings to current schema version
+   */
+  private static migrate(data: any): UserSettingsSchema {
+    // If already current version, return as-is
+    if (data.version === CURRENT_USER_SCHEMA_VERSION) {
+      return data as UserSettingsSchema;
     }
 
-    /**
-     * Check if user settings exist
-     */
-    static exists(): boolean {
-        const filePath = UserSettings.getSettingsPath();
-        return existsSync(filePath);
+    // For now, just ensure all required fields exist
+    const migrated: UserSettingsSchema = {
+      version: CURRENT_USER_SCHEMA_VERSION,
+      aiAgents: data.aiAgents || [AI_AGENT.Claude],
+      defaults: {
+        aiAgent: data.defaults?.aiAgent || AI_AGENT.Claude,
+      },
+    };
+
+    return migrated;
+  }
+
+  /**
+   * Save current settings to disk
+   */
+  save(): void {
+    const filePath = UserSettings.getSettingsPath();
+    const dirPath = join(process.cwd(), '.rover');
+
+    try {
+      // Ensure .rover directory exists
+      if (!existsSync(dirPath)) {
+        mkdirSync(dirPath, { recursive: true });
+      }
+
+      const json = JSON.stringify(this.data, null, 2);
+      writeFileSync(filePath, json, 'utf8');
+    } catch (error) {
+      throw new Error(`Failed to save user settings: ${error}`);
     }
+  }
 
-    /**
-     * Get the path to the settings file
-     */
-    private static getSettingsPath(): string {
-        return join(process.cwd(), '.rover', 'settings.json');
+  /**
+   * Reload settings from disk
+   */
+  reload(): void {
+    const reloaded = UserSettings.load();
+    this.data = reloaded.data;
+  }
+
+  // Data Access (Getters)
+  get version(): string {
+    return this.data.version;
+  }
+  get aiAgents(): AI_AGENT[] {
+    return this.data.aiAgents;
+  }
+  get defaultAiAgent(): AI_AGENT | undefined {
+    return this.data.defaults.aiAgent;
+  }
+
+  // Data Modification (Setters)
+  setDefaultAiAgent(agent: AI_AGENT): void {
+    this.data.defaults.aiAgent = agent;
+    // Ensure the agent is in the available agents list
+    if (!this.data.aiAgents.includes(agent)) {
+      this.data.aiAgents.push(agent);
     }
+    this.save();
+  }
 
-    /**
-     * Migrate old settings to current schema version
-     */
-    private static migrate(data: any): UserSettingsSchema {
-        // If already current version, return as-is
-        if (data.version === CURRENT_USER_SCHEMA_VERSION) {
-            return data as UserSettingsSchema;
-        }
-
-        // For now, just ensure all required fields exist
-        const migrated: UserSettingsSchema = {
-            version: CURRENT_USER_SCHEMA_VERSION,
-            aiAgents: data.aiAgents || [AI_AGENT.Claude],
-            defaults: {
-                aiAgent: data.defaults?.aiAgent || AI_AGENT.Claude
-            }
-        };
-
-        return migrated;
+  addAiAgent(agent: AI_AGENT): void {
+    if (!this.data.aiAgents.includes(agent)) {
+      this.data.aiAgents.push(agent);
+      this.save();
     }
+  }
 
-    /**
-     * Save current settings to disk
-     */
-    save(): void {
-        const filePath = UserSettings.getSettingsPath();
-        const dirPath = join(process.cwd(), '.rover');
-
-        try {
-            // Ensure .rover directory exists
-            if (!existsSync(dirPath)) {
-                mkdirSync(dirPath, { recursive: true });
-            }
-
-            const json = JSON.stringify(this.data, null, 2);
-            writeFileSync(filePath, json, 'utf8');
-        } catch (error) {
-            throw new Error(`Failed to save user settings: ${error}`);
-        }
+  removeAiAgent(agent: AI_AGENT): void {
+    const index = this.data.aiAgents.indexOf(agent);
+    if (index > -1) {
+      this.data.aiAgents.splice(index, 1);
+      // If we removed the default agent, set a new default
+      if (
+        this.data.defaults.aiAgent === agent &&
+        this.data.aiAgents.length > 0
+      ) {
+        this.data.defaults.aiAgent = this.data.aiAgents[0];
+      }
+      this.save();
     }
+  }
 
-    /**
-     * Reload settings from disk
-     */
-    reload(): void {
-        const reloaded = UserSettings.load();
-        this.data = reloaded.data;
-    }
-
-    // Data Access (Getters)
-    get version(): string { return this.data.version; }
-    get aiAgents(): AI_AGENT[] { return this.data.aiAgents; }
-    get defaultAiAgent(): AI_AGENT | undefined { return this.data.defaults.aiAgent; }
-
-    // Data Modification (Setters)
-    setDefaultAiAgent(agent: AI_AGENT): void {
-        this.data.defaults.aiAgent = agent;
-        // Ensure the agent is in the available agents list
-        if (!this.data.aiAgents.includes(agent)) {
-            this.data.aiAgents.push(agent);
-        }
-        this.save();
-    }
-
-    addAiAgent(agent: AI_AGENT): void {
-        if (!this.data.aiAgents.includes(agent)) {
-            this.data.aiAgents.push(agent);
-            this.save();
-        }
-    }
-
-    removeAiAgent(agent: AI_AGENT): void {
-        const index = this.data.aiAgents.indexOf(agent);
-        if (index > -1) {
-            this.data.aiAgents.splice(index, 1);
-            // If we removed the default agent, set a new default
-            if (this.data.defaults.aiAgent === agent && this.data.aiAgents.length > 0) {
-                this.data.defaults.aiAgent = this.data.aiAgents[0];
-            }
-            this.save();
-        }
-    }
-
-    /**
-     * Get raw JSON data
-     */
-    toJSON(): UserSettingsSchema {
-        return { ...this.data };
-    }
+  /**
+   * Get raw JSON data
+   */
+  toJSON(): UserSettingsSchema {
+    return { ...this.data };
+  }
 }

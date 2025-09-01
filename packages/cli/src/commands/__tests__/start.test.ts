@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtempSync, rmSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
+import {
+  mkdtempSync,
+  rmSync,
+  existsSync,
+  writeFileSync,
+  mkdirSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execSync } from 'node:child_process';
@@ -9,13 +15,13 @@ import { TaskDescription } from '../../lib/description.js';
 // Mock external dependencies
 vi.mock('../../lib/telemetry.js', () => ({
   getTelemetry: vi.fn().mockReturnValue({
-    shutdown: vi.fn().mockResolvedValue(undefined)
-  })
+    shutdown: vi.fn().mockResolvedValue(undefined),
+  }),
 }));
 
 // Mock Docker execution to prevent actual container execution
 vi.mock('../task.js', () => ({
-  startDockerExecution: vi.fn().mockResolvedValue(undefined)
+  startDockerExecution: vi.fn().mockResolvedValue(undefined),
 }));
 
 // Mock user settings
@@ -23,20 +29,20 @@ vi.mock('../../lib/config.js', () => ({
   AI_AGENT: { Claude: 'claude', Gemini: 'gemini' },
   UserSettings: {
     exists: vi.fn().mockReturnValue(true),
-    load: vi.fn().mockReturnValue({ defaultAiAgent: 'claude' })
-  }
+    load: vi.fn().mockReturnValue({ defaultAiAgent: 'claude' }),
+  },
 }));
 
 // Mock display utilities to suppress output
 vi.mock('../../utils/display.js', () => ({
-  showRoverChat: vi.fn()
+  showRoverChat: vi.fn(),
 }));
 
 // Mock exit utilities to prevent process.exit
 vi.mock('../../utils/exit.js', () => ({
-  exitWithError: vi.fn().mockImplementation(() => { }),
-  exitWithSuccess: vi.fn().mockImplementation(() => { }),
-  exitWithWarn: vi.fn().mockImplementation(() => { })
+  exitWithError: vi.fn().mockImplementation(() => {}),
+  exitWithSuccess: vi.fn().mockImplementation(() => {}),
+  exitWithWarn: vi.fn().mockImplementation(() => {}),
 }));
 
 describe('start command', () => {
@@ -75,11 +81,15 @@ describe('start command', () => {
     rmSync(testDir, { recursive: true, force: true });
   });
 
-  const createTestTask = (taskId: number, title: string, status: 'NEW' | 'IN_PROGRESS' | 'COMPLETED' = 'NEW') => {
+  const createTestTask = (
+    taskId: number,
+    title: string,
+    status: 'NEW' | 'IN_PROGRESS' | 'COMPLETED' = 'NEW'
+  ) => {
     const task = TaskDescription.create({
       id: taskId,
       title,
-      description: `Test task ${taskId}: ${title}`
+      description: `Test task ${taskId}: ${title}`,
     });
 
     if (status !== 'NEW') {
@@ -124,7 +134,9 @@ describe('start command', () => {
 
       // Mock Docker execution to fail
       const { startDockerExecution } = await import('../task.js');
-      vi.mocked(startDockerExecution).mockRejectedValueOnce(new Error('Docker failed'));
+      vi.mocked(startDockerExecution).mockRejectedValueOnce(
+        new Error('Docker failed')
+      );
 
       try {
         await startCommand('3');
@@ -177,7 +189,7 @@ describe('start command', () => {
 
       expect(exitWithError).toHaveBeenCalledWith(
         expect.objectContaining({
-          error: "Invalid task ID 'invalid' - must be a number"
+          error: "Invalid task ID 'invalid' - must be a number",
         }),
         false
       );
@@ -190,7 +202,7 @@ describe('start command', () => {
 
       expect(exitWithError).toHaveBeenCalledWith(
         expect.objectContaining({
-          error: "The task with ID 999 was not found"
+          error: 'The task with ID 999 was not found',
         }),
         false
       );

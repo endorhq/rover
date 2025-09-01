@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  mkdtempSync,
+  rmSync,
+  existsSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execSync } from 'node:child_process';
@@ -14,7 +20,7 @@ vi.mock('../../utils/system.js', async () => {
     checkDocker: vi.fn().mockResolvedValue(true),
     checkClaude: vi.fn().mockResolvedValue(true),
     checkGemini: vi.fn().mockResolvedValue(false),
-    checkGitHubCLI: vi.fn().mockResolvedValue(false)
+    checkGitHubCLI: vi.fn().mockResolvedValue(false),
   };
 });
 
@@ -22,8 +28,8 @@ vi.mock('../../utils/system.js', async () => {
 vi.mock('../../lib/telemetry.js', () => ({
   getTelemetry: vi.fn().mockReturnValue({
     eventInit: vi.fn(),
-    shutdown: vi.fn().mockResolvedValue(undefined)
-  })
+    shutdown: vi.fn().mockResolvedValue(undefined),
+  }),
 }));
 
 describe('init command', () => {
@@ -56,16 +62,30 @@ describe('init command', () => {
 
   it('should create rover.json with detected TypeScript/Node.js environment', async () => {
     // Create project files that will be detected
-    writeFileSync('package.json', JSON.stringify({
-      name: 'test-project',
-      version: '1.0.0'
-    }, null, 2));
-    writeFileSync('tsconfig.json', JSON.stringify({
-      compilerOptions: {
-        target: 'ES2020',
-        module: 'commonjs'
-      }
-    }, null, 2));
+    writeFileSync(
+      'package.json',
+      JSON.stringify(
+        {
+          name: 'test-project',
+          version: '1.0.0',
+        },
+        null,
+        2
+      )
+    );
+    writeFileSync(
+      'tsconfig.json',
+      JSON.stringify(
+        {
+          compilerOptions: {
+            target: 'ES2020',
+            module: 'commonjs',
+          },
+        },
+        null,
+        2
+      )
+    );
     writeFileSync('package-lock.json', '{}'); // NPM lock file
 
     await initCommand('.', { yes: true });
@@ -96,8 +116,8 @@ describe('init command', () => {
       version: '1.0',
       aiAgents: ['claude'],
       defaults: {
-        aiAgent: 'claude'
-      }
+        aiAgent: 'claude',
+      },
     });
   });
 
@@ -181,7 +201,9 @@ describe('init command', () => {
       throw new Error('Process exit called');
     });
 
-    await expect(initCommand('.', { yes: true })).rejects.toThrow('Process exit called');
+    await expect(initCommand('.', { yes: true })).rejects.toThrow(
+      'Process exit called'
+    );
 
     expect(processExitSpy).toHaveBeenCalledWith(1);
     processExitSpy.mockRestore();
@@ -197,7 +219,9 @@ describe('init command', () => {
       throw new Error('Process exit called');
     });
 
-    await expect(initCommand('.', { yes: true })).rejects.toThrow('Process exit called');
+    await expect(initCommand('.', { yes: true })).rejects.toThrow(
+      'Process exit called'
+    );
 
     expect(processExitSpy).toHaveBeenCalledWith(1);
     processExitSpy.mockRestore();
@@ -222,12 +246,19 @@ describe('init command', () => {
 
   it('should update existing rover.json if reinitializing user settings', async () => {
     // Create existing rover.json
-    writeFileSync('rover.json', JSON.stringify({
-      version: '1.0',
-      languages: ['python'],
-      packageManagers: ['pip'],
-      taskManagers: []
-    }, null, 2));
+    writeFileSync(
+      'rover.json',
+      JSON.stringify(
+        {
+          version: '1.0',
+          languages: ['python'],
+          packageManagers: ['pip'],
+          taskManagers: [],
+        },
+        null,
+        2
+      )
+    );
 
     // Create project files for environment detection
     writeFileSync('package.json', JSON.stringify({ name: 'test' }, null, 2));
@@ -250,11 +281,14 @@ describe('init command', () => {
 
   it('should detect Python environment correctly', async () => {
     // Create Python project files
-    writeFileSync('pyproject.toml', `
+    writeFileSync(
+      'pyproject.toml',
+      `
 [tool.poetry]
 name = "test-project"
 version = "0.1.0"
-    `);
+    `
+    );
     writeFileSync('poetry.lock', ''); // Poetry lock file
 
     await initCommand('.', { yes: true });
@@ -266,11 +300,14 @@ version = "0.1.0"
 
   it('should detect Rust environment correctly', async () => {
     // Create Rust project files (note: lowercase for detection)
-    writeFileSync('Cargo.toml', `
+    writeFileSync(
+      'Cargo.toml',
+      `
 [package]
 name = "test-project"
 version = "0.1.0"
-    `);
+    `
+    );
     writeFileSync('Cargo.lock', ''); // Cargo lock file
 
     await initCommand('.', { yes: true });
@@ -293,7 +330,10 @@ version = "0.1.0"
 
   it('should detect multiple languages and package managers', async () => {
     // Create a polyglot project
-    writeFileSync('package.json', JSON.stringify({ name: 'frontend' }, null, 2));
+    writeFileSync(
+      'package.json',
+      JSON.stringify({ name: 'frontend' }, null, 2)
+    );
     writeFileSync('tsconfig.json', '{}');
     writeFileSync('pnpm-lock.yaml', ''); // PNPM lock
     writeFileSync('go.mod', 'module test\n\ngo 1.21');

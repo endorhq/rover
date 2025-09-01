@@ -18,7 +18,7 @@ export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
   public resolveWebviewView(
     webviewView: vscode.WebviewView,
     context: vscode.WebviewViewResolveContext,
-    _token: vscode.CancellationToken,
+    _token: vscode.CancellationToken
   ) {
     this._view = webviewView;
 
@@ -26,14 +26,14 @@ export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
       enableScripts: true,
       localResourceRoots: [
         vscode.Uri.joinPath(this.extensionUri, 'dist'),
-        vscode.Uri.joinPath(this.extensionUri, 'src')
-      ]
+        vscode.Uri.joinPath(this.extensionUri, 'src'),
+      ],
     };
 
     webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
 
     // Handle messages from the webview
-    webviewView.webview.onDidReceiveMessage(async (data) => {
+    webviewView.webview.onDidReceiveMessage(async data => {
       switch (data.command) {
         case 'createTask':
           await this.handleCreateTask(data.description);
@@ -94,7 +94,10 @@ export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
     }
 
     try {
-      await vscode.commands.executeCommand('rover.createTask', description.trim());
+      await vscode.commands.executeCommand(
+        'rover.createTask',
+        description.trim()
+      );
       // Refresh tasks after creation
       setTimeout(() => this.refreshTasks(), 1000);
     } catch (error) {
@@ -103,41 +106,70 @@ export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
   }
 
   private async handleInspectTask(taskId: string, taskTitle: string) {
-    await vscode.commands.executeCommand('rover.inspectTask', { id: taskId, task: { id: taskId, title: taskTitle } });
+    await vscode.commands.executeCommand('rover.inspectTask', {
+      id: taskId,
+      task: { id: taskId, title: taskTitle },
+    });
   }
 
   private async handleGitCompareTask(taskId: string) {
-    await vscode.commands.executeCommand('rover.gitCompareTask', { id: taskId, task: { id: taskId } });
+    await vscode.commands.executeCommand('rover.gitCompareTask', {
+      id: taskId,
+      task: { id: taskId },
+    });
   }
 
   private async handlePushBranch(taskId: string) {
-    await vscode.commands.executeCommand('rover.pushBranch', { id: taskId, task: { id: taskId } });
+    await vscode.commands.executeCommand('rover.pushBranch', {
+      id: taskId,
+      task: { id: taskId },
+    });
   }
 
   private async handleIterateTask(taskId: string) {
-    await vscode.commands.executeCommand('rover.iterateTask', { id: taskId, task: { id: taskId } });
+    await vscode.commands.executeCommand('rover.iterateTask', {
+      id: taskId,
+      task: { id: taskId },
+    });
   }
 
   private async handleMergeTask(taskId: string) {
-    await vscode.commands.executeCommand('rover.mergeTask', { id: taskId, task: { id: taskId } });
+    await vscode.commands.executeCommand('rover.mergeTask', {
+      id: taskId,
+      task: { id: taskId },
+    });
   }
 
   private async handleDeleteTask(taskId: string, taskTitle: string) {
-    await vscode.commands.executeCommand('rover.deleteTask', { id: taskId, task: { id: taskId, title: taskTitle } });
+    await vscode.commands.executeCommand('rover.deleteTask', {
+      id: taskId,
+      task: { id: taskId, title: taskTitle },
+    });
     setTimeout(() => this.refreshTasks(), 500);
   }
 
   private async handleOpenShell(taskId: string) {
-    await vscode.commands.executeCommand('rover.shell', { id: taskId, task: { id: taskId } });
+    await vscode.commands.executeCommand('rover.shell', {
+      id: taskId,
+      task: { id: taskId },
+    });
   }
 
   private async handleViewLogs(taskId: string, taskStatus: string) {
-    const shouldFollow = ['running', 'initializing', 'installing'].includes(taskStatus);
-    await vscode.commands.executeCommand('rover.logs', { id: taskId, task: { id: taskId, status: taskStatus } });
+    const shouldFollow = ['running', 'initializing', 'installing'].includes(
+      taskStatus
+    );
+    await vscode.commands.executeCommand('rover.logs', {
+      id: taskId,
+      task: { id: taskId, status: taskStatus },
+    });
   }
 
   private async handleOpenWorkspace(taskId: string) {
-    await vscode.commands.executeCommand('rover.openWorkspace', { id: taskId, task: { id: taskId } });
+    await vscode.commands.executeCommand('rover.openWorkspace', {
+      id: taskId,
+      task: { id: taskId },
+    });
   }
 
   private async checkInitializationStatus() {
@@ -153,12 +185,12 @@ export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
         cliInstalled: cliStatus.installed,
         cliVersion: cliStatus.version,
         roverInitialized,
-        error: cliStatus.error
+        error: cliStatus.error,
       };
 
       this._view.webview.postMessage({
         command: 'updateInitializationStatus',
-        status: status
+        status: status,
       });
 
       // If everything is initialized, start auto-refresh and load tasks
@@ -173,8 +205,8 @@ export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
         status: {
           cliInstalled: false,
           roverInitialized: false,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        }
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
       });
     }
   }
@@ -200,20 +232,22 @@ export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
       const tasks = await this.cli.getTasks();
       this._view.webview.postMessage({
         command: 'updateTasks',
-        tasks: tasks
+        tasks: tasks,
       });
     } catch (error) {
       console.error('Failed to fetch tasks:', error);
       this._view.webview.postMessage({
         command: 'updateTasks',
         tasks: [],
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
     }
   }
 
   private startAutoRefresh(): void {
-    const interval = vscode.workspace.getConfiguration('rover').get<number>('autoRefreshInterval', 5000);
+    const interval = vscode.workspace
+      .getConfiguration('rover')
+      .get<number>('autoRefreshInterval', 5000);
     if (interval > 0) {
       this.autoRefreshInterval = setInterval(() => {
         this.refreshTasks();
@@ -239,7 +273,7 @@ export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
     try {
       this._view.webview.postMessage({
         command: 'roverInitializationChecked',
-        isInitialized: await this.cli.checkInitialization()
+        isInitialized: await this.cli.checkInitialization(),
       });
     } catch (error) {
       console.error('Failed to check rover initialization files:', error);
@@ -254,7 +288,12 @@ export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
 
     // Get the bundled tasks-webview component URI
     const tasksWebviewUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.extensionUri, 'dist', 'views', 'tasks-webview.js')
+      vscode.Uri.joinPath(
+        this.extensionUri,
+        'dist',
+        'views',
+        'tasks-webview.js'
+      )
     );
 
     return `<!DOCTYPE html>

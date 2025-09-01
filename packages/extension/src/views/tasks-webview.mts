@@ -184,10 +184,22 @@ export class TasksWebview extends LitElement {
       text-transform: uppercase;
     }
 
-    .status-completed { background-color: var(--vscode-testing-iconPassed); color: white; }
-    .status-failed { background-color: var(--vscode-testing-iconFailed); color: white; }
-    .status-running { background-color: var(--vscode-testing-iconQueued); color: white; }
-    .status-new { background-color: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); }
+    .status-completed {
+      background-color: var(--vscode-testing-iconPassed);
+      color: white;
+    }
+    .status-failed {
+      background-color: var(--vscode-testing-iconFailed);
+      color: white;
+    }
+    .status-running {
+      background-color: var(--vscode-testing-iconQueued);
+      color: white;
+    }
+    .status-new {
+      background-color: var(--vscode-button-secondaryBackground);
+      color: var(--vscode-button-secondaryForeground);
+    }
 
     .codicon {
       font-size: 16px;
@@ -240,7 +252,8 @@ export class TasksWebview extends LitElement {
         break;
       case 'updateInitializationStatus':
         this.initializationStatus = message.status;
-        this.showingSetupGuide = !message.status.cliInstalled || !message.status.roverInitialized;
+        this.showingSetupGuide =
+          !message.status.cliInstalled || !message.status.roverInitialized;
         this.loading = false;
 
         // Start polling for rover initialization if CLI is installed but rover is not initialized
@@ -259,7 +272,7 @@ export class TasksWebview extends LitElement {
         if (message.isInitialized && this.initializationStatus) {
           this.initializationStatus = {
             ...this.initializationStatus,
-            roverInitialized: true
+            roverInitialized: true,
           };
           this.showingSetupGuide = false;
           this.stopInitializationPolling();
@@ -271,7 +284,9 @@ export class TasksWebview extends LitElement {
 
   private handleKeyDown(event: KeyboardEvent) {
     if (event.ctrlKey && event.key === 'Enter') {
-      const textarea = this.shadowRoot?.querySelector('.form-textarea') as HTMLTextAreaElement;
+      const textarea = this.shadowRoot?.querySelector(
+        '.form-textarea'
+      ) as HTMLTextAreaElement;
       if (textarea === event.target) {
         this.createTask();
       }
@@ -290,7 +305,7 @@ export class TasksWebview extends LitElement {
     if (this.vscode) {
       this.vscode.postMessage({
         command: 'createTask',
-        description: description
+        description: description,
       });
     }
 
@@ -306,18 +321,24 @@ export class TasksWebview extends LitElement {
       this.vscode.postMessage({
         command: 'inspectTask',
         taskId: taskId,
-        taskTitle: taskTitle
+        taskTitle: taskTitle,
       });
     }
   }
 
-  private executeTaskAction(event: Event, action: string, taskId: string, taskTitle?: string, taskStatus?: string) {
+  private executeTaskAction(
+    event: Event,
+    action: string,
+    taskId: string,
+    taskTitle?: string,
+    taskStatus?: string
+  ) {
     event.stopPropagation();
 
     if (this.vscode) {
       const message: any = {
         command: action,
-        taskId: taskId
+        taskId: taskId,
       };
 
       if (taskTitle) {
@@ -335,7 +356,7 @@ export class TasksWebview extends LitElement {
   private handleInstallCLI(event: Event) {
     if (this.vscode) {
       this.vscode.postMessage({
-        command: 'installCLI'
+        command: 'installCLI',
       });
     }
   }
@@ -343,7 +364,7 @@ export class TasksWebview extends LitElement {
   private handleInitializeRover(event: Event) {
     if (this.vscode) {
       this.vscode.postMessage({
-        command: 'initializeRover'
+        command: 'initializeRover',
       });
     }
   }
@@ -351,30 +372,40 @@ export class TasksWebview extends LitElement {
   private handleRetryCheck(event: Event) {
     if (this.vscode) {
       this.vscode.postMessage({
-        command: 'checkInitialization'
+        command: 'checkInitialization',
       });
     }
   }
 
   private getStatusIcon(status?: string): string {
     switch (status?.toLowerCase()) {
-      case 'completed': return 'codicon-pass success';
-      case 'failed': return 'codicon-error failed';
-      case 'running': return 'codicon-play-circle running';
-      case 'initializing': return 'codicon-play-circle running';
-      case 'installing': return 'codicon-desktop-download running';
-      default: return 'codicon-circle';
+      case 'completed':
+        return 'codicon-pass success';
+      case 'failed':
+        return 'codicon-error failed';
+      case 'running':
+        return 'codicon-play-circle running';
+      case 'initializing':
+        return 'codicon-play-circle running';
+      case 'installing':
+        return 'codicon-desktop-download running';
+      default:
+        return 'codicon-circle';
     }
   }
 
   private getStatusClass(status?: string): string {
     switch (status?.toLowerCase()) {
-      case 'completed': return 'status-completed';
-      case 'failed': return 'status-failed';
+      case 'completed':
+        return 'status-completed';
+      case 'failed':
+        return 'status-failed';
       case 'running':
       case 'initializing':
-      case 'installing': return 'status-running';
-      default: return 'status-new';
+      case 'installing':
+        return 'status-running';
+      default:
+        return 'status-new';
     }
   }
 
@@ -384,7 +415,11 @@ export class TasksWebview extends LitElement {
       return `Completed ${this.formatRelativeTime(completed)}`;
     }
 
-    if (task.status === 'running' || task.status === 'initializing' || task.status === 'installing') {
+    if (
+      task.status === 'running' ||
+      task.status === 'initializing' ||
+      task.status === 'installing'
+    ) {
       const started = new Date(task.startedAt);
       return `Started ${this.formatRelativeTime(started)}`;
     }
@@ -420,7 +455,9 @@ export class TasksWebview extends LitElement {
 
     if (diffMins < 60) return `${diffMins}m`;
     const remainingMins = diffMins % 60;
-    return remainingMins > 0 ? `${diffHours}h ${remainingMins}m` : `${diffHours}h`;
+    return remainingMins > 0
+      ? `${diffHours}h ${remainingMins}m`
+      : `${diffHours}h`;
   }
 
   private startInitializationPolling() {
@@ -448,69 +485,150 @@ export class TasksWebview extends LitElement {
     // Show initialization guide if CLI not installed or Rover not initialized
     if (this.showingSetupGuide && this.initializationStatus) {
       return html`
-        <initialization-guide @install-cli=${this.handleInstallCLI} @initialize-rover=${this.handleInitializeRover} @retry-check=${this.handleRetryCheck} .status=${this.initializationStatus}></initialization-guide>
+        <initialization-guide
+          @install-cli=${this.handleInstallCLI}
+          @initialize-rover=${this.handleInitializeRover}
+          @retry-check=${this.handleRetryCheck}
+          .status=${this.initializationStatus}
+        ></initialization-guide>
       `;
     }
 
     return html`
       <div class="tasks-container">
-        ${this.loading ? html`
-          <div class="empty-state">Loading tasks...</div>
-        ` : this.tasks.length === 0 ? html`
-          <tasks-intro></tasks-intro>
-        ` : this.tasks.map(task => {
-      const timeInfo = this.formatTimeInfo(task);
-      const details = [task.status.toUpperCase()];
+        ${this.loading
+          ? html` <div class="empty-state">Loading tasks...</div> `
+          : this.tasks.length === 0
+            ? html` <tasks-intro></tasks-intro> `
+            : this.tasks.map(task => {
+                const timeInfo = this.formatTimeInfo(task);
+                const details = [task.status.toUpperCase()];
 
-      if (timeInfo) details.push(timeInfo);
-      if (task.progress !== undefined && task.progress > 0) details.push(`${task.progress}%`);
-      if (task.currentStep && task.status === 'running') details.push(`Step: ${task.currentStep}`);
+                if (timeInfo) details.push(timeInfo);
+                if (task.progress !== undefined && task.progress > 0)
+                  details.push(`${task.progress}%`);
+                if (task.currentStep && task.status === 'running')
+                  details.push(`Step: ${task.currentStep}`);
 
-      const isRunning = ['running', 'initializing', 'installing'].includes(task.status);
-      const isCompleted = task.status === 'completed';
+                const isRunning = [
+                  'running',
+                  'initializing',
+                  'installing',
+                ].includes(task.status);
+                const isCompleted = task.status === 'completed';
 
-      return html`
-            <div class="task-item" @click=${() => this.inspectTask(task.id, task.title)}>
-              <div class="task-icon">
-                <i class="codicon ${this.getStatusIcon(task.status)}"></i>
-              </div>
-              <div class="task-content">
-                <div class="task-title">${task.title}</div>
-                <div class="task-details">${details.join(' • ')}</div>
-              </div>
-              <div class="task-actions">
-                ${isCompleted ? html`
-                  <button class="action-btn" @click=${(e: Event) => this.executeTaskAction(e, 'gitCompare', task.id)} title="Compare Task Changes">
-                    <i class="codicon codicon-diff-multiple"></i>
-                  </button>
-                  <button class="action-btn" @click=${(e: Event) => this.executeTaskAction(e, 'iterateTask', task.id)} title="Iterate Task">
-                    <i class="codicon codicon-debug-rerun"></i>
-                  </button>
-                  <button class="action-btn" @click=${(e: Event) => this.executeTaskAction(e, 'mergeTask', task.id)} title="Merge Task">
-                    <i class="codicon codicon-git-merge"></i>
-                  </button>
-                  <button class="action-btn" @click=${(e: Event) => this.executeTaskAction(e, 'pushBranch', task.id)} title="Push Task Branch">
-                    <i class="codicon codicon-repo-push"></i>
-                  </button>
-                ` : ''}
-                <button class="action-btn" @click=${(e: Event) => this.executeTaskAction(e, 'viewLogs', task.id, undefined, task.status)} title="View Logs">
-                  <i class="codicon codicon-file"></i>
-                </button>
-                ${isRunning || isCompleted ? html`
-                  <button class="action-btn" @click=${(e: Event) => this.executeTaskAction(e, 'openShell', task.id)} title="Open Shell">
-                    <i class="codicon codicon-terminal"></i>
-                  </button>
-                ` : ''}
-                <button class="action-btn" @click=${(e: Event) => this.executeTaskAction(e, 'openWorkspace', task.id)} title="Open Workspace">
-                  <i class="codicon codicon-folder"></i>
-                </button>
-                <button class="action-btn" @click=${(e: Event) => this.executeTaskAction(e, 'deleteTask', task.id, task.title)} title="Delete Task">
-                  <i class="codicon codicon-trash"></i>
-                </button>
-              </div>
-            </div>
-          `;
-    })}
+                return html`
+                  <div
+                    class="task-item"
+                    @click=${() => this.inspectTask(task.id, task.title)}
+                  >
+                    <div class="task-icon">
+                      <i class="codicon ${this.getStatusIcon(task.status)}"></i>
+                    </div>
+                    <div class="task-content">
+                      <div class="task-title">${task.title}</div>
+                      <div class="task-details">${details.join(' • ')}</div>
+                    </div>
+                    <div class="task-actions">
+                      ${isCompleted
+                        ? html`
+                            <button
+                              class="action-btn"
+                              @click=${(e: Event) =>
+                                this.executeTaskAction(
+                                  e,
+                                  'gitCompare',
+                                  task.id
+                                )}
+                              title="Compare Task Changes"
+                            >
+                              <i class="codicon codicon-diff-multiple"></i>
+                            </button>
+                            <button
+                              class="action-btn"
+                              @click=${(e: Event) =>
+                                this.executeTaskAction(
+                                  e,
+                                  'iterateTask',
+                                  task.id
+                                )}
+                              title="Iterate Task"
+                            >
+                              <i class="codicon codicon-debug-rerun"></i>
+                            </button>
+                            <button
+                              class="action-btn"
+                              @click=${(e: Event) =>
+                                this.executeTaskAction(e, 'mergeTask', task.id)}
+                              title="Merge Task"
+                            >
+                              <i class="codicon codicon-git-merge"></i>
+                            </button>
+                            <button
+                              class="action-btn"
+                              @click=${(e: Event) =>
+                                this.executeTaskAction(
+                                  e,
+                                  'pushBranch',
+                                  task.id
+                                )}
+                              title="Push Task Branch"
+                            >
+                              <i class="codicon codicon-repo-push"></i>
+                            </button>
+                          `
+                        : ''}
+                      <button
+                        class="action-btn"
+                        @click=${(e: Event) =>
+                          this.executeTaskAction(
+                            e,
+                            'viewLogs',
+                            task.id,
+                            undefined,
+                            task.status
+                          )}
+                        title="View Logs"
+                      >
+                        <i class="codicon codicon-file"></i>
+                      </button>
+                      ${isRunning || isCompleted
+                        ? html`
+                            <button
+                              class="action-btn"
+                              @click=${(e: Event) =>
+                                this.executeTaskAction(e, 'openShell', task.id)}
+                              title="Open Shell"
+                            >
+                              <i class="codicon codicon-terminal"></i>
+                            </button>
+                          `
+                        : ''}
+                      <button
+                        class="action-btn"
+                        @click=${(e: Event) =>
+                          this.executeTaskAction(e, 'openWorkspace', task.id)}
+                        title="Open Workspace"
+                      >
+                        <i class="codicon codicon-folder"></i>
+                      </button>
+                      <button
+                        class="action-btn"
+                        @click=${(e: Event) =>
+                          this.executeTaskAction(
+                            e,
+                            'deleteTask',
+                            task.id,
+                            task.title
+                          )}
+                        title="Delete Task"
+                      >
+                        <i class="codicon codicon-trash"></i>
+                      </button>
+                    </div>
+                  </div>
+                `;
+              })}
       </div>
 
       <div class="create-form">
@@ -518,7 +636,8 @@ export class TasksWebview extends LitElement {
           class="form-textarea"
           placeholder="Describe what you want Rover to accomplish..."
           .value=${this.taskInput}
-          @input=${(e: InputEvent) => this.taskInput = (e.target as HTMLTextAreaElement).value}
+          @input=${(e: InputEvent) =>
+            (this.taskInput = (e.target as HTMLTextAreaElement).value)}
         ></textarea>
         <button
           class="form-button"
@@ -535,7 +654,10 @@ export class TasksWebview extends LitElement {
 // Initialize the component when the DOM is ready
 if (typeof window !== 'undefined') {
   // Acquire VS Code API
-  const vscode = typeof window.acquireVsCodeApi !== 'undefined' ? window.acquireVsCodeApi() : null;
+  const vscode =
+    typeof window.acquireVsCodeApi !== 'undefined'
+      ? window.acquireVsCodeApi()
+      : null;
 
   // Create and configure the component
   const component = document.createElement('tasks-webview');

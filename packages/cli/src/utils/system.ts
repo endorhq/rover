@@ -3,17 +3,24 @@
  */
 import { execa } from 'execa';
 
-const checkCommand = async (command: string, args: string[] = ['--version']): Promise<boolean> => {
-    try {
-        await execa(command, args);
-        return true;
-    } catch {
-        return false;
-    }
-}
+const checkCommand = async (
+  command: string,
+  args: string[] = ['--version']
+): Promise<boolean> => {
+  try {
+    await execa(command, args);
+    return true;
+  } catch {
+    return false;
+  }
+};
 
 export const checkGit = async (): Promise<boolean> => await checkCommand('git');
-export const checkGitHubCLI = async (): Promise<boolean> => await checkCommand('gh');
-export const checkDocker = async (): Promise<boolean> => await checkCommand('docker');
-export const checkClaude = async (): Promise<boolean> => await checkCommand('claude');
-export const checkGemini = async (): Promise<boolean> => await checkCommand('gemini');
+export const checkGitHubCLI = async (): Promise<boolean> =>
+  await checkCommand('gh');
+export const checkDocker = async (): Promise<boolean> =>
+  await checkCommand('docker');
+export const checkClaude = async (): Promise<boolean> =>
+  await checkCommand('claude');
+export const checkGemini = async (): Promise<boolean> =>
+  await checkCommand('gemini');

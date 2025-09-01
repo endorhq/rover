@@ -1,13 +1,13 @@
 export type NewTaskMetadata = {
-    provider: NewTaskProvider
-}
+  provider: NewTaskProvider;
+};
 
 export type IterateMetadata = {
-    iteration: number
-}
+  iteration: number;
+};
 
 export type InitMetadata = {
-    agents: string[],
-    preferredAgent: string,
-    languages: string[]
-}
+  agents: string[];
+  preferredAgent: string;
+  languages: string[];
+};

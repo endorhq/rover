@@ -8,20 +8,20 @@ import { spawnSync } from './os.js';
  * Replaces the existing docker-setup.sh and docker-setup-gemini.sh files
  */
 export class SetupBuilder {
-    private taskDescription: TaskDescription;
-    private agent: string;
-    private taskId: number;
+  private taskDescription: TaskDescription;
+  private agent: string;
+  private taskId: number;
 
-    constructor(taskDescription: TaskDescription, agent: string = 'claude') {
-        this.taskDescription = taskDescription;
-        this.agent = agent;
-        this.taskId = taskDescription.id;
-    }
+  constructor(taskDescription: TaskDescription, agent: string = 'claude') {
+    this.taskDescription = taskDescription;
+    this.agent = agent;
+    this.taskId = taskDescription.id;
+  }
 
-    private configureMcpServersFunction(): string {
-        switch (this.agent) {
-            case 'claude':
-                return `# Function to configure MCP servers for claude
+  private configureMcpServersFunction(): string {
+    switch (this.agent) {
+      case 'claude':
+        return `# Function to configure MCP servers for claude
 configure-mcp-servers() {
   # Ensure configuration file exists
   if [ ! -f /home/agent/.claude.json ]; then
@@ -34,9 +34,9 @@ configure-mcp-servers() {
     > /tmp/agent-settings.json
   mv /tmp/agent-settings.json /home/agent/.claude.json
 }
-`
-            case 'gemini':
-                return `# Function to configure MCP servers for gemini
+`;
+      case 'gemini':
+        return `# Function to configure MCP servers for gemini
 configure-mcp-servers() {
   # Ensure configuration file exists
   if [ ! -f /home/agent/.gemini/settings.json ]; then
@@ -50,17 +50,17 @@ configure-mcp-servers() {
     > /tmp/agent-settings.json
   mv /tmp/agent-settings.json /home/agent/.gemini/settings.json
 }
-`
-            default:
-                return `configure-mcp-servers() {
+`;
+      default:
+        return `configure-mcp-servers() {
   echo "Unknown agent: '${this.agent}'"
   exit 1;
 }`;
-        }
     }
+  }
 
-    private buildSetupMcpScript(): string {
-        return `#!/bin/sh
+  private buildSetupMcpScript(): string {
+    return `#!/bin/sh
 
 # Docker container setup script for Rover MCP servers integration
 # Generated for agent: ${this.agent}
@@ -87,32 +87,37 @@ echo "Package manager MCP is ready"
 ${this.configureMcpServersFunction()}
 
 configure-mcp-servers
-`
-    }
+`;
+  }
 
-    generateSetupMcpScript(): string {
-        // Ensure task directory exists
-        const taskDir = join(process.cwd(), '.rover', 'tasks', this.taskId.toString());
-        mkdirSync(taskDir, { recursive: true });
+  generateSetupMcpScript(): string {
+    // Ensure task directory exists
+    const taskDir = join(
+      process.cwd(),
+      '.rover',
+      'tasks',
+      this.taskId.toString()
+    );
+    mkdirSync(taskDir, { recursive: true });
 
-        // Generate script content
-        const scriptContent = this.buildSetupMcpScript();
+    // Generate script content
+    const scriptContent = this.buildSetupMcpScript();
 
-        // Write script to file
-        const scriptPath = join(taskDir, 'setup-mcp.sh');
-        writeFileSync(scriptPath, scriptContent, 'utf8');
+    // Write script to file
+    const scriptPath = join(taskDir, 'setup-mcp.sh');
+    writeFileSync(scriptPath, scriptContent, 'utf8');
 
-        // Make script executable
-        chmodSync(scriptPath, 0o755);
+    // Make script executable
+    chmodSync(scriptPath, 0o755);
 
-        return scriptPath;
-    }
+    return scriptPath;
+  }
 
-    /**
-     * Generate write_status function for the shell script
-     */
-    private generateWriteStatusFunction(): string {
-        return `# Function to write status updates using jq
+  /**
+   * Generate write_status function for the shell script
+   */
+  private generateWriteStatusFunction(): string {
+    return `# Function to write status updates using jq
 write_status() {
     local status="$1"
     local step="$2"
@@ -143,31 +148,33 @@ write_status() {
         | if ($status == "completed" or $status == "failed") then . + {completedAt: $completedAt} else . end' \\
         > /output/status.json
 }`;
-    }
+  }
 
-    /**
-     * Generate credential shredding and permission recovery function
-     */
-    private generateCleanupFunctions(): string {
-        const output = spawnSync('docker', ['info', '-f', 'json'], { encoding: 'utf8' }).stdout;
-        const info = JSON.parse(output.toString());
-        const isDockerRootless = (info?.SecurityOptions || []).some(
-            (value: string) => value.includes('rootless')
-        );
-        let recoverPermissions;
-        if (isDockerRootless) {
-            recoverPermissions = `
+  /**
+   * Generate credential shredding and permission recovery function
+   */
+  private generateCleanupFunctions(): string {
+    const output = spawnSync('docker', ['info', '-f', 'json'], {
+      encoding: 'utf8',
+    }).stdout;
+    const info = JSON.parse(output.toString());
+    const isDockerRootless = (info?.SecurityOptions || []).some(
+      (value: string) => value.includes('rootless')
+    );
+    let recoverPermissions;
+    if (isDockerRootless) {
+      recoverPermissions = `
               chown -R root:root /workspace || true
               chown -R root:root /output || true
             `;
-        } else {
-            recoverPermissions = `
+    } else {
+      recoverPermissions = `
               chown -R $uid:$gid /workspace || true
               chown -R $uid:$gid /output || true
             `;
-        }
+    }
 
-        return `
+    return `
 # Function to shred secrets before exit
 shred_secrets() {
     # Remove credentials: on certain environments such as Darwin,
@@ -209,13 +216,13 @@ safe_exit() {
 
     exit $exit_code
 }`;
-    }
+  }
 
-    /**
-     * Generate prompt execution functions
-     */
-    private generatePromptExecutionFunctions(): string {
-        return `# Function to execute a prompt phase
+  /**
+   * Generate prompt execution functions
+   */
+  private generatePromptExecutionFunctions(): string {
+    return `# Function to execute a prompt phase
 execute_prompt_phase() {
     local phase_name="$1"
     local progress="$2"
@@ -267,13 +274,13 @@ check_generated_file() {
 
     echo "✅ Generated file found: $file_path"
 }`;
-    }
+  }
 
-    /**
-     * Generate user creation and setup functions
-     */
-    private generateUserSetupFunctions(): string {
-        return `# Function to create agent user
+  /**
+   * Generate user creation and setup functions
+   */
+  private generateUserSetupFunctions(): string {
+    return `# Function to create agent user
 create_agent_user() {
     echo "👤 Creating agent user..."
     write_status "installing" "Creating agent user" 10
@@ -304,27 +311,27 @@ setup_agent_environment() {
     echo "✅ Agent user environment configured"
     write_status "installing" "Agent environment setup" 15
 }`;
-    }
+  }
 
-    /**
-     * Get the agent command for the specific AI agent
-     */
-    private getAgentCommand(): string {
-        switch (this.agent) {
-            case 'claude':
-                return 'claude --dangerously-skip-permissions -p --debug';
-            case 'gemini':
-                return 'gemini --yolo -p --debug';
-            default:
-                return 'claude --dangerously-skip-permissions -p --debug';
-        }
+  /**
+   * Get the agent command for the specific AI agent
+   */
+  private getAgentCommand(): string {
+    switch (this.agent) {
+      case 'claude':
+        return 'claude --dangerously-skip-permissions -p --debug';
+      case 'gemini':
+        return 'gemini --yolo -p --debug';
+      default:
+        return 'claude --dangerously-skip-permissions -p --debug';
     }
+  }
 
-    /**
-     * Generate the task execution workflow
-     */
-    private generateTaskExecutionWorkflow(): string {
-        return `# Execute the complete task workflow
+  /**
+   * Generate the task execution workflow
+   */
+  private generateTaskExecutionWorkflow(): string {
+    return `# Execute the complete task workflow
 echo "======================================="
 echo "🚀 Starting Task Execution Workflow"
 echo "======================================="
@@ -361,14 +368,14 @@ check_generated_file "summary.md" "summary"
 echo "======================================="
 echo "✅ Task execution workflow completed"
 echo "======================================="`;
-    }
+  }
 
-    /**
-    * Generate the task execution workflow
-    */
-    private generateInstallAgent(): string {
-        if (this.agent == 'claude') {
-            return `npm install -g @anthropic-ai/claude-code
+  /**
+   * Generate the task execution workflow
+   */
+  private generateInstallAgent(): string {
+    if (this.agent == 'claude') {
+      return `npm install -g @anthropic-ai/claude-code
 
 mkdir -p /home/agent/.claude
 
@@ -395,8 +402,8 @@ fi
 # Update permissions
 chown -R agent:agent /home/agent/.claude
 `;
-        } else if (this.agent == 'gemini') {
-            return `npm install -g @google/gemini-cli
+    } else if (this.agent == 'gemini') {
+      return `npm install -g @google/gemini-cli
 
 # Configure the CLI
 # Process and copy Gemini credentials
@@ -415,17 +422,17 @@ else
     safe_exit 1 "Missing gemini credentials"
 fi
 `;
-        } else {
-            // Unknown agent
-            return ''
-        }
+    } else {
+      // Unknown agent
+      return '';
     }
+  }
 
-    /**
-     * Generate common setup functions
-     */
-    private generateCommonFunctions(): string {
-        return `${this.generateWriteStatusFunction()}
+  /**
+   * Generate common setup functions
+   */
+  private generateCommonFunctions(): string {
+    return `${this.generateWriteStatusFunction()}
 
 ${this.generateCleanupFunctions()}
 
@@ -463,13 +470,13 @@ validate_task_file() {
 }
 
 ${this.generateUserSetupFunctions()}`;
-    }
+  }
 
-    /**
-     * Build the complete setup script content
-     */
-    buildScript(): string {
-        return `#!/bin/sh
+  /**
+   * Build the complete setup script content
+   */
+  buildScript(): string {
+    return `#!/bin/sh
 
 # Docker container setup script for Rover task execution
 # Generated for agent: ${this.agent}
@@ -553,41 +560,55 @@ echo "✅ Task execution completed successfully"
 echo "======================================="
 exit 0
 `;
-    }
+  }
 
-    /**
-     * Generate and save the setup script to the appropriate task directory
-     */
-    generateSetupScript(): string {
-        // Ensure task directory exists
-        const taskDir = join(process.cwd(), '.rover', 'tasks', this.taskId.toString());
-        mkdirSync(taskDir, { recursive: true });
+  /**
+   * Generate and save the setup script to the appropriate task directory
+   */
+  generateSetupScript(): string {
+    // Ensure task directory exists
+    const taskDir = join(
+      process.cwd(),
+      '.rover',
+      'tasks',
+      this.taskId.toString()
+    );
+    mkdirSync(taskDir, { recursive: true });
 
-        // Generate script content
-        const scriptContent = this.buildScript();
+    // Generate script content
+    const scriptContent = this.buildScript();
 
-        // Write script to file
-        const scriptPath = join(taskDir, 'setup.sh');
-        writeFileSync(scriptPath, scriptContent, 'utf8');
+    // Write script to file
+    const scriptPath = join(taskDir, 'setup.sh');
+    writeFileSync(scriptPath, scriptContent, 'utf8');
 
-        // Make script executable
-        chmodSync(scriptPath, 0o755);
+    // Make script executable
+    chmodSync(scriptPath, 0o755);
 
-        return scriptPath;
-    }
+    return scriptPath;
+  }
 
-    /**
-     * Get the path where the setup script will be saved
-     */
-    getScriptPath(script: string): string {
-        return join(process.cwd(), '.rover', 'tasks', this.taskId.toString(), script);
-    }
+  /**
+   * Get the path where the setup script will be saved
+   */
+  getScriptPath(script: string): string {
+    return join(
+      process.cwd(),
+      '.rover',
+      'tasks',
+      this.taskId.toString(),
+      script
+    );
+  }
 
-    /**
-     * Static factory method to create and generate setup script
-     */
-    static generate(taskDescription: TaskDescription, agent: string = 'claude'): string {
-        const builder = new SetupBuilder(taskDescription, agent);
-        return builder.generateSetupScript();
-    }
+  /**
+   * Static factory method to create and generate setup script
+   */
+  static generate(
+    taskDescription: TaskDescription,
+    agent: string = 'claude'
+  ): string {
+    const builder = new SetupBuilder(taskDescription, agent);
+    return builder.generateSetupScript();
+  }
 }
