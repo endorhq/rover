@@ -13,6 +13,7 @@ import { iterateCommand } from './commands/iterate.js';
 import { shellCommand } from './commands/shell.js';
 import { resetCommand } from './commands/reset.js';
 import { startCommand } from './commands/start.js';
+import { restartCommand } from './commands/restart.js';
 import { deleteCommand } from './commands/delete.js';
 import { mergeCommand } from './commands/merge.js';
 import colors from 'ansi-colors';
@@ -137,6 +138,15 @@ program
   .option('--json', 'Output the result in JSON format')
   // .option('--debug', 'Show debug information like running commands')
   .action(startCommand);
+
+// Restart a task in FAILED status
+program
+  .command('restart')
+  .description('Restart a failed task by resetting it to NEW status and starting execution')
+  .argument('<taskId>', 'Task ID to restart')
+  .option('-f, --follow', 'Follow execution logs in real-time')
+  .option('--json', 'Output the result in JSON format')
+  .action(restartCommand);
 
 // Add the ps command for monitoring tasks
 program
