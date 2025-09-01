@@ -1119,7 +1119,6 @@ export const taskCommand = async (
     const branchName = generateBranchName(taskId);
 
     try {
-      // Use the git instance we created earlier instead of creating a new one
       git.createWorktree(worktreePath, branchName, baseBranch);
     } catch (error) {
       if (!json) {
