@@ -8,7 +8,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { execSync } from 'node:child_process';
+import { launchSync } from 'rover-common';
 import { logsCommand } from '../logs.js';
 import { TaskDescription } from '../../lib/description.js';
 
@@ -42,15 +42,9 @@ vi.mock('../../utils/display.js', () => ({
 }));
 
 // Mock the OS utilities for Docker commands
-vi.mock('../../lib/os.js', () => ({
-  spawnSync: vi.fn(),
-  spawn: vi.fn(),
-}));
-
-// Mock child_process spawn for follow mode
-vi.mock('node:child_process', () => ({
-  spawn: vi.fn(),
-  execSync: vi.fn(),
+vi.mock('rover-common', () => ({
+  launchSync: vi.fn(),
+  launch: vi.fn(),
 }));
 
 describe('logs command', () => {
@@ -64,15 +58,15 @@ describe('logs command', () => {
     process.chdir(testDir);
 
     // Initialize git repo
-    execSync('git init', { stdio: 'pipe' });
-    execSync('git config user.email "test@test.com"', { stdio: 'pipe' });
-    execSync('git config user.name "Test User"', { stdio: 'pipe' });
-    execSync('git config commit.gpgsign false', { stdio: 'pipe' });
+    launchSync('git', ['init']);
+    launchSync('git', ['config', 'user.email', 'test@test.com']);
+    launchSync('git', ['config', 'user.name', 'Test User']);
+    launchSync('git', ['config', 'commit.gpgsign', 'false']);
 
     // Create initial commit
     writeFileSync('README.md', '# Test');
-    execSync('git add .', { stdio: 'pipe' });
-    execSync('git commit -m "Initial commit"', { stdio: 'pipe' });
+    launchSync('git', ['add', '.']);
+    launchSync('git', ['commit', '-m', 'Initial commit']);
 
     // Create .rover directory structure
     mkdirSync('.rover/tasks', { recursive: true });
@@ -100,9 +94,7 @@ describe('logs command', () => {
     const worktreePath = join('.rover', 'tasks', id.toString(), 'workspace');
     const branchName = `rover-task-${id}`;
 
-    execSync(`git worktree add ${worktreePath} -b ${branchName}`, {
-      stdio: 'pipe',
-    });
+    launchSync('git', ['worktree', 'add', worktreePath, '-b', branchName]);
     task.setWorkspace(join(testDir, worktreePath), branchName);
 
     // Set container ID if provided
@@ -308,8 +300,8 @@ describe('logs command', () => {
       createTestTaskWithContainer(7, 'Success Task', 'container123');
       createIterations(7, [1, 2]);
 
-      const { spawnSync } = await import('../../lib/os.js');
-      vi.mocked(spawnSync).mockReturnValue({
+      const { launchSync } = await import('rover-common');
+      vi.mocked(launchSync).mockReturnValue({
         stdout: 'Log line 1\nLog line 2\nLog line 3',
         stderr: '',
         status: 0,
@@ -320,21 +312,17 @@ describe('logs command', () => {
 
       await logsCommand('7');
 
-      expect(spawnSync).toHaveBeenCalledWith(
-        'docker',
-        ['logs', 'container123'],
-        {
-          encoding: 'utf8',
-          stdio: 'pipe',
-        }
-      );
+      expect(launchSync).toHaveBeenCalledWith('docker', [
+        'logs',
+        'container123',
+      ]);
     });
 
     it('should print logs to console output', async () => {
       createTestTaskWithContainer(21, 'Console Output Task', 'console123');
       createIterations(21, [1]);
 
-      const { spawnSync } = await import('../../lib/os.js');
+      const { launchSync } = await import('rover-common');
 
       // Mock console.log to capture output
       const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -342,7 +330,7 @@ describe('logs command', () => {
       const testLogs =
         'Starting application...\nProcessing data...\nTask completed successfully!\n\nFinal status: OK';
 
-      vi.mocked(spawnSync).mockReturnValue({
+      vi.mocked(launchSync).mockReturnValue({
         stdout: testLogs,
         stderr: '',
         status: 0,
@@ -381,7 +369,7 @@ describe('logs command', () => {
       createTestTaskWithContainer(22, 'Special Chars Task', 'special123');
       createIterations(22, [1]);
 
-      const { spawnSync } = await import('../../lib/os.js');
+      const { launchSync } = await import('rover-common');
 
       // Mock console.log to capture output
       const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -389,7 +377,7 @@ describe('logs command', () => {
       const testLogs =
         '[ERROR] Failed to connect\n→ Retrying...\n✓ Connected!\n{ "status": "ok" }\nTab\there';
 
-      vi.mocked(spawnSync).mockReturnValue({
+      vi.mocked(launchSync).mockReturnValue({
         stdout: testLogs,
         stderr: '',
         status: 0,
@@ -414,7 +402,7 @@ describe('logs command', () => {
       createTestTaskWithContainer(23, 'Multiline Task', 'multiline123');
       createIterations(23, [1]);
 
-      const { spawnSync } = await import('../../lib/os.js');
+      const { launchSync } = await import('rover-common');
 
       // Mock console.log to capture output
       const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -428,7 +416,7 @@ Line 4 (after empty line)
 Line 7 (after two empty lines)
 Last line`;
 
-      vi.mocked(spawnSync).mockReturnValue({
+      vi.mocked(launchSync).mockReturnValue({
         stdout: testLogs,
         stderr: '',
         status: 0,
@@ -461,8 +449,8 @@ Last line`;
       createTestTaskWithContainer(8, 'JSON Task', 'container456');
       createIterations(8, [1]);
 
-      const { spawnSync } = await import('../../lib/os.js');
-      vi.mocked(spawnSync).mockReturnValue({
+      const { launchSync } = await import('rover-common');
+      vi.mocked(launchSync).mockReturnValue({
         stdout: 'JSON log output\nAnother line',
         stderr: '',
         status: 0,
@@ -473,24 +461,20 @@ Last line`;
 
       await logsCommand('8', undefined, { json: true });
 
-      expect(spawnSync).toHaveBeenCalledWith(
-        'docker',
-        ['logs', 'container456'],
-        {
-          encoding: 'utf8',
-          stdio: 'pipe',
-        }
-      );
+      expect(launchSync).toHaveBeenCalledWith('docker', [
+        'logs',
+        'container456',
+      ]);
     });
 
     it('should handle empty logs', async () => {
       createTestTaskWithContainer(9, 'Empty Logs Task', 'container789');
       createIterations(9, [1]);
 
-      const { spawnSync } = await import('../../lib/os.js');
+      const { launchSync } = await import('rover-common');
       const { exitWithWarn } = await import('../../utils/exit.js');
 
-      vi.mocked(spawnSync).mockReturnValue({
+      vi.mocked(launchSync).mockReturnValue({
         stdout: '   \n   \n   ', // Just whitespace
         stderr: '',
         status: 0,
@@ -521,10 +505,10 @@ Last line`;
       );
       createIterations(10, [1]);
 
-      const { spawnSync } = await import('../../lib/os.js');
+      const { launchSync } = await import('rover-common');
       const { exitWithWarn } = await import('../../utils/exit.js');
 
-      vi.mocked(spawnSync).mockImplementation(() => {
+      vi.mocked(launchSync).mockImplementation(() => {
         throw new Error('No such container: nonexistent123');
       });
 
@@ -544,10 +528,10 @@ Last line`;
       createTestTaskWithContainer(11, 'Docker Error Task', 'error123');
       createIterations(11, [1]);
 
-      const { spawnSync } = await import('../../lib/os.js');
+      const { launchSync } = await import('rover-common');
       const { exitWithError } = await import('../../utils/exit.js');
 
-      vi.mocked(spawnSync).mockImplementation(() => {
+      vi.mocked(launchSync).mockImplementation(() => {
         throw new Error('Docker daemon not running');
       });
 
@@ -565,10 +549,10 @@ Last line`;
       createTestTaskWithContainer(12, 'Permission Error Task', 'perm123');
       createIterations(12, [1]);
 
-      const { spawnSync } = await import('../../lib/os.js');
+      const { launchSync } = await import('rover-common');
       const { exitWithError } = await import('../../utils/exit.js');
 
-      vi.mocked(spawnSync).mockImplementation(() => {
+      vi.mocked(launchSync).mockImplementation(() => {
         throw new Error(
           'permission denied while trying to connect to the Docker daemon socket'
         );
@@ -599,18 +583,16 @@ Last line`;
         kill: vi.fn(),
       };
 
-      const { spawn } = await import('node:child_process');
-      vi.mocked(spawn).mockReturnValue(mockProcess as any);
+      const { launch } = await import('rover-common');
+      vi.mocked(launch).mockReturnValue(mockProcess as any);
 
       await logsCommand('13', undefined, { follow: true });
 
-      expect(spawn).toHaveBeenCalledWith(
-        'docker',
-        ['logs', '-f', 'follow123'],
-        {
-          stdio: ['inherit', 'pipe', 'pipe'],
-        }
-      );
+      expect(launch).toHaveBeenCalledWith('docker', [
+        'logs',
+        '-f',
+        'follow123',
+      ]);
 
       // Verify event listeners are set up
       expect(mockProcess.stdout.on).toHaveBeenCalledWith(
@@ -661,8 +643,8 @@ Last line`;
         kill: vi.fn(),
       };
 
-      const { spawn } = await import('node:child_process');
-      vi.mocked(spawn).mockReturnValue(mockProcess as any);
+      const { launch } = await import('rover-common');
+      vi.mocked(launch).mockReturnValue(mockProcess as any);
 
       await logsCommand('24', undefined, { follow: true });
 
@@ -704,8 +686,8 @@ Last line`;
         kill: vi.fn(),
       };
 
-      const { spawn } = await import('node:child_process');
-      vi.mocked(spawn).mockReturnValue(mockProcess as any);
+      const { launch } = await import('rover-common');
+      vi.mocked(launch).mockReturnValue(mockProcess as any);
 
       await logsCommand('25', undefined, { follow: true });
 
@@ -738,28 +720,25 @@ Last line`;
         kill: vi.fn(),
       };
 
-      const { spawn } = await import('node:child_process');
-      vi.mocked(spawn).mockReturnValue(mockProcess as any);
+      const { launch } = await import('rover-common');
+      vi.mocked(launch).mockReturnValue(mockProcess as any);
 
       await logsCommand('14', '2', { follow: true });
 
-      expect(spawn).toHaveBeenCalledWith(
-        'docker',
-        ['logs', '-f', 'follow456'],
-        {
-          stdio: ['inherit', 'pipe', 'pipe'],
-        }
-      );
+      expect(launch).toHaveBeenCalledWith('docker', [
+        'logs',
+        '-f',
+        'follow456',
+      ]);
     });
 
     it('should skip follow mode in JSON mode', async () => {
       createTestTaskWithContainer(15, 'JSON Follow Task', 'jsonfollow123');
       createIterations(15, [1]);
 
-      const { spawnSync } = await import('../../lib/os.js');
-      const { spawn } = await import('node:child_process');
+      const { launchSync, launch } = await import('rover-common');
 
-      vi.mocked(spawnSync).mockReturnValue({
+      vi.mocked(launchSync).mockReturnValue({
         stdout: 'JSON follow logs',
         stderr: '',
         status: 0,
@@ -770,16 +749,12 @@ Last line`;
 
       await logsCommand('15', undefined, { follow: true, json: true });
 
-      // Should use spawnSync instead of spawn for JSON mode
-      expect(spawnSync).toHaveBeenCalledWith(
-        'docker',
-        ['logs', 'jsonfollow123'],
-        {
-          encoding: 'utf8',
-          stdio: 'pipe',
-        }
-      );
-      expect(spawn).not.toHaveBeenCalled();
+      // Should use launchSync instead of launch for JSON mode
+      expect(launchSync).toHaveBeenCalledWith('docker', [
+        'logs',
+        'jsonfollow123',
+      ]);
+      expect(launch).not.toHaveBeenCalled();
     });
   });
 
@@ -788,8 +763,8 @@ Last line`;
       createTestTaskWithContainer(16, 'Latest Iteration Task', 'latest123');
       createIterations(16, [1, 3, 2]); // Unsorted to test sorting
 
-      const { spawnSync } = await import('../../lib/os.js');
-      vi.mocked(spawnSync).mockReturnValue({
+      const { launchSync } = await import('rover-common');
+      vi.mocked(launchSync).mockReturnValue({
         stdout: 'Latest iteration logs',
         stderr: '',
         status: 0,
@@ -800,18 +775,15 @@ Last line`;
 
       await logsCommand('16');
 
-      expect(spawnSync).toHaveBeenCalledWith('docker', ['logs', 'latest123'], {
-        encoding: 'utf8',
-        stdio: 'pipe',
-      });
+      expect(launchSync).toHaveBeenCalledWith('docker', ['logs', 'latest123']);
     });
 
     it('should use specific iteration when provided', async () => {
       createTestTaskWithContainer(17, 'Specific Iteration Task', 'specific123');
       createIterations(17, [1, 2, 3]);
 
-      const { spawnSync } = await import('../../lib/os.js');
-      vi.mocked(spawnSync).mockReturnValue({
+      const { launchSync } = await import('rover-common');
+      vi.mocked(launchSync).mockReturnValue({
         stdout: 'Specific iteration logs',
         stderr: '',
         status: 0,
@@ -822,14 +794,10 @@ Last line`;
 
       await logsCommand('17', '2');
 
-      expect(spawnSync).toHaveBeenCalledWith(
-        'docker',
-        ['logs', 'specific123'],
-        {
-          encoding: 'utf8',
-          stdio: 'pipe',
-        }
-      );
+      expect(launchSync).toHaveBeenCalledWith('docker', [
+        'logs',
+        'specific123',
+      ]);
     });
   });
 
@@ -838,8 +806,8 @@ Last line`;
       createTestTaskWithContainer(18, 'Single Iteration Task', 'single123');
       createIterations(18, [1]);
 
-      const { spawnSync } = await import('../../lib/os.js');
-      vi.mocked(spawnSync).mockReturnValue({
+      const { launchSync } = await import('rover-common');
+      vi.mocked(launchSync).mockReturnValue({
         stdout: 'Single iteration logs',
         stderr: '',
         status: 0,
@@ -850,18 +818,15 @@ Last line`;
 
       await logsCommand('18');
 
-      expect(spawnSync).toHaveBeenCalledWith('docker', ['logs', 'single123'], {
-        encoding: 'utf8',
-        stdio: 'pipe',
-      });
+      expect(launchSync).toHaveBeenCalledWith('docker', ['logs', 'single123']);
     });
 
     it('should handle task with many iterations', async () => {
       createTestTaskWithContainer(19, 'Many Iterations Task', 'many123');
       createIterations(19, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
 
-      const { spawnSync } = await import('../../lib/os.js');
-      vi.mocked(spawnSync).mockReturnValue({
+      const { launchSync } = await import('rover-common');
+      vi.mocked(launchSync).mockReturnValue({
         stdout: 'Many iterations logs',
         stderr: '',
         status: 0,
@@ -872,10 +837,7 @@ Last line`;
 
       await logsCommand('19', '5');
 
-      expect(spawnSync).toHaveBeenCalledWith('docker', ['logs', 'many123'], {
-        encoding: 'utf8',
-        stdio: 'pipe',
-      });
+      expect(launchSync).toHaveBeenCalledWith('docker', ['logs', 'many123']);
     });
   });
 
@@ -885,10 +847,10 @@ Last line`;
       createIterations(20, [1]);
 
       const { getTelemetry } = await import('../../lib/telemetry.js');
-      const { spawnSync } = await import('../../lib/os.js');
+      const { launchSync } = await import('rover-common');
 
       const mockTelemetry = getTelemetry();
-      vi.mocked(spawnSync).mockReturnValue({
+      vi.mocked(launchSync).mockReturnValue({
         stdout: 'Telemetry logs',
         stderr: '',
         status: 0,

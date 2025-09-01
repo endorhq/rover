@@ -8,7 +8,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { execSync } from 'node:child_process';
+import { launchSync } from 'rover-common';
 import { diffCommand } from '../diff.js';
 import { TaskDescription } from '../../lib/description.js';
 
@@ -42,16 +42,16 @@ describe('diff command', () => {
     process.chdir(testDir);
 
     // Initialize git repo
-    execSync('git init', { stdio: 'pipe' });
-    execSync('git config user.email "test@test.com"', { stdio: 'pipe' });
-    execSync('git config user.name "Test User"', { stdio: 'pipe' });
-    execSync('git config commit.gpgsign false', { stdio: 'pipe' });
+    launchSync('git', ['init']);
+    launchSync('git', ['config', 'user.email', 'test@test.com']);
+    launchSync('git', ['config', 'user.name', 'Test User']);
+    launchSync('git', ['config', 'commit.gpgsign', 'false']);
 
     // Create initial commit
     writeFileSync('README.md', '# Test Project\n');
     writeFileSync('.gitignore', 'node_modules/\n*.log\n.rover\n');
-    execSync('git add .', { stdio: 'pipe' });
-    execSync('git commit -m "Initial commit"', { stdio: 'pipe' });
+    launchSync('git', ['add', '.']);
+    launchSync('git', ['commit', '-m', 'Initial commit']);
 
     // Create .rover directory structure
     mkdirSync('.rover/tasks', { recursive: true });
@@ -79,9 +79,7 @@ describe('diff command', () => {
     const worktreePath = join('.rover', 'tasks', id.toString(), 'workspace');
     const branchName = `rover-task-${id}`;
 
-    execSync(`git worktree add ${worktreePath} -b ${branchName}`, {
-      stdio: 'pipe',
-    });
+    launchSync('git', ['worktree', 'add', worktreePath, '-b', branchName]);
     task.setWorkspace(join(testDir, worktreePath), branchName);
 
     return { task, worktreePath, branchName };
@@ -157,7 +155,9 @@ describe('diff command', () => {
       // Create and stage a new file
       const newFilePath = join(worktreePath, 'new-file.js');
       writeFileSync(newFilePath, 'console.log("Hello World");\n');
-      execSync('git add new-file.js', { cwd: worktreePath, stdio: 'pipe' });
+      launchSync('git', ['add', 'new-file.js'], {
+        cwd: worktreePath,
+      });
 
       await diffCommand('3');
 
@@ -177,7 +177,9 @@ describe('diff command', () => {
       // Stage a new file
       const stagedFile = join(worktreePath, 'staged.txt');
       writeFileSync(stagedFile, 'This file is staged\n');
-      execSync('git add staged.txt', { cwd: worktreePath, stdio: 'pipe' });
+      launchSync('git', ['add', 'staged.txt'], {
+        cwd: worktreePath,
+      });
 
       // Create an unstaged modification
       const readmePath = join(worktreePath, 'README.md');
@@ -262,7 +264,9 @@ describe('diff command', () => {
 
       // New staged file
       writeFileSync(join(worktreePath, 'staged-new.txt'), 'Staged new file\n');
-      execSync('git add staged-new.txt', { cwd: worktreePath, stdio: 'pipe' });
+      launchSync('git', ['add', 'staged-new.txt'], {
+        cwd: worktreePath,
+      });
 
       // Untracked files
       writeFileSync(join(worktreePath, 'untracked.txt'), 'Untracked content\n');
@@ -399,16 +403,15 @@ describe('diff command', () => {
         join(worktreePath, 'task-file.txt'),
         'Task branch content\n'
       );
-      execSync('git add .', { cwd: worktreePath, stdio: 'pipe' });
-      execSync('git commit -m "Task changes"', {
+      launchSync('git', ['add', '.'], { cwd: worktreePath });
+      launchSync('git', ['commit', '-m', 'Task changes'], {
         cwd: worktreePath,
-        stdio: 'pipe',
       });
 
       // Make different changes in main branch
       writeFileSync('main-only.txt', 'Main branch file\n');
-      execSync('git add .', { stdio: 'pipe' });
-      execSync('git commit -m "Main branch change"', { stdio: 'pipe' });
+      launchSync('git', ['add', '.']);
+      launchSync('git', ['commit', '-m', 'Main branch change']);
 
       await diffCommand('13', undefined, { branch: 'main' });
 
@@ -444,16 +447,14 @@ describe('diff command', () => {
 
       // Create and commit a file first
       writeFileSync(join(worktreePath, 'old-name.txt'), 'File content\n');
-      execSync('git add .', { cwd: worktreePath, stdio: 'pipe' });
-      execSync('git commit -m "Add file"', {
+      launchSync('git', ['add', '.'], { cwd: worktreePath });
+      launchSync('git', ['commit', '-m', 'Add file'], {
         cwd: worktreePath,
-        stdio: 'pipe',
       });
 
       // Rename the file
-      execSync('git mv old-name.txt new-name.txt', {
+      launchSync('git', ['mv', 'old-name.txt', 'new-name.txt'], {
         cwd: worktreePath,
-        stdio: 'pipe',
       });
 
       await diffCommand('15');
@@ -472,14 +473,15 @@ describe('diff command', () => {
 
       // Create and commit a file
       writeFileSync(join(worktreePath, 'to-delete.txt'), 'Will be deleted\n');
-      execSync('git add .', { cwd: worktreePath, stdio: 'pipe' });
-      execSync('git commit -m "Add file to delete"', {
+      launchSync('git', ['add', '.'], { cwd: worktreePath });
+      launchSync('git', ['commit', '-m', 'Add file to delete'], {
         cwd: worktreePath,
-        stdio: 'pipe',
       });
 
       // Delete the file
-      execSync('git rm to-delete.txt', { cwd: worktreePath, stdio: 'pipe' });
+      launchSync('git', ['rm', 'to-delete.txt'], {
+        cwd: worktreePath,
+      });
 
       await diffCommand('16');
 
@@ -564,10 +566,9 @@ describe('diff command', () => {
       const emptyDir = mkdtempSync(join(tmpdir(), 'rover-empty-diff-'));
       process.chdir(emptyDir);
 
-      execSync('git init', { stdio: 'pipe' });
-      execSync('git config user.email "test@test.com"', { stdio: 'pipe' });
-      execSync('git config user.name "Test User"', { stdio: 'pipe' });
-
+      launchSync('git', ['init']);
+      launchSync('git', ['config', 'user.email', 'test@test.com']);
+      launchSync('git', ['config', 'user.name', 'Test User']);
       mkdirSync('.rover/tasks', { recursive: true });
 
       const task = TaskDescription.create({
@@ -580,13 +581,11 @@ describe('diff command', () => {
       const branchName = 'rover-task-1';
 
       // Create orphan branch for worktree since there's no commits
-      execSync('git checkout --orphan temp-branch', { stdio: 'pipe' });
+      launchSync('git', ['checkout', '--orphan', 'temp-branch']);
       writeFileSync('temp.txt', 'temp');
-      execSync('git add .', { stdio: 'pipe' });
-      execSync('git commit -m "temp"', { stdio: 'pipe' });
-      execSync(`git worktree add ${worktreePath} -b ${branchName}`, {
-        stdio: 'pipe',
-      });
+      launchSync('git', ['add', '.']);
+      launchSync('git', ['commit', '-m', 'temp']);
+      launchSync('git', ['worktree', 'add', worktreePath, '-b', branchName]);
 
       task.setWorkspace(join(emptyDir, worktreePath), branchName);
 

@@ -75,9 +75,9 @@ export const diffCommand = async (
           includeUntracked: !options.branch, // Only include untracked when not comparing branches
         });
 
-        const diffOutput = diffResult.stdout.toString();
+        const diffOutput = diffResult.stdout?.toString();
 
-        if (diffOutput.trim() === '') {
+        if (diffOutput?.trim() === '') {
           if (filePath) {
             console.log(
               colors.yellow(`No changes found for file: ${filePath}`)
@@ -89,7 +89,7 @@ export const diffCommand = async (
           if (options.onlyFiles) {
             console.log(colors.bold.white('\nChanged Files'));
             // Display file list with colors
-            const files = diffOutput.trim().split('\n');
+            const files = diffOutput?.trim().split('\n') || [];
 
             for (let i = 0; i < files.length; i++) {
               const connector = i === files.length - 1 ? '└──' : '├──';
@@ -98,7 +98,7 @@ export const diffCommand = async (
           } else {
             // Display full diff with syntax highlighting
             console.log('');
-            const lines = diffOutput.split('\n');
+            const lines = diffOutput?.split('\n') || [];
             lines.forEach(line => {
               if (line.startsWith('@@')) {
                 console.log(colors.magenta(line));

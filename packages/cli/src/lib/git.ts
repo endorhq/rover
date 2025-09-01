@@ -1,5 +1,4 @@
-import { spawnSync, SpawnSyncReturns } from './os.js';
-import { spawnSync as nodeSpawnSync } from 'node:child_process';
+import { launchSync } from 'rover-common';
 
 export class GitError extends Error {
   constructor(reason: string) {
@@ -52,26 +51,22 @@ export type GitRemoteUrlOptions = {
 export class Git {
   constructor() {
     // Check docker is available
-    if (spawnSync('git', ['--version'], { stdio: 'pipe' }).error) {
+    if (launchSync('git', ['--version']).exitCode !== 0) {
       throw new GitError('Git is not installed.');
     }
   }
 
   isGitRepo(): boolean {
-    const result = spawnSync('git', ['rev-parse', '--is-inside-work-tree'], {
-      stdio: 'pipe',
-    });
-    return result.status === 0;
+    const result = launchSync('git', ['rev-parse', '--is-inside-work-tree']);
+    return result.exitCode === 0;
   }
 
   hasCommits(): boolean {
-    const result = spawnSync('git', ['rev-list', '--count', 'HEAD'], {
-      stdio: 'pipe',
-    });
-    return result.status === 0;
+    const result = launchSync('git', ['rev-list', '--count', 'HEAD']);
+    return result.exitCode === 0;
   }
 
-  diff(options: GitDiffOptions = {}): SpawnSyncReturns<Buffer | string> {
+  diff(options: GitDiffOptions = {}): ReturnType<typeof launchSync> {
     const args = ['diff'];
 
     if (options.onlyFiles) {
@@ -86,9 +81,7 @@ export class Git {
       args.push('--', options.filePath);
     }
 
-    const diffResult = spawnSync('git', args, {
-      stdio: 'pipe',
-      encoding: 'utf8',
+    const diffResult = launchSync('git', args, {
       cwd: options.worktreePath,
     });
 
@@ -97,26 +90,25 @@ export class Git {
     if (options.includeUntracked && !options.filePath) {
       // Use git ls-files to get the actual untracked files (not just directories)
       let untrackedFiles: string[] = [];
-      const lsFilesResult = spawnSync(
+      const lsFilesResult = launchSync(
         'git',
         ['ls-files', '--others', '--exclude-standard'],
         {
-          stdio: 'pipe',
-          encoding: 'utf8',
           cwd: options.worktreePath,
         }
       );
 
-      if (lsFilesResult.status === 0) {
-        untrackedFiles = lsFilesResult.stdout
-          .toString()
-          .split('\n')
-          .map(line => line.trim())
-          .filter(file => file.length > 0);
+      if (lsFilesResult.exitCode === 0) {
+        untrackedFiles =
+          lsFilesResult?.stdout
+            ?.toString()
+            .split('\n')
+            .map(line => line.trim())
+            .filter(file => file.length > 0) || [];
       }
 
       if (untrackedFiles.length > 0) {
-        let combinedOutput = diffResult.stdout.toString();
+        let combinedOutput = diffResult?.stdout?.toString() || '';
 
         if (options.onlyFiles) {
           // Just append the untracked file names
@@ -127,22 +119,23 @@ export class Git {
         } else {
           // Show full diff for each untracked file
           for (const file of untrackedFiles) {
-            const untrackedDiff = nodeSpawnSync(
+            const untrackedDiff = launchSync(
               'git',
               ['diff', '--no-index', '/dev/null', file],
               {
-                stdio: 'pipe',
-                encoding: 'utf8',
                 cwd: options.worktreePath,
+                reject: false,
               }
             );
 
-            if (untrackedDiff.status === 0 || untrackedDiff.status === 1) {
+            if (untrackedDiff.exitCode === 0 || untrackedDiff.exitCode === 1) {
               // git diff --no-index returns 1 when files differ, which is expected
               if (combinedOutput && !combinedOutput.endsWith('\n')) {
                 combinedOutput += '\n';
               }
-              combinedOutput += untrackedDiff.stdout.toString();
+              if (untrackedDiff?.stdout) {
+                combinedOutput += untrackedDiff.stdout.toString();
+              }
             }
           }
         }
@@ -163,9 +156,7 @@ export class Git {
    */
   add(file: string, options: GitWorktreeOptions = {}): boolean {
     try {
-      spawnSync('git', ['add', file], {
-        stdio: 'pipe',
-        encoding: 'utf8',
+      launchSync('git', ['add', file], {
         cwd: options.worktreePath,
       });
       return true;
@@ -179,15 +170,11 @@ export class Git {
    */
   addAndCommit(message: string, options: GitWorktreeOptions = {}): boolean {
     try {
-      spawnSync('git', ['add', '-A'], {
-        stdio: 'pipe',
-        encoding: 'utf8',
+      launchSync('git', ['add', '-A'], {
         cwd: options.worktreePath,
       });
 
-      spawnSync('git', ['commit', '-m', message], {
-        stdio: 'pipe',
-        encoding: 'utf8',
+      launchSync('git', ['commit', '-m', message], {
         cwd: options.worktreePath,
       });
 
@@ -204,12 +191,13 @@ export class Git {
     const remoteName = options.remoteName || 'origin';
 
     try {
-      const result = spawnSync('git', ['remote', 'get-url', remoteName], {
-        stdio: 'pipe',
+      const result = launchSync('git', ['remote', 'get-url', remoteName], {
         cwd: options.worktreePath,
       });
 
-      return result.status == 0 ? result.stdout.toString().trim() : '';
+      return result?.exitCode == 0
+        ? result?.stdout?.toString().trim() || ''
+        : '';
     } catch (_err) {
       return '';
     }
@@ -224,8 +212,7 @@ export class Git {
     options: GitWorktreeOptions = {}
   ): boolean {
     try {
-      spawnSync('git', ['merge', '--no-ff', branch, '-m', message], {
-        stdio: 'pipe',
+      launchSync('git', ['merge', '--no-ff', branch, '-m', message], {
         cwd: options.worktreePath,
       });
 
@@ -241,8 +228,7 @@ export class Git {
    */
   abortMerge(options: GitWorktreeOptions = {}) {
     try {
-      spawnSync('git', ['merge', '--abort'], {
-        stdio: 'pipe',
+      launchSync('git', ['merge', '--abort'], {
         cwd: options.worktreePath,
       });
     } catch (_err) {
@@ -255,8 +241,7 @@ export class Git {
    */
   continueMerge(options: GitWorktreeOptions = {}) {
     try {
-      spawnSync('git', ['merge', '--continue'], {
-        stdio: 'pipe',
+      launchSync('git', ['merge', '--continue'], {
         cwd: options.worktreePath,
       });
     } catch (_err) {
@@ -270,9 +255,7 @@ export class Git {
    */
   pruneWorktree(): boolean {
     try {
-      spawnSync('git', ['worktree', 'prune'], {
-        stdio: 'pipe',
-      });
+      launchSync('git', ['worktree', 'prune']);
       return true;
     } catch (_err) {
       // Ignore abort errors
@@ -286,13 +269,15 @@ export class Git {
   getMergeConflicts(options: GitWorktreeOptions = {}): string[] {
     try {
       // Check if we're in a merge state
-      const status = spawnSync('git', ['status', '--porcelain'], {
-        stdio: 'pipe',
-        encoding: 'utf8',
+      const status = launchSync('git', ['status', '--porcelain'], {
         cwd: options.worktreePath,
       })
-        .stdout.toString()
+        .stdout?.toString()
         .trim();
+
+      if (!status) {
+        return [];
+      }
 
       // Look for conflict markers (UU, AA, etc.)
       const conflictFiles = status
@@ -327,13 +312,12 @@ export class Git {
         args.push('-u', 'no');
       }
 
-      const status = spawnSync('git', args, {
-        stdio: 'pipe',
-        encoding: 'utf8',
-        cwd: options.worktreePath,
-      })
-        .stdout.toString()
-        .trim();
+      const status =
+        launchSync('git', args, {
+          cwd: options.worktreePath,
+        })
+          .stdout?.toString()
+          .trim() || '';
 
       if (status.length == 0) {
         return [];
@@ -369,16 +353,10 @@ export class Git {
     const targetBranch = options.targetBranch || this.getCurrentBranch();
 
     try {
-      const unmergedCommits = spawnSync(
-        'git',
-        ['log', `${targetBranch}..${srcBranch}`, '--oneline'],
-        {
-          stdio: 'pipe',
-          encoding: 'utf8',
-        }
-      )
-        .stdout.toString()
-        .trim();
+      const unmergedCommits =
+        launchSync('git', ['log', `${targetBranch}..${srcBranch}`, '--oneline'])
+          .stdout?.toString()
+          .trim() || '';
 
       return unmergedCommits.length > 0;
     } catch (_err) {
@@ -391,13 +369,13 @@ export class Git {
    */
   getCurrentBranch(options: GitWorktreeOptions = {}): string {
     try {
-      return spawnSync('git', ['branch', '--show-current'], {
-        stdio: 'pipe',
-        encoding: 'utf8',
-        cwd: options.worktreePath,
-      })
-        .stdout.toString()
-        .trim();
+      return (
+        launchSync('git', ['branch', '--show-current'], {
+          cwd: options.worktreePath,
+        })
+          .stdout?.toString()
+          .trim() || 'unknown'
+      );
     } catch (error) {
       return 'unknown';
     }
@@ -409,11 +387,12 @@ export class Git {
   branchExists(branch: string): boolean {
     try {
       return (
-        spawnSync(
-          'git',
-          ['show-ref', '--verify', '--quiet', `refs/heads/${branch}`],
-          { stdio: 'pipe' }
-        ).status === 0
+        launchSync('git', [
+          'show-ref',
+          '--verify',
+          '--quiet',
+          `refs/heads/${branch}`,
+        ]).exitCode === 0
       );
     } catch (error) {
       return false;
@@ -430,16 +409,14 @@ export class Git {
   ): boolean {
     if (this.branchExists(branchName)) {
       return (
-        spawnSync('git', ['worktree', 'add', path, branchName], {
-          stdio: 'pipe',
-        }).status == 0
+        launchSync('git', ['worktree', 'add', path, branchName]).exitCode == 0
       );
     }
     // Create new branch from base branch if specified, otherwise from current branch
     const args = baseBranch
       ? ['worktree', 'add', path, '-b', branchName, baseBranch]
       : ['worktree', 'add', path, '-b', branchName];
-    return spawnSync('git', args, { stdio: 'pipe' }).status == 0;
+    return launchSync('git', args).exitCode == 0;
   }
 
   /**
@@ -450,15 +427,11 @@ export class Git {
     let branch = 'main';
 
     try {
-      const remoteHead = spawnSync(
-        'git',
-        ['symbolic-ref', 'refs/remotes/origin/HEAD'],
-        {
-          encoding: 'utf8',
-          stdio: ['pipe', 'pipe', 'ignore'],
-        }
-      )
-        .stdout.toString()
+      const remoteHead = launchSync('git', [
+        'symbolic-ref',
+        'refs/remotes/origin/HEAD',
+      ])
+        .stdout?.toString()
         .trim();
 
       if (remoteHead) {
@@ -466,19 +439,21 @@ export class Git {
       } else {
         // Fallback: check if main or master exists
         try {
-          spawnSync(
-            'git',
-            ['show-ref', '--verify', '--quiet', 'refs/heads/main'],
-            { stdio: 'pipe' }
-          );
+          launchSync('git', [
+            'show-ref',
+            '--verify',
+            '--quiet',
+            'refs/heads/main',
+          ]);
           branch = 'main';
         } catch (error) {
           try {
-            spawnSync(
-              'git',
-              ['show-ref', '--verify', '--quiet', 'refs/heads/master'],
-              { stdio: 'pipe' }
-            );
+            launchSync('git', [
+              'show-ref',
+              '--verify',
+              '--quiet',
+              'refs/heads/master',
+            ]);
             branch = 'master';
           } catch (error) {
             branch = 'main'; // Default fallback
@@ -497,7 +472,7 @@ export class Git {
    */
   getRecentCommits(options: GitRecentCommitOptions = {}): string[] {
     const commitBranch = options.branch || this.getMainBranch();
-    const commits = spawnSync(
+    const commits = launchSync(
       'git',
       [
         'log',
@@ -507,13 +482,15 @@ export class Git {
         `${options.count || 15}`,
       ],
       {
-        stdio: 'pipe',
-        encoding: 'utf8',
         cwd: options.worktreePath,
       }
     )
-      .stdout.toString()
+      .stdout?.toString()
       .trim();
+
+    if (!commits) {
+      return [];
+    }
 
     return commits.split('\n').filter(line => line.trim() !== '');
   }
@@ -530,13 +507,11 @@ export class Git {
 
     args.push('origin', branch);
 
-    const result = spawnSync('git', args, {
-      stdio: 'pipe',
-      encoding: 'utf8',
+    const result = launchSync('git', args, {
       cwd: options.worktreePath,
     });
 
-    if (result.status !== 0) {
+    if (result.exitCode !== 0) {
       const stderr = result.stderr?.toString() || '';
       const stdout = result.stdout?.toString() || '';
       const errorMessage = stderr || stdout || 'Unknown error';

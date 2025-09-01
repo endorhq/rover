@@ -2,7 +2,7 @@ import colors from 'ansi-colors';
 import enquirer from 'enquirer';
 import { existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { spawnSync } from '../lib/os.js';
+import { launchSync } from 'rover-common';
 import yoctoSpinner from 'yocto-spinner';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
 import { getTelemetry } from '../lib/telemetry.js';
@@ -72,25 +72,24 @@ export const resetCommand = async (
 
     try {
       // Check if we're in a git repository
-      spawnSync('git', ['rev-parse', '--is-inside-work-tree'], {
-        stdio: 'pipe',
-      });
+      launchSync('git', ['rev-parse', '--is-inside-work-tree']);
 
       // Remove git workspace if it exists
       if (task.worktreePath) {
         try {
-          spawnSync(
-            'git',
-            ['worktree', 'remove', task.worktreePath, '--force'],
-            { stdio: 'pipe' }
-          );
+          launchSync('git', [
+            'worktree',
+            'remove',
+            task.worktreePath,
+            '--force',
+          ]);
           spinner.text = 'Workspace removed';
         } catch (error) {
           // If workspace removal fails, try to remove it manually
           try {
             rmSync(task.worktreePath, { recursive: true, force: true });
             // Remove worktree from git's tracking
-            spawnSync('git', ['worktree', 'prune'], { stdio: 'pipe' });
+            launchSync('git', ['worktree', 'prune']);
           } catch (manualError) {
             console.warn(
               colors.yellow('Warning: Could not remove workspace directory')
@@ -103,20 +102,14 @@ export const resetCommand = async (
       if (task.branchName) {
         try {
           // Check if branch exists
-          spawnSync(
-            'git',
-            [
-              'show-ref',
-              '--verify',
-              '--quiet',
-              `refs/heads/${task.branchName}`,
-            ],
-            { stdio: 'pipe' }
-          );
+          launchSync('git', [
+            'show-ref',
+            '--verify',
+            '--quiet',
+            `refs/heads/${task.branchName}`,
+          ]);
           // Delete the branch
-          spawnSync('git', ['branch', '-D', task.branchName], {
-            stdio: 'pipe',
-          });
+          launchSync('git', ['branch', '-D', task.branchName]);
           spinner.text = 'Branch removed';
         } catch (error) {
           // Branch doesn't exist or couldn't be deleted, which is fine

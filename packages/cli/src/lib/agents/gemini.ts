@@ -1,4 +1,4 @@
-import { spawn, spawnSync } from '../os.js';
+import { launch, launchSync } from 'rover-common';
 import {
   AIAgentTool,
   InvokeAIAgentError,
@@ -18,7 +18,7 @@ class GeminiAI implements AIAgentTool {
   constructor() {
     // Check Gemini CLI is available
     try {
-      spawnSync(this.AGENT_BIN, ['--version'], { stdio: 'pipe' });
+      launchSync(this.AGENT_BIN, ['--version']);
     } catch (err) {
       throw new MissingAIAgentError(this.AGENT_BIN);
     }
@@ -36,7 +36,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
     }
 
     try {
-      const { stdout } = await spawn(this.AGENT_BIN, geminiArgs, {
+      const { stdout } = await launch(this.AGENT_BIN, geminiArgs, {
         input: prompt,
       });
       return stdout?.toString().trim() || '';

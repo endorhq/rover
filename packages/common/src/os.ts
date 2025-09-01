@@ -1,15 +1,8 @@
-import {
-  execa,
-  execaSync,
-  ExecaError,
-  Options,
-  Result,
-  ResultPromise,
-  SyncOptions,
-  SyncResult,
-} from 'execa';
+import { execa, execaSync, ExecaError, ResultPromise } from 'execa';
 
+import type { Options, Result, SyncOptions, SyncResult } from 'execa';
 import type { LaunchOptions, LaunchSyncOptions } from './types.d.ts';
+export type { Options, Result, SyncOptions, SyncResult };
 
 import colors from 'ansi-colors';
 
@@ -37,11 +30,11 @@ const log = (stream: string) => {
 const logStdout = log('stdout');
 const logStderr = log('stderr');
 
-export async function launch(
+export function launch(
   command: string,
   args?: ReadonlyArray<string>,
   options?: Options
-): Promise<Result> {
+): ReturnType<typeof execa> {
   if (VERBOSE) {
     const stdout = options?.stdout
       ? [options.stdout as any, logStdout]
@@ -62,7 +55,7 @@ export function launchSync(
   command: string,
   args?: ReadonlyArray<string>,
   options?: SyncOptions
-): SyncResult {
+): ReturnType<typeof execaSync> {
   if (VERBOSE) {
     const stdout = options?.stdout
       ? [options.stdout as any, logStdout]

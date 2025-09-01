@@ -1,7 +1,8 @@
+import colors from 'ansi-colors';
 import { writeFileSync, chmodSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { TaskDescription } from './description.js';
-import { spawnSync } from './os.js';
+import { launchSync } from 'rover-common';
 
 /**
  * SetupBuilder class - Consolidates Docker setup script generation
@@ -170,24 +171,29 @@ write_status() {
    * Generate credential shredding and permission recovery function
    */
   private generateCleanupFunctions(): string {
-    const output = spawnSync('docker', ['info', '-f', 'json'], {
-      encoding: 'utf8',
-    }).stdout;
-    const info = JSON.parse(output.toString());
-    const isDockerRootless = (info?.SecurityOptions || []).some(
-      (value: string) => value.includes('rootless')
-    );
-    let recoverPermissions;
-    if (isDockerRootless) {
-      recoverPermissions = `
-              chown -R root:root /workspace || true
-              chown -R root:root /output || true
-            `;
+    let isDockerRootless = true;
+    let recoverPermissions = `
+chown -R $uid:$gid /workspace || true
+chown -R $uid:$gid /output || true
+`;
+    const dockerInfo = launchSync('docker', ['info', '-f', 'json']).stdout;
+    if (dockerInfo) {
+      const info = JSON.parse(dockerInfo.toString());
+      isDockerRootless = (info?.SecurityOptions || []).some((value: string) =>
+        value.includes('rootless')
+      );
+      if (isDockerRootless) {
+        recoverPermissions = `
+chown -R root:root /workspace || true
+chown -R root:root /output || true
+`;
+      }
     } else {
-      recoverPermissions = `
-              chown -R $uid:$gid /workspace || true
-              chown -R $uid:$gid /output || true
-            `;
+      console.log(
+        colors.yellow(
+          '⚠ Warning: Could not retrieve Docker information in order to recover worktree permissions. Assuming Docker root installation; worktree permissions might be off.'
+        )
+      );
     }
 
     return `

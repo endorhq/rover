@@ -13,8 +13,9 @@ import { SetupBuilder } from '../lib/setup.js';
 import { AI_AGENT } from '../lib/config.js';
 import { IterationConfig } from '../lib/iteration.js';
 import { generateBranchName } from '../utils/branch-name.js';
-import { spawn } from 'node:child_process';
-import { launchSync } from 'rover-common';
+import { request } from 'node:https';
+import { launch, launchSync } from 'rover-common';
+import { checkGitHubCLI } from '../utils/system.js';
 import { showRoverBanner, showRoverChat, showTips } from '../utils/display.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { NewTaskProvider } from 'rover-telemetry';
@@ -305,9 +306,7 @@ export const startDockerExecution = async (
         console.log(`[DEBUG] docker ${dockerArgs.join(' ')}`);
       }
 
-      const dockerProcess = spawn('docker', dockerArgs, {
-        stdio: ['inherit', 'pipe', 'pipe'],
-      });
+      const dockerProcess = launch('docker', dockerArgs);
 
       let currentStep = 'Initializing';
       if (!jsonMode) {

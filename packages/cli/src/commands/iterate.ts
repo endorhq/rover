@@ -2,7 +2,7 @@ import enquirer from 'enquirer';
 import colors from 'ansi-colors';
 import { existsSync, readFileSync, mkdirSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { spawnSync } from '../lib/os.js';
+import { launchSync } from 'rover-common';
 import yoctoSpinner from 'yocto-spinner';
 import { startDockerExecution } from './task.js';
 import { getAIAgentTool, type AIAgentTool } from '../lib/agents/index.js';
@@ -356,9 +356,7 @@ export const iterateCommand = async (
 
     // Check if we're in a git repository and setup worktree
     try {
-      spawnSync('git', ['rev-parse', '--is-inside-work-tree'], {
-        stdio: 'pipe',
-      });
+      launchSync('git', ['rev-parse', '--is-inside-work-tree']);
     } catch (error) {
       result.error = 'Not in a git repository';
       if (options.json) {

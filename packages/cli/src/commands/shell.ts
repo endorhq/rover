@@ -1,7 +1,6 @@
 import colors from 'ansi-colors';
 import { existsSync } from 'node:fs';
-import { spawn } from 'node:child_process';
-import { spawnSync } from '../lib/os.js';
+import { launch, launchSync } from 'rover-common';
 import yoctoSpinner from 'yocto-spinner';
 import { formatTaskStatus, statusColor } from '../utils/task-status.js';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
@@ -56,7 +55,7 @@ export const shellCommand = async (
     if (options.container) {
       // Check if Docker is available
       try {
-        spawnSync('docker', ['--version'], { stdio: 'pipe' });
+        launchSync('docker', ['--version']);
       } catch (error) {
         jsonOutput.error = `Docker is not available. Please install it.`;
         exitWithError(jsonOutput, json);
@@ -97,7 +96,7 @@ export const shellCommand = async (
         ];
 
         // Start Docker container with direct stdio inheritance for true interactivity
-        shellProcess = spawn('docker', dockerArgs, {
+        shellProcess = launch('docker', dockerArgs, {
           stdio: 'inherit', // This gives full control to the user
         });
 
@@ -107,7 +106,7 @@ export const shellCommand = async (
         process.on('SIGINT', () => {
           console.log(colors.yellow('\n\n⚠ Stopping shell session...'));
           try {
-            spawnSync('docker', ['stop', containerName], { stdio: 'pipe' });
+            launchSync('docker', ['stop', containerName]);
             console.log(colors.green('✓ Container stopped'));
           } catch (error) {
             jsonOutput.error = 'Failed to stop container';
@@ -125,9 +124,8 @@ export const shellCommand = async (
       const shell = process.env.SHELL || '/bin/sh';
 
       try {
-        shellProcess = spawn(shell, [], {
+        shellProcess = launch(shell, [], {
           cwd: task.worktreePath,
-          stdio: 'inherit',
         });
 
         spinner.success(`Shell started using ${shell}`);

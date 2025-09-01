@@ -4,9 +4,9 @@ import { TasksLitWebviewProvider } from './providers/TasksLitWebviewProvider.mjs
 import { RoverCLI } from './rover/cli.mjs';
 import { TaskItem } from './providers/TaskItem.mjs';
 import { TaskDetailsPanel } from './panels/TaskDetailsPanel.mjs';
-import { spawnSync } from './lib/os.mjs';
 import { getTelemetry } from './lib/telemetry.mjs';
 import { NewTaskProvider } from 'rover-telemetry';
+import { launch, launchSync } from 'rover-common';
 
 let tasksWebviewProvider: TasksLitWebviewProvider;
 
@@ -268,17 +268,19 @@ export function activate(context: vscode.ExtensionContext) {
             // Get list of changed files in the task workspace
             let changedFiles: string[] = [];
             try {
-              const { stdout: statusOutput } = spawnSync(
+              const { stdout: statusOutput } = launchSync(
                 'git',
                 ['status', '--porcelain', '-u'],
                 { cwd: taskWorkspacePath }
               );
               changedFiles = statusOutput
-                .toString()
-                .split('\n')
-                .filter(line => line.trim())
-                .map(line => line.substring(3).trim()) // Remove status flags (e.g., "M ", "A ", etc.)
-                .filter(file => file.length > 0);
+                ? statusOutput
+                    .toString()
+                    .split('\n')
+                    .filter(line => line.trim())
+                    .map(line => line.substring(3).trim()) // Remove status flags (e.g., "M ", "A ", etc.)
+                    .filter(file => file.length > 0)
+                : [];
             } catch (error) {
               throw new Error(
                 'Failed to get changed files from task workspace: ' + error
@@ -1011,14 +1013,16 @@ export function activate(context: vscode.ExtensionContext) {
               const workspaceRoot =
                 vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ||
                 process.cwd();
-              const { stdout: remoteUrl } = spawnSync(
+              const { stdout: remoteUrl } = launchSync(
                 'git',
                 ['remote', 'get-url', 'origin'],
                 { cwd: workspaceRoot }
               );
               const match = remoteUrl
-                .toString()
-                .match(/github\.com[:/]([^/]+)\/([^/.]+)(\.git)?/);
+                ? remoteUrl
+                    .toString()
+                    .match(/github\.com[:/]([^/]+)\/([^/.]+)(\.git)?/)
+                : null;
               if (match) {
                 repoInfo = { owner: match[1], repo: match[2] };
               }
@@ -1061,7 +1065,7 @@ export function activate(context: vscode.ExtensionContext) {
               const workspaceRoot =
                 vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ||
                 process.cwd();
-              const { stdout } = spawnSync(
+              const { stdout } = launchSync(
                 'gh',
                 [
                   'issue',
@@ -1073,7 +1077,7 @@ export function activate(context: vscode.ExtensionContext) {
                 ],
                 { cwd: workspaceRoot }
               );
-              return JSON.parse(stdout.toString());
+              return stdout ? JSON.parse(stdout.toString()) : null;
             } catch (error) {
               console.warn('GitHub CLI failed:', error);
               return null;
@@ -1159,7 +1163,7 @@ export function activate(context: vscode.ExtensionContext) {
 
               telemetry?.eventNewTask(NewTaskProvider.GITHUB);
 
-              const { stdout } = spawnSync(
+              const { stdout } = launchSync(
                 roverPath,
                 [
                   'task',
@@ -1170,7 +1174,7 @@ export function activate(context: vscode.ExtensionContext) {
                 ],
                 { cwd: workspaceRoot }
               );
-              return JSON.parse(stdout.toString());
+              return stdout ? JSON.parse(stdout.toString()) : null;
             }
           );
 
