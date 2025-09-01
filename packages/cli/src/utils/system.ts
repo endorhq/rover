@@ -22,5 +22,7 @@ export const checkDocker = async (): Promise<boolean> =>
   await checkCommand('docker');
 export const checkClaude = async (): Promise<boolean> =>
   await checkCommand('claude');
+export const checkQwen = async (): Promise<boolean> =>
+  await checkCommand('qwen');
 export const checkGemini = async (): Promise<boolean> =>
   await checkCommand('gemini');

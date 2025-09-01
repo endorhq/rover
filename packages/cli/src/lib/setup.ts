@@ -51,6 +51,22 @@ configure-mcp-servers() {
   mv /tmp/agent-settings.json /home/agent/.gemini/settings.json
 }
 `;
+      case 'qwen':
+        return `# Function to configure MCP servers for qwen
+configure-mcp-servers() {
+  # Ensure configuration file exists
+  if [ ! -f /home/agent/.qwen/settings.json ]; then
+    mkdir -p /home/agent/.qwen
+    echo '{}' > /home/agent/.qwen/settings.json
+    chown -R agent:agent /home/agent/.qwen
+  fi
+
+  jq '.mcpServers //= {}' /home/agent/.qwen/settings.json | \
+    jq '.mcpServers += { "package-manager": { "httpUrl": "http://127.0.0.1:8090/mcp", "oauth": { "enabled": false } } }' \
+    > /tmp/agent-settings.json
+  mv /tmp/agent-settings.json /home/agent/.qwen/settings.json
+}
+`;
       default:
         return `configure-mcp-servers() {
   echo "Unknown agent: '${this.agent}'"
@@ -322,6 +338,8 @@ setup_agent_environment() {
         return 'claude --dangerously-skip-permissions -p --debug';
       case 'gemini':
         return 'gemini --yolo -p --debug';
+      case 'qwen':
+        return 'qwen --yolo -p --debug';
       default:
         return 'claude --dangerously-skip-permissions -p --debug';
     }
@@ -420,6 +438,26 @@ if [ -d "/.gemini" ]; then
 else
     echo "❌  No Gemini configuration found at /.gemini"
     safe_exit 1 "Missing gemini credentials"
+fi
+`;
+    } else if (this.agent == 'qwen') {
+      return `npm install -g @qwen-code/qwen-code@latest
+
+# Configure the CLI
+# Process and copy Qwen credentials
+if [ -d "/.qwen" ]; then
+    echo "📝 Processing Qwen credentials..."
+    write_status "installing" "Process Qwen credentials" 20
+
+    mkdir -p /home/agent/.qwen
+    cp /.qwen/installation_id /home/agent/.qwen/
+    cp /.qwen/oauth_creds.json /home/agent/.qwen/
+    cp /.qwen/settings.json /home/agent/.qwen/
+    chown -R agent:agent /home/agent/.qwen
+    echo "✅ Qwen credentials processed and copied to agent user"
+else
+    echo "❌  No Qwen configuration found at /.qwen"
+    safe_exit 1 "Missing qwen credentials"
 fi
 `;
     } else {

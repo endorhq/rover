@@ -1,15 +1,8 @@
 import enquirer from 'enquirer';
 import colors from 'ansi-colors';
 import yoctoSpinner from 'yocto-spinner';
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { platform } from 'node:process';
 import { getNextTaskId } from '../utils/task-id.js';
 import { homedir, tmpdir } from 'node:os';
 import { getAIAgentTool, type AIAgentTool } from '../lib/agents/index.js';
@@ -22,7 +15,7 @@ import { IterationConfig } from '../lib/iteration.js';
 import { generateBranchName } from '../utils/branch-name.js';
 import { request } from 'node:https';
 import { spawn } from 'node:child_process';
-import { launch, launchSync } from 'rover-common';
+import { launchSync } from 'rover-common';
 import { checkGitHubCLI } from '../utils/system.js';
 import { showRoverBanner, showRoverChat, showTips } from '../utils/display.js';
 import { userInfo } from 'node:os';
@@ -114,6 +107,28 @@ const validations = (
       }
       return false;
     }
+  } else if (selectedAiAgent === 'qwen') {
+    // Check Gemini credentials if needed
+    const qwenFile = join(homedir(), '.qwen', 'settings.json');
+    const qwenCreds = join(homedir(), '.qwen', 'oauth_creds.json');
+
+    if (!existsSync(qwenFile)) {
+      if (!isJsonMode) {
+        console.log(colors.red('\n✗ Qwen configuration not found'));
+        console.log(colors.gray('  Please run `qwen` first to configure it'));
+      }
+      return false;
+    }
+
+    if (!existsSync(qwenCreds)) {
+      if (!isJsonMode) {
+        console.log(colors.red('\n✗ Qwen credentials not found'));
+        console.log(
+          colors.gray('  Please run `qwen` first to set up credentials')
+        );
+      }
+      return false;
+    }
   }
 
   if (isJsonMode && followMode) {
@@ -167,19 +182,6 @@ const updateTaskMetadata = (
   }
 };
 
-export const findKeychainCredentials = (key: string): string => {
-  const result = launchSync('security', [
-    'find-generic-password',
-    '-s',
-    key,
-    '-w',
-  ]).stdout as string;
-  if (result === undefined) {
-    throw new Error('could not find keychain credentials');
-  }
-  return result;
-};
-
 /**
  * Start environment using containers
  */
@@ -230,40 +232,9 @@ export const startDockerExecution = async (
   const promptBuilder = new PromptBuilder(selectedAiAgent);
   promptBuilder.generatePromptFiles(iteration, promptsDir);
 
-  // Check AI agent credentials based on selected agent
-  let credentialsValid = true;
-  const dockerMounts: string[] = [];
-
-  if (selectedAiAgent === 'claude') {
-    const claudeFile = join(homedir(), '.claude.json');
-    const claudeCreds = join(homedir(), '.claude', '.credentials.json');
-
-    dockerMounts.push(`-v`, `${claudeFile}:/.claude.json:Z,ro`);
-
-    if (existsSync(claudeCreds)) {
-      dockerMounts.push(`-v`, `${claudeCreds}:/.credentials.json:Z,ro`);
-    } else if (platform == 'darwin') {
-      const claudeCreds = findKeychainCredentials('Claude Code-credentials');
-      const userCredentialsTempPath = mkdtempSync(join(tmpdir(), 'rover-'));
-      const claudeCredsFile = join(
-        userCredentialsTempPath,
-        '.credentials.json'
-      );
-      writeFileSync(claudeCredsFile, claudeCreds);
-      // Do not mount credentials as RO, as they will be
-      // shredded by the setup script when it finishes
-      dockerMounts.push(`-v`, `${claudeCredsFile}:/.credentials.json:Z`);
-    }
-  } else if (selectedAiAgent === 'gemini') {
-    // Gemini might use environment variables or other auth methods
-    const geminiFolder = join(homedir(), '.gemini');
-
-    dockerMounts.push(`-v`, `${geminiFolder}:/.gemini:Z,ro`);
-  }
-
-  if (!credentialsValid) {
-    return;
-  }
+  // Get agent-specific Docker mounts
+  const agent = getAIAgentTool(selectedAiAgent);
+  const dockerMounts: string[] = agent.getContainerMounts();
 
   if (!jsonMode) {
     console.log(colors.white.bold('\n🐳 Starting Docker container:'));

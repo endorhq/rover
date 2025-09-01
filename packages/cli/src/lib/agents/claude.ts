@@ -6,6 +6,20 @@ import {
 } from './index.js';
 import { PromptBuilder, IPromptTask } from '../prompts/index.js';
 import { parseJsonResponse } from '../../utils/json-parser.js';
+import { homedir, tmpdir, platform } from 'node:os';
+import { join } from 'node:path';
+import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { launchSync } from 'rover-common';
+
+const findKeychainCredentials = (key: string): string => {
+  const result = launchSync('security', [
+    'find-generic-password',
+    '-s',
+    key,
+    '-w',
+  ]);
+  return result.stdout?.toString() || '';
+};
 
 class ClaudeAI implements AIAgentTool {
   // constants
@@ -13,7 +27,7 @@ class ClaudeAI implements AIAgentTool {
   private promptBuilder = new PromptBuilder('claude');
 
   constructor() {
-    // Check docker is available
+    // Check Claude CLI is available
     try {
       spawnSync(this.AGENT_BIN, ['--version'], { stdio: 'pipe' });
     } catch (err) {
@@ -145,6 +159,33 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
     } catch (err) {
       return null;
     }
+  }
+
+  getContainerMounts(): string[] {
+    const dockerMounts: string[] = [];
+    const claudeFile = join(homedir(), '.claude.json');
+    const claudeCreds = join(homedir(), '.claude', '.credentials.json');
+
+    dockerMounts.push(`-v`, `${claudeFile}:/.claude.json:Z,ro`);
+
+    if (existsSync(claudeCreds)) {
+      dockerMounts.push(`-v`, `${claudeCreds}:/.credentials.json:Z,ro`);
+    } else if (platform() === 'darwin') {
+      const claudeCredsData = findKeychainCredentials(
+        'Claude Code-credentials'
+      );
+      const userCredentialsTempPath = mkdtempSync(join(tmpdir(), 'rover-'));
+      const claudeCredsFile = join(
+        userCredentialsTempPath,
+        '.credentials.json'
+      );
+      writeFileSync(claudeCredsFile, claudeCredsData);
+      // Do not mount credentials as RO, as they will be
+      // shredded by the setup script when it finishes
+      dockerMounts.push(`-v`, `${claudeCredsFile}:/.credentials.json:Z`);
+    }
+
+    return dockerMounts;
   }
 }
 

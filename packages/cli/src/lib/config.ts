@@ -228,6 +228,7 @@ export class ProjectConfig {
 export enum AI_AGENT {
   Claude = 'claude',
   Gemini = 'gemini',
+  Qwen = 'qwen',
 }
 
 const CURRENT_USER_SCHEMA_VERSION = '1.0';

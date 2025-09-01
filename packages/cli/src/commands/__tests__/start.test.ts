@@ -26,7 +26,7 @@ vi.mock('../task.js', () => ({
 
 // Mock user settings
 vi.mock('../../lib/config.js', () => ({
-  AI_AGENT: { Claude: 'claude', Gemini: 'gemini' },
+  AI_AGENT: { Claude: 'claude', Gemini: 'gemini', Qwen: 'qwen' },
   UserSettings: {
     exists: vi.fn().mockReturnValue(true),
     load: vi.fn().mockReturnValue({ defaultAiAgent: 'claude' }),

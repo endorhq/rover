@@ -9,6 +9,7 @@ import {
   checkClaude,
   checkDocker,
   checkGemini,
+  checkQwen,
   checkGit,
 } from '../utils/system.js';
 import { AI_AGENT, ProjectConfig, UserSettings } from '../lib/config.js';
@@ -101,8 +102,14 @@ export const initCommand = async (
 
   const geminiInstalled = await checkGemini();
 
+  reqSpinner.text = 'Checking Qwen';
+
+  const qwenInstalled = await checkQwen();
+
   const completeInstallation =
-    gitInstalled && dockerInstalled && (claudeInstalled || geminiInstalled);
+    gitInstalled &&
+    dockerInstalled &&
+    (claudeInstalled || geminiInstalled || qwenInstalled);
 
   if (completeInstallation) {
     reqSpinner.succeed('Your system is ready!');
@@ -123,7 +130,10 @@ export const initCommand = async (
     `├── Claude: ${claudeInstalled ? colors.green('✓ Installed') : colors.red('✗ Missing')}`
   );
   console.log(
-    `└── Gemini: ${geminiInstalled ? colors.green('✓ Installed') : colors.red('✗ Missing')}`
+    `├── Gemini: ${geminiInstalled ? colors.green('✓ Installed') : colors.red('✗ Missing')}`
+  );
+  console.log(
+    `└── Qwen: ${qwenInstalled ? colors.green('✓ Installed') : colors.red('✗ Missing')}`
   );
 
   if (!completeInstallation) {
@@ -169,6 +179,10 @@ export const initCommand = async (
 
     if (geminiInstalled) {
       availableAgents.push(AI_AGENT.Gemini);
+    }
+
+    if (qwenInstalled) {
+      availableAgents.push(AI_AGENT.Qwen);
     }
 
     // If multiple AI agents are available, ask user to select one

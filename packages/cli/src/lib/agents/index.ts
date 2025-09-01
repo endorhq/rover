@@ -1,5 +1,6 @@
 import ClaudeAI from './claude.js';
 import GeminiAI from './gemini.js';
+import QwenAI from './qwen.js';
 import type { IPromptTask } from '../prompts/index.js';
 
 export interface AIAgentTool {
@@ -33,6 +34,9 @@ export interface AIAgentTool {
     diffContext: string,
     conflictedContent: string
   ): Promise<string | null>;
+
+  // Get Docker mount strings for agent-specific credential files
+  getContainerMounts(): string[];
 }
 
 export class MissingAIAgentError extends Error {
@@ -57,6 +61,8 @@ export function getAIAgentTool(agent: string): AIAgentTool {
       return new ClaudeAI();
     case 'gemini':
       return new GeminiAI();
+    case 'qwen':
+      return new QwenAI();
     default:
       throw new Error(`Unknown AI agent: ${agent}`);
   }

@@ -10,13 +10,13 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { existsSync } from 'node:fs';
 
-class GeminiAI implements AIAgentTool {
+class QwenAI implements AIAgentTool {
   // constants
-  public AGENT_BIN = 'gemini';
-  private promptBuilder = new PromptBuilder('gemini');
+  public AGENT_BIN = 'qwen';
+  private promptBuilder = new PromptBuilder('qwen');
 
   constructor() {
-    // Check Gemini CLI is available
+    // Check Qwen CLI is available
     try {
       spawnSync(this.AGENT_BIN, ['--version'], { stdio: 'pipe' });
     } catch (err) {
@@ -25,10 +25,10 @@ class GeminiAI implements AIAgentTool {
   }
 
   async invoke(prompt: string, json: boolean = false): Promise<string> {
-    const geminiArgs = ['-p'];
+    const qwenArgs = ['-p'];
 
     if (json) {
-      // Gemini does not have any way to force the JSON output at CLI level.
+      // Qwen does not have any way to force the JSON output at CLI level.
       // Trying to force it via prompting
       prompt = `${prompt}
 
@@ -36,7 +36,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
     }
 
     try {
-      const { stdout } = await spawn(this.AGENT_BIN, geminiArgs, {
+      const { stdout } = await spawn(this.AGENT_BIN, qwenArgs, {
         input: prompt,
       });
       return stdout?.toString().trim() || '';
@@ -55,7 +55,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
       const response = await this.invoke(prompt, true);
       return parseJsonResponse<IPromptTask>(response);
     } catch (error) {
-      console.error('Failed to expand task with Gemini:', error);
+      console.error('Failed to expand task with Qwen:', error);
       return null;
     }
   }
@@ -76,7 +76,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
       return parseJsonResponse<IPromptTask>(response);
     } catch (error) {
       console.error(
-        'Failed to expand iteration instructions with Gemini:',
+        'Failed to expand iteration instructions with Qwen:',
         error
       );
       return null;
@@ -133,15 +133,15 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
 
   getContainerMounts(): string[] {
     const dockerMounts: string[] = [];
-    const geminiFolder = join(homedir(), '.gemini');
+    const qwenFolder = join(homedir(), '.qwen');
 
     // Only mount if the folder exists
-    if (existsSync(geminiFolder)) {
-      dockerMounts.push(`-v`, `${geminiFolder}:/.gemini:Z,ro`);
+    if (existsSync(qwenFolder)) {
+      dockerMounts.push(`-v`, `${qwenFolder}:/.qwen:Z,ro`);
     }
 
     return dockerMounts;
   }
 }
 
-export default GeminiAI;
+export default QwenAI;
