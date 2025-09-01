@@ -1,11 +1,13 @@
-You are preparing an implementation plan for this task: 
+You are preparing an implementation plan for this task:
 
-----
+---
+
 Title: %title%
 Description:
 %description%
 Context: Read it from /workspace/context.md . If the file do not exist, try your best based on the title and description. THIS IS IMPORTANT.
-----
+
+---
 
 Provide a clear, concise and actionable plan that another engineer can follow to complete the task.
 
@@ -20,7 +22,7 @@ Follow these steps to complete it. Do not move to the next phase until to comple
 - Identify files that will be affected by the changes
 - Identify existing test files that should be updated
 
-### Phase 2: Write a plan based on the task requirements. 
+### Phase 2: Write a plan based on the task requirements.
 
 Adapt the details depending on the task complexity, objectives and scope:
 
@@ -42,17 +44,22 @@ Write your plan to `/workspace/plan.md` following this template. This is mandato
 # Implementation Plan
 
 ## Objective
+
 1–2 sentences describing the task objective
 
 ## Scope
+
 - List of changes that are in the task scope (one line each)
 
 ## Implementation Steps
+
 - [ ] One line each, start with a verb, always include filenames, keep concise and actionable.
 
 ## Risks & Edge Cases
+
 - Potential pitfalls in 1 line each (skip if none)
 
 ## Dependencies
+
 - Prerequisite libraries, configs, or tasks (skip if none)
-</template>
+  </template>

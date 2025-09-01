@@ -22,7 +22,7 @@
     "test": "run-p -l test:*",
     "test:extension": "npm run test --workspace=./packages/extension",
     "test:cli": "npm run test --workspace=./packages/cli",
-    "format": "prettier --write \"**/*.{ts,js,json}\"",
+    "format": "prettier --write .",
     "postinstall": "run-s -l build:common build:telemetry"
   },
   "devDependencies": {

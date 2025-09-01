@@ -21,6 +21,7 @@ rover/
 ## Essential Development Commands
 
 ### Workspace Commands (run from root)
+
 ```bash
 # Development workflow
 npm run dev           # Start all packages in development mode
@@ -40,6 +41,7 @@ npm run test:extension # Run extension tests only
 ```
 
 ### Package-Specific Commands
+
 ```bash
 # CLI package (packages/cli/)
 cd packages/cli
@@ -68,6 +70,7 @@ npm run check  # TypeScript type checking
 ## Architecture
 
 ### CLI Package (`packages/cli/`)
+
 - **Entry point**: `src/index.ts` - Sets up the CLI using Commander.js
 - **Commands**: `src/commands/` - Each command is implemented as a separate module
 - **Build output**: `dist/index.js` - Single bundled ES module file
@@ -76,12 +79,14 @@ npm run check  # TypeScript type checking
 - **Testing**: Uses Vitest with real Git operations and mocked external dependencies
 
 Key architectural decisions:
+
 - Uses tsdown for bundling
 - AI providers implement a common interface for easy switching between Claude and Gemini
 - Commands interact with Git worktrees for isolated task execution
 - Docker containers execute AI agent tasks
 
 ### Extension Package (`packages/extension/`)
+
 - **Entry point**: `src/extension.mts` - VS Code extension activation
 - **Providers**: Tree data providers for Rover tasks
 - **Panels**: Webview panels for detailed task information
@@ -89,6 +94,7 @@ Key architectural decisions:
 - **CLI Integration**: Communicates with Rover CLI via child processes
 
 ### Telemetry Package (`packages/telemetry/`)
+
 - **Shared telemetry library** used by CLI and extension
 - **Event tracking** for usage analytics
 - **Privacy-focused** implementation
@@ -111,7 +117,7 @@ Key architectural decisions:
    - ❌ **DON'T**: Modify the test to ignore the bug
    - ❌ **DON'T**: Add `.skip()` or change assertions to make tests green
 
-2. **Mock Strategy**: 
+2. **Mock Strategy**:
    - **Mock only external dependencies** (APIs, CLI tools like Docker/Claude/Gemini)
    - **Use real implementations** for core logic (Git operations, file system, environment detection)
    - **Create real test environments** (temporary Git repos, actual project files)
@@ -135,38 +141,44 @@ npm run test:coverage # Generate coverage report
 ## AI Agent Guidelines
 
 ### When Working on Commands
+
 1. **Read existing command structure** in `packages/cli/src/commands/`
 2. **Follow established patterns** for error handling, validation, and user interaction
 3. **Add comprehensive tests** for new functionality
 4. **Mock external dependencies** but test core logic with real operations
 
 ### When Adding Features
+
 1. **Check if the feature belongs in CLI, extension, or telemetry package**
 2. **Update package.json scripts** if new build/dev commands are needed
 3. **Consider cross-package dependencies** and update imports accordingly
 4. **Test integration** between packages when applicable
 
 ### When Debugging Failed Tests
+
 1. **Examine the actual failure** - understand what the code is doing wrong
-2. **Fix the implementation** - never change tests to mask bugs  
+2. **Fix the implementation** - never change tests to mask bugs
 3. **Verify the fix** - ensure the corrected code passes existing and new tests
 4. **Consider edge cases** - add additional tests if the bug reveals gaps
 
 ## Important File Patterns
 
 ### CLI Package
+
 - Commands: `src/commands/*.ts`
-- Tests: `src/commands/__tests__/*.test.ts` 
+- Tests: `src/commands/__tests__/*.test.ts`
 - Library code: `src/lib/*.ts`
 - Utilities: `src/utils/*.ts`
 
-### Extension Package  
+### Extension Package
+
 - Main entry: `src/extension.mts`
 - Providers: `src/providers/*.mts`
 - Views: `src/views/*.mts`
 - Tests: `src/test/*.test.ts`
 
 ### Configuration Files
+
 - Root: `package.json`, `tsconfig.json` (workspace config)
 - CLI: `packages/cli/package.json`, `vitest.config.ts`
 - Extension: `packages/extension/package.json`

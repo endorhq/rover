@@ -1,11 +1,13 @@
 You are in summary mode.
 
-----
+---
+
 Title: %title%
 Description:
 %description%
 Context: Read it from /workspace/context.md . If the file do not exist, try your best based on the title and description. THIS IS IMPORTANT.
-----
+
+---
 
 ### Phase 1: Triage task complexity
 
@@ -28,14 +30,18 @@ Write to `/workspace/summary.md` following this template. This is mandatory.
 # Implementation Summary
 
 ## What was implemented
+
 1–2 sentences describing the changes made
 
 ## Files modified
+
 - `path/to/file`: Brief description of changes
 
 ## Technical decisions
+
 - Key decision and rationale (skip if none)
 
 ## Notes
+
 - Remaining tasks, considerations, or `None`
-</template>
+  </template>

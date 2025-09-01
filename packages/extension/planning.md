@@ -7,6 +7,7 @@ This document outlines the plan for creating a Visual Studio Code extension that
 The goal is to create a VSCode extension that enhances the developer experience of using Rover. The extension will provide a UI for managing and interacting with Rover tasks directly within the editor, reducing the need to switch to a terminal for common operations.
 
 ### Core Features:
+
 - **Task Explorer:** A dedicated view in the VSCode Activity Bar to list all Rover tasks, showing their status and key information.
 - **Task Interaction:** Contextual commands to create, inspect, start, stop, and delete tasks.
 - **Log Viewing:** A way to stream logs for running tasks directly in a VSCode output channel or terminal.
@@ -43,6 +44,7 @@ The extension will be built using TypeScript, leveraging the standard VSCode ext
 The extension's architecture is designed to separate concerns between the VSCode UI components and the underlying CLI interaction logic.
 
 ### `extension.ts` (Entry Point)
+
 - **Activation:** The `activate` function will be the entry point.
 - **Responsibilities:**
   - Register all commands defined in `package.json`.
@@ -50,6 +52,7 @@ The extension's architecture is designed to separate concerns between the VSCode
   - Set up any event listeners (e.g., for configuration changes).
 
 ### `rover/cli.ts` (CLI Wrapper)
+
 - **Purpose:** This module will be the sole interface for interacting with the `rover` executable. It abstracts the details of command execution and output parsing.
 - **Key Functions:**
   - `getTasks(): Promise<RoverTask[]>`: Executes `rover list --json` and parses the output.
@@ -60,6 +63,7 @@ The extension's architecture is designed to separate concerns between the VSCode
 - **Implementation:** Uses Node.js's `child_process.exec` or `child_process.spawn` to run Rover commands. It will handle stdout, stderr, and exit codes.
 
 ### `providers/TaskTreeProvider.ts` (Tree Data Provider)
+
 - **Purpose:** Implements the `vscode.TreeDataProvider` interface to populate the Task Explorer view.
 - **Responsibilities:**
   - `getChildren()`: Fetches the list of tasks using the `rover/cli.ts` wrapper and maps them to `TaskItem` instances.
@@ -67,6 +71,7 @@ The extension's architecture is designed to separate concerns between the VSCode
   - **Refresh Mechanism:** Implements an `onDidChangeTreeData` event emitter to allow the view to be refreshed programmatically (e.g., after a task is created or deleted).
 
 ### `providers/TaskItem.ts`
+
 - **Purpose:** Represents a single task in the Tree View.
 - **Implementation:** Extends `vscode.TreeItem`.
 - **Properties:**
@@ -83,6 +88,7 @@ Here is a list of tasks to be completed to build the extension.
 ---
 
 ### **Task 1: Initial Project Setup**
+
 - **Title:** Scaffold VSCode Extension Project
 - **Description:** Use the official Yeoman generator (`npx --package yo --package generator-code -- yo code`) to create a new TypeScript-based VSCode extension project. Configure the basic `package.json` and `tsconfig.json` files. The extension will created in a new `extension` folder in this repository.
 - **Completion Criteria:**
@@ -91,6 +97,7 @@ Here is a list of tasks to be completed to build the extension.
   - The default "Hello World" command provided by the template runs successfully.
 
 ### **Task 2: Enhance Rover CLI for JSON Output**
+
 - **Title:** Add `--json` flag to Rover commands
 - **Description:** To ensure reliable parsing, modify the Rover CLI to support a `--json` flag for commands that output data, such as `list` and `inspect`. This avoids brittle screen scraping of human-readable tables.
 - **Completion Criteria:**
@@ -99,6 +106,7 @@ Here is a list of tasks to be completed to build the extension.
   - Existing human-readable output is maintained when the `--json` flag is not present.
 
 ### **Task 3: Implement the CLI Wrapper Service**
+
 - **Title:** Create the Rover CLI Wrapper
 - **Description:** Implement the `src/rover/cli.ts` module. This service will be responsible for executing `rover` commands and parsing their JSON output.
 - **Completion Criteria:**
@@ -108,6 +116,7 @@ Here is a list of tasks to be completed to build the extension.
   - Error handling is implemented for cases where the CLI command fails.
 
 ### **Task 4: Create the Rover Task Explorer View**
+
 - **Title:** Implement the Task Explorer Tree View
 - **Description:** Create the UI for the extension, including an Activity Bar icon and a Tree View that lists tasks.
 - **Completion Criteria:**
@@ -119,6 +128,7 @@ Here is a list of tasks to be completed to build the extension.
   - A "Refresh" button is added to the view's title bar.
 
 ### **Task 5: Implement Core Task Commands**
+
 - **Title:** Implement Create, Inspect, and Delete Task Commands
 - **Description:** Implement the core commands for managing tasks. These commands will be accessible via the command palette and context menus in the Task Explorer.
 - **Completion Criteria:**
@@ -135,6 +145,7 @@ Here is a list of tasks to be completed to build the extension.
     - It calls `cli.deleteTask()` and refreshes the Task Explorer.
 
 ### **Task 6: Implement Interactive Commands**
+
 - **Title:** Implement Shell and Logs Commands
 - **Description:** Add commands to open an interactive shell and view logs for a task.
 - **Completion Criteria:**
@@ -147,6 +158,7 @@ Here is a list of tasks to be completed to build the extension.
     - It executes `rover logs <taskId> --follow` in a new VSCode "Output" channel named "Rover Logs: <taskId>".
 
 ### **Task 7: Implement Diff and Merge Commands**
+
 - **Title:** Implement Diff and Merge functionality
 - **Description:** Integrate Rover's git capabilities with VSCode's UI.
 - **Completion Criteria:**
@@ -160,6 +172,7 @@ Here is a list of tasks to be completed to build the extension.
     - It shows the output of the merge command in an output channel.
 
 ### **Task 8: Polishing and Error Handling**
+
 - **Title:** Refine UX and Improve Error Handling
 - **Description:** Add final touches to the extension, including better status reporting, icons, and robust error handling.
 - **Completion Criteria:**

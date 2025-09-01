@@ -32,6 +32,7 @@ npm run watch-tests    # Watch mode for test compilation
 The extension follows VS Code extension patterns with these key components:
 
 ### Core Structure
+
 - **Entry Point**: `src/extension.ts` - Extension activation and command registration
 - **Tree Provider**: `src/providers/TaskTreeProvider.ts` - Implements VS Code tree data provider for Rover tasks
 - **Task Items**: `src/providers/TaskItem.ts` - Tree view item representation
@@ -40,6 +41,7 @@ The extension follows VS Code extension patterns with these key components:
 - **Type Definitions**: `src/rover/types.ts` - TypeScript interfaces for Rover data structures
 
 ### Key Architectural Decisions
+
 - **Build System**: Uses esbuild for fast bundling, outputs to `dist/extension.js`
 - **CLI Integration**: Communicates with Rover CLI via child process execution
 - **Auto-refresh**: Tree view automatically refreshes every 5 seconds (configurable)
@@ -47,8 +49,9 @@ The extension follows VS Code extension patterns with these key components:
 - **Error Handling**: Comprehensive error handling with VS Code notifications
 
 ### VS Code Integration Points
+
 - **Activity Bar**: Custom "Rover" view container with rocket icon
-- **Tree View**: "Tasks" view showing all Rover tasks with status indicators  
+- **Tree View**: "Tasks" view showing all Rover tasks with status indicators
 - **Commands**: Registered commands for task creation, inspection, deletion, logs, shell access
 - **Context Menus**: Right-click actions on task items
 - **Configuration**: Settings for CLI path and auto-refresh interval
@@ -57,6 +60,7 @@ The extension follows VS Code extension patterns with these key components:
 - **Output Channels**: Displays task logs in VS Code output panel
 
 ### Data Flow
+
 1. Extension loads and creates `TaskTreeProvider` instance
 2. Tree provider calls `RoverCLI.getTasks()` to fetch task list
 3. Tasks display in tree view with real-time status updates
@@ -72,6 +76,7 @@ The extension follows VS Code extension patterns with these key components:
 - **Testing**: VS Code extension test framework with Mocha
 
 ### File Structure Patterns
+
 - Commands are registered in `extension.ts` activation function
 - Each provider implements appropriate VS Code interface (`TreeDataProvider`)
 - Webview panels manage their own HTML content and messaging
@@ -79,5 +84,6 @@ The extension follows VS Code extension patterns with these key components:
 - Types mirror the JSON responses from Rover CLI commands
 
 ### Extension Configuration
+
 - `rover.cliPath`: Path to Rover CLI executable (default: "rover")
 - `rover.autoRefreshInterval`: Tree refresh interval in ms (default: 5000, 0 to disable)
