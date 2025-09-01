@@ -423,7 +423,11 @@ export class Git {
   /**
    * Create worktree
    */
-  createWorktree(path: string, branchName: string): boolean {
+  createWorktree(
+    path: string,
+    branchName: string,
+    baseBranch?: string
+  ): boolean {
     if (this.branchExists(branchName)) {
       return (
         spawnSync('git', ['worktree', 'add', path, branchName], {
@@ -431,11 +435,11 @@ export class Git {
         }).status == 0
       );
     }
-    return (
-      spawnSync('git', ['worktree', 'add', path, '-b', branchName], {
-        stdio: 'pipe',
-      }).status == 0
-    );
+    // Create new branch from base branch if specified, otherwise from current branch
+    const args = baseBranch
+      ? ['worktree', 'add', path, '-b', branchName, baseBranch]
+      : ['worktree', 'add', path, '-b', branchName];
+    return spawnSync('git', args, { stdio: 'pipe' }).status == 0;
   }
 
   /**

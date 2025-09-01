@@ -781,13 +781,14 @@ export const taskCommand = async (
     fromGithub?: string;
     follow?: boolean;
     yes?: boolean;
+    branch?: string;
     json?: boolean;
     debug?: boolean;
   } = {}
 ) => {
   const telemetry = getTelemetry();
   // Extract options
-  const { follow, yes, json, fromGithub, debug } = options;
+  const { follow, yes, json, fromGithub, debug, branch } = options;
 
   // Check if rover is initialized
   const roverPath = join(process.cwd(), '.rover');
@@ -928,6 +929,49 @@ export const taskCommand = async (
         process.exit(1);
       }
     }
+  }
+
+  // Validate branch option and check for uncommitted changes
+  const git = new Git();
+  let baseBranch = branch;
+
+  if (branch) {
+    // Validate specified branch exists
+    if (!git.branchExists(branch)) {
+      if (!json) {
+        console.log(colors.red(`✗ Branch '${branch}' does not exist`));
+      }
+      process.exit(1);
+    }
+  } else {
+    // No branch specified, use current branch
+    baseBranch = git.getCurrentBranch();
+
+    // Check for uncommitted changes and warn
+    if (git.hasUncommittedChanges()) {
+      if (!json) {
+        console.log(
+          colors.yellow(
+            '⚠ Warning: Current branch has uncommitted or untracked changes'
+          )
+        );
+        console.log(
+          colors.gray(
+            '  Consider using --branch option to specify a clean base branch'
+          )
+        );
+        console.log(
+          colors.gray(
+            `  Example: rover task --branch main "${description || initPrompt || ''}"\n`
+          )
+        );
+      }
+    }
+  }
+
+  // Display source branch
+  if (!json) {
+    console.log(colors.gray(`Using branch: `) + colors.cyan(`${baseBranch}\n`));
   }
 
   let satisfied = skipExpansion;
@@ -1075,8 +1119,8 @@ export const taskCommand = async (
     const branchName = generateBranchName(taskId);
 
     try {
-      const git = new Git();
-      git.createWorktree(worktreePath, branchName);
+      // Use the git instance we created earlier instead of creating a new one
+      git.createWorktree(worktreePath, branchName, baseBranch);
     } catch (error) {
       if (!json) {
         console.error(colors.red('Error creating git workspace:'), error);
