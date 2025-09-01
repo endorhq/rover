@@ -17,6 +17,7 @@ import { deleteCommand } from './commands/delete.js';
 import { mergeCommand } from './commands/merge.js';
 import colors from 'ansi-colors';
 import { pushCommand } from './commands/push.js';
+import { stopCommand } from './commands/stop.js';
 import { showTips, TIP_TITLES } from './utils/display.js';
 import { launch, setVerbose } from 'rover-common';
 
@@ -142,6 +143,14 @@ program
   .option('--json', 'Output the result in JSON format')
   // .option('--debug', 'Show debug information like running commands')
   .action(startCommand);
+
+// Stop a running task
+program
+  .command('stop')
+  .description('Stop a running task and clean up its resources')
+  .argument('<taskId>', 'Task ID to stop')
+  .option('--json', 'Output the result in JSON format')
+  .action(stopCommand);
 
 // Add the ps command for monitoring tasks
 program
