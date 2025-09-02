@@ -15,13 +15,13 @@ npm install -g @endorhq/rover@latest && rover init .
 
 ## What is Rover?
 
-Rover is a CLI tool and VSCode extension that isolates AI Agents like Claude Code, Gemini, and Qwen Coder, and provides them with an environment to complete a task. It gives you the control to spawn them, inspect, iterate and parallelize AI agents using the tools you already have. No new subscriptions. Everything runs locally, under your control. 
+Rover is a CLI tool and VSCode extension that isolates AI Agents like Claude Code, Gemini, and Qwen Coder, and provides them with an environment to complete a task. It gives you control to spawn them, inspect, iterate and parallelize AI agents using the tools you already have. No new subscriptions. Everything runs locally, under your control. 
 
 ### Why Rover?
 
 * 🚀 **Easy to use**: Create your first AI agent task in 5 minutes. No AI agent experience required
-* 🔒 **Isolated**: Prevent AI Agents from overriding your changes or deleting files
-* 🤖 **Bring your AI Agents**: Use your existing AI agents like Claude Code or Gemini. No new subscriptions
+* 🔒 **Isolated**: Prevent AI Agents from overriding your changes, accessing private information or deleting files
+* 🤖 **Bring your AI Agents**: Use your existing AI agents like Claude Code or Gemini. No new subscriptions needed
 * ⚙️ **Predefined workflows**: Use different agents, get consistent results. Use existing workflows to complete any task
 * 💻 **Local**: Everything runs on your computer. No new apps and permissions in your repositories
 
@@ -51,7 +51,7 @@ npm install -g @endorhq/rover@latest
 1. Initialize Rover in your project:
 
     ```sh
-    cd your-project && rover init .
+    cd your-project && rover init
     ```
 
 2. Create your first task with Rover:
@@ -99,7 +99,7 @@ npm install -g @endorhq/rover@latest
     - Take manual control:
 
     ```sh
-    cd .rover/tasks/1/workspace
+    rover shell 1
     git status
     ```
 
@@ -113,7 +113,7 @@ Once you create a task, Rover creates a separate _git worktree_ (`workspace`) fo
 
 Workflows provide a set of predefined steps to produce an output. Depending on the workflow, you might get a set of changes in the workspace or a document with research. We recommend exploring the different workflows to get the maximum benefit from your AI Agents.
 
-After an AI agent finishes the task, all the code changes and output documents are available in the task workspace. You can inspect those documents, check changes, iterate with an AI agent, or even take full control and start applying changes manually. Each of us has a different workflow, and Rover will honor all of them. 
+After an AI agent finishes the task, all code changes and output documents are available in the task workspace. You can inspect those documents, check changes, iterate with an AI agent, or even take full control and start applying changes manually. Every developer has a different workflow, and Rover will not get in between. 
 
 Once you are ready, you can merge changes or push the branch. That's it! 🚀 
 
@@ -127,7 +127,7 @@ Once you are ready, you can merge changes or push the branch. That's it! 🚀
 
     Working on a performance issue? Spin up different agents to try various approaches simultaneously. Compare results, pick the best solution, or combine insights from multiple attempts.
 
-3. ⚡ **Maintain momentum during context switches**
+3. ⚡ **Keep momentum during context switches**
 
     When urgent bugs interrupt your feature work, delegate the investigation to an agent while you handle the critical issue. Return to a complete analysis and proposed fixes when you're ready.
 
@@ -137,7 +137,7 @@ Once you are ready, you can merge changes or push the branch. That's it! 🚀
 
 ## Get in touch
 
-We'd love to hear from you! Whether you have questions, feedback, or want to share what you're building with Rover, there are several ways to connect:
+We'd love to hear from you! Whether you have questions, feedback, or want to share what you're building with Rover, there are multiple ways to connect.
 
 ### Report Issues
 
