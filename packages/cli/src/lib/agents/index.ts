@@ -2,6 +2,7 @@ import ClaudeAI from './claude.js';
 import GeminiAI from './gemini.js';
 import QwenAI from './qwen.js';
 import type { IPromptTask } from '../prompts/index.js';
+import { AI_AGENT, UserSettings } from '../config.js';
 
 export interface AIAgentTool {
   // Invoke the CLI tool using the SDK / direct mode with the given prompt
@@ -48,6 +49,13 @@ export class MissingAIAgentError extends Error {
   }
 }
 
+export class AIAgentConfigError extends Error {
+  constructor() {
+    super('Could not load user settings');
+    this.name = 'AIAgentConfigError';
+  }
+}
+
 export class InvokeAIAgentError extends Error {
   constructor(agent: string, error: unknown) {
     super(`Failed to invoke "${agent}" due to: ${error}`);
@@ -55,7 +63,10 @@ export class InvokeAIAgentError extends Error {
   }
 }
 
-export function getAIAgentTool(agent: string): AIAgentTool {
+/**
+ * Retrieve the AIAgentTool instance based on the agent name.
+ */
+export const getAIAgentTool = (agent: string): AIAgentTool => {
   switch (agent.toLowerCase()) {
     case 'claude':
       return new ClaudeAI();
@@ -66,4 +77,21 @@ export function getAIAgentTool(agent: string): AIAgentTool {
     default:
       throw new Error(`Unknown AI agent: ${agent}`);
   }
-}
+};
+
+/**
+ * Load the user configuration and return the given AI agent
+ * or Claude by default.
+ */
+export const getUserAIAgent = (): AI_AGENT => {
+  try {
+    if (UserSettings.exists()) {
+      const userSettings = UserSettings.load();
+      return userSettings.defaultAiAgent || AI_AGENT.Claude;
+    } else {
+      return AI_AGENT.Claude;
+    }
+  } catch (error) {
+    throw new AIAgentConfigError();
+  }
+};
