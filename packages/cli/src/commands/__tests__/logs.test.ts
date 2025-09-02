@@ -42,31 +42,40 @@ vi.mock('../../utils/display.js', () => ({
 }));
 
 // Mock the OS utilities for Docker commands
-vi.mock('rover-common', () => ({
-  launchSync: vi.fn(),
-  launch: vi.fn(),
-}));
+vi.mock('rover-common', async () => {
+  const actual = await vi.importActual('rover-common');
+  return {
+    ...actual,
+    launchSync: vi.fn(),
+    launch: vi.fn(),
+  };
+});
 
 describe('logs command', () => {
   let testDir: string;
   let originalCwd: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     // Create temp directory with git repo
     testDir = mkdtempSync(join(tmpdir(), 'rover-logs-test-'));
     originalCwd = process.cwd();
     process.chdir(testDir);
 
+    // Get the real launchSync for Git operations
+    const { launchSync: realLaunchSync } = (await vi.importActual(
+      'rover-common'
+    )) as any;
+
     // Initialize git repo
-    launchSync('git', ['init']);
-    launchSync('git', ['config', 'user.email', 'test@test.com']);
-    launchSync('git', ['config', 'user.name', 'Test User']);
-    launchSync('git', ['config', 'commit.gpgsign', 'false']);
+    realLaunchSync('git', ['init']);
+    realLaunchSync('git', ['config', 'user.email', 'test@test.com']);
+    realLaunchSync('git', ['config', 'user.name', 'Test User']);
+    realLaunchSync('git', ['config', 'commit.gpgsign', 'false']);
 
     // Create initial commit
     writeFileSync('README.md', '# Test');
-    launchSync('git', ['add', '.']);
-    launchSync('git', ['commit', '-m', 'Initial commit']);
+    realLaunchSync('git', ['add', '.']);
+    realLaunchSync('git', ['commit', '-m', 'Initial commit']);
 
     // Create .rover directory structure
     mkdirSync('.rover/tasks', { recursive: true });
@@ -79,7 +88,7 @@ describe('logs command', () => {
   });
 
   // Helper to create a test task with container ID
-  const createTestTaskWithContainer = (
+  const createTestTaskWithContainer = async (
     id: number,
     title: string = 'Test Task',
     containerId?: string
@@ -94,7 +103,11 @@ describe('logs command', () => {
     const worktreePath = join('.rover', 'tasks', id.toString(), 'workspace');
     const branchName = `rover-task-${id}`;
 
-    launchSync('git', ['worktree', 'add', worktreePath, '-b', branchName]);
+    // Get the real launchSync for Git operations
+    const { launchSync: realLaunchSync } = (await vi.importActual(
+      'rover-common'
+    )) as any;
+    realLaunchSync('git', ['worktree', 'add', worktreePath, '-b', branchName]);
     task.setWorkspace(join(testDir, worktreePath), branchName);
 
     // Set container ID if provided
@@ -188,7 +201,7 @@ describe('logs command', () => {
 
   describe('Iteration validation', () => {
     it('should reject non-numeric iteration number', async () => {
-      createTestTaskWithContainer(1, 'Test Task', 'container123');
+      await createTestTaskWithContainer(1, 'Test Task', 'container123');
       createIterations(1, [1, 2]);
 
       const { exitWithError } = await import('../../utils/exit.js');
@@ -204,7 +217,7 @@ describe('logs command', () => {
     });
 
     it('should handle non-existent iteration', async () => {
-      createTestTaskWithContainer(2, 'Test Task', 'container123');
+      await createTestTaskWithContainer(2, 'Test Task', 'container123');
       createIterations(2, [1, 2]);
 
       const { exitWithError } = await import('../../utils/exit.js');
@@ -223,7 +236,11 @@ describe('logs command', () => {
 
   describe('No iterations scenarios', () => {
     it('should warn when no iterations found', async () => {
-      createTestTaskWithContainer(3, 'No Iterations Task', 'container123');
+      await createTestTaskWithContainer(
+        3,
+        'No Iterations Task',
+        'container123'
+      );
 
       const { exitWithWarn } = await import('../../utils/exit.js');
 
@@ -240,7 +257,11 @@ describe('logs command', () => {
     });
 
     it('should warn when no iterations found in JSON mode', async () => {
-      createTestTaskWithContainer(4, 'No Iterations Task', 'container123');
+      await createTestTaskWithContainer(
+        4,
+        'No Iterations Task',
+        'container123'
+      );
 
       const { exitWithWarn } = await import('../../utils/exit.js');
 
@@ -259,7 +280,7 @@ describe('logs command', () => {
 
   describe('No container scenarios', () => {
     it('should warn when no container found', async () => {
-      createTestTaskWithContainer(5, 'No Container Task'); // No container ID provided
+      await createTestTaskWithContainer(5, 'No Container Task'); // No container ID provided
       createIterations(5, [1]);
 
       const { exitWithWarn } = await import('../../utils/exit.js');
@@ -277,7 +298,7 @@ describe('logs command', () => {
     });
 
     it('should warn when no container found in JSON mode', async () => {
-      createTestTaskWithContainer(6, 'No Container Task'); // No container ID provided
+      await createTestTaskWithContainer(6, 'No Container Task'); // No container ID provided
       createIterations(6, [1]);
 
       const { exitWithWarn } = await import('../../utils/exit.js');
@@ -297,7 +318,7 @@ describe('logs command', () => {
 
   describe('Docker logs retrieval', () => {
     it('should successfully retrieve and display logs', async () => {
-      createTestTaskWithContainer(7, 'Success Task', 'container123');
+      await createTestTaskWithContainer(7, 'Success Task', 'container123');
       createIterations(7, [1, 2]);
 
       const { launchSync } = await import('rover-common');
@@ -319,7 +340,11 @@ describe('logs command', () => {
     });
 
     it('should print logs to console output', async () => {
-      createTestTaskWithContainer(21, 'Console Output Task', 'console123');
+      await createTestTaskWithContainer(
+        21,
+        'Console Output Task',
+        'console123'
+      );
       createIterations(21, [1]);
 
       const { launchSync } = await import('rover-common');
@@ -366,7 +391,7 @@ describe('logs command', () => {
     });
 
     it('should print logs with special characters and formatting', async () => {
-      createTestTaskWithContainer(22, 'Special Chars Task', 'special123');
+      await createTestTaskWithContainer(22, 'Special Chars Task', 'special123');
       createIterations(22, [1]);
 
       const { launchSync } = await import('rover-common');
@@ -399,7 +424,7 @@ describe('logs command', () => {
     });
 
     it('should handle multiline logs with proper formatting', async () => {
-      createTestTaskWithContainer(23, 'Multiline Task', 'multiline123');
+      await createTestTaskWithContainer(23, 'Multiline Task', 'multiline123');
       createIterations(23, [1]);
 
       const { launchSync } = await import('rover-common');
@@ -446,7 +471,7 @@ Last line`;
     });
 
     it('should return logs in JSON format', async () => {
-      createTestTaskWithContainer(8, 'JSON Task', 'container456');
+      await createTestTaskWithContainer(8, 'JSON Task', 'container456');
       createIterations(8, [1]);
 
       const { launchSync } = await import('rover-common');
@@ -468,7 +493,7 @@ Last line`;
     });
 
     it('should handle empty logs', async () => {
-      createTestTaskWithContainer(9, 'Empty Logs Task', 'container789');
+      await createTestTaskWithContainer(9, 'Empty Logs Task', 'container789');
       createIterations(9, [1]);
 
       const { launchSync } = await import('rover-common');
@@ -498,7 +523,7 @@ Last line`;
 
   describe('Docker error scenarios', () => {
     it('should handle "No such container" error', async () => {
-      createTestTaskWithContainer(
+      await createTestTaskWithContainer(
         10,
         'Missing Container Task',
         'nonexistent123'
@@ -525,7 +550,7 @@ Last line`;
     });
 
     it('should handle general Docker errors', async () => {
-      createTestTaskWithContainer(11, 'Docker Error Task', 'error123');
+      await createTestTaskWithContainer(11, 'Docker Error Task', 'error123');
       createIterations(11, [1]);
 
       const { launchSync } = await import('rover-common');
@@ -546,7 +571,7 @@ Last line`;
     });
 
     it('should handle Docker permission errors', async () => {
-      createTestTaskWithContainer(12, 'Permission Error Task', 'perm123');
+      await createTestTaskWithContainer(12, 'Permission Error Task', 'perm123');
       createIterations(12, [1]);
 
       const { launchSync } = await import('rover-common');
@@ -572,7 +597,7 @@ Last line`;
 
   describe('Follow mode', () => {
     it('should start follow mode with valid container', async () => {
-      createTestTaskWithContainer(13, 'Follow Task', 'follow123');
+      await createTestTaskWithContainer(13, 'Follow Task', 'follow123');
       createIterations(13, [1]);
 
       const mockSpawn = vi.fn();
@@ -614,7 +639,7 @@ Last line`;
     });
 
     it('should stream logs in follow mode to stdout and stderr', async () => {
-      createTestTaskWithContainer(24, 'Stream Task', 'stream123');
+      await createTestTaskWithContainer(24, 'Stream Task', 'stream123');
       createIterations(24, [1]);
 
       // Mock process.stdout and stderr
@@ -665,7 +690,11 @@ Last line`;
     });
 
     it('should handle follow mode completion and errors', async () => {
-      createTestTaskWithContainer(25, 'Follow Complete Task', 'complete123');
+      await createTestTaskWithContainer(
+        25,
+        'Follow Complete Task',
+        'complete123'
+      );
       createIterations(25, [1]);
 
       const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -710,7 +739,11 @@ Last line`;
     });
 
     it('should handle follow mode with specific iteration', async () => {
-      createTestTaskWithContainer(14, 'Follow Iteration Task', 'follow456');
+      await createTestTaskWithContainer(
+        14,
+        'Follow Iteration Task',
+        'follow456'
+      );
       createIterations(14, [1, 2, 3]);
 
       const mockProcess = {
@@ -733,7 +766,11 @@ Last line`;
     });
 
     it('should skip follow mode in JSON mode', async () => {
-      createTestTaskWithContainer(15, 'JSON Follow Task', 'jsonfollow123');
+      await createTestTaskWithContainer(
+        15,
+        'JSON Follow Task',
+        'jsonfollow123'
+      );
       createIterations(15, [1]);
 
       const { launchSync, launch } = await import('rover-common');
@@ -760,7 +797,11 @@ Last line`;
 
   describe('Iteration selection', () => {
     it('should use latest iteration when none specified', async () => {
-      createTestTaskWithContainer(16, 'Latest Iteration Task', 'latest123');
+      await createTestTaskWithContainer(
+        16,
+        'Latest Iteration Task',
+        'latest123'
+      );
       createIterations(16, [1, 3, 2]); // Unsorted to test sorting
 
       const { launchSync } = await import('rover-common');
@@ -779,7 +820,11 @@ Last line`;
     });
 
     it('should use specific iteration when provided', async () => {
-      createTestTaskWithContainer(17, 'Specific Iteration Task', 'specific123');
+      await createTestTaskWithContainer(
+        17,
+        'Specific Iteration Task',
+        'specific123'
+      );
       createIterations(17, [1, 2, 3]);
 
       const { launchSync } = await import('rover-common');
@@ -803,7 +848,11 @@ Last line`;
 
   describe('Combined scenarios', () => {
     it('should handle task with single iteration', async () => {
-      createTestTaskWithContainer(18, 'Single Iteration Task', 'single123');
+      await createTestTaskWithContainer(
+        18,
+        'Single Iteration Task',
+        'single123'
+      );
       createIterations(18, [1]);
 
       const { launchSync } = await import('rover-common');
@@ -822,7 +871,7 @@ Last line`;
     });
 
     it('should handle task with many iterations', async () => {
-      createTestTaskWithContainer(19, 'Many Iterations Task', 'many123');
+      await createTestTaskWithContainer(19, 'Many Iterations Task', 'many123');
       createIterations(19, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
 
       const { launchSync } = await import('rover-common');
@@ -843,7 +892,7 @@ Last line`;
 
   describe('Telemetry integration', () => {
     it('should call telemetry on successful logs retrieval', async () => {
-      createTestTaskWithContainer(20, 'Telemetry Task', 'telemetry123');
+      await createTestTaskWithContainer(20, 'Telemetry Task', 'telemetry123');
       createIterations(20, [1]);
 
       const { getTelemetry } = await import('../../lib/telemetry.js');
