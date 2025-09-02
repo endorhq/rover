@@ -37,6 +37,8 @@ On the other side, **you don't get all the potential from coding agents until yo
 
 **Rover manages AI coding agents for you**. It integrates with both your terminal and VSCode (as an extension). Create a new task with `rover task` and it will copy your repository using git, start a container with the required configuration and services, and provide the AI agent with a workflow to follow.
 
+[PLACEHOLDER FOR A GIF / VIDEO]
+
 You can now focus on your work or just relax. AI agents will implement the required changes and produce a set of documents you can review later. Then, you can decide the next steps:
 
 - Ask for more changes by adding new instructions (iterate)
