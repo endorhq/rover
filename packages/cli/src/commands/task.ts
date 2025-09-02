@@ -514,14 +514,14 @@ export const startDockerExecution = async (
         if (!jsonMode) {
           showTips([
             'Use ' +
-            colors.cyan(`rover logs -f ${task.id}`) +
-            ` to monitor logs`,
+              colors.cyan(`rover logs -f ${task.id}`) +
+              ` to monitor logs`,
             'Use ' +
-            colors.cyan(`rover inspect ${task.id}`) +
-            ` to get task details`,
+              colors.cyan(`rover inspect ${task.id}`) +
+              ` to get task details`,
             'Use ' +
-            colors.cyan(`rover list`) +
-            ` to check the status of all tasks`,
+              colors.cyan(`rover list`) +
+              ` to check the status of all tasks`,
           ]);
         }
 
@@ -563,8 +563,8 @@ export const startDockerExecution = async (
           console.log(colors.gray('  Resetting the task status to "New"'));
           console.log(
             colors.gray('  Use ') +
-            colors.cyan(`rover start ${taskId}`) +
-            colors.gray(' to retry execution')
+              colors.cyan(`rover start ${taskId}`) +
+              colors.gray(' to retry execution')
           );
         }
 
@@ -594,8 +594,8 @@ export const startDockerExecution = async (
       console.log(colors.yellow('⚠ Task reset to NEW status'));
       console.log(
         colors.gray('  Use ') +
-        colors.cyan(`rover start ${taskId}`) +
-        colors.gray(' to retry execution')
+          colors.cyan(`rover start ${taskId}`) +
+          colors.gray(' to retry execution')
       );
     }
 
@@ -789,7 +789,8 @@ export const taskCommand = async (
 ) => {
   const telemetry = getTelemetry();
   // Extract options
-  const { follow, yes, json, fromGithub, debug, sourceBranch, targetBranch } = options;
+  const { follow, yes, json, fromGithub, debug, sourceBranch, targetBranch } =
+    options;
 
   // Check if rover is initialized
   const roverPath = join(process.cwd(), '.rover');
@@ -798,8 +799,8 @@ export const taskCommand = async (
       console.log(colors.red('✗ Rover is not initialized in this directory'));
       console.log(
         colors.gray('  Run ') +
-        colors.cyan('rover init') +
-        colors.gray(' first')
+          colors.cyan('rover init') +
+          colors.gray(' first')
       );
     }
     // TODO: use exitWithError
@@ -866,10 +867,10 @@ export const taskCommand = async (
         console.log(colors.gray('├── Title: ') + colors.cyan(issueData.title));
         console.log(
           colors.gray('└── Body: ') +
-          colors.white(
-            issueData.body.substring(0, 100) +
-            (issueData.body.length > 100 ? '...' : '')
-          )
+            colors.white(
+              issueData.body.substring(0, 100) +
+                (issueData.body.length > 100 ? '...' : '')
+            )
         );
       }
     } else {
@@ -914,13 +915,13 @@ export const taskCommand = async (
         if (initialPrompt.length > 0) {
           console.log(
             colors.gray(`  Example: `) +
-            colors.cyan(`rover task --source-branch main "${initialPrompt}"
+              colors.cyan(`rover task --source-branch main "${initialPrompt}"
 `)
           );
         } else {
           console.log(
             colors.gray(`  Example: `) +
-            colors.cyan(`rover task --source-branch main
+              colors.cyan(`rover task --source-branch main
 `)
           );
         }
@@ -993,8 +994,8 @@ export const taskCommand = async (
     // Expand task with selected AI provider
     const spinner = !json
       ? yoctoSpinner({
-        text: `Expanding task description with ${selectedAiAgent.charAt(0).toUpperCase() + selectedAiAgent.slice(1)}...`,
-      }).start()
+          text: `Expanding task description with ${selectedAiAgent.charAt(0).toUpperCase() + selectedAiAgent.slice(1)}...`,
+        }).start()
       : null;
 
     try {
@@ -1020,7 +1021,7 @@ export const taskCommand = async (
             );
             console.log(
               colors.gray('└── Description: ') +
-              colors.white(taskData.description)
+                colors.white(taskData.description)
             );
           }
 
@@ -1197,8 +1198,8 @@ export const taskCommand = async (
         );
         console.log(
           colors.gray('  Use ') +
-          colors.cyan(`rover start ${taskId}`) +
-          colors.gray(' to retry execution')
+            colors.cyan(`rover start ${taskId}`) +
+            colors.gray(' to retry execution')
         );
       }
       throw error;
