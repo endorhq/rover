@@ -59,8 +59,8 @@ export const startCommand = async (
       exitWithError(jsonOutput, json, {
         tips: [
           'Use ' +
-          colors.cyan(`rover task "${task.title}"`) +
-          colors.gray(' to create a new task'),
+            colors.cyan(`rover task "${task.title}"`) +
+            colors.gray(' to create a new task'),
         ],
       });
       return;
@@ -114,7 +114,7 @@ export const startCommand = async (
         git.createWorktree(worktreePath, branchName);
 
         // Copy user .env development files
-        copyEnvironmentFiles(process.cwd(), worktreePath)
+        copyEnvironmentFiles(process.cwd(), worktreePath);
 
         // Update task with workspace information
         task.setWorkspace(worktreePath, branchName);

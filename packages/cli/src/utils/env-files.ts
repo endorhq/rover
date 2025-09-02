@@ -4,7 +4,7 @@ import { join } from 'node:path';
 /**
  * Copy environment files from source directory to target directory
  * Copies .env, .env.*, but excludes .env.example
- * 
+ *
  * @param sourcePath - Source directory path
  * @param targetPath - Target directory path
  * @param jsonMode - Whether to suppress console output
@@ -28,9 +28,8 @@ export const copyEnvironmentFiles = (
 
     // Find and copy .env.* files (but not .env.example)
     const files = readdirSync(sourcePath);
-    const envFiles = files.filter(file =>
-      file.startsWith('.env.') &&
-      file !== '.env.example'
+    const envFiles = files.filter(
+      file => file.startsWith('.env.') && file !== '.env.example'
     );
 
     for (const envFile of envFiles) {
