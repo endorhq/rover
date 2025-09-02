@@ -4,7 +4,7 @@ import yoctoSpinner from 'yocto-spinner';
 import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { getNextTaskId } from '../utils/task-id.js';
-import { homedir } from 'node:os';
+import { homedir, userInfo } from 'node:os';
 import {
   getAIAgentTool,
   getUserAIAgent,
@@ -16,18 +16,16 @@ import { SetupBuilder } from '../lib/setup.js';
 import { AI_AGENT } from '../lib/config.js';
 import { IterationConfig } from '../lib/iteration.js';
 import { generateBranchName } from '../utils/branch-name.js';
-import { request } from 'node:https';
 import { spawn } from 'node:child_process';
 import { launchSync } from 'rover-common';
-import { checkGitHubCLI } from '../utils/system.js';
 import { showRoverBanner, showRoverChat, showTips } from '../utils/display.js';
-import { userInfo } from 'node:os';
 import { getTelemetry } from '../lib/telemetry.js';
 import { NewTaskProvider } from 'rover-telemetry';
 import { Git } from '../lib/git.js';
 import { readFromStdin, stdinIsAvailable } from '../utils/stdin.js';
 import { CLIJsonOutput } from '../types.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
+import { GitHub, GitHubError } from '../lib/github.js';
 
 const { prompt } = enquirer;
 
@@ -574,174 +572,6 @@ export const startDockerExecution = async (
 };
 
 /**
- * Get GitHub repo info from remote URL
- */
-const getGitHubRepoInfo = (
-  remoteUrl: string
-): { owner: string; repo: string } | null => {
-  // Handle various GitHub URL formats
-  const patterns = [
-    /github\.com[:/]([^/]+)\/([^/.]+)(\.git)?$/,
-    /^git@github\.com:([^/]+)\/([^/.]+)(\.git)?$/,
-    /^https?:\/\/github\.com\/([^/]+)\/([^/.]+)(\.git)?$/,
-  ];
-
-  for (const pattern of patterns) {
-    const match = remoteUrl.match(pattern);
-    if (match) {
-      return { owner: match[1], repo: match[2] };
-    }
-  }
-
-  return null;
-};
-
-/**
- * Fetch GitHub issue using HTTPS API
- */
-const fetchGitHubIssueViaAPI = async (
-  owner: string,
-  repo: string,
-  issueNumber: string
-): Promise<{ title: string; body: string } | null> => {
-  return new Promise(resolve => {
-    const options = {
-      hostname: 'api.github.com',
-      path: `/repos/${owner}/${repo}/issues/${issueNumber}`,
-      method: 'GET',
-      headers: {
-        'User-Agent': 'Rover-CLI',
-        Accept: 'application/vnd.github.v3+json',
-      },
-    };
-
-    const req = request(options, res => {
-      let data = '';
-
-      res.on('data', chunk => {
-        data += chunk;
-      });
-
-      res.on('end', () => {
-        if (res.statusCode === 200) {
-          try {
-            const issue = JSON.parse(data);
-            resolve({
-              title: issue.title || '',
-              body: issue.body || '',
-            });
-          } catch {
-            resolve(null);
-          }
-        } else {
-          resolve(null);
-        }
-      });
-    });
-
-    req.on('error', () => {
-      resolve(null);
-    });
-
-    req.end();
-  });
-};
-
-/**
- * Fetch GitHub issue using gh CLI
- */
-const fetchGitHubIssueViaCLI = async (
-  owner: string,
-  repo: string,
-  issueNumber: string
-): Promise<{ title: string; body: string } | null> => {
-  try {
-    const { stdout } = launchSync('gh', [
-      'issue',
-      'view',
-      issueNumber.toString(),
-      '--repo',
-      `${owner}/${repo}`,
-      '--json',
-      'title,body',
-    ]);
-    if (!stdout) {
-      return null;
-    }
-    const issue = JSON.parse(stdout.toString());
-    return {
-      title: issue.title || '',
-      body: issue.body || '',
-    };
-  } catch {
-    return null;
-  }
-};
-
-/**
- * Fetch GitHub issue with fallback
- */
-const fetchGitHubIssue = async (
-  issueNumber: string,
-  json: boolean
-): Promise<{ title: string; body: string } | null> => {
-  try {
-    // Try to get repo info from git remote
-    const remoteUrl = launchSync('git', ['remote', 'get-url', 'origin'])
-      .stdout?.toString()
-      .trim();
-
-    if (!remoteUrl) {
-      throw new Error('could not get origin remote URL');
-    }
-
-    const repoInfo = getGitHubRepoInfo(remoteUrl);
-
-    if (!repoInfo) {
-      if (!json) {
-        console.log(
-          colors.red('✗ Could not determine GitHub repository from git remote')
-        );
-      }
-      return null;
-    }
-
-    // Try API first
-    let issueData = await fetchGitHubIssueViaAPI(
-      repoInfo.owner,
-      repoInfo.repo,
-      issueNumber
-    );
-
-    // If API fails and gh CLI is available, try gh
-    const githubCLI = await checkGitHubCLI();
-
-    if (!issueData && githubCLI) {
-      issueData = await fetchGitHubIssueViaCLI(
-        repoInfo.owner,
-        repoInfo.repo,
-        issueNumber
-      );
-    }
-
-    if (!issueData) {
-      if (!json) {
-        console.log(colors.red('✗ Failed to fetch GitHub issue'));
-        console.log(colors.gray('  The issue might be private or not exist'));
-      }
-      return null;
-    }
-
-    return issueData;
-  } catch (error) {
-    if (!json) {
-      console.log(colors.red('✗ Error fetching GitHub issue'));
-    }
-    return null;
-  }
-};
-
-/**
  * Interface for the JSON output
  */
 interface TaskTaskOutput extends CLIJsonOutput {
@@ -824,45 +654,60 @@ export const taskCommand = async (
   let skipExpansion = false;
   let taskData: IPromptTask | null = null;
 
+  const git = new Git();
+
   // Handle --from-github option
   if (fromGithub) {
-    const issueData = await fetchGitHubIssue(fromGithub, json === true);
-    if (issueData) {
-      description = `${issueData.title}\n\n${issueData.body}`;
-      skipExpansion = true;
+    const github = new GitHub(false);
+    try {
+      const issueData = await github.fetchIssue(fromGithub, git.remoteUrl());
+      if (issueData) {
+        description = `${issueData.title}\n\n${issueData.body}`;
+        skipExpansion = true;
 
-      if (!issueData.body || issueData.body.length == 0) {
-        jsonOutput.error =
-          'The GitHub issue description is empty. Add more details to the issue so the Agent can complete it successfully.';
+        if (!issueData.body || issueData.body.length == 0) {
+          jsonOutput.error =
+            'The GitHub issue description is empty. Add more details to the issue so the Agent can complete it successfully.';
+          exitWithError(jsonOutput, json);
+          return;
+        }
+
+        taskData = {
+          title: issueData.title,
+          description,
+        };
+
+        if (!json) {
+          console.log(colors.green('✓ GitHub issue fetched successfully'));
+          console.log(
+            colors.gray('├── Title: ') + colors.cyan(issueData.title)
+          );
+          console.log(
+            colors.gray('└── Body: ') +
+            colors.white(
+              issueData.body.substring(0, 100) +
+              (issueData.body.length > 100 ? '...' : '')
+            )
+          );
+        }
+      } else {
+        jsonOutput.error = 'Failed to fetch issue from GitHub';
         exitWithError(jsonOutput, json);
         return;
       }
-
-      taskData = {
-        title: issueData.title,
-        description,
-      };
-
-      if (!json) {
-        console.log(colors.green('✓ GitHub issue fetched successfully'));
-        console.log(colors.gray('├── Title: ') + colors.cyan(issueData.title));
-        console.log(
-          colors.gray('└── Body: ') +
-          colors.white(
-            issueData.body.substring(0, 100) +
-            (issueData.body.length > 100 ? '...' : '')
-          )
-        );
+    } catch (err) {
+      if (err instanceof GitHubError) {
+        jsonOutput.error = `Failed to fetch issue from GitHub: ${err.cause}`;
+      } else {
+        jsonOutput.error = `Failed to fetch issue from GitHub: ${err}`;
       }
-    } else {
-      jsonOutput.error = 'Failed to fetch issue from GitHub';
+
       exitWithError(jsonOutput, json);
       return;
     }
   }
 
   // Validate branch option and check for uncommitted changes
-  const git = new Git();
   let baseBranch = sourceBranch;
 
   if (sourceBranch) {
