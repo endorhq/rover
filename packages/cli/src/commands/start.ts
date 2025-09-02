@@ -12,6 +12,7 @@ import { UserSettings, AI_AGENT } from '../lib/config.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { Git } from '../lib/git.js';
 import yoctoSpinner from 'yocto-spinner';
+import { copyEnvironmentFiles } from '../utils/env-files.js';
 
 /**
  * Interface for JSON output
@@ -58,8 +59,8 @@ export const startCommand = async (
       exitWithError(jsonOutput, json, {
         tips: [
           'Use ' +
-            colors.cyan(`rover task "${task.title}"`) +
-            colors.gray(' to create a new task'),
+          colors.cyan(`rover task "${task.title}"`) +
+          colors.gray(' to create a new task'),
         ],
       });
       return;
@@ -111,6 +112,9 @@ export const startCommand = async (
       try {
         const git = new Git();
         git.createWorktree(worktreePath, branchName);
+
+        // Copy user .env development files
+        copyEnvironmentFiles(process.cwd(), worktreePath)
 
         // Update task with workspace information
         task.setWorkspace(worktreePath, branchName);
