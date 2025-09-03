@@ -27,6 +27,9 @@ export const stopCommand = async (
 ) => {
   const telemetry = getTelemetry();
 
+  // Track stop task event
+  telemetry?.eventStopTask();
+
   const json = options.json === true;
   let jsonOutput: TaskStopOutput = {
     success: false,
@@ -158,15 +161,6 @@ export const stopCommand = async (
 
     if (spinner) spinner.success('Task stopped successfully');
 
-    if (!json) {
-      console.log(colors.green('\n✓ Task has been stopped and cleaned up'));
-      console.log(colors.gray('  Status: ') + colors.cyan('cancelled'));
-      console.log(colors.gray('  Container stopped and removed'));
-      console.log(colors.gray('  Workspace and branch removed'));
-      console.log(colors.gray('  Iterations cleaned up'));
-    }
-
-    // Output final JSON after all operations are complete
     jsonOutput = {
       ...jsonOutput,
       success: true,
@@ -175,8 +169,13 @@ export const stopCommand = async (
       status: task.status,
       stoppedAt: new Date().toISOString(),
     };
-    exitWithSuccess('Task stopped successfully!', jsonOutput, json);
-    return;
+    exitWithSuccess('Task stopped successfully!', jsonOutput, json, {
+      tips: [
+        'Use ' + colors.cyan(`rover logs ${task.id}`) + ' to check the logs',
+        'Use ' + colors.cyan(`rover restart ${task.id}`) + ' to restart the task',
+        'Use ' + colors.cyan(`rover delete ${task.id}`) + ' to delete and clean up the task',
+      ]
+    });
   } catch (error) {
     if (error instanceof TaskNotFoundError) {
       jsonOutput.error = `The task with ID ${numericTaskId} was not found`;
