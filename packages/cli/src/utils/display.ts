@@ -62,7 +62,7 @@ export const showRoverChat = (
 
   for (const message of messages) {
     // Use teal-400 (45, 212, 191) when true colors are supported
-    const roverName = supportsTrueColor() 
+    const roverName = supportsTrueColor()
       ? rgb(45, 212, 191, 'Rover')
       : colors.cyan('Rover');
     console.log(`🤖 ${roverName}:`, message);
@@ -114,9 +114,12 @@ export const showRoverBanner = () => {
         // Apply color based on line index (vertical gradient)
         const colorIndex = Math.min(lineIndex, colorSteps.length - 1);
         const [r, g, b] = colorSteps[colorIndex];
-        
+
         // Apply the same color to all characters in the line
-        return line.split('').map(char => rgb(r, g, b, char)).join('');
+        return line
+          .split('')
+          .map(char => rgb(r, g, b, char))
+          .join('');
       })
       .join('\n');
   } else {
