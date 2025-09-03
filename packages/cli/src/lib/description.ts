@@ -116,9 +116,9 @@ export class TaskFileError extends Error {
  * TaskDescription class - Centralized management of task metadata
  */
 export class TaskDescription {
-  private data: TaskDescriptionSchema;
-  private taskId: number;
-  private filePath: string;
+  data: TaskDescriptionSchema;
+  taskId: number;
+  filePath: string;
 
   constructor(data: TaskDescriptionSchema, taskId: number) {
     this.data = data;

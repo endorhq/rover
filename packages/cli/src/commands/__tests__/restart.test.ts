@@ -93,7 +93,7 @@ describe('restart command', async () => {
       });
 
       // Manually set task to FAILED status
-      task.markFailed();
+      task.markFailed('This task failed');
       expect(task.status).toBe('FAILED');
 
       // Run restart command
@@ -124,14 +124,14 @@ describe('restart command', async () => {
       });
 
       // Manually set task to FAILED status and restart twice
-      task.markFailed();
+      task.markFailed('This task failed');
       await restartCommand(taskId.toString(), { json: true });
 
       const firstRestart = TaskDescription.load(taskId);
       expect(firstRestart.data.restartCount).toBe(1);
 
       // Set back to failed and restart again
-      firstRestart.markFailed();
+      firstRestart.markFailed('This task failed');
       await restartCommand(taskId.toString(), { json: true });
 
       const secondRestart = TaskDescription.load(taskId);
@@ -229,7 +229,7 @@ describe('restart command', async () => {
         description: 'A test task',
       });
 
-      task.markFailed();
+      task.markFailed('This task failed');
 
       // Run restart command with follow option
       await restartCommand(taskId.toString(), { follow: true, json: true });
@@ -253,7 +253,7 @@ describe('restart command', async () => {
         description: 'A test task',
       });
 
-      task.markFailed();
+      task.markFailed('This task failed');
 
       // Run restart command with debug option
       await restartCommand(taskId.toString(), { debug: true, json: true });
