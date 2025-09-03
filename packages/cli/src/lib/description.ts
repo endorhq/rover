@@ -438,11 +438,11 @@ export class TaskDescription {
    */
   restart(timestamp?: string): void {
     const restartTimestamp = timestamp || new Date().toISOString();
-    
+
     // Increment restart count
     this.data.restartCount = (this.data.restartCount || 0) + 1;
     this.data.lastRestartAt = restartTimestamp;
-    
+
     // Reset to NEW status
     this.setStatus('NEW', { timestamp: restartTimestamp });
   }

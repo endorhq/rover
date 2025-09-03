@@ -31,7 +31,7 @@ vi.mock('../../utils/exit.js', () => ({
   exitWithWarn: vi.fn().mockImplementation(() => {}),
 }));
 
-describe('restart command', () => {
+describe('restart command', async () => {
   let testDir: string;
   let originalCwd: string;
   const mockStartCommand = vi.mocked(await import('../start.js')).startCommand;

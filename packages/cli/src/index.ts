@@ -142,7 +142,9 @@ program
 // Restart a task in FAILED status
 program
   .command('restart')
-  .description('Restart a failed task by resetting it to NEW status and starting execution')
+  .description(
+    'Restart a failed task by resetting it to NEW status and starting execution'
+  )
   .argument('<taskId>', 'Task ID to restart')
   .option('-f, --follow', 'Follow execution logs in real-time')
   .option('--json', 'Output the result in JSON format')
