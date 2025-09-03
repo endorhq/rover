@@ -68,8 +68,8 @@ export const shellCommand = async (
     );
     console.log(
       colors.gray('Type') +
-      colors.cyan(' "exit" ') +
-      colors.gray('to leave the shell')
+        colors.cyan(' "exit" ') +
+        colors.gray('to leave the shell')
     );
     console.log('');
 
@@ -122,10 +122,8 @@ export const shellCommand = async (
 
         spinner.success(`Shell started using ${shell}`);
 
-        // Await for the process to complete 
+        // Await for the process to complete
         shellProcess = await shellInit;
-
-
       } catch (error) {
         spinner.error(`Failed to start shell ${shell}`);
         jsonOutput.error = 'Failed to start shell: ' + error;

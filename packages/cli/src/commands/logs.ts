@@ -139,18 +139,24 @@ export const logsCommand = async (
         const controller = new AbortController();
         const cancelSignal = controller.signal;
 
-        const logsProcess = await launch('docker', ['logs', '-f', containerId], {
-          stdout: ['inherit'],
-          stderr: ['inherit'],
-          cancelSignal
-        });
+        const logsProcess = await launch(
+          'docker',
+          ['logs', '-f', containerId],
+          {
+            stdout: ['inherit'],
+            stderr: ['inherit'],
+            cancelSignal,
+          }
+        );
 
         // Done
         if (logsProcess.exitCode === 0) {
           console.log(colors.green('\n✓ Log following completed'));
         } else {
           console.log(
-            colors.yellow(`\n⚠ Log following ended with code ${logsProcess.exitCode}`)
+            colors.yellow(
+              `\n⚠ Log following ended with code ${logsProcess.exitCode}`
+            )
           );
         }
 
@@ -230,21 +236,21 @@ export const logsCommand = async (
           console.log(colors.gray('💡 Tips:'));
           tips.push(
             'Use ' +
-            colors.cyan(`rover logs ${numericTaskId} <iteration>`) +
-            ' to view specific iteration (if container exists)'
+              colors.cyan(`rover logs ${numericTaskId} <iteration>`) +
+              ' to view specific iteration (if container exists)'
           );
         }
       }
 
       tips.push(
         'Use ' +
-        colors.cyan(`rover logs ${numericTaskId} --follow`) +
-        ' to follow logs in real-time'
+          colors.cyan(`rover logs ${numericTaskId} --follow`) +
+          ' to follow logs in real-time'
       );
       tips.push(
         'Use ' +
-        colors.cyan(`rover diff ${numericTaskId}`) +
-        ' to see code changes'
+          colors.cyan(`rover diff ${numericTaskId}`) +
+          ' to see code changes'
       );
 
       showTips(tips);

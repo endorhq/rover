@@ -1,6 +1,7 @@
 import { execa, execaSync } from 'execa';
 
-import type { Options, SyncOptions } from 'execa';
+import type { Options, Result, SyncOptions, SyncResult } from 'execa';
+export type { Options, Result, SyncOptions, SyncResult };
 
 import colors from 'ansi-colors';
 
@@ -13,10 +14,10 @@ const log = (stream: string) => {
     if (process.stderr.isTTY) {
       console.error(
         colors.gray(now.toISOString()) +
-        ' ' +
-        colors.cyan(stream) +
-        ' ' +
-        colors.gray(data)
+          ' ' +
+          colors.cyan(stream) +
+          ' ' +
+          colors.gray(data)
       );
     } else {
       console.error(`${now.toISOString()} ${stream} ${data}`);
