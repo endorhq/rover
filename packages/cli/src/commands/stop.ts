@@ -2,7 +2,7 @@ import colors from 'ansi-colors';
 import { join } from 'node:path';
 import { rmSync } from 'node:fs';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
-import { spawnSync } from '../lib/os.js';
+import { launchSync } from 'rover-common';
 import { exitWithError, exitWithSuccess } from '../utils/exit.js';
 import { CLIJsonOutput } from '../types.js';
 import { getTelemetry } from '../lib/telemetry.js';
@@ -66,7 +66,7 @@ export const stopCommand = async (
     // Stop Docker container if it exists and is running
     if (task.containerId) {
       try {
-        spawnSync('docker', ['stop', task.containerId]);
+        launchSync('docker', ['stop', task.containerId]);
         if (spinner) spinner.text = 'Container stopped';
         if (!json) {
           console.log(colors.green('✓ Container stopped'));
@@ -83,7 +83,7 @@ export const stopCommand = async (
       // Try to remove the container
       if (options.removeAll || options.removeContainer) {
         try {
-          spawnSync('docker', ['rm', '-f', task.containerId]);
+          launchSync('docker', ['rm', '-f', task.containerId]);
           if (spinner) spinner.text = 'Container removed';
         } catch (error) {
           // Container removal might fail, but that's ok
@@ -97,7 +97,7 @@ export const stopCommand = async (
     // Clean up Git worktree and branch
     try {
       // Check if we're in a git repository
-      spawnSync('git', ['rev-parse', '--is-inside-work-tree'], {
+      launchSync('git', ['rev-parse', '--is-inside-work-tree'], {
         stdio: 'pipe',
       });
 
@@ -107,7 +107,7 @@ export const stopCommand = async (
         (options.removeAll || options.removeGitWorktreeAndBranch)
       ) {
         try {
-          spawnSync(
+          launchSync(
             'git',
             ['worktree', 'remove', task.worktreePath, '--force'],
             { stdio: 'pipe' }
@@ -118,7 +118,7 @@ export const stopCommand = async (
           try {
             rmSync(task.worktreePath, { recursive: true, force: true });
             // Remove worktree from git's tracking
-            spawnSync('git', ['worktree', 'prune'], { stdio: 'pipe' });
+            launchSync('git', ['worktree', 'prune'], { stdio: 'pipe' });
           } catch (manualError) {
             if (!json) {
               console.warn(
@@ -136,7 +136,7 @@ export const stopCommand = async (
       ) {
         try {
           // Check if branch exists
-          spawnSync(
+          launchSync(
             'git',
             [
               'show-ref',
@@ -147,7 +147,7 @@ export const stopCommand = async (
             { stdio: 'pipe' }
           );
           // Delete the branch
-          spawnSync('git', ['branch', '-D', task.branchName], {
+          launchSync('git', ['branch', '-D', task.branchName], {
             stdio: 'pipe',
           });
           if (spinner) spinner.text = 'Branch removed';
