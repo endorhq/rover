@@ -23,7 +23,12 @@ interface TaskStopOutput extends CLIJsonOutput {
  */
 export const stopCommand = async (
   taskId: string,
-  options: { json?: boolean } = {}
+  options: {
+    json?: boolean;
+    removeAll?: boolean;
+    removeContainer?: boolean;
+    removeGitWorktreeAndBranch?: boolean;
+  } = {}
 ) => {
   const telemetry = getTelemetry();
 
@@ -76,11 +81,13 @@ export const stopCommand = async (
       }
 
       // Try to remove the container
-      try {
-        spawnSync('docker', ['rm', '-f', task.containerId]);
-        if (spinner) spinner.text = 'Container removed';
-      } catch (error) {
-        // Container removal might fail, but that's ok
+      if (options.removeAll || options.removeContainer) {
+        try {
+          spawnSync('docker', ['rm', '-f', task.containerId]);
+          if (spinner) spinner.text = 'Container removed';
+        } catch (error) {
+          // Container removal might fail, but that's ok
+        }
       }
     }
 
@@ -95,7 +102,10 @@ export const stopCommand = async (
       });
 
       // Remove git workspace if it exists
-      if (task.worktreePath) {
+      if (
+        task.worktreePath &&
+        (options.removeAll || options.removeGitWorktreeAndBranch)
+      ) {
         try {
           spawnSync(
             'git',
@@ -120,7 +130,10 @@ export const stopCommand = async (
       }
 
       // Remove git branch if it exists
-      if (task.branchName) {
+      if (
+        task.branchName &&
+        (options.removeAll || options.removeGitWorktreeAndBranch)
+      ) {
         try {
           // Check if branch exists
           spawnSync(
@@ -172,9 +185,13 @@ export const stopCommand = async (
     exitWithSuccess('Task stopped successfully!', jsonOutput, json, {
       tips: [
         'Use ' + colors.cyan(`rover logs ${task.id}`) + ' to check the logs',
-        'Use ' + colors.cyan(`rover restart ${task.id}`) + ' to restart the task',
-        'Use ' + colors.cyan(`rover delete ${task.id}`) + ' to delete and clean up the task',
-      ]
+        'Use ' +
+          colors.cyan(`rover restart ${task.id}`) +
+          ' to restart the task',
+        'Use ' +
+          colors.cyan(`rover delete ${task.id}`) +
+          ' to delete and clean up the task',
+      ],
     });
   } catch (error) {
     if (error instanceof TaskNotFoundError) {

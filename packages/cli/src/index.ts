@@ -149,6 +149,15 @@ program
   .command('stop')
   .description('Stop a running task and clean up its resources')
   .argument('<taskId>', 'Task ID to stop')
+  .option(
+    '-a, --remove-all',
+    'Remove container, git worktree and branch if they exist'
+  )
+  .option('-c, --remove-container', 'Remove container if it exists')
+  .option(
+    '-g, --remove-git-worktree-and-branch',
+    'Remove git worktree and branch'
+  )
   .option('--json', 'Output the result in JSON format')
   .action(stopCommand);
 
