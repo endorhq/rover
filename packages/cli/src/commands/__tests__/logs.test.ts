@@ -600,93 +600,57 @@ Last line`;
       await createTestTaskWithContainer(13, 'Follow Task', 'follow123');
       createIterations(13, [1]);
 
-      const mockSpawn = vi.fn();
-      const mockProcess = {
-        stdout: { on: vi.fn() },
-        stderr: { on: vi.fn() },
-        on: vi.fn(),
-        kill: vi.fn(),
-      };
-
       const { launch } = await import('rover-common');
-      vi.mocked(launch).mockReturnValue(mockProcess as any);
+      vi.mocked(launch).mockResolvedValue({
+        exitCode: 0,
+        stdout: '',
+        stderr: '',
+        failed: false,
+        timedOut: false,
+        isCanceled: false,
+        killed: false,
+      } as any);
 
       await logsCommand('13', undefined, { follow: true });
 
-      expect(launch).toHaveBeenCalledWith('docker', [
-        'logs',
-        '-f',
-        'follow123',
-      ]);
-
-      // Verify event listeners are set up
-      expect(mockProcess.stdout.on).toHaveBeenCalledWith(
-        'data',
-        expect.any(Function)
-      );
-      expect(mockProcess.stderr.on).toHaveBeenCalledWith(
-        'data',
-        expect.any(Function)
-      );
-      expect(mockProcess.on).toHaveBeenCalledWith(
-        'close',
-        expect.any(Function)
-      );
-      expect(mockProcess.on).toHaveBeenCalledWith(
-        'error',
-        expect.any(Function)
+      expect(launch).toHaveBeenCalledWith(
+        'docker',
+        ['logs', '-f', 'follow123'],
+        expect.objectContaining({
+          stdout: ['inherit'],
+          stderr: ['inherit'],
+          cancelSignal: expect.any(AbortSignal),
+        })
       );
     });
 
-    it('should stream logs in follow mode to stdout and stderr', async () => {
+    it('should stream logs in follow mode with inherit stdio', async () => {
       await createTestTaskWithContainer(24, 'Stream Task', 'stream123');
       createIterations(24, [1]);
 
-      // Mock process.stdout and stderr
-      const stdoutSpy = vi
-        .spyOn(process.stdout, 'write')
-        .mockImplementation(() => true);
-      const stderrSpy = vi
-        .spyOn(process.stderr, 'write')
-        .mockImplementation(() => true);
-
-      let stdoutCallback: any;
-      let stderrCallback: any;
-
-      const mockProcess = {
-        stdout: {
-          on: vi.fn((event, callback) => {
-            if (event === 'data') stdoutCallback = callback;
-          }),
-        },
-        stderr: {
-          on: vi.fn((event, callback) => {
-            if (event === 'data') stderrCallback = callback;
-          }),
-        },
-        on: vi.fn(),
-        kill: vi.fn(),
-      };
-
       const { launch } = await import('rover-common');
-      vi.mocked(launch).mockReturnValue(mockProcess as any);
+      vi.mocked(launch).mockResolvedValue({
+        exitCode: 0,
+        stdout: '',
+        stderr: '',
+        failed: false,
+        timedOut: false,
+        isCanceled: false,
+        killed: false,
+      } as any);
 
       await logsCommand('24', undefined, { follow: true });
 
-      // Simulate data coming from stdout
-      const stdoutData = Buffer.from('Stdout log line 1\nStdout log line 2\n');
-      stdoutCallback(stdoutData);
-
-      // Simulate data coming from stderr
-      const stderrData = Buffer.from('[ERROR] Something went wrong\n');
-      stderrCallback(stderrData);
-
-      // Verify data was written to process streams
-      expect(stdoutSpy).toHaveBeenCalledWith(stdoutData);
-      expect(stderrSpy).toHaveBeenCalledWith(stderrData);
-
-      stdoutSpy.mockRestore();
-      stderrSpy.mockRestore();
+      // Verify that inherit is used for stdout and stderr
+      expect(launch).toHaveBeenCalledWith(
+        'docker',
+        ['logs', '-f', 'stream123'],
+        expect.objectContaining({
+          stdout: ['inherit'],
+          stderr: ['inherit'],
+          cancelSignal: expect.any(AbortSignal),
+        })
+      );
     });
 
     it('should handle follow mode completion and errors', async () => {
@@ -698,44 +662,59 @@ Last line`;
       createIterations(25, [1]);
 
       const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      const consoleErrorSpy = vi
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
-
-      let closeCallback: any;
-      let errorCallback: any;
-
-      const mockProcess = {
-        stdout: { on: vi.fn() },
-        stderr: { on: vi.fn() },
-        on: vi.fn((event, callback) => {
-          if (event === 'close') closeCallback = callback;
-          if (event === 'error') errorCallback = callback;
-        }),
-        kill: vi.fn(),
-      };
 
       const { launch } = await import('rover-common');
-      vi.mocked(launch).mockReturnValue(mockProcess as any);
+
+      // Test successful completion
+      vi.mocked(launch).mockResolvedValue({
+        exitCode: 0,
+        stdout: '',
+        stderr: '',
+        failed: false,
+        timedOut: false,
+        isCanceled: false,
+        killed: false,
+      } as any);
 
       await logsCommand('25', undefined, { follow: true });
 
-      // Test successful completion
-      closeCallback(0);
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining('✓ Log following completed')
       );
 
-      // Test error scenario
-      const testError = new Error('Connection lost');
-      errorCallback(testError);
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Error following logs:'),
-        'Connection lost'
+      consoleSpy.mockRestore();
+    });
+
+    it('should handle follow mode with non-zero exit code', async () => {
+      await createTestTaskWithContainer(
+        26,
+        'Failed Complete Task',
+        'failed123'
+      );
+      createIterations(26, [1]);
+
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+      const { launch } = await import('rover-common');
+
+      // Test non-zero exit code
+      vi.mocked(launch).mockResolvedValue({
+        exitCode: 1,
+        stdout: '',
+        stderr: '',
+        failed: true,
+        timedOut: false,
+        isCanceled: false,
+        killed: false,
+      } as any);
+
+      await logsCommand('26', undefined, { follow: true });
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('⚠ Log following ended with code 1')
       );
 
       consoleSpy.mockRestore();
-      consoleErrorSpy.mockRestore();
     });
 
     it('should handle follow mode with specific iteration', async () => {
@@ -746,23 +725,28 @@ Last line`;
       );
       createIterations(14, [1, 2, 3]);
 
-      const mockProcess = {
-        stdout: { on: vi.fn() },
-        stderr: { on: vi.fn() },
-        on: vi.fn(),
-        kill: vi.fn(),
-      };
-
       const { launch } = await import('rover-common');
-      vi.mocked(launch).mockReturnValue(mockProcess as any);
+      vi.mocked(launch).mockResolvedValue({
+        exitCode: 0,
+        stdout: '',
+        stderr: '',
+        failed: false,
+        timedOut: false,
+        isCanceled: false,
+        killed: false,
+      } as any);
 
       await logsCommand('14', '2', { follow: true });
 
-      expect(launch).toHaveBeenCalledWith('docker', [
-        'logs',
-        '-f',
-        'follow456',
-      ]);
+      expect(launch).toHaveBeenCalledWith(
+        'docker',
+        ['logs', '-f', 'follow456'],
+        expect.objectContaining({
+          stdout: ['inherit'],
+          stderr: ['inherit'],
+          cancelSignal: expect.any(AbortSignal),
+        })
+      );
     });
 
     it('should skip follow mode in JSON mode', async () => {
