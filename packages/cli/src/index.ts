@@ -19,7 +19,7 @@ import colors from 'ansi-colors';
 import { pushCommand } from './commands/push.js';
 import { stopCommand } from './commands/stop.js';
 import { showTips, TIP_TITLES } from './utils/display.js';
-import { launch, setVerbose } from 'rover-common';
+import { setVerbose } from 'rover-common';
 
 const program = new Command();
 
@@ -46,8 +46,8 @@ program
       showTips(
         [
           'Run ' +
-            colors.cyan('rover init') +
-            ' in this directory to initialize project config and user settings',
+          colors.cyan('rover init') +
+          ' in this directory to initialize project config and user settings',
         ],
         {
           title: TIP_TITLES.NEXT_STEPS,
@@ -77,8 +77,8 @@ program
       showTips(
         [
           'Run ' +
-            colors.cyan('rover init') +
-            ' in this directory to initialize user settings',
+          colors.cyan('rover init') +
+          ' in this directory to initialize user settings',
         ],
         {
           title: TIP_TITLES.NEXT_STEPS,
@@ -117,7 +117,6 @@ program
     '--from-github <issue>',
     'Fetch task description from a GitHub issue number'
   )
-  .option('-f, --follow', 'Follow execution logs in real-time')
   .option('-y, --yes', 'Skip all confirmations and run non-interactively')
   .option(
     '-s, --source-branch <branch>',
@@ -139,7 +138,6 @@ program
     'Start a task that could not be automatically started when created'
   )
   .argument('<taskId>', 'Task ID to start')
-  .option('-f, --follow', 'Follow execution logs in real-time')
   .option('--json', 'Output the result in JSON format')
   // .option('--debug', 'Show debug information like running commands')
   .action(startCommand);

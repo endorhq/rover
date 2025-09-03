@@ -31,7 +31,7 @@ interface TaskStartOutput extends CLIJsonOutput {
  */
 export const startCommand = async (
   taskId: string,
-  options: { follow?: boolean; json?: boolean; debug?: boolean } = {}
+  options: { json?: boolean; debug?: boolean } = {}
 ) => {
   const telemetry = getTelemetry();
 
@@ -58,8 +58,8 @@ export const startCommand = async (
       exitWithError(jsonOutput, json, {
         tips: [
           'Use ' +
-            colors.cyan(`rover task "${task.title}"`) +
-            colors.gray(' to create a new task'),
+          colors.cyan(`rover task "${task.title}"`) +
+          colors.gray(' to create a new task'),
         ],
       });
       return;
@@ -165,7 +165,6 @@ export const startCommand = async (
         worktreePath,
         iterationPath,
         selectedAiAgent,
-        options.follow,
         json,
         options.debug
       );
