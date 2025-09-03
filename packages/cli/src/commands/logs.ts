@@ -2,7 +2,6 @@ import colors from 'ansi-colors';
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { launch, launchSync } from 'rover-common';
-import { execa } from 'execa';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { showTips, TIP_TITLES } from '../utils/display.js';

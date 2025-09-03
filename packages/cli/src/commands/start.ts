@@ -2,7 +2,6 @@ import colors from 'ansi-colors';
 import { join } from 'node:path';
 import { existsSync, mkdirSync } from 'node:fs';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
-import { launchSync } from 'rover-common';
 import { generateBranchName } from '../utils/branch-name.js';
 import { exitWithError, exitWithSuccess } from '../utils/exit.js';
 import { CLIJsonOutput } from '../types.js';

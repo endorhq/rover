@@ -189,11 +189,10 @@ chown -R root:root /output || true
 `;
       }
     } else {
-      console.log(
-        colors.yellow(
-          '⚠ Warning: Could not retrieve Docker information in order to recover worktree permissions. Assuming Docker root installation; worktree permissions might be off.'
-        )
-      );
+      recoverPermissions = `
+${recoverPermissions}
+echo "❌ It was not possible to identify Docker installation information on the host, project permissions might be off"
+`;
     }
 
     return `
