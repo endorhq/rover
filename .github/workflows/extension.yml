@@ -33,7 +33,7 @@ jobs:
         run: npm run build
 
       - name: Run type checking
-        run: npm run check-types
+        run: npm run check
         working-directory: packages/extension
 
       - name: Run linting

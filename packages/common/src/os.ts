@@ -13,10 +13,11 @@ import type { LaunchOptions, LaunchSyncOptions } from './types.d.ts';
 
 import colors from 'ansi-colors';
 
-import { VERBOSE } from './index.ts';
+import { VERBOSE } from './index.js';
 
 const log = (stream: string) => {
-  return function* (data: string) {
+  return function* (chunk: unknown) {
+    const data = String(chunk);
     const now = new Date();
     if (process.stderr.isTTY) {
       console.error(
@@ -29,7 +30,7 @@ const log = (stream: string) => {
     } else {
       console.error(`${now.toISOString()} ${stream} ${data}`);
     }
-    yield data;
+    yield chunk;
   };
 };
 
@@ -41,33 +42,39 @@ export async function launch(
   args?: ReadonlyArray<string>,
   options?: Options
 ): Promise<Result> {
-  let stdout = options?.stdout;
-  let stderr = options?.stderr;
   if (VERBOSE) {
-    stdout = stdout ? [...Array(stdout), logStdout] : [logStdout];
-    stderr = stderr ? [...Array(stderr), logStderr] : [logStderr];
+    const stdout = options?.stdout
+      ? [options.stdout as any, logStdout]
+      : [logStdout];
+    const stderr = options?.stderr
+      ? [options.stderr as any, logStderr]
+      : [logStderr];
+    return execa(command, args, {
+      ...options,
+      stdout: stdout as any,
+      stderr: stderr as any,
+    });
   }
-  return execa(command, args, {
-    ...options,
-    stdout,
-    stderr,
-  } as Options);
+  return execa(command, args, options);
 }
 
 export function launchSync(
   command: string,
   args?: ReadonlyArray<string>,
-  options?: Options
+  options?: SyncOptions
 ): SyncResult {
-  let stdout = options?.stdout;
-  let stderr = options?.stderr;
   if (VERBOSE) {
-    stdout = stdout ? [...Array(stdout), logStdout] : [logStdout];
-    stderr = stderr ? [...Array(stderr), logStderr] : [logStderr];
+    const stdout = options?.stdout
+      ? [options.stdout as any, logStdout]
+      : [logStdout];
+    const stderr = options?.stderr
+      ? [options.stderr as any, logStderr]
+      : [logStderr];
+    return execaSync(command, args, {
+      ...options,
+      stdout: stdout as any,
+      stderr: stderr as any,
+    });
   }
-  return execaSync(command, args, {
-    ...options,
-    stdout,
-    stderr,
-  } as SyncOptions);
+  return execaSync(command, args, options);
 }
