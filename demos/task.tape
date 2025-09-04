@@ -62,10 +62,10 @@ Require rover
 
 Set Shell "bash"
 Set FontSize 18
-Set FontFamily "Hack Nerd Font Propo"
+Set FontFamily "Menlo"
 Set LetterSpacing 0.8
 Set Width 1200
-Set Height 600
+Set Height 380
 Set TypingSpeed 75ms
 
 Hide
