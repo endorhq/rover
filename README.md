@@ -1,15 +1,22 @@
-# Rover
+<div align="center">
+  <a href="https://endor.dev/rover">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://github.com/user-attachments/assets/d53e2e6d-2dac-4999-b1c9-63961035ffd9">
+      <img alt="Endor logo" src="https://github.com/user-attachments/assets/fea0f426-7577-4935-a345-b00ef681b490" height="128">
+    </picture>
+  </a>
+  <h1>Rover</h1>
 
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Version](https://img.shields.io/npm/v/@endorhq/rover.svg)](https://www.npmjs.com/package/@endorhq/rover)
-[![GitHub Actions](https://img.shields.io/github/actions/workflow/status/endorhq/rover/ci.yml?branch=main)](https://github.com/endorhq/rover/actions)
-[![Discord](https://img.shields.io/discord/1404714845995139192?color=7289da&label=Discord&logo=discord&logoColor=white)](https://discord.gg/EndorHQ)
+<a href="https://endor.dev"><img alt="Endor logo" src="https://img.shields.io/badge/Made%20by%20Endor-107e7a.svg?style=for-the-badge&labelColor=000"></a>
+<a href="https://www.npmjs.com/package/@endorhq/rover"><img alt="NPM version" src="https://img.shields.io/npm/v/%40endorhq%2Fcli?style=for-the-badge&color=2172A7&labelColor=000"></a>
+<a href="https://github.com/endorhq/rover/blob/main/license.md"><img alt="License" src="https://img.shields.io/badge/License-Apache%202.0-2172A7.svg?style=for-the-badge&labelColor=000"></a>
+<a href="https://discord.gg/VGzGVWxrXz"><img alt="Join our Discord" src="https://img.shields.io/discord/1404714845995139192?color=7289da&label=Discord&logo=discord&logoColor=white&style=for-the-badge&labelColor=000"></a>
 
-Rover is a **manager for AI coding agents that works with Claude Code, Gemini, Codex, and Qwen**. It helps you get more done, faster, by allowing multiple agents to work on your codebase in the background without interfering with you or each other.
+</div>
+
+Rover is a **manager for AI coding agents that works with Claude Code, Gemini, and Qwen**. It helps you get more done, faster, by allowing multiple agents to work on your codebase in the background without interfering with you or each other.
 
 Everything runs locally, under your control, and using your already installed tools.
-
-![A screencast showing rover task](https://github.com/user-attachments/assets/f8f1f6be-07ae-4cc3-8e20-664c0fff026b)
 
 ## Getting Started
 
@@ -19,43 +26,31 @@ First, install Rover and initialize your project:
 npm install -g @endorhq/rover@latest && rover init .
 ```
 
-Then, create a task describing what you want to accomplish in your existing project and hand it to Rover. It will:
+Then, create a task describing what you want to accomplish in your existing project and hand it to Rover:
 
-- Prepare a local isolated environment (using containers) with a copy of your code
-- Configure the AI Condig Agent and provide a worflow
-- Run everything in the background until the agent finishes
+![A screencast showing rover task](https://github.com/user-attachments/assets/f8f1f6be-07ae-4cc3-8e20-664c0fff026b)
 
-While this happens, you can create new tasks to also run in parallel to the existing one or simply relax, step back and do some other work, either in the computer or real life!
+Rover will:
 
-[PLACEHOLDER FOR A GIF / VIDEO]
+- Prepare a **local isolated environment** (using containers) with a separate copy of your project
+- Install and configure the AI coding agent in that environment
+- Setup a workflow for the agent to complete the task and run it in the background until it finishes
 
-## What is Rover?
+Depending on the task complexity, it might take a few minutes. Meanwhile, you can create new tasks to also run in parallel to the existing one or simply relax, step back and do some other work, either in the computer or real life!
 
-Managing multiple AI Coding Agents at the same time might be overwhelming. You need to run then in isolated environments or different folders so they don't overlap with the changes; and they constantly ask for attention.
+## Why Rover?
 
-The context switch is a nightmare.
+Running and managing multiple AI coding agents at the same time is overwhelming. You need to run them isolated and they constantly ask for attention. **The context switch is a nightmare**. At the same time, **parallelization is best benefit of AI coding agents**. You can focus on a task while agents complete small issues or just write some new documentation.
 
-On the other side, **you don't get all the potential from coding agents until you start running them in parallel**. You can focus on a task while coding agents complete small issues, analyze required changes for another task, or just write some new documentation.
+To simplify this process, **Rover manages AI coding agents for you**. It integrates with both your terminal and VSCode (as an extension). Configure Rover in your repository, setup your preferred AI coding agent and create new tasks with a single command.
 
-**Rover manages AI coding agents for you**. It integrates with both your terminal and VSCode (as an extension). Create a new task with `rover task` and it will copy your repository using git, start a container with the required configuration and services, and provide the AI agent with a workflow to follow.
+Rover will take care of setting up an environment for every task and configure your AI agent to complete it.
 
-[PLACEHOLDER FOR A GIF / VIDEO]
-
-You can now focus on your work or just relax. AI agents will implement the required changes and produce a set of documents you can review later. Then, you can decide the next steps:
-
-- Ask for more changes by adding new instructions (iterate)
-- Take control and continue the implemention on your own
-- Merge the changes in your current branch
-- Push the changes to a new remote branch
-
-Rover uses your local AI agents, like Claude Code and Gemini CLI, so you do not need to pay any extra subscription. It integrates with both your terminal and VSCode (as an extension).
-
-### Why Rover?
+### Main features
 
 - 🚀 **Easy to use**: Manage multiple AI coding agents working on different tasks with a single command
 - 🔒 **Isolated**: Prevent AI Agents from overriding your changes, accessing private information or deleting system files
-- 🤖 **Bring your AI Agents**: Use your existing AI agents like Claude Code, Gemini, and Qwen. No new subscriptions needed
-- ⚙️ **Predefined workflows**: Use different agents and get consistent results
+- 🤖 **Bring your AI Agents**: Use your existing AI agents like Claude Code, Gemini, and Qwen. **No new subscriptions needed**
 - 💻 **Local**: Everything runs on your computer. No new apps and permissions in your repositories
 
 ## Quickstart
@@ -142,7 +137,7 @@ npm install -g @endorhq/rover@latest
 
 Rover relies on the local tools you already have like Git, Docker/Podman and AI Coding Agents. When you initialize it in a project (using `rover init`), it identifies the project and the available tools in your environment. Then, you can start assigning tasks to your agents.
 
-Once you create a task, Rover creates a separate _git worktree_ (`workspace`) and branch for that task, starts a container, mounts the required files, installs tools, configures them, and lets your AI agent complete a workflow.
+Once you create a task, Rover creates a separate _git worktree_ (`workspace`) and branch for that task. Then, it starts a container, mounts the required files, installs tools, configures them, and lets your AI agent complete a workflow.
 
 Rover workflows provide a set of predefined steps to a AI coding agent. Depending on the workflow, you might get a set of changes in the workspace or a document with research. We recommend exploring the different workflows to get the maximum benefit from your AI Agents.
 
