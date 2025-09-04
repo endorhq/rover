@@ -65,7 +65,7 @@ Set FontSize 18
 Set FontFamily "Menlo"
 Set LetterSpacing 0.8
 Set Width 1200
-Set Height 380
+Set Height 420
 Set TypingSpeed 75ms
 
 Hide
@@ -74,7 +74,7 @@ Type "clear" Enter
 Show
 
 Sleep 250ms
-Type "rover task"
+Type "rover task -s main"
 Enter
 Sleep 3s
 
