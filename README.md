@@ -5,9 +5,9 @@
 [![GitHub Actions](https://img.shields.io/github/actions/workflow/status/endorhq/rover/ci.yml?branch=main)](https://github.com/endorhq/rover/actions)
 [![Discord](https://img.shields.io/discord/1404714845995139192?color=7289da&label=Discord&logo=discord&logoColor=white)](https://discord.gg/EndorHQ)
 
-Rover is a **manager for AI coding agents that works with Claude Code, Gemini, and Qwen**. It helps you get more done, faster, by allowing multiple agents to work on your codebase in parallel without interfering with you or each other. 
+Rover is a **manager for AI coding agents that works with Claude Code, Gemini, Codex, and Qwen**. It helps you get more done, faster, by allowing multiple agents to work on your codebase in the background without interfering with you or each other.
 
-Everything runs locally, under your control and using your already installed tools.
+Everything runs locally, under your control, and using your already installed tools.
 
 ## Getting Started
 
@@ -29,7 +29,7 @@ While this happens, you can create new tasks to also run in parallel to the exis
 
 ## What is Rover?
 
-Managing multiple AI Coding Agents at the same time might be overwhelming. You need to run then in isolated environments or different folders so they don't overlap with the changes; and they constantly ask for attention. 
+Managing multiple AI Coding Agents at the same time might be overwhelming. You need to run then in isolated environments or different folders so they don't overlap with the changes; and they constantly ask for attention.
 
 The context switch is a nightmare.
 
@@ -50,25 +50,25 @@ Rover uses your local AI agents, like Claude Code and Gemini CLI, so you do not 
 
 ### Why Rover?
 
-* 🚀 **Easy to use**: Manage multiple AI coding agents working on different tasks with a single command
-* 🔒 **Isolated**: Prevent AI Agents from overriding your changes, accessing private information or deleting system files
-* 🤖 **Bring your AI Agents**: Use your existing AI agents like Claude Code, Gemini, and Qwen. No new subscriptions needed
-* ⚙️ **Predefined workflows**: Use different agents and get consistent results
-* 💻 **Local**: Everything runs on your computer. No new apps and permissions in your repositories
+- 🚀 **Easy to use**: Manage multiple AI coding agents working on different tasks with a single command
+- 🔒 **Isolated**: Prevent AI Agents from overriding your changes, accessing private information or deleting system files
+- 🤖 **Bring your AI Agents**: Use your existing AI agents like Claude Code, Gemini, and Qwen. No new subscriptions needed
+- ⚙️ **Predefined workflows**: Use different agents and get consistent results
+- 💻 **Local**: Everything runs on your computer. No new apps and permissions in your repositories
 
 ## Quickstart
 
 ### Prerequisites
 
-* [Node.js 22+](https://nodejs.org/en/download)
-* [Git](https://git-scm.com/downloads)
-* [Docker](https://docs.docker.com/engine/install/)
+- [Node.js 22+](https://nodejs.org/en/download)
+- [Git](https://git-scm.com/downloads)
+- [Docker](https://docs.docker.com/engine/install/)
 
 You need at least one supported AI Agent in your system:
 
-* [Claude Code](https://docs.anthropic.com/en/docs/claude-code/setup)
-* [Gemini CLI](https://github.com/google-gemini/gemini-cli?tab=readme-ov-file#-installation)
-* [Qwen Code](https://github.com/QwenLM/qwen-code?tab=readme-ov-file#installation)
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code/setup)
+- [Gemini CLI](https://github.com/google-gemini/gemini-cli?tab=readme-ov-file#-installation)
+- [Qwen Code](https://github.com/QwenLM/qwen-code?tab=readme-ov-file#installation)
 
 ### Installation
 
@@ -82,74 +82,73 @@ npm install -g @endorhq/rover@latest
 
 1. Initialize Rover in your project:
 
-    ```sh
-    cd your-project && rover init
-    ```
+   ```sh
+   cd your-project && rover init
+   ```
 
 2. Create your first task with Rover:
 
-    ```sh
-    rover task
-    ```
+   ```sh
+   rover task
+   ```
 
 3. Check the status of your task:
 
-    ```sh
-    rover ls -w
-    ```
+   ```sh
+   rover ls -w
+   ```
 
 4. Keep working on your own tasks 🤓
 
 5. After finishing, check the task result:
 
-    ```sh
-    rover inspect 1
-    rover inspect 1 --file changes.md
-    rover diff 1
-    ```
+   ```sh
+   rover inspect 1
+   rover inspect 1 --file changes.md
+   rover diff 1
+   ```
 
 6. If you want to apply more changes, create a second iteration with new instructions:
 
-    ```sh
-    rover iterate 1
-    ```
+   ```sh
+   rover iterate 1
+   ```
 
 7. If changes are fine, you can:
+   - Merge them:
 
-    - Merge them:
+   ```sh
+   rover merge 1
+   ```
 
-    ```sh
-    rover merge 1
-    ```
+   - Push the branch to the remote using your git configuration:
 
-    - Push the branch to the remote using your git configuration:
+   ```sh
+   rover push 1
+   ```
 
-    ```sh
-    rover push 1
-    ```
+   - Take manual control:
 
-    - Take manual control:
-
-    ```sh
-    rover shell 1
-    git status
-    ```
+   ```sh
+   rover shell 1
+   git status
+   ```
 
 > 💡 TIP: You can run multiple tasks in parallel. Just take into account your AI agents' limits.
 
 ## How it works
 
-Rover relies on the local tools you already have like Git, Docker/Podman and AI Coding Agents. When you initialize it in a project (using `rover init`), it identifies the project and the available tools in your environment. Then, you can start assigning tasks to your agents. 
+Rover relies on the local tools you already have like Git, Docker/Podman and AI Coding Agents. When you initialize it in a project (using `rover init`), it identifies the project and the available tools in your environment. Then, you can start assigning tasks to your agents.
 
 Once you create a task, Rover creates a separate _git worktree_ (`workspace`) and branch for that task, starts a container, mounts the required files, installs tools, configures them, and lets your AI agent complete a workflow.
 
 Rover workflows provide a set of predefined steps to a AI coding agent. Depending on the workflow, you might get a set of changes in the workspace or a document with research. We recommend exploring the different workflows to get the maximum benefit from your AI Agents.
 
-After an AI agent finishes the task, all code changes and output documents are available in the task workspace. You can inspect those documents, check changes, iterate with an AI agent, or even take full control and start applying changes manually. 
+After an AI agent finishes the task, all code changes and output documents are available in the task workspace. You can inspect those documents, check changes, iterate with an AI agent, or even take full control and start applying changes manually.
 
 Every developer has a different workflow, and Rover will not get in between.
 
-Once you are ready, you can merge changes or push the branch. That's it! 🚀 
+Once you are ready, you can merge changes or push the branch. That's it! 🚀
 
 ### Report Issues
 

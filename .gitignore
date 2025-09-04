@@ -144,3 +144,6 @@ vite.config.ts.timestamp-*
 # Extensions
 *.vsix
 
+# Demos
+demos/*
+!demos/*.tape
