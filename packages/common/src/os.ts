@@ -68,16 +68,14 @@ export function launch(
   args?: ReadonlyArray<string>,
   options?: Options
 ): ReturnType<typeof execa> {
-  const now = new Date();
-  console.error(
-    colors.gray(now.toISOString()) +
-      ' ' +
-      colors.cyan('Command') +
-      ' ' +
-      colors.gray(`${command} ${args?.join(' ')}`)
-  );
-
   if (VERBOSE) {
+    const now = new Date();
+    console.error(
+      colors.gray(now.toISOString()) +
+        colors.cyan(' Command ') +
+        colors.gray(`${command} ${args?.join(' ')}`)
+    );
+
     // Check first if we need to add logging
     let newOpts: Options = {
       ...options,
@@ -116,16 +114,14 @@ export function launchSync(
   args?: ReadonlyArray<string>,
   options?: SyncOptions
 ): ReturnType<typeof execaSync> {
-  const now = new Date();
-  console.error(
-    colors.gray(now.toISOString()) +
-      ' ' +
-      colors.cyan('Command') +
-      ' ' +
-      colors.gray(`${command} ${args?.join(' ')}`)
-  );
-
   if (VERBOSE) {
+    const now = new Date();
+    console.error(
+      colors.gray(now.toISOString()) +
+        colors.cyan(' Command ') +
+        colors.gray(`${command} ${args?.join(' ')}`)
+    );
+
     // Check first if we need to add logging
     let newOpts: SyncOptions = {
       ...options,
