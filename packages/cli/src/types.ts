@@ -10,6 +10,11 @@ export interface CLIJsonOutput {
   error?: string;
 }
 
+export interface CLIJsonOutputWithErrors {
+  success: boolean;
+  errors: string[];
+}
+
 export interface Task {
   id: string;
   title: string;

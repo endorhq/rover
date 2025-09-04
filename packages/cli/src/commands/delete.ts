@@ -6,8 +6,12 @@ import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { showRoverChat } from '../utils/display.js';
 import { statusColor } from '../utils/task-status.js';
-import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
-import { CLIJsonOutput } from '../types.js';
+import {
+  exitWithErrors,
+  exitWithSuccess,
+  exitWithWarn,
+} from '../utils/exit.js';
+import { CLIJsonOutputWithErrors } from '../types.js';
 import Git from '../lib/git.js';
 
 const { prompt } = enquirer;
@@ -15,10 +19,10 @@ const { prompt } = enquirer;
 /**
  * Interface for JSON output
  */
-interface TaskDeleteOutput extends CLIJsonOutput {}
+interface TaskDeleteOutput extends CLIJsonOutputWithErrors {}
 
 export const deleteCommand = async (
-  taskId: string,
+  taskIds: string[],
   options: { json?: boolean; yes?: boolean } = {}
 ) => {
   const telemetry = getTelemetry();
@@ -28,93 +32,139 @@ export const deleteCommand = async (
   const skipConfirmation = options.yes === true || json;
   const jsonOutput: TaskDeleteOutput = {
     success: false,
+    errors: [],
   };
 
   // Convert string taskId to number
-  const numericTaskId = parseInt(taskId, 10);
-  if (isNaN(numericTaskId)) {
-    jsonOutput.error = `Invalid task ID '${taskId}' - must be a number`;
-    exitWithError(jsonOutput, json);
-    return; // Add explicit return to prevent further execution
+  const numericTaskIds: number[] = [];
+  for (const taskId of taskIds) {
+    const numericTaskId = parseInt(taskId, 10);
+    if (isNaN(numericTaskId)) {
+      jsonOutput.errors?.push(`Invalid task ID '${taskId}' - must be a number`);
+      exitWithErrors(jsonOutput, json);
+      return; // Add explicit return to prevent further execution
+    }
+    numericTaskIds.push(numericTaskId);
   }
 
+  let allSucceeded = true;
+  let someSucceeded = false;
+  let someConfirmed = false;
   try {
-    // Load task using TaskDescription
-    const task = TaskDescription.load(numericTaskId);
-    const taskPath = join(
-      process.cwd(),
-      '.rover',
-      'tasks',
-      numericTaskId.toString()
-    );
-
-    if (!json) {
-      showRoverChat(["It's time to cleanup some tasks!"]);
-
-      const colorFunc = statusColor(task.status);
-
-      console.log(colors.white.bold('Task to delete'));
-      console.log(colors.gray('├── ID: ') + colors.cyan(task.id.toString()));
-      console.log(colors.gray('├── Title: ') + colors.white(task.title));
-      console.log(colors.gray('└── Status: ') + colorFunc(task.status) + '\n');
-
-      console.log(
-        colors.white(
-          'This action will delete the task metadata and workspace (git worktree)'
-        )
-      );
-    }
-
-    // Confirm deletion
-    let confirmDeletion = true;
-
-    if (!skipConfirmation) {
+    for (const numericTaskId of numericTaskIds) {
       try {
-        const { confirm } = await prompt<{ confirm: boolean }>({
-          type: 'confirm',
-          name: 'confirm',
-          message: 'Are you sure you want to delete this task?',
-          initial: false,
-        });
-        confirmDeletion = confirm;
-      } catch (_err) {
-        jsonOutput.error = 'Task deletion cancelled';
-        exitWithWarn('Task deletion cancelled', jsonOutput, json);
-      }
-    }
+        // Load task using TaskDescription
+        const task = TaskDescription.load(numericTaskId);
+        const taskPath = join(
+          process.cwd(),
+          '.rover',
+          'tasks',
+          numericTaskId.toString()
+        );
 
-    if (confirmDeletion) {
-      // Create backup before deletion
-      telemetry?.eventDeleteTask();
-      task.delete();
-      rmSync(taskPath, { recursive: true, force: true });
-
-      // Prune the git workspace
-      const prune = git.pruneWorktree();
-
-      if (!prune) {
         if (!json) {
+          showRoverChat(["It's time to cleanup some tasks!"]);
+
+          const colorFunc = statusColor(task.status);
+
+          console.log(colors.white.bold('Task to delete'));
           console.log(
-            colors.yellow('⚠ There was an error pruning the git worktrees.')
+            colors.gray('├── ID: ') + colors.cyan(task.id.toString())
+          );
+          console.log(colors.gray('├── Title: ') + colors.white(task.title));
+          console.log(
+            colors.gray('└── Status: ') + colorFunc(task.status) + '\n'
+          );
+
+          console.log(
+            colors.white(
+              'This action will delete the task metadata and workspace (git worktree)'
+            )
+          );
+        }
+
+        // Confirm deletion
+        let confirmDeletion = true;
+
+        if (!skipConfirmation) {
+          try {
+            const { confirm } = await prompt<{ confirm: boolean }>({
+              type: 'confirm',
+              name: 'confirm',
+              message: 'Are you sure you want to delete this task?',
+              initial: false,
+            });
+            confirmDeletion = confirm;
+            if (confirm) {
+              someConfirmed = true;
+            }
+          } catch (_err) {
+            jsonOutput.errors?.push(
+              `Task ${task.id.toString()} deletion cancelled`
+            );
+          }
+        } else {
+          someConfirmed = true;
+        }
+
+        if (confirmDeletion) {
+          // Create backup before deletion
+          telemetry?.eventDeleteTask();
+          task.delete();
+          rmSync(taskPath, { recursive: true, force: true });
+
+          // Prune the git workspace
+          const prune = git.pruneWorktree();
+
+          if (prune) {
+            someSucceeded = true;
+          } else {
+            allSucceeded = false;
+            if (!json) {
+              console.log(
+                colors.yellow(
+                  '⚠ There was an error pruning the git worktrees.'
+                )
+              );
+            }
+            jsonOutput.errors?.push(
+              `There was an error pruning task ${task.id.toString()} worktree`
+            );
+          }
+        } else {
+          jsonOutput.errors?.push(
+            `Task ${task.id.toString()} deletion cancelled`
+          );
+        }
+      } catch (error) {
+        allSucceeded = false;
+        if (error instanceof TaskNotFoundError) {
+          jsonOutput.errors?.push(
+            `The task with ID ${numericTaskId} was not found`
+          );
+        } else {
+          jsonOutput.errors?.push(
+            `There was an error deleting the task: ${error}`
           );
         }
       }
-
-      jsonOutput.success = true;
-      exitWithSuccess('Task deleted successfully!', jsonOutput, json);
-    } else {
-      jsonOutput.error = 'Task deletion cancelled';
-      exitWithWarn('Task deletion cancelled', jsonOutput, json);
-    }
-  } catch (error) {
-    if (error instanceof TaskNotFoundError) {
-      jsonOutput.error = `The task with ID ${numericTaskId} was not found`;
-      exitWithError(jsonOutput, json);
-    } else {
-      jsonOutput.error = `There was an error deleting the task: ${error}`;
-      exitWithError(jsonOutput, json);
     }
   } finally {
+    jsonOutput.success = allSucceeded;
+    if (allSucceeded && someConfirmed) {
+      exitWithSuccess('Task(s) deleted successfully', jsonOutput, json);
+    } else if (someSucceeded && !someConfirmed) {
+      exitWithSuccess(
+        'No task was deleted as none was confirmed',
+        jsonOutput,
+        json
+      );
+    } else if (someSucceeded) {
+      exitWithWarn('Some task(s) deleted successfully', jsonOutput, json);
+    } else {
+      exitWithErrors(jsonOutput, json);
+    }
+
     await telemetry?.shutdown();
   }
 };

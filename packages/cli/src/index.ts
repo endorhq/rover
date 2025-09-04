@@ -207,7 +207,7 @@ program
   .command('delete')
   .alias('del')
   .description('Delete a task')
-  .argument('<taskId>', 'Task ID to delete')
+  .argument('<taskId...>', 'Task IDs to delete')
   .option('-y, --yes', 'Skip all confirmations and run non-interactively')
   .option('--json', 'Output in JSON format')
   .action(deleteCommand);

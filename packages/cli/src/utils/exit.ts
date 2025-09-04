@@ -1,6 +1,6 @@
 import colors from 'ansi-colors';
 import { showTips, TipsConfig } from './display.js';
-import { CLIJsonOutput } from '../types.js';
+import { CLIJsonOutput, CLIJsonOutputWithErrors } from '../types.js';
 
 type ExitWithErrorOpts = {
   exitCode?: number;
@@ -28,13 +28,37 @@ export const exitWithError = (
   json: boolean | undefined,
   options: ExitWithErrorOpts = {}
 ) => {
+  exitWithErrors(
+    {
+      success: jsonOutput.success,
+      errors: jsonOutput.error ? [jsonOutput.error] : [],
+    },
+    json,
+    options
+  );
+};
+
+/**
+ * Exit the current process and print a list of error messages or the
+ * full JSON object. This method expects the JSON output to include a
+ * .error property with the error message.
+ *
+ * It can also show a set of tips to show after the error messages.
+ * It will show only on non-json outputs.
+ */
+export const exitWithErrors = (
+  jsonOutput: CLIJsonOutputWithErrors,
+  json: boolean | undefined,
+  options: ExitWithErrorOpts = {}
+) => {
   const { tips, tipsConfig, exitCode } = options;
 
   if (json === true) {
     console.log(JSON.stringify(jsonOutput, null, 2));
   } else {
-    console.log(colors.red(`\n✗ ${jsonOutput.error}`));
-
+    for (const error of jsonOutput.errors) {
+      console.log(colors.red(`\n✗ ${error}`));
+    }
     if (tips != null) showTips(tips, tipsConfig);
   }
 
