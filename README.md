@@ -9,6 +9,8 @@ Rover is a **manager for AI coding agents that works with Claude Code, Gemini, C
 
 Everything runs locally, under your control, and using your already installed tools.
 
+![A screencast showing rover task](https://github.com/user-attachments/assets/f8f1f6be-07ae-4cc3-8e20-664c0fff026b)
+
 ## Getting Started
 
 First, install Rover and initialize your project:
