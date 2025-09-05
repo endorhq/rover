@@ -46,8 +46,8 @@ program
       showTips(
         [
           'Run ' +
-            colors.cyan('rover init') +
-            ' in this directory to initialize project config and user settings',
+          colors.cyan('rover init') +
+          ' in this directory to initialize project config and user settings',
         ],
         {
           title: TIP_TITLES.NEXT_STEPS,
@@ -77,8 +77,8 @@ program
       showTips(
         [
           'Run ' +
-            colors.cyan('rover init') +
-            ' in this directory to initialize user settings',
+          colors.cyan('rover init') +
+          ' in this directory to initialize user settings',
         ],
         {
           title: TIP_TITLES.NEXT_STEPS,
@@ -123,6 +123,7 @@ program
     'Base branch for git worktree creation'
   )
   .option('-t, --target-branch <branch>', 'Custom name for the worktree branch')
+  .option('-a, --agent <agent>', 'AI agent to use (claude, gemini, qwen)')
   .option('--json', 'Output the result in JSON format')
   .option('--debug', 'Show debug information like running commands')
   .argument(

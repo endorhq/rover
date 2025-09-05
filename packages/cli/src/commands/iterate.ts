@@ -5,10 +5,10 @@ import { join } from 'node:path';
 import { launchSync } from 'rover-common';
 import yoctoSpinner from 'yocto-spinner';
 import { startDockerExecution } from './task.js';
-import { getAIAgentTool, type AIAgentTool } from '../lib/agents/index.js';
+import { getAIAgentTool, getUserAIAgent, type AIAgentTool } from '../lib/agents/index.js';
 import type { IPromptTask } from '../lib/prompts/index.js';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
-import { UserSettings, AI_AGENT } from '../lib/config.js';
+import { AI_AGENT } from '../lib/config.js';
 import { IterationConfig } from '../lib/iteration.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { showRoverChat } from '../utils/display.js';
@@ -215,38 +215,34 @@ export const iterateCommand = async (
     );
   }
 
-  // Load AI agent selection from user settings
-  let selectedAiAgent = 'claude'; // default
-
   try {
-    if (UserSettings.exists()) {
-      const userSettings = UserSettings.load();
-      selectedAiAgent = userSettings.defaultAiAgent || AI_AGENT.Claude;
+    // Load task using TaskDescription first to get agent preference
+    const task = TaskDescription.load(numericTaskId);
+
+    // Load AI agent selection - prefer task's agent, fall back to user settings
+    let selectedAiAgent = task.agent || AI_AGENT.Claude; // Use task agent if available
+
+    if (!task.agent) {
+      // No agent stored in task, try user settings
+      try {
+        selectedAiAgent = getUserAIAgent();
+      } catch (_err) {
+        if (!json) {
+          console.log(
+            colors.yellow('⚠ Could not load user settings, defaulting to Claude')
+          );
+        }
+      }
     } else {
       if (!options.json) {
         console.log(
-          colors.yellow('⚠ User settings not found, defaulting to Claude')
-        );
-        console.log(
-          colors.gray('  Run `rover init` to configure AI agent preferences')
+          colors.gray(`Using agent from task: ${selectedAiAgent}`)
         );
       }
     }
-  } catch (error) {
-    if (!options.json) {
-      console.log(
-        colors.yellow('⚠ Could not load user settings, defaulting to Claude')
-      );
-    }
-    selectedAiAgent = AI_AGENT.Claude;
-  }
 
-  // Create AI agent instance
-  const aiAgent = getAIAgentTool(selectedAiAgent);
-
-  try {
-    // Load task using TaskDescription
-    const task = TaskDescription.load(numericTaskId);
+    // Create AI agent instance
+    const aiAgent = getAIAgentTool(selectedAiAgent);
     const taskPath = join(
       process.cwd(),
       '.rover',
@@ -280,8 +276,8 @@ export const iterateCommand = async (
 
     const spinner = !options.json
       ? yoctoSpinner({
-          text: `Expanding task instructions with ${selectedAiAgent.charAt(0).toUpperCase() + selectedAiAgent.slice(1)}...`,
-        }).start()
+        text: `Expanding task instructions with ${selectedAiAgent.charAt(0).toUpperCase() + selectedAiAgent.slice(1)}...`,
+      }).start()
       : null;
 
     let expandedTask: IPromptTask | null = null;
@@ -377,8 +373,8 @@ export const iterateCommand = async (
         console.log(colors.red('✗ No workspace found for this task'));
         console.log(
           colors.gray('  Run ') +
-            colors.cyan(`rover task ${taskId}`) +
-            colors.gray(' first')
+          colors.cyan(`rover task ${taskId}`) +
+          colors.gray(' first')
         );
       }
       return;

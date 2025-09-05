@@ -401,13 +401,15 @@ export const taskCommand = async (
     yes?: boolean;
     sourceBranch?: string;
     targetBranch?: string;
+    agent?: string;
     json?: boolean;
     debug?: boolean;
   } = {}
 ) => {
   const telemetry = getTelemetry();
   // Extract options
-  const { yes, json, fromGithub, debug, sourceBranch, targetBranch } = options;
+  const { yes, json, fromGithub, debug, sourceBranch, targetBranch, agent } =
+    options;
 
   const jsonOutput: TaskTaskOutput = {
     success: false,
@@ -425,13 +427,30 @@ export const taskCommand = async (
 
   let selectedAiAgent = AI_AGENT.Claude;
 
-  try {
-    selectedAiAgent = getUserAIAgent();
-  } catch (_err) {
-    if (!json) {
-      console.log(
-        colors.yellow('⚠ Could not load user settings, defaulting to Claude')
-      );
+  // Check if --agent option is provided and validate it
+  if (agent) {
+    const agentLower = agent.toLowerCase();
+    if (agentLower === 'claude') {
+      selectedAiAgent = AI_AGENT.Claude;
+    } else if (agentLower === 'gemini') {
+      selectedAiAgent = AI_AGENT.Gemini;
+    } else if (agentLower === 'qwen') {
+      selectedAiAgent = AI_AGENT.Qwen;
+    } else {
+      jsonOutput.error = `Invalid agent: ${agent}. Valid options are: claude, gemini, qwen`;
+      exitWithError(jsonOutput, json);
+      return;
+    }
+  } else {
+    // Fall back to user settings if no agent specified
+    try {
+      selectedAiAgent = getUserAIAgent();
+    } catch (_err) {
+      if (!json) {
+        console.log(
+          colors.yellow('⚠ Could not load user settings, defaulting to Claude')
+        );
+      }
     }
   }
 
@@ -753,6 +772,8 @@ export const taskCommand = async (
       id: taskId,
       title: taskData.title,
       description: taskData.description,
+      agent: selectedAiAgent,
+      sourceBranch: sourceBranch,
     });
 
     // Setup git worktree and branch
