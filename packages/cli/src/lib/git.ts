@@ -61,6 +61,21 @@ export class Git {
     return result.exitCode === 0;
   }
 
+  /**
+   * Get the root directory of the Git repository
+   */
+  getRepositoryRoot(): string | null {
+    try {
+      const result = launchSync('git', ['rev-parse', '--show-toplevel']);
+      if (result.exitCode === 0) {
+        return result.stdout?.toString().trim() || null;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
   hasCommits(): boolean {
     const result = launchSync('git', ['rev-list', '--count', 'HEAD']);
     return result.exitCode === 0;

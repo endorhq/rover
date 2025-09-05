@@ -1,7 +1,6 @@
 #!/usr/bin/env node
-import { existsSync } from 'fs';
-import { join } from 'node:path';
 import { Command } from 'commander';
+import { ProjectConfig, UserSettings } from './lib/config.js';
 import { initCommand } from './commands/init.js';
 import { listCommand } from './commands/list.js';
 import { getVersion } from './utils/version.js';
@@ -30,10 +29,7 @@ program
   })
   .hook('preAction', (thisCommand, actionCommand) => {
     const commandName = actionCommand.name();
-    if (
-      commandName !== 'init' &&
-      !existsSync(join(process.cwd(), 'rover.json'))
-    ) {
+    if (commandName !== 'init' && !ProjectConfig.exists()) {
       console.log(
         colors.white(
           `Rover is not initialized in this directory. The command you requested (\`${commandName}\`) was not executed.`
@@ -61,8 +57,8 @@ program
     const commandName = actionCommand.name();
     if (
       commandName !== 'init' &&
-      existsSync(join(process.cwd(), 'rover.json')) &&
-      !existsSync(join(process.cwd(), '.rover', 'settings.json'))
+      ProjectConfig.exists() &&
+      !UserSettings.exists()
     ) {
       console.log(
         colors.white(
