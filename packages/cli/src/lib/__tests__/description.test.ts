@@ -34,7 +34,7 @@ describe('TaskDescription', () => {
 
       expect(task.agent).toBe('claude');
       expect(task.sourceBranch).toBe('main');
-      
+
       // Verify persistence
       const reloaded = TaskDescription.load(1);
       expect(reloaded.agent).toBe('claude');

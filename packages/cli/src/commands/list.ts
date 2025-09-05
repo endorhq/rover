@@ -80,8 +80,8 @@ export const listCommand = async (
 
         showTips([
           'Use ' +
-          colors.cyan('rover task') +
-          ' to assign a new task to an agent',
+            colors.cyan('rover task') +
+            ' to assign a new task to an agent',
         ]);
       }
       return;
@@ -242,15 +242,15 @@ export const listCommand = async (
     if (!options.watch && !options.watching) {
       showTips([
         'Use ' +
-        colors.cyan('rover list --watch') +
-        ' to monitor the task status',
+          colors.cyan('rover list --watch') +
+          ' to monitor the task status',
         'Use ' +
-        colors.cyan('rover task') +
-        ' to assign a new task to an agent',
+          colors.cyan('rover task') +
+          ' to assign a new task to an agent',
         'Use ' + colors.cyan('rover inspect <id>') + ' to see the task details',
         'Use ' +
-        colors.cyan('rover logs <id> --follow') +
-        ' to read the task logs',
+          colors.cyan('rover logs <id> --follow') +
+          ' to read the task logs',
       ]);
     }
   } catch (error) {

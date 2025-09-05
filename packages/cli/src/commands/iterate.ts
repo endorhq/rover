@@ -5,7 +5,11 @@ import { join } from 'node:path';
 import { launchSync } from 'rover-common';
 import yoctoSpinner from 'yocto-spinner';
 import { startDockerExecution } from './task.js';
-import { getAIAgentTool, getUserAIAgent, type AIAgentTool } from '../lib/agents/index.js';
+import {
+  getAIAgentTool,
+  getUserAIAgent,
+  type AIAgentTool,
+} from '../lib/agents/index.js';
 import type { IPromptTask } from '../lib/prompts/index.js';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
 import { AI_AGENT } from '../lib/config.js';
@@ -229,15 +233,15 @@ export const iterateCommand = async (
       } catch (_err) {
         if (!json) {
           console.log(
-            colors.yellow('⚠ Could not load user settings, defaulting to Claude')
+            colors.yellow(
+              '⚠ Could not load user settings, defaulting to Claude'
+            )
           );
         }
       }
     } else {
       if (!options.json) {
-        console.log(
-          colors.gray(`Using agent from task: ${selectedAiAgent}`)
-        );
+        console.log(colors.gray(`Using agent from task: ${selectedAiAgent}`));
       }
     }
 
@@ -276,8 +280,8 @@ export const iterateCommand = async (
 
     const spinner = !options.json
       ? yoctoSpinner({
-        text: `Expanding task instructions with ${selectedAiAgent.charAt(0).toUpperCase() + selectedAiAgent.slice(1)}...`,
-      }).start()
+          text: `Expanding task instructions with ${selectedAiAgent.charAt(0).toUpperCase() + selectedAiAgent.slice(1)}...`,
+        }).start()
       : null;
 
     let expandedTask: IPromptTask | null = null;
@@ -373,8 +377,8 @@ export const iterateCommand = async (
         console.log(colors.red('✗ No workspace found for this task'));
         console.log(
           colors.gray('  Run ') +
-          colors.cyan(`rover task ${taskId}`) +
-          colors.gray(' first')
+            colors.cyan(`rover task ${taskId}`) +
+            colors.gray(' first')
         );
       }
       return;
