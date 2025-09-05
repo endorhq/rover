@@ -68,8 +68,8 @@ export const shellCommand = async (
     );
     console.log(
       colors.gray('Type') +
-      colors.cyan(' "exit" ') +
-      colors.gray('to leave the shell')
+        colors.cyan(' "exit" ') +
+        colors.gray('to leave the shell')
     );
     console.log('');
 
@@ -116,7 +116,7 @@ export const shellCommand = async (
       try {
         const shellInit = launch(shell, [], {
           stdio: 'inherit',
-          cwd: task.worktreePath
+          cwd: task.worktreePath,
         });
 
         spinner.success(`Shell started using ${shell}`);
