@@ -198,8 +198,8 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
 
     const pushSpinner = !options.json
       ? yoctoSpinner({
-        text: `Pushing branch ${task.branchName} to remote...`,
-      }).start()
+          text: `Pushing branch ${task.branchName} to remote...`,
+        }).start()
       : null;
     try {
       git.push(task.branchName, {
@@ -339,9 +339,9 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
     if (repoInfo != null) {
       tips.push(
         'You can open a new PR on ' +
-        colors.cyan(
-          `https://github.com/${repoInfo.owner}/${repoInfo.repo}/pull/new/${task.branchName}`
-        )
+          colors.cyan(
+            `https://github.com/${repoInfo.owner}/${repoInfo.repo}/pull/new/${task.branchName}`
+          )
       );
     }
 
