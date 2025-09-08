@@ -44,6 +44,8 @@ export interface TaskDescriptionSchema {
   iterations: number; // Default: 1
   worktreePath: string; // Path to git worktree
   branchName: string; // Git branch name
+  agent?: string; // AI agent used for execution (claude, gemini, qwen)
+  sourceBranch?: string; // Source branch task was created from
 
   // Docker Execution
   containerId?: string; // Docker container ID
@@ -65,6 +67,8 @@ export interface CreateTaskData {
   title: string;
   description: string;
   uuid?: string; // Optional, will be generated if not provided
+  agent?: string; // AI agent to use for execution
+  sourceBranch?: string; // Source branch task was created from
 }
 
 // Metadata for status updates
@@ -145,6 +149,8 @@ export class TaskDescription {
       iterations: 1,
       worktreePath: '',
       branchName: '',
+      agent: taskData.agent,
+      sourceBranch: taskData.sourceBranch,
       version: CURRENT_SCHEMA_VERSION,
     };
 
@@ -267,6 +273,10 @@ export class TaskDescription {
 
     // Preserve error information
     migrated.error = data.error;
+
+    // Preserve agent and sourceBranch fields
+    migrated.agent = data.agent;
+    migrated.sourceBranch = data.sourceBranch;
 
     return migrated as TaskDescriptionSchema;
   }
@@ -501,6 +511,12 @@ export class TaskDescription {
   }
   get branchName(): string {
     return this.data.branchName;
+  }
+  get agent(): string | undefined {
+    return this.data.agent;
+  }
+  get sourceBranch(): string | undefined {
+    return this.data.sourceBranch;
   }
   get containerId(): string | undefined {
     return this.data.containerId;

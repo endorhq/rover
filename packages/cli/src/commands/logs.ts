@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { findProjectRoot, launch, launchSync } from 'rover-common';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
 import { getTelemetry } from '../lib/telemetry.js';
-import { showTips, TIP_TITLES } from '../utils/display.js';
+import { showTips } from '../utils/display.js';
 import { CLIJsonOutput } from '../types.js';
 import { exitWithError, exitWithWarn } from '../utils/exit.js';
 
@@ -136,45 +136,36 @@ export const logsCommand = async (
       console.log('');
 
       try {
-        const logsProcess = launch('docker', ['logs', '-f', containerId]);
+        const controller = new AbortController();
+        const cancelSignal = controller.signal;
 
-        // Handle stdout
-        if (logsProcess.stdout) {
-          logsProcess.stdout?.on('data', data => {
-            process.stdout.write(data);
-          });
-        }
-
-        // Handle stderr
-        if (logsProcess.stderr) {
-          logsProcess.stderr.on('data', data => {
-            process.stderr.write(data);
-          });
-        }
-
-        // Handle process completion
-        logsProcess.on('close', code => {
-          if (code === 0) {
-            console.log(colors.green('\n✓ Log following completed'));
-          } else {
-            console.log(
-              colors.yellow(`\n⚠ Log following ended with code ${code}`)
-            );
+        const logsProcess = await launch(
+          'docker',
+          ['logs', '-f', containerId],
+          {
+            stdout: ['inherit'],
+            stderr: ['inherit'],
+            cancelSignal,
           }
-        });
+        );
 
-        logsProcess.on('error', error => {
-          console.error(colors.red('\nError following logs:'), error.message);
-        });
+        // Done
+        if (logsProcess.exitCode === 0) {
+          console.log(colors.green('\n✓ Log following completed'));
+        } else {
+          console.log(
+            colors.yellow(
+              `\n⚠ Log following ended with code ${logsProcess.exitCode}`
+            )
+          );
+        }
 
         // Handle process interruption (Ctrl+C)
         process.on('SIGINT', () => {
           console.log(colors.yellow('\n\n⚠ Stopping log following...'));
-          logsProcess.kill('SIGTERM');
+          controller.abort();
           process.exit(0);
         });
-
-        await logsProcess;
       } catch (error: any) {
         if (error.message.includes('No such container')) {
           console.log(colors.yellow('⚠ Container no longer exists'));

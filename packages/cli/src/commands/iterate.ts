@@ -5,10 +5,14 @@ import { join } from 'node:path';
 import { findProjectRoot, launchSync } from 'rover-common';
 import yoctoSpinner from 'yocto-spinner';
 import { startDockerExecution } from './task.js';
-import { getAIAgentTool, type AIAgentTool } from '../lib/agents/index.js';
+import {
+  getAIAgentTool,
+  getUserAIAgent,
+  type AIAgentTool,
+} from '../lib/agents/index.js';
 import type { IPromptTask } from '../lib/prompts/index.js';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
-import { UserSettings, AI_AGENT } from '../lib/config.js';
+import { AI_AGENT } from '../lib/config.js';
 import { IterationConfig } from '../lib/iteration.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { showRoverChat } from '../utils/display.js';
@@ -215,38 +219,34 @@ export const iterateCommand = async (
     );
   }
 
-  // Load AI agent selection from user settings
-  let selectedAiAgent = 'claude'; // default
-
   try {
-    if (UserSettings.exists()) {
-      const userSettings = UserSettings.load();
-      selectedAiAgent = userSettings.defaultAiAgent || AI_AGENT.Claude;
+    // Load task using TaskDescription first to get agent preference
+    const task = TaskDescription.load(numericTaskId);
+
+    // Load AI agent selection - prefer task's agent, fall back to user settings
+    let selectedAiAgent = task.agent || AI_AGENT.Claude; // Use task agent if available
+
+    if (!task.agent) {
+      // No agent stored in task, try user settings
+      try {
+        selectedAiAgent = getUserAIAgent();
+      } catch (_err) {
+        if (!json) {
+          console.log(
+            colors.yellow(
+              '⚠ Could not load user settings, defaulting to Claude'
+            )
+          );
+        }
+      }
     } else {
       if (!options.json) {
-        console.log(
-          colors.yellow('⚠ User settings not found, defaulting to Claude')
-        );
-        console.log(
-          colors.gray('  Run `rover init` to configure AI agent preferences')
-        );
+        console.log(colors.gray(`Using agent from task: ${selectedAiAgent}`));
       }
     }
-  } catch (error) {
-    if (!options.json) {
-      console.log(
-        colors.yellow('⚠ Could not load user settings, defaulting to Claude')
-      );
-    }
-    selectedAiAgent = AI_AGENT.Claude;
-  }
 
-  // Create AI agent instance
-  const aiAgent = getAIAgentTool(selectedAiAgent);
-
-  try {
-    // Load task using TaskDescription
-    const task = TaskDescription.load(numericTaskId);
+    // Create AI agent instance
+    const aiAgent = getAIAgentTool(selectedAiAgent);
     const taskPath = join(
       findProjectRoot(),
       '.rover',

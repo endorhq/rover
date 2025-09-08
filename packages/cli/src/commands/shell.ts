@@ -2,7 +2,7 @@ import colors from 'ansi-colors';
 import { existsSync } from 'node:fs';
 import { launch, launchSync } from 'rover-common';
 import yoctoSpinner from 'yocto-spinner';
-import { formatTaskStatus, statusColor } from '../utils/task-status.js';
+import { statusColor } from '../utils/task-status.js';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { CLIJsonOutput } from '../types.js';
@@ -75,7 +75,8 @@ export const shellCommand = async (
 
     const spinner = yoctoSpinner({ text: 'Starting shell...' }).start();
 
-    let shellProcess = undefined;
+    let shellProcess;
+
     if (options.container) {
       try {
         const containerName = `rover-shell-${numericTaskId}-${generateRandomId()}`;
@@ -96,25 +97,14 @@ export const shellCommand = async (
         ];
 
         // Start Docker container with direct stdio inheritance for true interactivity
-        shellProcess = launch('docker', dockerArgs, {
+        const containerProcess = launch('docker', dockerArgs, {
           stdio: 'inherit', // This gives full control to the user
         });
 
         spinner.success(`Shell started. Container name: ${containerName}`);
 
-        // Handle process interruption (Ctrl+C)
-        process.on('SIGINT', () => {
-          console.log(colors.yellow('\n\n⚠ Stopping shell session...'));
-          try {
-            launchSync('docker', ['stop', containerName]);
-            console.log(colors.green('✓ Container stopped'));
-          } catch (error) {
-            jsonOutput.error = 'Failed to stop container';
-            exitWithError(jsonOutput, json);
-            return;
-          }
-          process.exit(0);
-        });
+        // Wait for the user to exit the container
+        shellProcess = await containerProcess;
       } catch (error) {
         jsonOutput.error = 'Failed to start container: ' + error;
         exitWithError(jsonOutput, json);
@@ -124,12 +114,15 @@ export const shellCommand = async (
       const shell = process.env.SHELL || '/bin/sh';
 
       try {
-        shellProcess = launch(shell, [], {
+        const shellInit = launch(shell, [], {
+          stdio: 'inherit',
           cwd: task.worktreePath,
-          stdio: 'inherit', // This gives full control to the user
         });
 
         spinner.success(`Shell started using ${shell}`);
+
+        // Await for the process to complete
+        shellProcess = await shellInit;
       } catch (error) {
         spinner.error(`Failed to start shell ${shell}`);
         jsonOutput.error = 'Failed to start shell: ' + error;
@@ -140,22 +133,15 @@ export const shellCommand = async (
 
     if (shellProcess) {
       // Handle process completion
-      shellProcess.on('close', code => {
-        if (code === 0) {
-          exitWithSuccess('Shell session ended', jsonOutput, json);
-        } else {
-          exitWithWarn(
-            `Shell session ended with code ${code}`,
-            jsonOutput,
-            json
-          );
-        }
-      });
-
-      shellProcess.on('error', error => {
-        jsonOutput.error = 'Error running shell: ' + error;
-        exitWithError(jsonOutput, json);
-      });
+      if (shellProcess.exitCode === 0) {
+        exitWithSuccess('Shell session ended', jsonOutput, json);
+      } else {
+        exitWithWarn(
+          `Shell session ended with code ${shellProcess.exitCode}`,
+          jsonOutput,
+          json
+        );
+      }
     }
   } catch (error) {
     if (error instanceof TaskNotFoundError) {

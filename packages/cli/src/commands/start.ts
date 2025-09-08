@@ -32,7 +32,7 @@ interface TaskStartOutput extends CLIJsonOutput {
  */
 export const startCommand = async (
   taskId: string,
-  options: { follow?: boolean; json?: boolean; debug?: boolean } = {}
+  options: { json?: boolean; debug?: boolean } = {}
 ) => {
   const telemetry = getTelemetry();
 
@@ -166,7 +166,6 @@ export const startCommand = async (
         worktreePath,
         iterationPath,
         selectedAiAgent,
-        options.follow,
         json,
         options.debug
       );

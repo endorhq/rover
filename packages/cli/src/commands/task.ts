@@ -38,8 +38,7 @@ type validationResult = {
  */
 const validations = (
   selectedAiAgent?: string,
-  isJsonMode?: boolean,
-  followMode?: boolean
+  isJsonMode?: boolean
 ): validationResult => {
   // Check if we're in a git repository
   try {
@@ -124,12 +123,6 @@ const validations = (
     }
   }
 
-  if (isJsonMode && followMode) {
-    return {
-      error: 'You cannot use --json and --follow at the same time',
-    };
-  }
-
   return null;
 };
 
@@ -186,7 +179,6 @@ export const startDockerExecution = async (
   worktreePath: string,
   iterationPath: string,
   selectedAiAgent: string,
-  followMode?: boolean,
   jsonMode?: boolean,
   debug?: boolean
 ) => {
@@ -261,14 +253,8 @@ export const startDockerExecution = async (
       containerName,
       // For now, do not remove for logs
       // '--rm'
+      '-d',
     ];
-
-    // Add interactive flag only in follow mode
-    if (followMode) {
-      dockerArgs.push('-it');
-    } else {
-      dockerArgs.push('-d'); // Detached mode for background execution
-    }
 
     const currentUser = userInfo();
 
@@ -295,233 +281,70 @@ export const startDockerExecution = async (
       currentUser.gid.toString()
     );
 
-    if (followMode) {
-      if (spinner) spinner.success('Container started');
+    // Background mode execution
+    try {
+      const containerId = launchSync('docker', dockerArgs)
+        .stdout?.toString()
+        .trim();
+
+      if (spinner) spinner.success('Container started in background');
       if (!jsonMode) {
-        console.log(colors.bold.white(`Container logs (--follow)\n`));
+        showTips([
+          'Use ' + colors.cyan(`rover logs -f ${task.id}`) + ` to monitor logs`,
+          'Use ' +
+            colors.cyan(`rover inspect ${task.id}`) +
+            ` to get task details`,
+          'Use ' +
+            colors.cyan(`rover list`) +
+            ` to check the status of all tasks`,
+        ]);
       }
 
-      // Start Docker container with streaming output
-      if (debug && !jsonMode) {
-        console.log(`[DEBUG] docker ${dockerArgs.join(' ')}`);
-      }
-
-      const dockerProcess = launch('docker', dockerArgs);
-
-      let currentStep = 'Initializing';
+      // Update task metadata with container ID
+      updateTaskMetadata(
+        taskId,
+        {
+          containerId: containerId,
+          executionStatus: 'running',
+          runningAt: new Date().toISOString(),
+        },
+        jsonMode
+      );
+    } catch (error: any) {
+      if (spinner) spinner.error('Failed to start container in background');
       if (!jsonMode) {
-        console.log(colors.yellow(`📋 Current step: ${currentStep}`));
+        console.error(
+          colors.red('Error starting Docker container:'),
+          error.message
+        );
       }
 
-      // Handle stdout
-      dockerProcess.stdout?.on('data', data => {
-        const output = data.toString();
+      // Reset task to NEW status when container fails to start
+      updateTaskMetadata(
+        taskId,
+        {
+          status: 'NEW',
+          executionStatus: 'error',
+          error: error.message,
+          errorAt: new Date().toISOString(),
+        },
+        jsonMode
+      );
 
-        // Update current step based on output
-        if (output.includes(`Installing ${selectedAiAgent} CLI`)) {
-          if (currentStep !== `Installing ${selectedAiAgent} CLI`) {
-            currentStep = `Installing ${selectedAiAgent} CLI`;
-            if (!jsonMode) {
-              console.log(colors.yellow(`📋 Current step: ${currentStep}`));
-            }
-          }
-        } else if (output.includes('Creating agent user')) {
-          if (currentStep !== 'Setting up agent user') {
-            currentStep = 'Setting up agent user';
-            if (!jsonMode) {
-              console.log(colors.yellow(`📋 Current step: ${currentStep}`));
-            }
-          }
-        } else if (output.includes('Starting context phase')) {
-          if (currentStep !== 'Context Analysis') {
-            currentStep = 'Context Analysis';
-            if (!jsonMode) {
-              console.log(colors.yellow(`📋 Current step: ${currentStep}`));
-            }
-          }
-        } else if (output.includes('Starting plan phase')) {
-          if (currentStep !== 'Planning') {
-            currentStep = 'Planning';
-            if (!jsonMode) {
-              console.log(colors.yellow(`📋 Current step: ${currentStep}`));
-            }
-          }
-        } else if (output.includes('Starting implement phase')) {
-          if (currentStep !== 'Implementation') {
-            currentStep = 'Implementation';
-            if (!jsonMode) {
-              console.log(colors.yellow(`📋 Current step: ${currentStep}`));
-            }
-          }
-        } else if (output.includes('Starting review phase')) {
-          if (currentStep !== 'Code Review') {
-            currentStep = 'Code Review';
-            if (!jsonMode) {
-              console.log(colors.yellow(`📋 Current step: ${currentStep}`));
-            }
-          }
-        } else if (output.includes('Starting apply_review phase')) {
-          if (currentStep !== 'Applying Review Fixes') {
-            currentStep = 'Applying Review Fixes';
-            if (!jsonMode) {
-              console.log(colors.yellow(`📋 Current step: ${currentStep}`));
-            }
-          }
-        } else if (output.includes('Starting summary phase')) {
-          if (currentStep !== 'Creating Summary') {
-            currentStep = 'Creating Summary';
-            if (!jsonMode) {
-              console.log(colors.yellow(`📋 Current step: ${currentStep}`));
-            }
-          }
-        } else if (output.includes('Task execution completed')) {
-          if (currentStep !== 'Task execution complete') {
-            currentStep = 'Task execution complete';
-            if (!jsonMode) {
-              console.log(colors.yellow(`📋 Current step: ${currentStep}`));
-            }
-          }
-        }
-
-        // Display output with proper formatting
-        if (!jsonMode) {
-          process.stdout.write(colors.gray(output));
-        }
-      });
-
-      // Handle stderr
-      dockerProcess.stderr?.on('data', data => {
-        if (!jsonMode) {
-          process.stderr.write(colors.gray(data.toString()));
-        }
-      });
-
-      // Handle process completion
-      dockerProcess.on('close', code => {
-        if (code === 0) {
-          if (!jsonMode) {
-            console.log(
-              colors.green('\n✓ Task execution completed successfully')
-            );
-          }
-          // Update task metadata
-          updateTaskMetadata(
-            taskId,
-            {
-              executionStatus: 'completed',
-              completedAt: new Date().toISOString(),
-              exitCode: code,
-            },
-            jsonMode
-          );
-        } else {
-          if (!jsonMode) {
-            console.log(
-              colors.red(`\n✗ Task execution failed with code ${code}`)
-            );
-          }
-          // Update task metadata
-          updateTaskMetadata(
-            taskId,
-            {
-              executionStatus: 'failed',
-              failedAt: new Date().toISOString(),
-              exitCode: code,
-            },
-            jsonMode
-          );
-        }
-      });
-
-      dockerProcess.on('error', error => {
-        if (!jsonMode) {
-          console.error(colors.red('\nError running Docker container:'), error);
-        }
-        // Update task metadata
-        updateTaskMetadata(
-          taskId,
-          {
-            executionStatus: 'error',
-            error: error.message,
-            errorAt: new Date().toISOString(),
-          },
-          jsonMode
+      if (!jsonMode) {
+        console.log(
+          colors.yellow('⚠ There was an error during container creation')
         );
-      });
-
-      // Handle process interruption (Ctrl+C)
-      process.on('SIGINT', () => {
-        if (!jsonMode) {
-          console.log(colors.yellow('\n\n⚠ Stopping task execution...'));
-        }
-        try {
-          launchSync('docker', ['stop', containerName]);
-          if (!jsonMode) {
-            console.log(colors.green('✓ Container stopped'));
-          }
-        } catch (error) {
-          if (!jsonMode) {
-            console.log(colors.red('✗ Failed to stop container'));
-          }
-        }
-        // TODO: use exitWithSuccess
-        process.exit(0);
-      });
-    } else {
-      // Background mode execution
-      try {
-        const containerId = launchSync('docker', dockerArgs)
-          .stdout?.toString()
-          .trim();
-
-        if (spinner) spinner.success('Container started in background');
-
-        // Update task metadata with container ID
-        updateTaskMetadata(
-          taskId,
-          {
-            containerId: containerId,
-            executionStatus: 'running',
-            runningAt: new Date().toISOString(),
-          },
-          jsonMode
+        console.log(colors.gray('  Resetting the task status to "New"'));
+        console.log(
+          colors.gray('  Use ') +
+            colors.cyan(`rover start ${taskId}`) +
+            colors.gray(' to retry execution')
         );
-      } catch (error: any) {
-        if (spinner) spinner.error('Failed to start container in background');
-        if (!jsonMode) {
-          console.error(
-            colors.red('Error starting Docker container:'),
-            error.message
-          );
-        }
-
-        // Reset task to NEW status when container fails to start
-        updateTaskMetadata(
-          taskId,
-          {
-            status: 'NEW',
-            executionStatus: 'error',
-            error: error.message,
-            errorAt: new Date().toISOString(),
-          },
-          jsonMode
-        );
-
-        if (!jsonMode) {
-          console.log(
-            colors.yellow('⚠ There was an error during container creation')
-          );
-          console.log(colors.gray('  Resetting the task status to "New"'));
-          console.log(
-            colors.gray('  Use ') +
-              colors.cyan(`rover start ${taskId}`) +
-              colors.gray(' to retry execution')
-          );
-        }
-
-        // TODO: use exitWithError
-        process.exit(1);
       }
+
+      // TODO: use exitWithError
+      process.exit(1);
     }
   } catch (error) {
     if (spinner) spinner.error('Failed to start container');
@@ -577,17 +400,17 @@ export const taskCommand = async (
   initPrompt?: string,
   options: {
     fromGithub?: string;
-    follow?: boolean;
     yes?: boolean;
     sourceBranch?: string;
     targetBranch?: string;
+    agent?: string;
     json?: boolean;
     debug?: boolean;
   } = {}
 ) => {
   const telemetry = getTelemetry();
   // Extract options
-  const { follow, yes, json, fromGithub, debug, sourceBranch, targetBranch } =
+  const { yes, json, fromGithub, debug, sourceBranch, targetBranch, agent } =
     options;
 
   const jsonOutput: TaskTaskOutput = {
@@ -606,17 +429,34 @@ export const taskCommand = async (
 
   let selectedAiAgent = AI_AGENT.Claude;
 
-  try {
-    selectedAiAgent = getUserAIAgent();
-  } catch (_err) {
-    if (!json) {
-      console.log(
-        colors.yellow('⚠ Could not load user settings, defaulting to Claude')
-      );
+  // Check if --agent option is provided and validate it
+  if (agent) {
+    const agentLower = agent.toLowerCase();
+    if (agentLower === 'claude') {
+      selectedAiAgent = AI_AGENT.Claude;
+    } else if (agentLower === 'gemini') {
+      selectedAiAgent = AI_AGENT.Gemini;
+    } else if (agentLower === 'qwen') {
+      selectedAiAgent = AI_AGENT.Qwen;
+    } else {
+      jsonOutput.error = `Invalid agent: ${agent}. Valid options are: claude, gemini, qwen`;
+      exitWithError(jsonOutput, json);
+      return;
+    }
+  } else {
+    // Fall back to user settings if no agent specified
+    try {
+      selectedAiAgent = getUserAIAgent();
+    } catch (_err) {
+      if (!json) {
+        console.log(
+          colors.yellow('⚠ Could not load user settings, defaulting to Claude')
+        );
+      }
     }
   }
 
-  const valid = validations(selectedAiAgent, json, follow);
+  const valid = validations(selectedAiAgent, json);
 
   if (valid != null) {
     jsonOutput.error = valid.error;
@@ -934,6 +774,8 @@ export const taskCommand = async (
       id: taskId,
       title: taskData.title,
       description: taskData.description,
+      agent: selectedAiAgent,
+      sourceBranch: sourceBranch,
     });
 
     // Setup git worktree and branch
@@ -1006,7 +848,6 @@ export const taskCommand = async (
         worktreePath,
         iterationPath,
         selectedAiAgent,
-        follow,
         json,
         debug
       );
