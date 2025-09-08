@@ -174,6 +174,15 @@ export const iterateCommand = async (
       if (stdinInput) {
         finalInstructions = stdinInput;
         if (!options.json) {
+          showRoverChat(
+            [
+              "hey human! Let's iterate on this task.",
+              'I got your instructions and I will start an agent to implement them.',
+            ],
+            {
+              breaklineBefore: false,
+            }
+          );
           console.log(colors.gray('✓ Read instructions from stdin'));
         }
       }
@@ -185,6 +194,16 @@ export const iterateCommand = async (
         result.error = 'Instructions are required in JSON mode';
         exitWithError(result, json);
         return;
+      } else {
+        showRoverChat(
+          [
+            "hey human! Let's iterate on this task.",
+            'Tell me your new instructions and I will start an agent to implement them.',
+          ],
+          {
+            breaklineBefore: false,
+          }
+        );
       }
 
       // Interactive prompt for instructions
@@ -192,8 +211,7 @@ export const iterateCommand = async (
         const { input } = await prompt<{ input: string }>({
           type: 'input',
           name: 'input',
-          message:
-            'Describe the refinement instructions or new requirements for this task:',
+          message: 'Describe the new instructions or requirements:',
           validate: value =>
             value.trim().length > 0 || 'Please provide refinement instructions',
         });
@@ -203,21 +221,21 @@ export const iterateCommand = async (
         return;
       }
     }
+  } else {
+    if (!json) {
+      showRoverChat(
+        [
+          "hey human! Let's iterate on this task.",
+          'I got your instructions and I will start an agent to implement them.',
+        ],
+        {
+          breaklineBefore: false,
+        }
+      );
+    }
   }
 
   result.instructions = finalInstructions;
-
-  if (!json) {
-    showRoverChat(
-      [
-        "hey human! Let's iterate over this task.",
-        'I got your new instructions and will ask an agent to implement them.',
-      ],
-      {
-        breaklineBefore: false,
-      }
-    );
-  }
 
   try {
     // Load task using TaskDescription first to get agent preference
