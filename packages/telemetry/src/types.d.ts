@@ -10,4 +10,5 @@ export type InitMetadata = {
   agents: string[];
   preferredAgent: string;
   languages: string[];
+  attribution: boolean;
 };

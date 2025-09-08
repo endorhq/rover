@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import yoctoSpinner from 'yocto-spinner';
 import { getAIAgentTool, type AIAgentTool } from '../lib/agents/index.js';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
-import { UserSettings, AI_AGENT } from '../lib/config.js';
+import { UserSettings, AI_AGENT, ProjectConfig } from '../lib/config.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { Git } from 'rover-common';
 import { showRoverChat, showTips } from '../utils/display.js';
@@ -239,7 +239,18 @@ export const mergeCommand = async (
 
   // Load AI agent selection from user settings
   let selectedAiAgent = 'claude'; // default
+  let projectConfig;
 
+  // Load config
+  try {
+    projectConfig = ProjectConfig.load();
+  } catch (err) {
+    if (!options.json) {
+      console.log(colors.yellow('⚠ Could not load project settings'));
+    }
+  }
+
+  // Load user preferences
   try {
     if (UserSettings.exists()) {
       const userSettings = UserSettings.load();
@@ -437,8 +448,11 @@ export const mergeCommand = async (
         const commitMessage =
           aiCommitMessage || `${task.title}\n\n${task.description}`;
 
-        // Add Co-Authored-By line
-        finalCommitMessage = `${commitMessage}\n\nCo-Authored-By: Rover <noreply@endor.dev>`;
+        // Add Co-Authored-By line when attribution is enabled
+        if (projectConfig == null || projectConfig?.attribution === true) {
+          finalCommitMessage = `${commitMessage}\n\nCo-Authored-By: Rover <noreply@endor.dev>`;
+        }
+
         result.commitMessage = finalCommitMessage.split('\n')[0]; // Store first line for result
 
         if (spinner) spinner.text = 'Committing changes in worktree...';

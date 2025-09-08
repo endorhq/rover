@@ -9,6 +9,7 @@ import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
 import { showRoverChat, TIP_TITLES } from '../utils/display.js';
 import { statusColor } from '../utils/task-status.js';
 import { Git } from 'rover-common';
+import { ProjectConfig } from '../lib/config.js';
 
 const { prompt } = enquirer;
 
@@ -78,6 +79,17 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
 
   // Store the task ID!
   result.taskId = numericTaskId;
+
+  let projectConfig;
+
+  // Load config
+  try {
+    projectConfig = ProjectConfig.load();
+  } catch (err) {
+    if (!options.json) {
+      console.log(colors.yellow('⚠ Could not load project settings'));
+    }
+  }
 
   try {
     // Load task using TaskDescription
@@ -157,6 +169,10 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
         }
       }
 
+      if (projectConfig == null || projectConfig?.attribution === true) {
+        commitMessage = `${commitMessage}\n\nCo-Authored-By: Rover <noreply@endor.dev>`;
+      }
+
       result.commitMessage = commitMessage;
 
       // Stage and commit changes
@@ -182,8 +198,8 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
 
     const pushSpinner = !options.json
       ? yoctoSpinner({
-          text: `Pushing branch ${task.branchName} to remote...`,
-        }).start()
+        text: `Pushing branch ${task.branchName} to remote...`,
+      }).start()
       : null;
     try {
       git.push(task.branchName, {
@@ -323,9 +339,9 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
     if (repoInfo != null) {
       tips.push(
         'You can open a new PR on ' +
-          colors.cyan(
-            `https://github.com/${repoInfo.owner}/${repoInfo.repo}/pull/new/${task.branchName}`
-          )
+        colors.cyan(
+          `https://github.com/${repoInfo.owner}/${repoInfo.repo}/pull/new/${task.branchName}`
+        )
       );
     }
 

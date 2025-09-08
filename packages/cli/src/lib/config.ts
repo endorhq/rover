@@ -48,6 +48,9 @@ export interface ProjectConfigSchema {
   languages: LANGUAGE[];
   packageManagers: PACKAGE_MANAGER[];
   taskManagers: TASK_MANAGER[];
+
+  // Attribution
+  attribution: boolean;
 }
 
 const PROJECT_CONFIG_FILE = 'rover.json';
@@ -99,6 +102,7 @@ export class ProjectConfig {
       languages: [],
       packageManagers: [],
       taskManagers: [],
+      attribution: true,
     };
 
     const instance = new ProjectConfig(schema);
@@ -130,6 +134,7 @@ export class ProjectConfig {
       languages: data.languages || [],
       packageManagers: data.packageManagers || [],
       taskManagers: data.taskManagers || [],
+      attribution: data.attribution || true,
     };
 
     return migrated;
@@ -169,6 +174,9 @@ export class ProjectConfig {
   }
   get taskManagers(): TASK_MANAGER[] {
     return this.data.taskManagers;
+  }
+  get attribution(): boolean {
+    return this.data.attribution;
   }
 
   // Data Modification (Setters)
@@ -215,6 +223,11 @@ export class ProjectConfig {
       this.data.taskManagers.splice(index, 1);
       this.save();
     }
+  }
+
+  setAttribution(value: boolean): void {
+    this.data.attribution = value;
+    this.save();
   }
 
   /**

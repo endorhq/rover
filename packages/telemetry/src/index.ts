@@ -131,11 +131,17 @@ class Telemetry {
     this.capture(EVENT_IDS.DIFF);
   }
 
-  eventInit(agents: string[], preferredAgent: string, languages: string[]) {
+  eventInit(
+    agents: string[],
+    preferredAgent: string,
+    languages: string[],
+    attribution: boolean
+  ) {
     const metadata: InitMetadata = {
       agents,
       preferredAgent,
       languages,
+      attribution,
     };
 
     this.capture(EVENT_IDS.INIT, metadata);
