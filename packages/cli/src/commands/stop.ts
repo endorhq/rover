@@ -2,7 +2,7 @@ import colors from 'ansi-colors';
 import { join } from 'node:path';
 import { rmSync } from 'node:fs';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
-import { launchSync } from 'rover-common';
+import { findProjectRoot, launchSync } from 'rover-common';
 import { exitWithError, exitWithSuccess } from '../utils/exit.js';
 import { CLIJsonOutput } from '../types.js';
 import { getTelemetry } from '../lib/telemetry.js';
@@ -161,7 +161,7 @@ export const stopCommand = async (
 
     // Delete the iterations
     const taskPath = join(
-      process.cwd(),
+      findProjectRoot(),
       '.rover',
       'tasks',
       numericTaskId.toString()

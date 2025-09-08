@@ -8,6 +8,7 @@ import {
 } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { findProjectRoot } from 'rover-common';
 
 // Schema version for migrations
 const CURRENT_SCHEMA_VERSION = '1.0';
@@ -151,7 +152,7 @@ export class TaskDescription {
 
     // Ensure task directory exists
     const taskDir = join(
-      process.cwd(),
+      findProjectRoot(),
       '.rover',
       'tasks',
       taskData.id.toString()
@@ -211,7 +212,7 @@ export class TaskDescription {
 
   private static getTaskDescriptionPath(taskId: number): string {
     return join(
-      process.cwd(),
+      findProjectRoot(),
       '.rover',
       'tasks',
       taskId.toString(),

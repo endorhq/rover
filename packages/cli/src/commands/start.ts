@@ -9,9 +9,10 @@ import { IterationConfig } from '../lib/iteration.js';
 import { startDockerExecution } from './task.js';
 import { UserSettings, AI_AGENT } from '../lib/config.js';
 import { getTelemetry } from '../lib/telemetry.js';
-import { Git } from '../lib/git.js';
+import { Git } from 'rover-common';
 import yoctoSpinner from 'yocto-spinner';
 import { copyEnvironmentFiles } from '../utils/env-files.js';
+import { findProjectRoot } from 'rover-common';
 
 /**
  * Interface for JSON output
@@ -90,7 +91,7 @@ export const startCommand = async (
     }
 
     const taskPath = join(
-      process.cwd(),
+      findProjectRoot(),
       '.rover',
       'tasks',
       numericTaskId.toString()
@@ -113,7 +114,7 @@ export const startCommand = async (
         git.createWorktree(worktreePath, branchName);
 
         // Copy user .env development files
-        copyEnvironmentFiles(process.cwd(), worktreePath);
+        copyEnvironmentFiles(findProjectRoot(), worktreePath);
 
         // Update task with workspace information
         task.setWorkspace(worktreePath, branchName);

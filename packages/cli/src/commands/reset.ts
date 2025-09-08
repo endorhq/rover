@@ -2,7 +2,7 @@ import colors from 'ansi-colors';
 import enquirer from 'enquirer';
 import { existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { launchSync } from 'rover-common';
+import { findProjectRoot, launchSync } from 'rover-common';
 import yoctoSpinner from 'yocto-spinner';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
 import { getTelemetry } from '../lib/telemetry.js';
@@ -25,7 +25,7 @@ export const resetCommand = async (
     // Load task using TaskDescription
     const task = TaskDescription.load(numericTaskId);
     const taskPath = join(
-      process.cwd(),
+      findProjectRoot(),
       '.rover',
       'tasks',
       numericTaskId.toString()

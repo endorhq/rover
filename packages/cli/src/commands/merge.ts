@@ -7,8 +7,9 @@ import { getAIAgentTool, type AIAgentTool } from '../lib/agents/index.js';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
 import { UserSettings, AI_AGENT } from '../lib/config.js';
 import { getTelemetry } from '../lib/telemetry.js';
-import Git from '../lib/git.js';
+import { Git } from 'rover-common';
 import { showRoverChat, showTips } from '../utils/display.js';
+import { findProjectRoot } from 'rover-common';
 
 const { prompt } = enquirer;
 
@@ -17,7 +18,7 @@ const { prompt } = enquirer;
  */
 const getTaskIterationSummaries = (taskId: string): string[] => {
   try {
-    const roverPath = join(process.cwd(), '.rover');
+    const roverPath = join(findProjectRoot(), '.rover');
     const taskPath = join(roverPath, 'tasks', taskId);
     const iterationsPath = join(taskPath, 'iterations');
 

@@ -2,7 +2,7 @@ import colors from 'ansi-colors';
 import { writeFileSync, chmodSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { TaskDescription } from './description.js';
-import { launchSync } from 'rover-common';
+import { findProjectRoot, launchSync } from 'rover-common';
 
 /**
  * SetupBuilder class - Consolidates Docker setup script generation
@@ -110,7 +110,7 @@ configure-mcp-servers
   generateSetupMcpScript(): string {
     // Ensure task directory exists
     const taskDir = join(
-      process.cwd(),
+      findProjectRoot(),
       '.rover',
       'tasks',
       this.taskId.toString()
@@ -611,7 +611,7 @@ exit 0
   generateSetupScript(): string {
     // Ensure task directory exists
     const taskDir = join(
-      process.cwd(),
+      findProjectRoot(),
       '.rover',
       'tasks',
       this.taskId.toString()
@@ -636,7 +636,7 @@ exit 0
    */
   getScriptPath(script: string): string {
     return join(
-      process.cwd(),
+      findProjectRoot(),
       '.rover',
       'tasks',
       this.taskId.toString(),

@@ -540,5 +540,3 @@ export class Git {
     }
   }
 }
-
-export default Git;

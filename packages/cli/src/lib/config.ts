@@ -5,7 +5,7 @@
 import { join, dirname, resolve } from 'node:path';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { FileNotFoundError, InvalidFormatError } from '../errors.js';
-import Git from './git.js';
+import { findProjectRoot, Git } from 'rover-common';
 
 // Supported languages
 export enum LANGUAGE {
@@ -53,47 +53,6 @@ export interface ProjectConfigSchema {
 const PROJECT_CONFIG_FILE = 'rover.json';
 
 /**
- * Find the project root directory by searching for rover.json in parent directories
- * up to the Git repository root
- */
-function findProjectRoot(startDir: string = process.cwd()): string | null {
-  let currentDir = resolve(startDir);
-  let gitRoot: string | null = null;
-
-  try {
-    const git = new Git();
-    if (git.isGitRepo()) {
-      gitRoot = git.getRepositoryRoot();
-    }
-  } catch {
-    // Git not available or not in a Git repo, continue without Git boundary
-  }
-
-  while (true) {
-    const configPath = join(currentDir, PROJECT_CONFIG_FILE);
-
-    if (existsSync(configPath)) {
-      return currentDir;
-    }
-
-    // Stop at Git repository root if available
-    if (gitRoot && currentDir === gitRoot) {
-      break;
-    }
-
-    // Stop at filesystem root
-    const parentDir = dirname(currentDir);
-    if (parentDir === currentDir) {
-      break;
-    }
-
-    currentDir = parentDir;
-  }
-
-  return null;
-}
-
-/**
  * Project-wide configuration. Useful to add context and constraints. We
  * expect users to commit this file to the repo.
  */
@@ -105,11 +64,6 @@ export class ProjectConfig {
    */
   static load(): ProjectConfig {
     const projectRoot = findProjectRoot();
-    if (!projectRoot) {
-      const filePath = join(process.cwd(), PROJECT_CONFIG_FILE);
-      throw new FileNotFoundError(filePath);
-    }
-
     const filePath = join(projectRoot, PROJECT_CONFIG_FILE);
 
     try {
@@ -157,7 +111,8 @@ export class ProjectConfig {
    */
   static exists(): boolean {
     const projectRoot = findProjectRoot();
-    return projectRoot !== null;
+    const filePath = join(projectRoot, PROJECT_CONFIG_FILE);
+    return existsSync(filePath);
   }
 
   /**
@@ -184,7 +139,7 @@ export class ProjectConfig {
    * Save current configuration to disk
    */
   save(): void {
-    const projectRoot = findProjectRoot() || process.cwd();
+    const projectRoot = findProjectRoot();
     const filePath = join(projectRoot, PROJECT_CONFIG_FILE);
     try {
       const json = JSON.stringify(this.data, null, 2);
@@ -360,7 +315,7 @@ export class UserSettings {
    * Get the path to the settings file
    */
   private static getSettingsPath(): string {
-    const projectRoot = findProjectRoot() || process.cwd();
+    const projectRoot = findProjectRoot();
     return join(projectRoot, '.rover', 'settings.json');
   }
 
@@ -390,7 +345,7 @@ export class UserSettings {
    */
   save(): void {
     const filePath = UserSettings.getSettingsPath();
-    const projectRoot = findProjectRoot() || process.cwd();
+    const projectRoot = findProjectRoot();
     const dirPath = join(projectRoot, '.rover');
 
     try {

@@ -1,7 +1,7 @@
 import colors from 'ansi-colors';
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { launch, launchSync } from 'rover-common';
+import { findProjectRoot, launch, launchSync } from 'rover-common';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { showTips, TIP_TITLES } from '../utils/display.js';
@@ -20,7 +20,7 @@ interface TaskLogsOutput extends CLIJsonOutput {
  */
 const getAvailableIterations = (taskId: string): number[] => {
   try {
-    const roverPath = join(process.cwd(), '.rover');
+    const roverPath = join(findProjectRoot(), '.rover');
     const taskPath = join(roverPath, 'tasks', taskId);
     const iterationsPath = join(taskPath, 'iterations');
 

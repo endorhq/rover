@@ -14,12 +14,12 @@ import { AI_AGENT } from '../lib/config.js';
 import { IterationConfig } from '../lib/iteration.js';
 import { generateBranchName } from '../utils/branch-name.js';
 import { request } from 'node:https';
-import { launch, launchSync } from 'rover-common';
+import { findProjectRoot, launch, launchSync } from 'rover-common';
 import { checkGitHubCLI } from '../utils/system.js';
 import { showRoverBanner, showRoverChat, showTips } from '../utils/display.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { NewTaskProvider } from 'rover-telemetry';
-import { Git } from '../lib/git.js';
+import { Git } from 'rover-common';
 import { readFromStdin, stdinIsAvailable } from '../utils/stdin.js';
 import { CLIJsonOutput } from '../types.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
@@ -216,7 +216,7 @@ export const startDockerExecution = async (
 
   // Generate prompts using PromptBuilder
   const promptsDir = join(
-    process.cwd(),
+    findProjectRoot(),
     '.rover',
     'tasks',
     taskId.toString(),
@@ -595,7 +595,7 @@ export const taskCommand = async (
   };
 
   // Check if rover is initialized
-  const roverPath = join(process.cwd(), '.rover');
+  const roverPath = join(findProjectRoot(), '.rover');
   if (!existsSync(roverPath)) {
     jsonOutput.error = 'Rover is not initialized in this directory';
     exitWithError(jsonOutput, json, {
@@ -807,7 +807,7 @@ export const taskCommand = async (
       const aiAgent = getAIAgentTool(selectedAiAgent);
       const expanded = await aiAgent.expandTask(
         taskData ? `${taskData.title}: ${taskData.description}` : description,
-        process.cwd()
+        findProjectRoot()
       );
 
       if (expanded) {
@@ -916,7 +916,7 @@ export const taskCommand = async (
     const taskId = getNextTaskId();
 
     // Create .rover/tasks directory structure
-    const endorPath = join(process.cwd(), '.rover');
+    const endorPath = join(findProjectRoot(), '.rover');
     const tasksPath = join(endorPath, 'tasks');
     const taskPath = join(tasksPath, taskId.toString());
 
@@ -944,7 +944,7 @@ export const taskCommand = async (
       git.createWorktree(worktreePath, branchName, baseBranch);
 
       // Copy user .env development files
-      copyEnvironmentFiles(process.cwd(), worktreePath);
+      copyEnvironmentFiles(findProjectRoot(), worktreePath);
     } catch (error) {
       jsonOutput.error = 'Error creating git workspace: ' + error;
       exitWithError(jsonOutput, json);

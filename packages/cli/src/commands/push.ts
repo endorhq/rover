@@ -8,7 +8,7 @@ import { CLIJsonOutput } from '../types.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
 import { showRoverChat, TIP_TITLES } from '../utils/display.js';
 import { statusColor } from '../utils/task-status.js';
-import Git from '../lib/git.js';
+import { Git } from 'rover-common';
 
 const { prompt } = enquirer;
 
