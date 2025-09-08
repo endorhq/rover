@@ -10,8 +10,6 @@ import type {
 export type { Options, Result, SyncOptions, SyncResult };
 
 import colors from 'ansi-colors';
-import { existsSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
 import { Git } from './git.js';
 
 import { PROJECT_CONFIG_FILE, VERBOSE } from './index.js';
