@@ -47,120 +47,182 @@ export const deleteCommand = async (
     numericTaskIds.push(numericTaskId);
   }
 
-  let allSucceeded = true;
-  let someSucceeded = false;
-  let someConfirmed = false;
+  // Load all tasks and validate they exist
+  const tasksToDelete: TaskDescription[] = [];
+  const invalidTaskIds: number[] = [];
+
+  for (const numericTaskId of numericTaskIds) {
+    try {
+      const task = TaskDescription.load(numericTaskId);
+      tasksToDelete.push(task);
+    } catch (error) {
+      if (error instanceof TaskNotFoundError) {
+        invalidTaskIds.push(numericTaskId);
+      } else {
+        jsonOutput.errors?.push(
+          `There was an error loading task ${numericTaskId}: ${error}`
+        );
+      }
+    }
+  }
+
+  // If there are invalid task IDs, add them to errors
+  if (invalidTaskIds.length > 0) {
+    for (const taskId of invalidTaskIds) {
+      jsonOutput.errors?.push(`The task with ID ${taskId} was not found`);
+    }
+  }
+
+  // Exit early if no valid tasks to delete
+  if (tasksToDelete.length === 0) {
+    jsonOutput.success = false;
+    exitWithErrors(jsonOutput, json);
+    await telemetry?.shutdown();
+    return;
+  }
+
+  // Show tasks information and get single confirmation
+  if (!json) {
+    showRoverChat(["It's time to cleanup some tasks!"]);
+
+    console.log(
+      colors.white.bold(`Task${tasksToDelete.length > 1 ? 's' : ''} to delete`)
+    );
+
+    tasksToDelete.forEach((task, index) => {
+      const colorFunc = statusColor(task.status);
+      const isLast = index === tasksToDelete.length - 1;
+      const prefix = isLast ? '└──' : '├──';
+
+      console.log(
+        colors.gray(`${prefix} ID: `) +
+          colors.cyan(task.id.toString()) +
+          colors.gray(' | Title: ') +
+          colors.white(task.title) +
+          colors.gray(' | Status: ') +
+          colorFunc(task.status)
+      );
+    });
+
+    console.log(
+      '\n' +
+        colors.white(
+          `This action will delete the task${tasksToDelete.length > 1 ? 's' : ''} metadata and workspace${tasksToDelete.length > 1 ? 's' : ''} (git worktree${tasksToDelete.length > 1 ? 's' : ''})`
+        )
+    );
+  }
+
+  // Single confirmation for all tasks
+  let confirmDeletion = true;
+  if (!skipConfirmation) {
+    try {
+      const { confirm } = await prompt<{ confirm: boolean }>({
+        type: 'confirm',
+        name: 'confirm',
+        message: `Are you sure you want to delete ${tasksToDelete.length > 1 ? 'these tasks' : 'this task'}?`,
+        initial: false,
+      });
+      confirmDeletion = confirm;
+    } catch (_err) {
+      // User cancelled, exit without doing anything
+      jsonOutput.errors?.push('Task deletion cancelled');
+      exitWithErrors(jsonOutput, json);
+      await telemetry?.shutdown();
+      return;
+    }
+  }
+
+  if (!confirmDeletion) {
+    jsonOutput.errors?.push('Task deletion cancelled');
+    exitWithErrors(jsonOutput, json);
+    await telemetry?.shutdown();
+    return;
+  }
+
+  // Process deletions
+  const succeededTasks: number[] = [];
+  const failedTasks: number[] = [];
+  const warningTasks: number[] = [];
+
   try {
-    for (const numericTaskId of numericTaskIds) {
+    for (const task of tasksToDelete) {
       try {
-        // Load task using TaskDescription
-        const task = TaskDescription.load(numericTaskId);
         const taskPath = join(
           process.cwd(),
           '.rover',
           'tasks',
-          numericTaskId.toString()
+          task.id.toString()
         );
 
-        if (!json) {
-          showRoverChat(["It's time to cleanup some tasks!"]);
+        // Delete the task
+        telemetry?.eventDeleteTask();
+        task.delete();
+        rmSync(taskPath, { recursive: true, force: true });
 
-          const colorFunc = statusColor(task.status);
+        // Prune the git workspace
+        const prune = git.pruneWorktree();
 
-          console.log(colors.white.bold('Task to delete'));
-          console.log(
-            colors.gray('├── ID: ') + colors.cyan(task.id.toString())
-          );
-          console.log(colors.gray('├── Title: ') + colors.white(task.title));
-          console.log(
-            colors.gray('└── Status: ') + colorFunc(task.status) + '\n'
-          );
-
-          console.log(
-            colors.white(
-              'This action will delete the task metadata and workspace (git worktree)'
-            )
-          );
-        }
-
-        // Confirm deletion
-        let confirmDeletion = true;
-
-        if (!skipConfirmation) {
-          try {
-            const { confirm } = await prompt<{ confirm: boolean }>({
-              type: 'confirm',
-              name: 'confirm',
-              message: 'Are you sure you want to delete this task?',
-              initial: false,
-            });
-            confirmDeletion = confirm;
-            if (confirm) {
-              someConfirmed = true;
-            }
-          } catch (_err) {
-            jsonOutput.errors?.push(
-              `Task ${task.id.toString()} deletion cancelled`
-            );
-          }
+        if (prune) {
+          succeededTasks.push(task.id);
         } else {
-          someConfirmed = true;
-        }
-
-        if (confirmDeletion) {
-          // Create backup before deletion
-          telemetry?.eventDeleteTask();
-          task.delete();
-          rmSync(taskPath, { recursive: true, force: true });
-
-          // Prune the git workspace
-          const prune = git.pruneWorktree();
-
-          if (prune) {
-            someSucceeded = true;
-          } else {
-            allSucceeded = false;
-            if (!json) {
-              console.log(
-                colors.yellow(
-                  '⚠ There was an error pruning the git worktrees.'
-                )
-              );
-            }
-            jsonOutput.errors?.push(
-              `There was an error pruning task ${task.id.toString()} worktree`
-            );
-          }
-        } else {
+          warningTasks.push(task.id);
           jsonOutput.errors?.push(
-            `Task ${task.id.toString()} deletion cancelled`
+            `There was an error pruning task ${task.id.toString()} worktree`
           );
         }
       } catch (error) {
-        allSucceeded = false;
-        if (error instanceof TaskNotFoundError) {
-          jsonOutput.errors?.push(
-            `The task with ID ${numericTaskId} was not found`
-          );
-        } else {
-          jsonOutput.errors?.push(
-            `There was an error deleting the task: ${error}`
-          );
-        }
+        failedTasks.push(task.id);
+        jsonOutput.errors?.push(
+          `There was an error deleting task ${task.id}: ${error}`
+        );
       }
     }
   } finally {
+    // Determine overall success
+    const allSucceeded = failedTasks.length === 0 && warningTasks.length === 0;
+    const someSucceeded = succeededTasks.length > 0;
+
     jsonOutput.success = allSucceeded;
-    if (allSucceeded && someConfirmed) {
-      exitWithSuccess('Task(s) deleted successfully', jsonOutput, json);
-    } else if (someSucceeded && !someConfirmed) {
+
+    // Group output messages
+    if (!json) {
+      if (succeededTasks.length > 0) {
+        console.log(
+          colors.green(
+            `✓ Successfully deleted task${succeededTasks.length > 1 ? 's' : ''}: ${succeededTasks.join(', ')}`
+          )
+        );
+      }
+
+      if (warningTasks.length > 0) {
+        console.log(
+          colors.yellow(
+            `⚠ Task${warningTasks.length > 1 ? 's' : ''} deleted but with warnings: ${warningTasks.join(', ')}`
+          )
+        );
+      }
+
+      if (failedTasks.length > 0) {
+        console.log(
+          colors.red(
+            `✗ Failed to delete task${failedTasks.length > 1 ? 's' : ''}: ${failedTasks.join(', ')}`
+          )
+        );
+      }
+    }
+
+    if (allSucceeded) {
       exitWithSuccess(
-        'No task was deleted as none was confirmed',
+        `Task${succeededTasks.length > 1 ? 's' : ''} deleted successfully`,
         jsonOutput,
         json
       );
     } else if (someSucceeded) {
-      exitWithWarn('Some task(s) deleted successfully', jsonOutput, json);
+      exitWithWarn(
+        `Some task${succeededTasks.length > 1 ? 's' : ''} deleted successfully`,
+        jsonOutput,
+        json
+      );
     } else {
       exitWithErrors(jsonOutput, json);
     }
