@@ -46,6 +46,11 @@ export const deleteCommand = async (
     }
   }
 
+  if (jsonOutput.errors.length > 0) {
+    exitWithErrors(jsonOutput, json);
+    return;
+  }
+
   // Load all tasks and validate they exist
   const tasksToDelete: TaskDescription[] = [];
   const invalidTaskIds: number[] = [];
