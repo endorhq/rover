@@ -19,9 +19,9 @@ vi.mock('../../lib/telemetry.js', () => ({
   }),
 }));
 
-// Mock start command to prevent actual execution
-vi.mock('../start.js', () => ({
-  startCommand: vi.fn().mockResolvedValue(undefined),
+// Mock restart command to prevent actual execution
+vi.mock('../restart.js', () => ({
+  startDockerExecution: vi.fn().mockResolvedValue(undefined),
 }));
 
 // Mock exit utilities to prevent process.exit
@@ -34,7 +34,9 @@ vi.mock('../../utils/exit.js', () => ({
 describe('restart command', async () => {
   let testDir: string;
   let originalCwd: string;
-  const mockStartCommand = vi.mocked(await import('../start.js')).startCommand;
+  const mockRestartCommand = vi.mocked(
+    await import('../restart.js')
+  ).restartCommand;
 
   beforeEach(() => {
     // Create temporary directory for test
@@ -101,12 +103,12 @@ describe('restart command', async () => {
 
       // Verify task was restarted
       const reloadedTask = TaskDescription.load(taskId);
-      expect(reloadedTask.status).toBe('NEW');
+      expect(reloadedTask.status).toBe('IN_PROGRESS');
       expect(reloadedTask.data.restartCount).toBe(1);
       expect(reloadedTask.data.lastRestartAt).toBeDefined();
 
       // Verify start command was called
-      expect(mockStartCommand).toHaveBeenCalledWith(taskId.toString(), {
+      expect(mockRestartCommand).toHaveBeenCalledWith(taskId.toString(), {
         json: true,
       });
     });
@@ -136,7 +138,7 @@ describe('restart command', async () => {
 
       const secondRestart = TaskDescription.load(taskId);
       expect(secondRestart.data.restartCount).toBe(2);
-      expect(mockStartCommand).toHaveBeenCalledTimes(2);
+      expect(mockRestartCommand).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -173,8 +175,8 @@ describe('restart command', async () => {
         })
       );
 
-      // Verify start command was NOT called
-      expect(mockStartCommand).not.toHaveBeenCalled();
+      // Verify restart command was NOT called
+      expect(mockRestartCommand).not.toHaveBeenCalled();
     });
 
     it('should handle invalid task IDs', async () => {
@@ -192,8 +194,8 @@ describe('restart command', async () => {
         true
       );
 
-      // Verify start command was NOT called
-      expect(mockStartCommand).not.toHaveBeenCalled();
+      // Verify restart command was NOT called
+      expect(mockRestartCommand).not.toHaveBeenCalled();
     });
 
     it('should handle non-existent tasks', async () => {
@@ -211,34 +213,8 @@ describe('restart command', async () => {
         true
       );
 
-      // Verify start command was NOT called
-      expect(mockStartCommand).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('options handling', () => {
-    it('should pass through debug option to start command', async () => {
-      // Create a failed task
-      const taskId = 222;
-      const taskDir = join(testDir, '.rover', 'tasks', taskId.toString());
-      mkdirSync(taskDir, { recursive: true });
-
-      const task = TaskDescription.create({
-        id: taskId,
-        title: 'Test Task',
-        description: 'A test task',
-      });
-
-      task.markFailed('This task failed');
-
-      // Run restart command with debug option
-      await restartCommand(taskId.toString(), { debug: true, json: true });
-
-      // Verify start command was called with debug option
-      expect(mockStartCommand).toHaveBeenCalledWith(taskId.toString(), {
-        debug: true,
-        json: true,
-      });
+      // Verify restart command was NOT called
+      expect(mockRestartCommand).not.toHaveBeenCalled();
     });
   });
 });

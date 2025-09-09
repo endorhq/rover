@@ -445,7 +445,7 @@ export class TaskDescription {
   }
 
   /**
-   * Restart a failed task by resetting to NEW status and tracking restart attempt
+   * Restart a failed task by resetting to IN_PROGRESS  status and tracking restart attempt
    */
   restart(timestamp?: string): void {
     const restartTimestamp = timestamp || new Date().toISOString();
@@ -454,8 +454,8 @@ export class TaskDescription {
     this.data.restartCount = (this.data.restartCount || 0) + 1;
     this.data.lastRestartAt = restartTimestamp;
 
-    // Reset to NEW status
-    this.setStatus('NEW', { timestamp: restartTimestamp });
+    // Reset to IN_PROGRESS status
+    this.setStatus('IN_PROGRESS', { timestamp: restartTimestamp });
   }
 
   // Iteration Management

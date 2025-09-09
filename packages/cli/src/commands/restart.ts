@@ -31,7 +31,7 @@ interface TaskRestartOutput extends CLIJsonOutput {
  */
 export const restartCommand = async (
   taskId: string,
-  options: { json?: boolean; debug?: boolean } = {}
+  options: { json?: boolean } = {}
 ) => {
   const telemetry = getTelemetry();
 
@@ -172,8 +172,7 @@ export const restartCommand = async (
         worktreePath,
         iterationPath,
         selectedAiAgent,
-        json,
-        options.debug
+        json
       );
     } catch (error) {
       // If Docker execution fails, reset task back to NEW status

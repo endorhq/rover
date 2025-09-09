@@ -11,7 +11,6 @@ import { inspectCommand } from './commands/inspect.js';
 import { iterateCommand } from './commands/iterate.js';
 import { shellCommand } from './commands/shell.js';
 import { resetCommand } from './commands/reset.js';
-import { startCommand } from './commands/start.js';
 import { restartCommand } from './commands/restart.js';
 import { deleteCommand } from './commands/delete.js';
 import { mergeCommand } from './commands/merge.js';
