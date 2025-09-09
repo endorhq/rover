@@ -27,7 +27,7 @@ interface TaskRestartOutput extends CLIJsonOutput {
 }
 
 /**
- * Restart a task that is in FAILED status
+ * Restart a task that is in NEW or FAILED status
  */
 export const restartCommand = async (
   taskId: string,
@@ -52,25 +52,18 @@ export const restartCommand = async (
     // Load task using TaskDescription
     const task = TaskDescription.load(numericTaskId);
 
-    // Check if task is in FAILED status
-    if (!task.isFailed()) {
-      jsonOutput.error = `Task ${taskId} is not in FAILED status (current: ${task.status})`;
+    // Check if task is in NEW or FAILED status
+    if (!task.isNew() && !task.isFailed()) {
+      jsonOutput.error = `Task ${taskId} is not in NEW or FAILED status (current: ${task.status})`;
       exitWithError(jsonOutput, json, {
         tips: [
-          'Only FAILED tasks can be restarted',
+          'Only NEW and FAILED tasks can be restarted',
           'Use ' +
-            colors.cyan(`rover start ${taskId}`) +
-            colors.gray(' for NEW tasks'),
+            colors.cyan(`rover restart ${taskId}`) +
+            colors.gray(' for NEW and FAILED tasks'),
         ],
       });
       return;
-    }
-
-    if (!json) {
-      console.log(colors.bold.white('Restarting Task'));
-      console.log(colors.gray('├── ID: ') + colors.cyan(task.id.toString()));
-      console.log(colors.gray('├── Title: ') + colors.white(task.title));
-      console.log(colors.gray('└── Status: ') + colors.red(task.status));
     }
 
     // Restart the task (resets to NEW status and tracks restart attempt)
@@ -78,16 +71,13 @@ export const restartCommand = async (
     task.restart(restartedAt);
 
     if (!json) {
+      console.log(colors.bold.white('Restarting Task'));
+      console.log(colors.gray('├── ID: ') + colors.cyan(task.id.toString()));
+      console.log(colors.gray('├── Title: ') + colors.white(task.title));
+      console.log(colors.gray('├── Status: ') + colors.red(task.status));
       console.log(colors.gray('└── Reset to: ') + colors.yellow('NEW'));
       console.log(colors.green('✓ Task reset successfully'));
       console.log('');
-    }
-
-    // Check if task is in NEW or FAILED status
-    if (!task.isNew() && !task.isFailed()) {
-      jsonOutput.error = `Task ${taskId} is not in NEW or FAILED status (current: ${task.status})`;
-      exitWithError(jsonOutput, json);
-      return;
     }
 
     // Load AI agent selection from user settings
@@ -111,7 +101,7 @@ export const restartCommand = async (
       console.log(colors.bold.white('Starting Task'));
       console.log(colors.gray('├── ID: ') + colors.cyan(task.id.toString()));
       console.log(colors.gray('├── Title: ') + colors.white(task.title));
-      console.log(colors.gray('└── Status: ') + colors.yellow(task.status));
+      console.log(colors.gray('├── Status: ') + colors.yellow(task.status));
     }
 
     const taskPath = join(
@@ -170,7 +160,7 @@ export const restartCommand = async (
     task.markInProgress();
 
     if (!json) {
-      console.log(colors.gray('└── Workspace: ') + colors.cyan(worktreePath));
+      console.log(colors.gray('├── Workspace: ') + colors.cyan(worktreePath));
       console.log(colors.gray('└── Branch: ') + colors.cyan(branchName));
     }
 
