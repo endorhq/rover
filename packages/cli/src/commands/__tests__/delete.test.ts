@@ -126,9 +126,10 @@ describe('delete command', () => {
 
       // parseInt('1.5') = 1, so this should try to delete task 1
       expect(exitWithErrors).toHaveBeenCalledWith(
-        expect.objectContaining({
-          errors: expect.arrayContaining(['The task with ID 1 was not found']),
-        }),
+        {
+          errors: ['Task with ID 1 was not found'],
+          success: false,
+        },
         false
       );
     });
@@ -141,11 +142,10 @@ describe('delete command', () => {
       await deleteCommand(['999']);
 
       expect(exitWithErrors).toHaveBeenCalledWith(
-        expect.objectContaining({
-          errors: expect.arrayContaining([
-            'The task with ID 999 was not found',
-          ]),
-        }),
+        {
+          errors: ['Task with ID 999 was not found'],
+          success: false,
+        },
         false
       );
     });
@@ -156,9 +156,10 @@ describe('delete command', () => {
       await deleteCommand(['-1']);
 
       expect(exitWithErrors).toHaveBeenCalledWith(
-        expect.objectContaining({
-          errors: expect.arrayContaining(['The task with ID -1 was not found']),
-        }),
+        {
+          errors: ['Task with ID -1 was not found'],
+          success: false,
+        },
         false
       );
     });
@@ -180,8 +181,11 @@ describe('delete command', () => {
       // Verify task was deleted
       expect(existsSync(taskPath)).toBe(false);
       expect(exitWithSuccess).toHaveBeenCalledWith(
-        'Task deleted successfully',
-        expect.objectContaining({ success: true }),
+        'All tasks (IDs: 1) deleted successfully',
+        {
+          success: true,
+          errors: [],
+        },
         false
       );
     });
@@ -194,8 +198,11 @@ describe('delete command', () => {
       await deleteCommand(['2'], { json: true });
 
       expect(exitWithSuccess).toHaveBeenCalledWith(
-        'Task deleted successfully',
-        expect.objectContaining({ success: true }),
+        'All tasks (IDs: 2) deleted successfully',
+        {
+          success: true,
+          errors: [],
+        },
         true
       );
       expect(existsSync('.rover/tasks/2')).toBe(false);
@@ -222,8 +229,11 @@ describe('delete command', () => {
       await deleteCommand(['4'], { yes: true });
 
       expect(exitWithSuccess).toHaveBeenCalledWith(
-        'Task deleted successfully',
-        expect.objectContaining({ success: true }),
+        'All tasks (IDs: 4) deleted successfully',
+        {
+          success: true,
+          errors: [],
+        },
         false
       );
       expect(existsSync('.rover/tasks/4')).toBe(false);
@@ -243,10 +253,10 @@ describe('delete command', () => {
       await deleteCommand(['5']);
 
       expect(exitWithErrors).toHaveBeenCalledWith(
-        expect.objectContaining({
+        {
           success: false,
-          errors: expect.arrayContaining(['Task deletion cancelled']),
-        }),
+          errors: ['Task deletion cancelled'],
+        },
         false
       );
 
@@ -266,8 +276,11 @@ describe('delete command', () => {
       await deleteCommand(['6']);
 
       expect(exitWithSuccess).toHaveBeenCalledWith(
-        'Task deleted successfully',
-        expect.objectContaining({ success: true }),
+        'All tasks (IDs: 6) deleted successfully',
+        {
+          success: true,
+          errors: [],
+        },
         false
       );
 
@@ -284,8 +297,11 @@ describe('delete command', () => {
       await deleteCommand(['7'], { json: true });
 
       expect(exitWithSuccess).toHaveBeenCalledWith(
-        'Task deleted successfully',
-        expect.objectContaining({ success: true }),
+        'All tasks (IDs: 7) deleted successfully',
+        {
+          success: true,
+          errors: [],
+        },
         true
       );
       expect(existsSync('.rover/tasks/7')).toBe(false);
@@ -386,8 +402,11 @@ describe('delete command', () => {
       await deleteCommand(['17'], { yes: true });
 
       expect(exitWithSuccess).toHaveBeenCalledWith(
-        'Task deleted successfully',
-        expect.objectContaining({ success: true }),
+        'All tasks (IDs: 17) deleted successfully',
+        {
+          success: true,
+          errors: [],
+        },
         false
       );
       expect(existsSync('.rover/tasks/17')).toBe(false);
@@ -399,9 +418,10 @@ describe('delete command', () => {
       await deleteCommand(['0']);
 
       expect(exitWithErrors).toHaveBeenCalledWith(
-        expect.objectContaining({
-          errors: expect.arrayContaining(['The task with ID 0 was not found']),
-        }),
+        {
+          errors: ['Task with ID 0 was not found'],
+          success: false,
+        },
         false
       );
     });
@@ -412,11 +432,10 @@ describe('delete command', () => {
       await deleteCommand(['999999999']);
 
       expect(exitWithErrors).toHaveBeenCalledWith(
-        expect.objectContaining({
-          errors: expect.arrayContaining([
-            'The task with ID 999999999 was not found',
-          ]),
-        }),
+        {
+          errors: ['Task with ID 999999999 was not found'],
+          success: false,
+        },
         false
       );
     });
@@ -431,8 +450,11 @@ describe('delete command', () => {
       await deleteCommand(['18'], { yes: true, json: true });
 
       expect(exitWithSuccess).toHaveBeenCalledWith(
-        'Task deleted successfully',
-        expect.objectContaining({ success: true }),
+        'All tasks (IDs: 18) deleted successfully',
+        {
+          success: true,
+          errors: [],
+        },
         true // JSON mode
       );
       expect(existsSync('.rover/tasks/18')).toBe(false);
@@ -454,8 +476,11 @@ describe('delete command', () => {
       await deleteCommand(['20', '21', '22']);
 
       expect(exitWithSuccess).toHaveBeenCalledWith(
-        'Tasks deleted successfully',
-        expect.objectContaining({ success: true }),
+        'All tasks (IDs: 20 21 22) deleted successfully',
+        {
+          success: true,
+          errors: [],
+        },
         false
       );
 
@@ -473,13 +498,11 @@ describe('delete command', () => {
       await deleteCommand(['23', '999'], { yes: true });
 
       expect(exitWithSuccess).toHaveBeenCalledWith(
-        'Task deleted successfully',
-        expect.objectContaining({
+        'All tasks (IDs: 23) deleted successfully',
+        {
           success: true,
-          errors: expect.arrayContaining([
-            'The task with ID 999 was not found',
-          ]),
-        }),
+          errors: ['Task with ID 999 was not found'],
+        },
         false
       );
 
@@ -500,10 +523,10 @@ describe('delete command', () => {
       await deleteCommand(['24', '25']);
 
       expect(exitWithErrors).toHaveBeenCalledWith(
-        expect.objectContaining({
+        {
           success: false,
-          errors: expect.arrayContaining(['Task deletion cancelled']),
-        }),
+          errors: ['Task deletion cancelled'],
+        },
         false
       );
 

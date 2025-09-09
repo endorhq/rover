@@ -192,13 +192,13 @@ export const deleteCommand = async (
 
     if (allSucceeded) {
       exitWithSuccess(
-        `All task${succeededTasks.length > 1 ? 's' : ''} (${succeededTasks.join(', ')}) deleted successfully`,
+        `All tasks (IDs: ${succeededTasks.join(' ')}) deleted successfully`,
         jsonOutput,
         json
       );
     } else if (someSucceeded) {
       exitWithWarn(
-        `Some task${succeededTasks.length > 1 ? 's' : ''} (${succeededTasks.join(', ')}) deleted successfully`,
+        `Some tasks (IDs: ${succeededTasks.join(' ')}) deleted successfully`,
         jsonOutput,
         json
       );
