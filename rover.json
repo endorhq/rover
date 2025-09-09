@@ -2,5 +2,6 @@
   "version": "1.0",
   "languages": ["javascript"],
   "packageManagers": ["npm"],
-  "taskManagers": []
+  "taskManagers": [],
+  "attribution": true
 }

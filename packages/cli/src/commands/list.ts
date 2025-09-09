@@ -99,6 +99,7 @@ export const listCommand = async (
         id: taskId,
         title: taskData?.title || 'Unknown Task',
         status: status?.status || 'unknown',
+        agent: taskData?.agent || '-',
         progress: status?.progress,
         currentStep: status?.currentStep || '',
         startedAt: status?.startedAt,
@@ -113,12 +114,13 @@ export const listCommand = async (
     const headers = [
       'ID',
       'Title',
+      'Agent',
       'Status',
       'Progress',
       'Current Step',
       'Duration',
     ];
-    const columnWidths = [4, 35, 12, 10, 30, 10];
+    const columnWidths = [4, 30, 8, 12, 10, 25, 10];
 
     // Print header
     let headerRow = '';
@@ -189,18 +191,21 @@ export const listCommand = async (
       const duration = formatDuration(startedAt, endTime);
       const colorFunc = statusColor(taskStatus);
 
+      const agent = taskData?.agent || '-';
+
       let row = '';
       row += colors.cyan(taskId.padEnd(columnWidths[0]));
       row += colors.white(
         truncateText(title, columnWidths[1] - 1).padEnd(columnWidths[1])
       );
-      row += colorFunc(formatTaskStatus(taskStatus).padEnd(columnWidths[2])); // +10 for ANSI codes
+      row += colors.gray(agent.padEnd(columnWidths[2]));
+      row += colorFunc(formatTaskStatus(taskStatus).padEnd(columnWidths[3])); // +10 for ANSI codes
       row += formatProgress(taskStatus, status?.progress || 0).padEnd(
-        columnWidths[3] + 10
+        columnWidths[4] + 10
       );
       row += colors.gray(
-        truncateText(status?.currentStep || '-', columnWidths[4] - 1).padEnd(
-          columnWidths[4]
+        truncateText(status?.currentStep || '-', columnWidths[5] - 1).padEnd(
+          columnWidths[5]
         )
       );
       row += colors.gray(status ? duration : '-');

@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, writeFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { TaskStatus } from '../types.js';
+import { findProjectRoot } from 'rover-common';
 
 /**
  * Write status update to the status file
@@ -74,7 +75,7 @@ export const getAllTaskStatuses = (): {
   taskData?: any;
 }[] => {
   try {
-    const roverPath = join(process.cwd(), '.rover');
+    const roverPath = join(findProjectRoot(), '.rover');
     const tasksPath = join(roverPath, 'tasks');
 
     if (!existsSync(tasksPath)) {
@@ -162,7 +163,7 @@ const createInitialStatus = (taskId: string): TaskStatus => {
  */
 export const updateTaskWithStatus = (taskId: string, status: TaskStatus) => {
   try {
-    const roverPath = join(process.cwd(), '.rover');
+    const roverPath = join(findProjectRoot(), '.rover');
     const taskPath = join(roverPath, 'tasks', taskId);
     const descriptionPath = join(taskPath, 'description.json');
 

@@ -1,12 +1,27 @@
-import { execa, execaSync, ExecaError, ResultPromise } from 'execa';
+import { execa, execaSync } from 'execa';
 
-import type { Options, Result, SyncOptions, SyncResult } from 'execa';
-import type { LaunchOptions, LaunchSyncOptions } from './types.d.ts';
+import type {
+  Options,
+  Result,
+  SyncOptions,
+  SyncResult,
+  StdoutStderrOption,
+} from 'execa';
 export type { Options, Result, SyncOptions, SyncResult };
 
 import colors from 'ansi-colors';
+import { Git } from './git.js';
 
-import { VERBOSE } from './index.js';
+import { PROJECT_CONFIG_FILE, VERBOSE } from './index.js';
+
+/**
+ * Find the project root directory by searching for rover.json in parent directories
+ * up to the Git repository root
+ */
+export function findProjectRoot(): string {
+  const git = new Git();
+  return git.getRepositoryRoot() || process.cwd();
+}
 
 const log = (stream: string) => {
   return function* (chunk: unknown) {
@@ -30,24 +45,77 @@ const log = (stream: string) => {
 const logStdout = log('stdout');
 const logStderr = log('stderr');
 
+/**
+ * Check if the given stream requires to print logging.
+ * We skip logging for inherit streams
+ */
+const shouldAddLogging = (stream: string, options?: Options | SyncOptions) => {
+  if (options == null) return true;
+
+  if (options.all) {
+    // Merging all streams into a single one
+    const stdioArrayInherit =
+      Array.isArray(options.stdio) &&
+      options.stdio.some(el => el === 'inherit');
+    const stdioInherit =
+      !Array.isArray(options.stdio) && options.stdio === 'inherit';
+
+    // Do not add logging if the stdio has an inherit value
+    return !(stdioArrayInherit || stdioInherit);
+  }
+
+  const streamOpts = stream === 'stdout' ? options.stdout : options.stderr;
+  const streamArrayInherit =
+    Array.isArray(streamOpts) && streamOpts.some(el => el === 'inherit');
+  const streamInherit = !Array.isArray(streamOpts) && streamOpts === 'inherit';
+
+  // Do not add logging if the stream has an inherit value
+  return !(streamArrayInherit || streamInherit);
+};
+
 export function launch(
   command: string,
   args?: ReadonlyArray<string>,
   options?: Options
 ): ReturnType<typeof execa> {
   if (VERBOSE) {
-    const stdout = options?.stdout
-      ? [options.stdout as any, logStdout]
-      : [logStdout];
-    const stderr = options?.stderr
-      ? [options.stderr as any, logStderr]
-      : [logStderr];
-    return execa(command, args, {
+    const now = new Date();
+    console.error(
+      colors.gray(now.toISOString()) +
+        colors.cyan(' Command ') +
+        colors.gray(`${command} ${args?.join(' ')}`)
+    );
+
+    // Check first if we need to add logging
+    let newOpts: Options = {
       ...options,
-      stdout: stdout as any,
-      stderr: stderr as any,
-    });
+    } as Options;
+
+    if (shouldAddLogging('stdout', options)) {
+      const stdout = options?.stdout
+        ? [logStdout, options.stdout].flat()
+        : [logStdout];
+
+      newOpts = {
+        ...newOpts,
+        stdout,
+      } as Options;
+    }
+
+    if (shouldAddLogging('stderr', options)) {
+      const stderr = options?.stderr
+        ? [logStderr, options.stderr].flat()
+        : [logStderr];
+
+      newOpts = {
+        ...newOpts,
+        stderr,
+      } as Options;
+    }
+
+    return execa(command, args, newOpts);
   }
+
   return execa(command, args, options);
 }
 
@@ -57,17 +125,41 @@ export function launchSync(
   options?: SyncOptions
 ): ReturnType<typeof execaSync> {
   if (VERBOSE) {
-    const stdout = options?.stdout
-      ? [options.stdout as any, logStdout]
-      : [logStdout];
-    const stderr = options?.stderr
-      ? [options.stderr as any, logStderr]
-      : [logStderr];
-    return execaSync(command, args, {
+    const now = new Date();
+    console.error(
+      colors.gray(now.toISOString()) +
+        colors.cyan(' Command ') +
+        colors.gray(`${command} ${args?.join(' ')}`)
+    );
+
+    // Check first if we need to add logging
+    let newOpts: SyncOptions = {
       ...options,
-      stdout: stdout as any,
-      stderr: stderr as any,
-    });
+    } as SyncOptions;
+
+    if (shouldAddLogging('stdout', options)) {
+      const stdout = options?.stdout
+        ? [logStdout, options.stdout].flat()
+        : [logStdout];
+
+      newOpts = {
+        ...newOpts,
+        stdout,
+      } as SyncOptions;
+    }
+
+    if (shouldAddLogging('stderr', options)) {
+      const stderr = options?.stderr
+        ? [logStderr, options.stderr].flat()
+        : [logStderr];
+
+      newOpts = {
+        ...newOpts,
+        stderr,
+      } as SyncOptions;
+    }
+
+    return execaSync(command, args, newOpts);
   }
   return execaSync(command, args, options);
 }

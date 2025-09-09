@@ -5,10 +5,11 @@ import { join } from 'node:path';
 import yoctoSpinner from 'yocto-spinner';
 import { getAIAgentTool, type AIAgentTool } from '../lib/agents/index.js';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
-import { UserSettings, AI_AGENT } from '../lib/config.js';
+import { UserSettings, AI_AGENT, ProjectConfig } from '../lib/config.js';
 import { getTelemetry } from '../lib/telemetry.js';
-import Git from '../lib/git.js';
+import { Git } from 'rover-common';
 import { showRoverChat, showTips } from '../utils/display.js';
+import { findProjectRoot } from 'rover-common';
 
 const { prompt } = enquirer;
 
@@ -17,7 +18,7 @@ const { prompt } = enquirer;
  */
 const getTaskIterationSummaries = (taskId: string): string[] => {
   try {
-    const roverPath = join(process.cwd(), '.rover');
+    const roverPath = join(findProjectRoot(), '.rover');
     const taskPath = join(roverPath, 'tasks', taskId);
     const iterationsPath = join(taskPath, 'iterations');
 
@@ -238,7 +239,18 @@ export const mergeCommand = async (
 
   // Load AI agent selection from user settings
   let selectedAiAgent = 'claude'; // default
+  let projectConfig;
 
+  // Load config
+  try {
+    projectConfig = ProjectConfig.load();
+  } catch (err) {
+    if (!options.json) {
+      console.log(colors.yellow('⚠ Could not load project settings'));
+    }
+  }
+
+  // Load user preferences
   try {
     if (UserSettings.exists()) {
       const userSettings = UserSettings.load();
@@ -406,6 +418,8 @@ export const mergeCommand = async (
       }
     }
 
+    console.log(''); // breakline
+
     const spinner = !options.json
       ? yoctoSpinner({ text: 'Preparing merge...' }).start()
       : null;
@@ -433,12 +447,16 @@ export const mergeCommand = async (
         );
 
         // Fallback commit message if AI fails
-        const commitMessage =
-          aiCommitMessage || `${task.title}\n\n${task.description}`;
+        const commitMessage = aiCommitMessage || task.title;
 
-        // Add Co-Authored-By line
-        finalCommitMessage = `${commitMessage}\n\nCo-Authored-By: Rover <noreply@endor.dev>`;
-        result.commitMessage = finalCommitMessage.split('\n')[0]; // Store first line for result
+        // Add Co-Authored-By line when attribution is enabled
+        if (projectConfig == null || projectConfig?.attribution === true) {
+          finalCommitMessage = `${commitMessage}\n\nCo-Authored-By: Rover <noreply@endor.dev>`;
+        } else {
+          finalCommitMessage = commitMessage;
+        }
+
+        result.commitMessage = finalCommitMessage; // Store first line for result
 
         if (spinner) spinner.text = 'Committing changes in worktree...';
 
@@ -557,6 +575,7 @@ export const mergeCommand = async (
 
               mergeSuccessful = true;
               result.merged = true;
+              task.markMerged();
 
               if (!options.json) {
                 console.log(

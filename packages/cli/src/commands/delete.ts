@@ -13,6 +13,7 @@ import {
 } from '../utils/exit.js';
 import { CLIJsonOutputWithErrors } from '../types.js';
 import Git from '../lib/git.js';
+import { findProjectRoot } from 'rover-common';
 
 const { prompt } = enquirer;
 
@@ -150,7 +151,7 @@ export const deleteCommand = async (
     for (const task of tasksToDelete) {
       try {
         const taskPath = join(
-          process.cwd(),
+          findProjectRoot(),
           '.rover',
           'tasks',
           task.id.toString()

@@ -6,7 +6,13 @@ import {
   TaskDetails,
   IterateResult,
 } from './types.js';
-import { launch, launchSync, type Options, type Result } from 'rover-common';
+import {
+  findProjectRoot,
+  launch,
+  launchSync,
+  type Options,
+  type Result,
+} from 'rover-common';
 
 export class RoverCLI {
   private roverPath: string;
@@ -29,7 +35,7 @@ export class RoverCLI {
 
   private getLaunchOptions(): Options {
     return {
-      cwd: this.workspaceRoot?.fsPath || process.cwd(),
+      cwd: this.workspaceRoot?.fsPath || findProjectRoot(),
       env: {
         ...process.env,
         // For now, disable the CLI telemetry as we will add it to the extension
@@ -259,11 +265,11 @@ export class RoverCLI {
       }
 
       // Fallback: construct expected path
-      const workspaceRoot = this.workspaceRoot || process.cwd();
+      const workspaceRoot = this.workspaceRoot || findProjectRoot();
       return `${workspaceRoot}/.rover/tasks/${taskId}/workspace`;
     } catch (error) {
       // Fallback: construct expected path
-      const workspaceRoot = this.workspaceRoot || process.cwd();
+      const workspaceRoot = this.workspaceRoot || findProjectRoot();
       return `${workspaceRoot}/.rover/tasks/${taskId}/workspace`;
     }
   }

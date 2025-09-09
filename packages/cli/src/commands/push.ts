@@ -8,7 +8,8 @@ import { CLIJsonOutput } from '../types.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
 import { showRoverChat, TIP_TITLES } from '../utils/display.js';
 import { statusColor } from '../utils/task-status.js';
-import Git from '../lib/git.js';
+import { Git } from 'rover-common';
+import { ProjectConfig } from '../lib/config.js';
 
 const { prompt } = enquirer;
 
@@ -78,6 +79,17 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
 
   // Store the task ID!
   result.taskId = numericTaskId;
+
+  let projectConfig;
+
+  // Load config
+  try {
+    projectConfig = ProjectConfig.load();
+  } catch (err) {
+    if (!options.json) {
+      console.log(colors.yellow('⚠ Could not load project settings'));
+    }
+  }
 
   try {
     // Load task using TaskDescription
@@ -155,6 +167,10 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
             commitMessage = defaultMessage;
           }
         }
+      }
+
+      if (projectConfig == null || projectConfig?.attribution === true) {
+        commitMessage = `${commitMessage}\n\nCo-Authored-By: Rover <noreply@endor.dev>`;
       }
 
       result.commitMessage = commitMessage;

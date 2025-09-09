@@ -214,11 +214,37 @@ export const initCommand = async (
       defaultAIAgent = availableAgents[0];
     }
 
+    let attribution = true;
+
+    if (!options.yes) {
+      console.log(colors.white.bold('\nAttribution'));
+      // Confirm attribution
+      console.log(
+        colors.gray(
+          '├── Rover can add itself as a co-author on commits it helps create'
+        )
+      );
+      console.log(
+        colors.gray(
+          '└── This helps track AI-assisted work in your repository\n'
+        )
+      );
+      const { confirm } = await prompt<{ confirm: boolean }>({
+        type: 'confirm',
+        name: 'confirm',
+        message:
+          'Would you like to enable commit attribution? (can change anytime)',
+        initial: true,
+      });
+      attribution = confirm;
+    }
+
     // Send telemetry information
     telemetry?.eventInit(
       availableAgents,
       defaultAIAgent,
-      environment.languages
+      environment.languages,
+      attribution
     );
 
     // Save configuration to .rover directory
@@ -238,8 +264,10 @@ export const initCommand = async (
         environment.taskManagers.forEach(tm =>
           projectConfig.addTaskManager(tm)
         );
+        projectConfig.setAttribution(attribution);
       } else {
         projectConfig = ProjectConfig.create();
+        projectConfig.setAttribution(attribution);
         // Set detected values
         environment.languages.forEach(lang => projectConfig.addLanguage(lang));
         environment.packageManagers.forEach(pm =>

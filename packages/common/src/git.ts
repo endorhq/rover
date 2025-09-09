@@ -1,4 +1,4 @@
-import { launchSync } from 'rover-common';
+import { launchSync } from './os.js';
 
 export class GitError extends Error {
   constructor(reason: string) {
@@ -59,6 +59,21 @@ export class Git {
   isGitRepo(): boolean {
     const result = launchSync('git', ['rev-parse', '--is-inside-work-tree']);
     return result.exitCode === 0;
+  }
+
+  /**
+   * Get the root directory of the Git repository
+   */
+  getRepositoryRoot(): string | null {
+    try {
+      const result = launchSync('git', ['rev-parse', '--show-toplevel']);
+      if (result.exitCode === 0) {
+        return result.stdout?.toString().trim() || null;
+      }
+      return null;
+    } catch {
+      return null;
+    }
   }
 
   hasCommits(): boolean {
@@ -525,5 +540,3 @@ export class Git {
     }
   }
 }
-
-export default Git;

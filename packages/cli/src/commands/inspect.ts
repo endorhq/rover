@@ -9,6 +9,7 @@ import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { showTips } from '../utils/display.js';
 import { getTelemetry } from '../lib/telemetry.js';
+import { findProjectRoot } from 'rover-common';
 
 /**
  * Interface for JSON output of task inspection
@@ -72,7 +73,7 @@ const discoverIterationFiles = (
   iterationId: number
 ): string[] => {
   const iterationDir = join(
-    process.cwd(),
+    findProjectRoot(),
     '.rover',
     'tasks',
     taskId.toString(),
@@ -126,7 +127,7 @@ export const iterationFiles = (
     if (files.includes(file)) {
       const fileContents = readFileSync(
         join(
-          process.cwd(),
+          findProjectRoot(),
           '.rover',
           'tasks',
           taskId.toString(),

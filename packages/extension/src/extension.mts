@@ -6,7 +6,7 @@ import { TaskItem } from './providers/TaskItem.mjs';
 import { TaskDetailsPanel } from './panels/TaskDetailsPanel.mjs';
 import { getTelemetry } from './lib/telemetry.mjs';
 import { NewTaskProvider } from 'rover-telemetry';
-import { launch, launchSync } from 'rover-common';
+import { findProjectRoot, launch, launchSync } from 'rover-common';
 
 let tasksWebviewProvider: TasksLitWebviewProvider;
 
@@ -1012,7 +1012,7 @@ export function activate(context: vscode.ExtensionContext) {
             try {
               const workspaceRoot =
                 vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ||
-                process.cwd();
+                findProjectRoot();
               const { stdout: remoteUrl } = launchSync(
                 'git',
                 ['remote', 'get-url', 'origin'],
@@ -1064,7 +1064,7 @@ export function activate(context: vscode.ExtensionContext) {
             try {
               const workspaceRoot =
                 vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ||
-                process.cwd();
+                findProjectRoot();
               const { stdout } = launchSync(
                 'gh',
                 [
@@ -1159,7 +1159,7 @@ export function activate(context: vscode.ExtensionContext) {
                   .get<string>('cliPath') || 'rover';
               const workspaceRoot =
                 vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ||
-                process.cwd();
+                findProjectRoot();
 
               telemetry?.eventNewTask(NewTaskProvider.GITHUB);
 
