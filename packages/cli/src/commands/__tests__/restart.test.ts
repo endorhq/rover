@@ -217,30 +217,6 @@ describe('restart command', async () => {
   });
 
   describe('options handling', () => {
-    it('should pass through follow option to start command', async () => {
-      // Create a failed task
-      const taskId = 111;
-      const taskDir = join(testDir, '.rover', 'tasks', taskId.toString());
-      mkdirSync(taskDir, { recursive: true });
-
-      const task = TaskDescription.create({
-        id: taskId,
-        title: 'Test Task',
-        description: 'A test task',
-      });
-
-      task.markFailed('This task failed');
-
-      // Run restart command with follow option
-      await restartCommand(taskId.toString(), { follow: true, json: true });
-
-      // Verify start command was called with follow option
-      expect(mockStartCommand).toHaveBeenCalledWith(taskId.toString(), {
-        follow: true,
-        json: true,
-      });
-    });
-
     it('should pass through debug option to start command', async () => {
       // Create a failed task
       const taskId = 222;

@@ -129,25 +129,11 @@ program
   )
   .action(taskCommand);
 
-// Start a task in NEW status
-program
-  .command('start')
-  .description(
-    'Start a task that could not be automatically started when created'
-  )
-  .argument('<taskId>', 'Task ID to start')
-  .option('--json', 'Output the result in JSON format')
-  // .option('--debug', 'Show debug information like running commands')
-  .action(startCommand);
-
 // Restart a task
 program
   .command('restart')
-  .description(
-    'Restart a task'
-  )
+  .description('Restart a task')
   .argument('<taskId>', 'Task ID to restart')
-  .option('-f, --follow', 'Follow execution logs in real-time')
   .option('--json', 'Output the result in JSON format')
   .action(restartCommand);
 
