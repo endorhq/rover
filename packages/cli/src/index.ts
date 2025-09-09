@@ -1,7 +1,6 @@
 #!/usr/bin/env node
-import { existsSync } from 'fs';
-import { join } from 'node:path';
 import { Command } from 'commander';
+import { ProjectConfig, UserSettings } from './lib/config.js';
 import { initCommand } from './commands/init.js';
 import { listCommand } from './commands/list.js';
 import { getVersion } from './utils/version.js';
@@ -18,8 +17,9 @@ import { deleteCommand } from './commands/delete.js';
 import { mergeCommand } from './commands/merge.js';
 import colors from 'ansi-colors';
 import { pushCommand } from './commands/push.js';
+import { stopCommand } from './commands/stop.js';
 import { showTips, TIP_TITLES } from './utils/display.js';
-import { launch, setVerbose } from 'rover-common';
+import { setVerbose } from 'rover-common';
 
 const program = new Command();
 
@@ -30,10 +30,7 @@ program
   })
   .hook('preAction', (thisCommand, actionCommand) => {
     const commandName = actionCommand.name();
-    if (
-      commandName !== 'init' &&
-      !existsSync(join(process.cwd(), 'rover.json'))
-    ) {
+    if (commandName !== 'init' && !ProjectConfig.exists()) {
       console.log(
         colors.white(
           `Rover is not initialized in this directory. The command you requested (\`${commandName}\`) was not executed.`
@@ -61,8 +58,8 @@ program
     const commandName = actionCommand.name();
     if (
       commandName !== 'init' &&
-      existsSync(join(process.cwd(), 'rover.json')) &&
-      !existsSync(join(process.cwd(), '.rover', 'settings.json'))
+      ProjectConfig.exists() &&
+      !UserSettings.exists()
     ) {
       console.log(
         colors.white(
@@ -117,8 +114,13 @@ program
     '--from-github <issue>',
     'Fetch task description from a GitHub issue number'
   )
-  .option('-f, --follow', 'Follow execution logs in real-time')
   .option('-y, --yes', 'Skip all confirmations and run non-interactively')
+  .option(
+    '-s, --source-branch <branch>',
+    'Base branch for git worktree creation'
+  )
+  .option('-t, --target-branch <branch>', 'Custom name for the worktree branch')
+  .option('-a, --agent <agent>', 'AI agent to use (claude, gemini, qwen)')
   .option('--json', 'Output the result in JSON format')
   .option('--debug', 'Show debug information like running commands')
   .argument(
@@ -134,21 +136,37 @@ program
     'Start a task that could not be automatically started when created'
   )
   .argument('<taskId>', 'Task ID to start')
-  .option('-f, --follow', 'Follow execution logs in real-time')
   .option('--json', 'Output the result in JSON format')
   // .option('--debug', 'Show debug information like running commands')
   .action(startCommand);
 
-// Restart a task in FAILED status
+// Restart a task
 program
   .command('restart')
   .description(
-    'Restart a failed task by resetting it to NEW status and starting execution'
+    'Restart a task'
   )
   .argument('<taskId>', 'Task ID to restart')
   .option('-f, --follow', 'Follow execution logs in real-time')
   .option('--json', 'Output the result in JSON format')
   .action(restartCommand);
+
+// Stop a running task
+program
+  .command('stop')
+  .description('Stop a running task and clean up its resources')
+  .argument('<taskId>', 'Task ID to stop')
+  .option(
+    '-a, --remove-all',
+    'Remove container, git worktree and branch if they exist'
+  )
+  .option('-c, --remove-container', 'Remove container if it exists')
+  .option(
+    '-g, --remove-git-worktree-and-branch',
+    'Remove git worktree and branch'
+  )
+  .option('--json', 'Output the result in JSON format')
+  .action(stopCommand);
 
 // Add the ps command for monitoring tasks
 program

@@ -8,7 +8,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { execSync } from 'node:child_process';
+import { launchSync } from 'rover-common';
 import { startCommand } from '../start.js';
 import { TaskDescription } from '../../lib/description.js';
 
@@ -26,7 +26,7 @@ vi.mock('../task.js', () => ({
 
 // Mock user settings
 vi.mock('../../lib/config.js', () => ({
-  AI_AGENT: { Claude: 'claude', Gemini: 'gemini' },
+  AI_AGENT: { Claude: 'claude', Gemini: 'gemini', Qwen: 'qwen' },
   UserSettings: {
     exists: vi.fn().mockReturnValue(true),
     load: vi.fn().mockReturnValue({ defaultAiAgent: 'claude' }),
@@ -56,14 +56,14 @@ describe('start command', () => {
     process.chdir(testDir);
 
     // Initialize git repo
-    execSync('git init', { stdio: 'pipe' });
-    execSync('git config user.email "test@test.com"', { stdio: 'pipe' });
-    execSync('git config user.name "Test User"', { stdio: 'pipe' });
+    launchSync('git', ['init']);
+    launchSync('git', ['config', 'user.email', 'test@test.com']);
+    launchSync('git', ['config', 'user.name', 'Test User']);
 
     // Create initial commit
     writeFileSync('README.md', '# Test');
-    execSync('git add README.md', { stdio: 'pipe' });
-    execSync('git commit -m "Initial commit"', { stdio: 'pipe' });
+    launchSync('git', ['add', 'README.md']);
+    launchSync('git', ['commit', '-m', 'Initial commit']);
 
     // Create .rover directory structure
     const roverDir = join(testDir, '.rover');

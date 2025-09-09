@@ -1,60 +1,54 @@
 import enquirer from 'enquirer';
 import colors from 'ansi-colors';
 import yoctoSpinner from 'yocto-spinner';
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { platform } from 'node:process';
 import { getNextTaskId } from '../utils/task-id.js';
-import { homedir, tmpdir } from 'node:os';
-import { getAIAgentTool, type AIAgentTool } from '../lib/agents/index.js';
+import { homedir, userInfo } from 'node:os';
+import { getAIAgentTool, getUserAIAgent } from '../lib/agents/index.js';
 import type { IPromptTask } from '../lib/prompts/index.js';
 import { TaskDescription } from '../lib/description.js';
 import { PromptBuilder } from '../lib/prompts/index.js';
 import { SetupBuilder } from '../lib/setup.js';
-import { UserSettings, AI_AGENT } from '../lib/config.js';
+import { AI_AGENT } from '../lib/config.js';
 import { IterationConfig } from '../lib/iteration.js';
 import { generateBranchName } from '../utils/branch-name.js';
 import { request } from 'node:https';
-import { spawn } from 'node:child_process';
-import { launch, launchSync } from 'rover-common';
+import { findProjectRoot, launch, launchSync } from 'rover-common';
 import { checkGitHubCLI } from '../utils/system.js';
 import { showRoverBanner, showRoverChat, showTips } from '../utils/display.js';
-import { userInfo } from 'node:os';
 import { getTelemetry } from '../lib/telemetry.js';
 import { NewTaskProvider } from 'rover-telemetry';
-import { Git } from '../lib/git.js';
+import { Git } from 'rover-common';
 import { readFromStdin, stdinIsAvailable } from '../utils/stdin.js';
+import { CLIJsonOutput } from '../types.js';
+import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
+import { GitHub, GitHubError } from '../lib/github.js';
+import { copyEnvironmentFiles } from '../utils/env-files.js';
 
 const { prompt } = enquirer;
+
+type validationResult = {
+  error: string;
+  tips?: string[];
+} | null;
 
 /**
  * Command validations.
  */
 const validations = (
   selectedAiAgent?: string,
-  isJsonMode?: boolean,
-  followMode?: boolean
-): boolean => {
+  isJsonMode?: boolean
+): validationResult => {
   // Check if we're in a git repository
   try {
     const git = new Git();
 
     if (!git.isGitRepo()) {
-      if (!isJsonMode) {
-        console.log(colors.red('✗ Not in a git repository'));
-        console.log(
-          colors.gray(
-            '  Git worktree requires the project to be in a git repository'
-          )
-        );
-      }
-      return false;
+      return {
+        error: 'Not in a git repository',
+        tips: ['Rover requires the project to be in a git repository'],
+      };
     }
 
     // Check if git repository has at least one commit
@@ -67,18 +61,18 @@ const validations = (
           )
         );
       }
-      return false;
+      return {
+        error: 'No commits found in git repository',
+        tips: ['Git worktree requires at least one commit in the repository'],
+      };
     }
   } catch (error) {
-    if (!isJsonMode) {
-      console.log(colors.red('✗ Git repository validation failed'));
-      console.log(
-        colors.gray(
-          '  Please ensure git is installed and the repository is properly initialized'
-        )
-      );
-    }
-    return false;
+    return {
+      error: 'Git repository validation failed',
+      tips: [
+        'Please ensure git is installed and the repository is properly initialized',
+      ],
+    };
   }
 
   // Check AI agent credentials based on selected agent
@@ -86,11 +80,10 @@ const validations = (
     const claudeFile = join(homedir(), '.claude.json');
 
     if (!existsSync(claudeFile)) {
-      if (!isJsonMode) {
-        console.log(colors.red('\n✗ Claude configuration not found'));
-        console.log(colors.gray('  Please run `claude` first to configure it'));
-      }
-      return false;
+      return {
+        error: 'Claude configuration not found',
+        tips: ['Run ' + colors.cyan('claude') + ' first to configure it'],
+      };
     }
   } else if (selectedAiAgent === 'gemini') {
     // Check Gemini credentials if needed
@@ -98,29 +91,39 @@ const validations = (
     const geminiCreds = join(homedir(), '.gemini', 'oauth_creds.json');
 
     if (!existsSync(geminiFile)) {
-      if (!isJsonMode) {
-        console.log(colors.red('\n✗ Gemini configuration not found'));
-        console.log(colors.gray('  Please run `gemini` first to configure it'));
-      }
-      return false;
+      return {
+        error: 'Gemini configuration not found',
+        tips: ['Run ' + colors.cyan('gemini') + ' first to configure it'],
+      };
     }
 
     if (!existsSync(geminiCreds)) {
-      if (!isJsonMode) {
-        console.log(colors.red('\n✗ Gemini credentials not found'));
-        console.log(
-          colors.gray('  Please run `gemini` first to set up credentials')
-        );
-      }
-      return false;
+      return {
+        error: 'Gemini credentials not found',
+        tips: ['Run ' + colors.cyan('gemini') + ' first to set up credentials'],
+      };
+    }
+  } else if (selectedAiAgent === 'qwen') {
+    // Check Gemini credentials if needed
+    const qwenFile = join(homedir(), '.qwen', 'settings.json');
+    const qwenCreds = join(homedir(), '.qwen', 'oauth_creds.json');
+
+    if (!existsSync(qwenFile)) {
+      return {
+        error: 'Qwen configuration not found',
+        tips: ['Run ' + colors.cyan('qwen') + ' first to configure it'],
+      };
+    }
+
+    if (!existsSync(qwenCreds)) {
+      return {
+        error: 'Qwen credentials not found',
+        tips: ['Run ' + colors.cyan('qwen') + ' first to set up credentials'],
+      };
     }
   }
 
-  if (isJsonMode && followMode) {
-    return false;
-  }
-
-  return true;
+  return null;
 };
 
 /**
@@ -167,19 +170,6 @@ const updateTaskMetadata = (
   }
 };
 
-export const findKeychainCredentials = (key: string): string => {
-  const result = launchSync('security', [
-    'find-generic-password',
-    '-s',
-    key,
-    '-w',
-  ]).stdout as string;
-  if (result === undefined) {
-    throw new Error('could not find keychain credentials');
-  }
-  return result;
-};
-
 /**
  * Start environment using containers
  */
@@ -189,7 +179,6 @@ export const startDockerExecution = async (
   worktreePath: string,
   iterationPath: string,
   selectedAiAgent: string,
-  followMode?: boolean,
   jsonMode?: boolean,
   debug?: boolean
 ) => {
@@ -219,7 +208,7 @@ export const startDockerExecution = async (
 
   // Generate prompts using PromptBuilder
   const promptsDir = join(
-    process.cwd(),
+    findProjectRoot(),
     '.rover',
     'tasks',
     taskId.toString(),
@@ -230,40 +219,9 @@ export const startDockerExecution = async (
   const promptBuilder = new PromptBuilder(selectedAiAgent);
   promptBuilder.generatePromptFiles(iteration, promptsDir);
 
-  // Check AI agent credentials based on selected agent
-  let credentialsValid = true;
-  const dockerMounts: string[] = [];
-
-  if (selectedAiAgent === 'claude') {
-    const claudeFile = join(homedir(), '.claude.json');
-    const claudeCreds = join(homedir(), '.claude', '.credentials.json');
-
-    dockerMounts.push(`-v`, `${claudeFile}:/.claude.json:Z,ro`);
-
-    if (existsSync(claudeCreds)) {
-      dockerMounts.push(`-v`, `${claudeCreds}:/.credentials.json:Z,ro`);
-    } else if (platform == 'darwin') {
-      const claudeCreds = findKeychainCredentials('Claude Code-credentials');
-      const userCredentialsTempPath = mkdtempSync(join(tmpdir(), 'rover-'));
-      const claudeCredsFile = join(
-        userCredentialsTempPath,
-        '.credentials.json'
-      );
-      writeFileSync(claudeCredsFile, claudeCreds);
-      // Do not mount credentials as RO, as they will be
-      // shredded by the setup script when it finishes
-      dockerMounts.push(`-v`, `${claudeCredsFile}:/.credentials.json:Z`);
-    }
-  } else if (selectedAiAgent === 'gemini') {
-    // Gemini might use environment variables or other auth methods
-    const geminiFolder = join(homedir(), '.gemini');
-
-    dockerMounts.push(`-v`, `${geminiFolder}:/.gemini:Z,ro`);
-  }
-
-  if (!credentialsValid) {
-    return;
-  }
+  // Get agent-specific Docker mounts
+  const agent = getAIAgentTool(selectedAiAgent);
+  const dockerMounts: string[] = agent.getContainerMounts();
 
   if (!jsonMode) {
     console.log(colors.white.bold('\n🐳 Starting Docker container:'));
@@ -295,14 +253,8 @@ export const startDockerExecution = async (
       containerName,
       // For now, do not remove for logs
       // '--rm'
+      '-d',
     ];
-
-    // Add interactive flag only in follow mode
-    if (followMode) {
-      dockerArgs.push('-it');
-    } else {
-      dockerArgs.push('-d'); // Detached mode for background execution
-    }
 
     const currentUser = userInfo();
 
@@ -329,248 +281,70 @@ export const startDockerExecution = async (
       currentUser.gid.toString()
     );
 
-    if (followMode) {
-      if (spinner) spinner.success('Container started');
+    // Background mode execution
+    try {
+      const containerId = launchSync('docker', dockerArgs)
+        .stdout?.toString()
+        .trim();
+
+      if (spinner) spinner.success('Container started in background');
       if (!jsonMode) {
-        console.log(colors.bold.white(`Container logs (--follow)\n`));
+        showTips([
+          'Use ' + colors.cyan(`rover logs -f ${task.id}`) + ` to monitor logs`,
+          'Use ' +
+            colors.cyan(`rover inspect ${task.id}`) +
+            ` to get task details`,
+          'Use ' +
+            colors.cyan(`rover list`) +
+            ` to check the status of all tasks`,
+        ]);
       }
 
-      // Start Docker container with streaming output
-      if (debug && !jsonMode) {
-        console.log(`[DEBUG] docker ${dockerArgs.join(' ')}`);
-      }
-
-      const dockerProcess = spawn('docker', dockerArgs, {
-        stdio: ['inherit', 'pipe', 'pipe'],
-      });
-
-      let currentStep = 'Initializing';
+      // Update task metadata with container ID
+      updateTaskMetadata(
+        taskId,
+        {
+          containerId: containerId,
+          executionStatus: 'running',
+          runningAt: new Date().toISOString(),
+        },
+        jsonMode
+      );
+    } catch (error: any) {
+      if (spinner) spinner.error('Failed to start container in background');
       if (!jsonMode) {
-        console.log(colors.yellow(`📋 Current step: ${currentStep}`));
+        console.error(
+          colors.red('Error starting Docker container:'),
+          error.message
+        );
       }
 
-      // Handle stdout
-      dockerProcess.stdout?.on('data', data => {
-        const output = data.toString();
+      // Reset task to NEW status when container fails to start
+      updateTaskMetadata(
+        taskId,
+        {
+          status: 'NEW',
+          executionStatus: 'error',
+          error: error.message,
+          errorAt: new Date().toISOString(),
+        },
+        jsonMode
+      );
 
-        // Update current step based on output
-        if (output.includes(`Installing ${selectedAiAgent} CLI`)) {
-          if (currentStep !== `Installing ${selectedAiAgent} CLI`) {
-            currentStep = `Installing ${selectedAiAgent} CLI`;
-            if (!jsonMode) {
-              console.log(colors.yellow(`📋 Current step: ${currentStep}`));
-            }
-          }
-        } else if (output.includes('Creating agent user')) {
-          if (currentStep !== 'Setting up agent user') {
-            currentStep = 'Setting up agent user';
-            if (!jsonMode) {
-              console.log(colors.yellow(`📋 Current step: ${currentStep}`));
-            }
-          }
-        } else if (output.includes('Starting context phase')) {
-          if (currentStep !== 'Context Analysis') {
-            currentStep = 'Context Analysis';
-            if (!jsonMode) {
-              console.log(colors.yellow(`📋 Current step: ${currentStep}`));
-            }
-          }
-        } else if (output.includes('Starting plan phase')) {
-          if (currentStep !== 'Planning') {
-            currentStep = 'Planning';
-            if (!jsonMode) {
-              console.log(colors.yellow(`📋 Current step: ${currentStep}`));
-            }
-          }
-        } else if (output.includes('Starting implement phase')) {
-          if (currentStep !== 'Implementation') {
-            currentStep = 'Implementation';
-            if (!jsonMode) {
-              console.log(colors.yellow(`📋 Current step: ${currentStep}`));
-            }
-          }
-        } else if (output.includes('Starting review phase')) {
-          if (currentStep !== 'Code Review') {
-            currentStep = 'Code Review';
-            if (!jsonMode) {
-              console.log(colors.yellow(`📋 Current step: ${currentStep}`));
-            }
-          }
-        } else if (output.includes('Starting apply_review phase')) {
-          if (currentStep !== 'Applying Review Fixes') {
-            currentStep = 'Applying Review Fixes';
-            if (!jsonMode) {
-              console.log(colors.yellow(`📋 Current step: ${currentStep}`));
-            }
-          }
-        } else if (output.includes('Starting summary phase')) {
-          if (currentStep !== 'Creating Summary') {
-            currentStep = 'Creating Summary';
-            if (!jsonMode) {
-              console.log(colors.yellow(`📋 Current step: ${currentStep}`));
-            }
-          }
-        } else if (output.includes('Task execution completed')) {
-          if (currentStep !== 'Task execution complete') {
-            currentStep = 'Task execution complete';
-            if (!jsonMode) {
-              console.log(colors.yellow(`📋 Current step: ${currentStep}`));
-            }
-          }
-        }
-
-        // Display output with proper formatting
-        if (!jsonMode) {
-          process.stdout.write(colors.gray(output));
-        }
-      });
-
-      // Handle stderr
-      dockerProcess.stderr?.on('data', data => {
-        if (!jsonMode) {
-          process.stderr.write(colors.gray(data.toString()));
-        }
-      });
-
-      // Handle process completion
-      dockerProcess.on('close', code => {
-        if (code === 0) {
-          if (!jsonMode) {
-            console.log(
-              colors.green('\n✓ Task execution completed successfully')
-            );
-          }
-          // Update task metadata
-          updateTaskMetadata(
-            taskId,
-            {
-              executionStatus: 'completed',
-              completedAt: new Date().toISOString(),
-              exitCode: code,
-            },
-            jsonMode
-          );
-        } else {
-          if (!jsonMode) {
-            console.log(
-              colors.red(`\n✗ Task execution failed with code ${code}`)
-            );
-          }
-          // Update task metadata
-          updateTaskMetadata(
-            taskId,
-            {
-              executionStatus: 'failed',
-              failedAt: new Date().toISOString(),
-              exitCode: code,
-            },
-            jsonMode
-          );
-        }
-      });
-
-      dockerProcess.on('error', error => {
-        if (!jsonMode) {
-          console.error(colors.red('\nError running Docker container:'), error);
-        }
-        // Update task metadata
-        updateTaskMetadata(
-          taskId,
-          {
-            executionStatus: 'error',
-            error: error.message,
-            errorAt: new Date().toISOString(),
-          },
-          jsonMode
+      if (!jsonMode) {
+        console.log(
+          colors.yellow('⚠ There was an error during container creation')
         );
-      });
-
-      // Handle process interruption (Ctrl+C)
-      process.on('SIGINT', () => {
-        if (!jsonMode) {
-          console.log(colors.yellow('\n\n⚠ Stopping task execution...'));
-        }
-        try {
-          launchSync('docker', ['stop', containerName]);
-          if (!jsonMode) {
-            console.log(colors.green('✓ Container stopped'));
-          }
-        } catch (error) {
-          if (!jsonMode) {
-            console.log(colors.red('✗ Failed to stop container'));
-          }
-        }
-        // TODO: use exitWithSuccess
-        process.exit(0);
-      });
-    } else {
-      // Background mode execution
-      try {
-        const containerId = launchSync('docker', dockerArgs)
-          .stdout?.toString()
-          .trim();
-
-        if (spinner) spinner.success('Container started in background');
-        if (!jsonMode) {
-          showTips([
-            'Use ' +
-              colors.cyan(`rover logs -f ${task.id}`) +
-              ` to monitor logs`,
-            'Use ' +
-              colors.cyan(`rover inspect ${task.id}`) +
-              ` to get task details`,
-            'Use ' +
-              colors.cyan(`rover list`) +
-              ` to check the status of all tasks`,
-          ]);
-        }
-
-        // Update task metadata with container ID
-        updateTaskMetadata(
-          taskId,
-          {
-            containerId: containerId,
-            executionStatus: 'running',
-            runningAt: new Date().toISOString(),
-          },
-          jsonMode
+        console.log(colors.gray('  Resetting the task status to "New"'));
+        console.log(
+          colors.gray('  Use ') +
+            colors.cyan(`rover start ${taskId}`) +
+            colors.gray(' to retry execution')
         );
-      } catch (error: any) {
-        if (spinner) spinner.error('Failed to start container in background');
-        if (!jsonMode) {
-          console.error(
-            colors.red('Error starting Docker container:'),
-            error.message
-          );
-        }
-
-        // Reset task to NEW status when container fails to start
-        updateTaskMetadata(
-          taskId,
-          {
-            status: 'NEW',
-            executionStatus: 'error',
-            error: error.message,
-            errorAt: new Date().toISOString(),
-          },
-          jsonMode
-        );
-
-        if (!jsonMode) {
-          console.log(
-            colors.yellow('⚠ There was an error during container creation')
-          );
-          console.log(colors.gray('  Resetting the task status to "New"'));
-          console.log(
-            colors.gray('  Use ') +
-              colors.cyan(`rover start ${taskId}`) +
-              colors.gray(' to retry execution')
-          );
-        }
-
-        // TODO: use exitWithError
-        process.exit(1);
       }
+
+      // TODO: use exitWithError
+      process.exit(1);
     }
   } catch (error) {
     if (spinner) spinner.error('Failed to start container');
@@ -605,172 +379,19 @@ export const startDockerExecution = async (
 };
 
 /**
- * Get GitHub repo info from remote URL
+ * Interface for the JSON output
  */
-const getGitHubRepoInfo = (
-  remoteUrl: string
-): { owner: string; repo: string } | null => {
-  // Handle various GitHub URL formats
-  const patterns = [
-    /github\.com[:/]([^/]+)\/([^/.]+)(\.git)?$/,
-    /^git@github\.com:([^/]+)\/([^/.]+)(\.git)?$/,
-    /^https?:\/\/github\.com\/([^/]+)\/([^/.]+)(\.git)?$/,
-  ];
-
-  for (const pattern of patterns) {
-    const match = remoteUrl.match(pattern);
-    if (match) {
-      return { owner: match[1], repo: match[2] };
-    }
-  }
-
-  return null;
-};
-
-/**
- * Fetch GitHub issue using HTTPS API
- */
-const fetchGitHubIssueViaAPI = async (
-  owner: string,
-  repo: string,
-  issueNumber: string
-): Promise<{ title: string; body: string } | null> => {
-  return new Promise(resolve => {
-    const options = {
-      hostname: 'api.github.com',
-      path: `/repos/${owner}/${repo}/issues/${issueNumber}`,
-      method: 'GET',
-      headers: {
-        'User-Agent': 'Rover-CLI',
-        Accept: 'application/vnd.github.v3+json',
-      },
-    };
-
-    const req = request(options, res => {
-      let data = '';
-
-      res.on('data', chunk => {
-        data += chunk;
-      });
-
-      res.on('end', () => {
-        if (res.statusCode === 200) {
-          try {
-            const issue = JSON.parse(data);
-            resolve({
-              title: issue.title || '',
-              body: issue.body || '',
-            });
-          } catch {
-            resolve(null);
-          }
-        } else {
-          resolve(null);
-        }
-      });
-    });
-
-    req.on('error', () => {
-      resolve(null);
-    });
-
-    req.end();
-  });
-};
-
-/**
- * Fetch GitHub issue using gh CLI
- */
-const fetchGitHubIssueViaCLI = async (
-  owner: string,
-  repo: string,
-  issueNumber: string
-): Promise<{ title: string; body: string } | null> => {
-  try {
-    const { stdout } = launchSync('gh', [
-      'issue',
-      'view',
-      issueNumber.toString(),
-      '--repo',
-      `${owner}/${repo}`,
-      '--json',
-      'title,body',
-    ]);
-    if (!stdout) {
-      return null;
-    }
-    const issue = JSON.parse(stdout.toString());
-    return {
-      title: issue.title || '',
-      body: issue.body || '',
-    };
-  } catch {
-    return null;
-  }
-};
-
-/**
- * Fetch GitHub issue with fallback
- */
-const fetchGitHubIssue = async (
-  issueNumber: string,
-  json: boolean
-): Promise<{ title: string; body: string } | null> => {
-  try {
-    // Try to get repo info from git remote
-    const remoteUrl = launchSync('git', ['remote', 'get-url', 'origin'])
-      .stdout?.toString()
-      .trim();
-
-    if (!remoteUrl) {
-      throw new Error('could not get origin remote URL');
-    }
-
-    const repoInfo = getGitHubRepoInfo(remoteUrl);
-
-    if (!repoInfo) {
-      if (!json) {
-        console.log(
-          colors.red('✗ Could not determine GitHub repository from git remote')
-        );
-      }
-      return null;
-    }
-
-    // Try API first
-    let issueData = await fetchGitHubIssueViaAPI(
-      repoInfo.owner,
-      repoInfo.repo,
-      issueNumber
-    );
-
-    // If API fails and gh CLI is available, try gh
-    const githubCLI = await checkGitHubCLI();
-
-    if (!issueData && githubCLI) {
-      issueData = await fetchGitHubIssueViaCLI(
-        repoInfo.owner,
-        repoInfo.repo,
-        issueNumber
-      );
-    }
-
-    if (!issueData) {
-      if (!json) {
-        console.log(colors.red('✗ Failed to fetch GitHub issue'));
-        console.log(colors.gray('  The issue might be private or not exist'));
-      }
-      return null;
-    }
-
-    return issueData;
-  } catch (error) {
-    if (!json) {
-      console.log(colors.red('✗ Error fetching GitHub issue'));
-    }
-    return null;
-  }
-};
+interface TaskTaskOutput extends CLIJsonOutput {
+  taskId?: number;
+  title?: string;
+  description?: string;
+  status?: string;
+  createdAt?: string;
+  startedAt?: string;
+  workspace?: string;
+  branch?: string;
+  savedTo?: string;
+}
 
 /**
  * Task commands
@@ -779,52 +400,70 @@ export const taskCommand = async (
   initPrompt?: string,
   options: {
     fromGithub?: string;
-    follow?: boolean;
     yes?: boolean;
+    sourceBranch?: string;
+    targetBranch?: string;
+    agent?: string;
     json?: boolean;
     debug?: boolean;
   } = {}
 ) => {
   const telemetry = getTelemetry();
   // Extract options
-  const { follow, yes, json, fromGithub, debug } = options;
+  const { yes, json, fromGithub, debug, sourceBranch, targetBranch, agent } =
+    options;
+
+  const jsonOutput: TaskTaskOutput = {
+    success: false,
+  };
 
   // Check if rover is initialized
-  const roverPath = join(process.cwd(), '.rover');
+  const roverPath = join(findProjectRoot(), '.rover');
   if (!existsSync(roverPath)) {
-    if (!json) {
-      console.log(colors.red('✗ Rover is not initialized in this directory'));
-      console.log(
-        colors.gray('  Run ') +
-          colors.cyan('rover init') +
-          colors.gray(' first')
-      );
-    }
-    // TODO: use exitWithError
-    process.exit(1);
+    jsonOutput.error = 'Rover is not initialized in this directory';
+    exitWithError(jsonOutput, json, {
+      tips: ['Run ' + colors.cyan('rover init') + ' first'],
+    });
+    return;
   }
 
-  // Load AI agent selection from user settings
-  let selectedAiAgent = AI_AGENT.Claude; // default
+  let selectedAiAgent = AI_AGENT.Claude;
 
-  try {
-    if (UserSettings.exists()) {
-      const userSettings = UserSettings.load();
-      selectedAiAgent = userSettings.defaultAiAgent || AI_AGENT.Claude;
+  // Check if --agent option is provided and validate it
+  if (agent) {
+    const agentLower = agent.toLowerCase();
+    if (agentLower === 'claude') {
+      selectedAiAgent = AI_AGENT.Claude;
+    } else if (agentLower === 'gemini') {
+      selectedAiAgent = AI_AGENT.Gemini;
+    } else if (agentLower === 'qwen') {
+      selectedAiAgent = AI_AGENT.Qwen;
+    } else {
+      jsonOutput.error = `Invalid agent: ${agent}. Valid options are: claude, gemini, qwen`;
+      exitWithError(jsonOutput, json);
+      return;
     }
-  } catch (error) {
-    if (!json) {
-      console.log(
-        colors.yellow('⚠ Could not load user settings, defaulting to Claude')
-      );
+  } else {
+    // Fall back to user settings if no agent specified
+    try {
+      selectedAiAgent = getUserAIAgent();
+    } catch (_err) {
+      if (!json) {
+        console.log(
+          colors.yellow('⚠ Could not load user settings, defaulting to Claude')
+        );
+      }
     }
-    selectedAiAgent = AI_AGENT.Claude;
   }
 
-  // Run initial validations
-  if (!validations(selectedAiAgent, json, follow)) {
-    // TODO: use exitWithError
-    process.exit(1);
+  const valid = validations(selectedAiAgent, json);
+
+  if (valid != null) {
+    jsonOutput.error = valid.error;
+    exitWithError(jsonOutput, json, {
+      tips: valid.tips,
+    });
+    return;
   }
 
   if (!json) {
@@ -839,43 +478,110 @@ export const taskCommand = async (
   let skipExpansion = false;
   let taskData: IPromptTask | null = null;
 
+  const git = new Git();
+
   // Handle --from-github option
   if (fromGithub) {
-    const issueData = await fetchGitHubIssue(fromGithub, json === true);
-    if (issueData) {
-      description = `${issueData.title}\n\n${issueData.body}`;
-      skipExpansion = true;
+    const github = new GitHub(false);
+    try {
+      const issueData = await github.fetchIssue(fromGithub, git.remoteUrl());
+      if (issueData) {
+        description = `${issueData.title}\n\n${issueData.body}`;
+        skipExpansion = true;
 
-      if (!issueData.body || issueData.body.length == 0) {
-        console.error(
+        if (!issueData.body || issueData.body.length == 0) {
+          jsonOutput.error =
+            'The GitHub issue description is empty. Add more details to the issue so the Agent can complete it successfully.';
+          exitWithError(jsonOutput, json);
+          return;
+        }
+
+        taskData = {
+          title: issueData.title,
+          description,
+        };
+
+        if (!json) {
+          console.log(colors.green('✓ GitHub issue fetched successfully'));
+          console.log(
+            colors.gray('├── Title: ') + colors.cyan(issueData.title)
+          );
+          console.log(
+            colors.gray('└── Body: ') +
+              colors.white(
+                issueData.body.substring(0, 100) +
+                  (issueData.body.length > 100 ? '...' : '')
+              )
+          );
+        }
+      } else {
+        jsonOutput.error = 'Failed to fetch issue from GitHub';
+        exitWithError(jsonOutput, json);
+        return;
+      }
+    } catch (err) {
+      if (err instanceof GitHubError) {
+        jsonOutput.error = `Failed to fetch issue from GitHub: ${err.cause}`;
+      } else {
+        jsonOutput.error = `Failed to fetch issue from GitHub: ${err}`;
+      }
+
+      exitWithError(jsonOutput, json);
+      return;
+    }
+  }
+
+  // Validate branch option and check for uncommitted changes
+  let baseBranch = sourceBranch;
+
+  if (sourceBranch) {
+    // Validate specified branch exists
+    if (!git.branchExists(sourceBranch)) {
+      jsonOutput.error = `Branch '${sourceBranch}' does not exist`;
+      exitWithError(jsonOutput, json);
+      return;
+    }
+  } else {
+    // No branch specified, use current branch
+    baseBranch = git.getCurrentBranch();
+
+    // Check for uncommitted changes and warn
+    if (git.hasUncommittedChanges()) {
+      if (!json) {
+        console.log(
           colors.yellow(
-            'GitHub issue description is empty; creating a task with the Github issue title alone: task information might not be accurate'
+            '⚠ Warning: Current branch has uncommitted or untracked changes'
           )
         );
-      }
-
-      taskData = {
-        title: issueData.title,
-        description,
-      };
-
-      if (!json) {
-        console.log(colors.green('✓ GitHub issue fetched successfully'));
-        console.log(colors.gray('├── Title: ') + colors.cyan(issueData.title));
         console.log(
-          colors.gray('└── Body: ') +
-            colors.white(
-              issueData.body.substring(0, 100) +
-                (issueData.body.length > 100 ? '...' : '')
-            )
+          colors.yellow(
+            '  Consider using --source-branch option to specify a clean base branch or stash your changes'
+          )
         );
+        const initialPrompt = description || initPrompt || '';
+
+        if (initialPrompt.length > 0) {
+          console.log(
+            colors.gray(`  Example: `) +
+              colors.cyan(`rover task --source-branch main "${initialPrompt}"
+`)
+          );
+        } else {
+          console.log(
+            colors.gray(`  Example: `) +
+              colors.cyan(`rover task --source-branch main
+`)
+          );
+        }
       }
-    } else {
-      // If GitHub fetch failed, exit
-      console.error(colors.red('✗ Failed to fetch issue from GitHub'));
-      // TODO: use exitWithError
-      process.exit(1);
     }
+  }
+
+  // Display source branch
+  if (!json) {
+    console.log(
+      colors.gray(`Source branch: `) + colors.cyan(`${baseBranch}\n`)
+    );
   }
 
   // Get initial task description - try stdin first if no description provided
@@ -897,19 +603,15 @@ export const taskCommand = async (
     // If still no description
     if (typeof description !== 'string' || description.length == 0) {
       if (yes) {
-        // In non-interactive mode, we must have a description
-        if (!json) {
-          console.error(
-            colors.red('✗ Task description is required in non-interactive mode')
-          );
-          console.error(
-            colors.gray(
-              '  Please provide a description as an argument: rover task "your task description" --yes'
-            )
-          );
-        }
-        // TODO: use exitWithError
-        process.exit(1);
+        jsonOutput.error =
+          'Task description is required in non-interactive mode';
+        exitWithError(jsonOutput, json, {
+          tips: [
+            'Provide a description as an argument using' +
+              colors.cyan(' rover task "your task description" --yes'),
+          ],
+        });
+        return;
       }
 
       try {
@@ -923,9 +625,10 @@ export const taskCommand = async (
 
         description = input;
       } catch (err) {
-        console.log(colors.yellow('\n⚠ Task creation cancelled'));
-        // TODO: use exitWithError
-        process.exit(1);
+        jsonOutput.error = 'Task creation cancelled';
+        exitWithWarn('Task creation cancelled', jsonOutput, json, {
+          exitCode: 1,
+        });
       }
     }
   }
@@ -944,7 +647,7 @@ export const taskCommand = async (
       const aiAgent = getAIAgentTool(selectedAiAgent);
       const expanded = await aiAgent.expandTask(
         taskData ? `${taskData.title}: ${taskData.description}` : description,
-        process.cwd()
+        findProjectRoot()
       );
 
       if (expanded) {
@@ -1005,15 +708,18 @@ export const taskCommand = async (
               // Update the description for next iteration
               taskData.description = `${taskData.description}. Additional instructions: ${additionalInfo}`;
             } catch (err) {
-              if (!json) {
-                console.log(colors.yellow('\n⚠ Task creation cancelled'));
-              }
+              jsonOutput.error = 'Task creation cancelled';
+              exitWithWarn('Task creation cancelled', jsonOutput, json, {
+                exitCode: 1,
+              });
+              return;
             }
           } else {
             // Cancel
-            if (!json) {
-              console.log(colors.yellow('\n⚠ Task creation cancelled'));
-            }
+            jsonOutput.error = 'Task creation cancelled';
+            exitWithWarn('Task creation cancelled', jsonOutput, json, {
+              exitCode: 1,
+            });
             return;
           }
         }
@@ -1050,7 +756,7 @@ export const taskCommand = async (
     const taskId = getNextTaskId();
 
     // Create .rover/tasks directory structure
-    const endorPath = join(process.cwd(), '.rover');
+    const endorPath = join(findProjectRoot(), '.rover');
     const tasksPath = join(endorPath, 'tasks');
     const taskPath = join(tasksPath, taskId.toString());
 
@@ -1068,19 +774,22 @@ export const taskCommand = async (
       id: taskId,
       title: taskData.title,
       description: taskData.description,
+      agent: selectedAiAgent,
+      sourceBranch: sourceBranch,
     });
 
     // Setup git worktree and branch
     const worktreePath = join(taskPath, 'workspace');
-    const branchName = generateBranchName(taskId);
+    const branchName = targetBranch || generateBranchName(taskId);
 
     try {
-      const git = new Git();
-      git.createWorktree(worktreePath, branchName);
+      git.createWorktree(worktreePath, branchName, baseBranch);
+
+      // Copy user .env development files
+      copyEnvironmentFiles(findProjectRoot(), worktreePath);
     } catch (error) {
-      if (!json) {
-        console.error(colors.red('Error creating git workspace:'), error);
-      }
+      jsonOutput.error = 'Error creating git workspace: ' + error;
+      exitWithError(jsonOutput, json);
       return;
     }
 
@@ -1120,6 +829,17 @@ export const taskCommand = async (
         : NewTaskProvider.INPUT
     );
 
+    // Complete JSON information
+    jsonOutput.taskId = task.id;
+    jsonOutput.title = task.title;
+    jsonOutput.description = task.description;
+    jsonOutput.status = task.status;
+    jsonOutput.createdAt = task.createdAt;
+    jsonOutput.startedAt = task.startedAt;
+    jsonOutput.workspace = task.worktreePath;
+    jsonOutput.branch = task.branchName;
+    jsonOutput.savedTo = `.rover/tasks/${taskId}/description.json`;
+
     // Start Docker container for task execution
     try {
       await startDockerExecution(
@@ -1128,42 +848,41 @@ export const taskCommand = async (
         worktreePath,
         iterationPath,
         selectedAiAgent,
-        follow,
         json,
         debug
       );
-    } catch (error) {
+    } catch (_err) {
       // If Docker execution fails to start, reset task to NEW status
       task.resetToNew();
-      if (!json) {
-        console.log(
-          colors.yellow('⚠ Task reset to NEW status due to execution failure')
-        );
-        console.log(
-          colors.gray('  Use ') +
-            colors.cyan(`rover start ${taskId}`) +
-            colors.gray(' to retry execution')
-        );
-      }
-      throw error;
+
+      jsonOutput.status = task.status;
+      jsonOutput.error =
+        "Task was created, but reset to 'New' due to an error running the container";
+      exitWithWarn(jsonOutput.error, jsonOutput, json, {
+        exitCode: 1,
+        tips: ['Use ' + colors.cyan(`rover start ${taskId}`) + ' to retry it'],
+      });
+      return;
     }
 
-    if (json) {
-      // Output final JSON after all operations are complete
-      const finalJsonOutput = {
-        success: true,
-        taskId: task.id,
-        title: task.title,
-        description: task.description,
-        status: task.status,
-        createdAt: task.createdAt,
-        startedAt: task.startedAt,
-        workspace: task.worktreePath,
-        branch: task.branchName,
-        savedTo: `.rover/tasks/${taskId}/description.json`,
-      };
-      console.log(JSON.stringify(finalJsonOutput, null, 2));
-    }
+    jsonOutput.success = true;
+
+    exitWithSuccess('Task was created successfully', jsonOutput, json, {
+      tips: [
+        'Use ' + colors.cyan('rover list') + ' to check the list of tasks',
+        'Use ' +
+          colors.cyan(`rover logs -f ${task.id}`) +
+          ' to watch the task logs',
+        'Use ' +
+          colors.cyan(`rover inspect ${task.id}`) +
+          ' to check the task status',
+      ],
+    });
+  } else {
+    // This error should be really weird. Keeping this branch just in case,
+    // but I don't expect it to trigger because we have several fallbacks
+    jsonOutput.error = 'There was an issue retrieving the task information';
+    exitWithError(jsonOutput, json);
   }
 
   await telemetry?.shutdown();

@@ -2,7 +2,6 @@ import colors from 'ansi-colors';
 import { join } from 'node:path';
 import { existsSync, mkdirSync } from 'node:fs';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
-import { spawnSync } from '../lib/os.js';
 import { generateBranchName } from '../utils/branch-name.js';
 import { exitWithError, exitWithSuccess } from '../utils/exit.js';
 import { CLIJsonOutput } from '../types.js';
@@ -10,8 +9,10 @@ import { IterationConfig } from '../lib/iteration.js';
 import { startDockerExecution } from './task.js';
 import { UserSettings, AI_AGENT } from '../lib/config.js';
 import { getTelemetry } from '../lib/telemetry.js';
-import { Git } from '../lib/git.js';
+import { Git } from 'rover-common';
 import yoctoSpinner from 'yocto-spinner';
+import { copyEnvironmentFiles } from '../utils/env-files.js';
+import { findProjectRoot } from 'rover-common';
 
 /**
  * Interface for JSON output
@@ -31,7 +32,7 @@ interface TaskStartOutput extends CLIJsonOutput {
  */
 export const startCommand = async (
   taskId: string,
-  options: { follow?: boolean; json?: boolean; debug?: boolean } = {}
+  options: { json?: boolean; debug?: boolean } = {}
 ) => {
   const telemetry = getTelemetry();
 
@@ -90,7 +91,7 @@ export const startCommand = async (
     }
 
     const taskPath = join(
-      process.cwd(),
+      findProjectRoot(),
       '.rover',
       'tasks',
       numericTaskId.toString()
@@ -111,6 +112,9 @@ export const startCommand = async (
       try {
         const git = new Git();
         git.createWorktree(worktreePath, branchName);
+
+        // Copy user .env development files
+        copyEnvironmentFiles(findProjectRoot(), worktreePath);
 
         // Update task with workspace information
         task.setWorkspace(worktreePath, branchName);
@@ -162,7 +166,6 @@ export const startCommand = async (
         worktreePath,
         iterationPath,
         selectedAiAgent,
-        options.follow,
         json,
         options.debug
       );
@@ -184,7 +187,17 @@ export const startCommand = async (
       workspace: task.worktreePath,
       branch: task.branchName,
     };
-    exitWithSuccess('Task started succesfully!', jsonOutput, json);
+    exitWithSuccess('Task started succesfully!', jsonOutput, json, {
+      tips: [
+        'Use ' + colors.cyan('rover list') + ' to check the list of tasks',
+        'Use ' +
+          colors.cyan(`rover logs -f ${task.id}`) +
+          ' to watch the task logs',
+        'Use ' +
+          colors.cyan(`rover inspect ${task.id}`) +
+          ' to check the task status',
+      ],
+    });
     return;
   } catch (error) {
     if (error instanceof TaskNotFoundError) {

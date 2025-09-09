@@ -50,6 +50,8 @@ enum EVENT_IDS {
   RESET = 'reset',
   // Open shell in container
   SHELL = 'shell',
+  // Stop a task
+  STOP_TASK = 'stop',
   // Open a workspace in the extension
   OPEN_WORKSPACE = 'open_workspace',
 }
@@ -129,11 +131,17 @@ class Telemetry {
     this.capture(EVENT_IDS.DIFF);
   }
 
-  eventInit(agents: string[], preferredAgent: string, languages: string[]) {
+  eventInit(
+    agents: string[],
+    preferredAgent: string,
+    languages: string[],
+    attribution: boolean
+  ) {
     const metadata: InitMetadata = {
       agents,
       preferredAgent,
       languages,
+      attribution,
     };
 
     this.capture(EVENT_IDS.INIT, metadata);
@@ -165,6 +173,10 @@ class Telemetry {
 
   eventShell() {
     this.capture(EVENT_IDS.SHELL);
+  }
+
+  eventStopTask() {
+    this.capture(EVENT_IDS.STOP_TASK);
   }
 
   eventOpenWorkspace() {

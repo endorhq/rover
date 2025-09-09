@@ -8,7 +8,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { execSync } from 'node:child_process';
+import { launchSync } from 'rover-common';
 import { deleteCommand } from '../delete.js';
 import { TaskDescription } from '../../lib/description.js';
 
@@ -50,15 +50,15 @@ describe('delete command', () => {
     process.chdir(testDir);
 
     // Initialize git repo
-    execSync('git init', { stdio: 'pipe' });
-    execSync('git config user.email "test@test.com"', { stdio: 'pipe' });
-    execSync('git config user.name "Test User"', { stdio: 'pipe' });
-    execSync('git config commit.gpgsign false', { stdio: 'pipe' });
+    launchSync('git', ['init']);
+    launchSync('git', ['config', 'user.email', 'test@test.com']);
+    launchSync('git', ['config', 'user.name', 'Test User']);
+    launchSync('git', ['config', 'commit.gpgsign', 'false']);
 
     // Create initial commit
     writeFileSync('README.md', '# Test');
-    execSync('git add .', { stdio: 'pipe' });
-    execSync('git commit -m "Initial commit"', { stdio: 'pipe' });
+    launchSync('git', ['add', '.']);
+    launchSync('git', ['commit', '-m', 'Initial commit']);
 
     // Create .rover directory structure
     mkdirSync('.rover/tasks', { recursive: true });
@@ -82,9 +82,7 @@ describe('delete command', () => {
     const worktreePath = join('.rover', 'tasks', id.toString(), 'workspace');
     const branchName = `rover-task-${id}`;
 
-    execSync(`git worktree add ${worktreePath} -b ${branchName}`, {
-      stdio: 'pipe',
-    });
+    launchSync('git', ['worktree', 'add', worktreePath, '-b', branchName]);
     task.setWorkspace(join(testDir, worktreePath), branchName);
 
     return task;
@@ -201,7 +199,7 @@ describe('delete command', () => {
       createTestTask(3, 'Worktree Test Task');
 
       // Verify worktree exists
-      const worktreeList = execSync('git worktree list').toString();
+      const worktreeList = launchSync('git', ['worktree', 'list']).stdout;
       expect(worktreeList).toContain('rover-task-3');
 
       await deleteCommand('3', { yes: true });
@@ -329,7 +327,7 @@ describe('delete command', () => {
       createTestTask(15, 'Task C');
 
       // Verify worktrees exist
-      const initialWorktrees = execSync('git worktree list').toString();
+      const initialWorktrees = launchSync('git', ['worktree', 'list']).stdout;
       expect(initialWorktrees).toContain('rover-task-13');
       expect(initialWorktrees).toContain('rover-task-14');
       expect(initialWorktrees).toContain('rover-task-15');
@@ -344,7 +342,7 @@ describe('delete command', () => {
       expect(existsSync('.rover/tasks/14')).toBe(false);
       expect(existsSync('.rover/tasks/15')).toBe(false);
 
-      const finalWorktrees = execSync('git worktree list').toString();
+      const finalWorktrees = launchSync('git', ['worktree', 'list']).stdout;
       expect(finalWorktrees).not.toContain('rover-task-13');
       expect(finalWorktrees).not.toContain('rover-task-14');
       expect(finalWorktrees).not.toContain('rover-task-15');

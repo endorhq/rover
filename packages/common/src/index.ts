@@ -1,7 +1,18 @@
 export let VERBOSE = false;
+export const PROJECT_CONFIG_FILE = 'rover.json';
 
 export const setVerbose = (verbose: boolean) => {
   VERBOSE = verbose;
 };
 
-export { launch, launchSync } from './os.js';
+export {
+  findProjectRoot,
+  launch,
+  launchSync,
+  type Options,
+  type Result,
+  type SyncOptions,
+  type SyncResult,
+} from './os.js';
+
+export { Git } from './git.js';

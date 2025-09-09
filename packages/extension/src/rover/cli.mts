@@ -6,30 +6,13 @@ import {
   TaskDetails,
   IterateResult,
 } from './types.js';
-import { spawn as spawn_, SpawnOptions } from 'child_process';
-import { execa, ExecaError, Options, Result } from 'execa';
-
-export async function spawn(
-  command: string,
-  args?: ReadonlyArray<string>,
-  options?: Options
-): Promise<Result> {
-  try {
-    return await execa(command, args, options);
-  } catch (error) {
-    if (error instanceof ExecaError) {
-      if (error.exitCode !== 0) {
-        throw `exit code for ${command} is ${error.exitCode} (stdout: ${error.stdout}; stderr: ${error.stderr})`;
-      } else if (error.cause) {
-        throw `failed to execute ${command}: ${error.cause}`;
-      } else {
-        throw `failed to execute ${command}`;
-      }
-    } else {
-      throw `failed to execute ${command}`;
-    }
-  }
-}
+import {
+  findProjectRoot,
+  launch,
+  launchSync,
+  type Options,
+  type Result,
+} from 'rover-common';
 
 export class RoverCLI {
   private roverPath: string;
@@ -50,9 +33,9 @@ export class RoverCLI {
     }
   }
 
-  private getSpawnOptions(): Options {
+  private getLaunchOptions(): Options {
     return {
-      cwd: this.workspaceRoot?.fsPath || process.cwd(),
+      cwd: this.workspaceRoot?.fsPath || findProjectRoot(),
       env: {
         ...process.env,
         // For now, disable the CLI telemetry as we will add it to the extension
@@ -66,10 +49,10 @@ export class RoverCLI {
    */
   async getTasks(): Promise<RoverTask[]> {
     try {
-      const { stdout, stderr, exitCode } = await spawn(
+      const { stdout, stderr, exitCode } = await launch(
         this.roverPath,
         ['list', '--json'],
-        this.getSpawnOptions()
+        this.getLaunchOptions()
       );
       if (exitCode != 0 || !stdout) {
         throw new Error(
@@ -91,10 +74,10 @@ export class RoverCLI {
    * Create a new task
    */
   async createTask(description: string): Promise<RoverTask> {
-    const { stdout, stderr, exitCode } = await spawn(
+    const { stdout, stderr, exitCode } = await launch(
       this.roverPath,
       ['task', description, '--yes', '--json'],
-      this.getSpawnOptions()
+      this.getLaunchOptions()
     );
     if (exitCode != 0 || !stdout) {
       throw new Error(
@@ -108,10 +91,10 @@ export class RoverCLI {
    * Push branch
    */
   async pushBranch(taskId: string, commit: string): Promise<PushResult> {
-    const { stdout, stderr, exitCode } = await spawn(
+    const { stdout, stderr, exitCode } = await launch(
       this.roverPath,
       ['push', taskId.toString(), '--message', commit, '--json'],
-      this.getSpawnOptions()
+      this.getLaunchOptions()
     );
     if (exitCode != 0 || !stdout) {
       throw new Error(
@@ -125,10 +108,10 @@ export class RoverCLI {
    * Iterate a task
    */
   async iterate(taskId: string, instructions: string): Promise<IterateResult> {
-    const { stdout, stderr, exitCode } = await spawn(
+    const { stdout, stderr, exitCode } = await launch(
       this.roverPath,
       ['iterate', taskId.toString(), instructions, '--json'],
-      this.getSpawnOptions()
+      this.getLaunchOptions()
     );
     if (exitCode != 0 || !stdout) {
       throw new Error(
@@ -142,10 +125,10 @@ export class RoverCLI {
    * Get detailed information about a task
    */
   async inspectTask(taskId: string): Promise<TaskDetails> {
-    const { stdout, stderr, exitCode } = await spawn(
+    const { stdout, stderr, exitCode } = await launch(
       this.roverPath,
       ['inspect', taskId.toString(), '--json'],
-      this.getSpawnOptions()
+      this.getLaunchOptions()
     );
 
     if (exitCode != 0 || !stdout) {
@@ -168,10 +151,10 @@ export class RoverCLI {
    * Delete a task
    */
   async deleteTask(taskId: string): Promise<void> {
-    const { stdout, stderr, exitCode } = await spawn(
+    const { stdout, stderr, exitCode } = await launch(
       this.roverPath,
       ['delete', taskId.toString(), '--force'],
-      this.getSpawnOptions()
+      this.getLaunchOptions()
     );
 
     if (exitCode != 0 || !stdout) {
@@ -208,25 +191,27 @@ export class RoverCLI {
     );
     outputChannel.show();
 
-    const process = spawn_(
-      this.roverPath,
-      ['logs', `${taskId}${follow ? ' --follow' : ''}`],
-      this.getSpawnOptions() as SpawnOptions
-    );
+    try {
+      const { stdout, stderr, exitCode } = await launch(
+        this.roverPath,
+        ['logs', `${taskId}${follow ? ' --follow' : ''}`],
+        this.getLaunchOptions()
+      );
 
-    process.stdout?.on('data', data => {
-      outputChannel.append(data.toString());
-    });
+      if (stdout) {
+        outputChannel.append(stdout.toString());
+      }
 
-    process.stderr?.on('data', data => {
-      outputChannel.append(`ERROR: ${data.toString()}`);
-    });
+      if (stderr) {
+        outputChannel.append(`ERROR: ${stderr.toString()}`);
+      }
 
-    process.on('close', code => {
-      if (code !== 0) {
+      if (exitCode !== 0) {
         throw new Error('could not show logs');
       }
-    });
+    } catch (error) {
+      outputChannel.append(`Error: ${error}`);
+    }
 
     return outputChannel;
   }
@@ -235,10 +220,10 @@ export class RoverCLI {
    * Get list of changed files in a task
    */
   async getChangedFiles(taskId: string): Promise<string[]> {
-    const { stdout, stderr, exitCode } = await spawn(
+    const { stdout, stderr, exitCode } = await launch(
       this.roverPath,
       ['diff', taskId.toString(), '--only-files'],
-      this.getSpawnOptions()
+      this.getLaunchOptions()
     );
     if (exitCode != 0 || !stdout) {
       throw new Error(
@@ -256,10 +241,10 @@ export class RoverCLI {
    * Merge a task
    */
   async mergeTask(taskId: string): Promise<MergeResult> {
-    const { stdout, stderr, exitCode } = await spawn(
+    const { stdout, stderr, exitCode } = await launch(
       this.roverPath,
       ['merge', taskId.toString(), '--force', '--json'],
-      this.getSpawnOptions()
+      this.getLaunchOptions()
     );
     if (exitCode != 0 || !stdout) {
       throw new Error(
@@ -280,11 +265,11 @@ export class RoverCLI {
       }
 
       // Fallback: construct expected path
-      const workspaceRoot = this.workspaceRoot || process.cwd();
+      const workspaceRoot = this.workspaceRoot || findProjectRoot();
       return `${workspaceRoot}/.rover/tasks/${taskId}/workspace`;
     } catch (error) {
       // Fallback: construct expected path
-      const workspaceRoot = this.workspaceRoot || process.cwd();
+      const workspaceRoot = this.workspaceRoot || findProjectRoot();
       return `${workspaceRoot}/.rover/tasks/${taskId}/workspace`;
     }
   }
@@ -298,10 +283,10 @@ export class RoverCLI {
     error?: string;
   }> {
     try {
-      const { stdout, exitCode } = await spawn(
+      const { stdout, exitCode } = await launch(
         this.roverPath,
         ['--version'],
-        this.getSpawnOptions()
+        this.getLaunchOptions()
       );
       if (exitCode !== 0 || !stdout) {
         throw new Error('could not retrieve rover version');
@@ -362,10 +347,10 @@ export class RoverCLI {
    */
   async initializeRover(): Promise<{ success: boolean; error?: string }> {
     try {
-      const { stdout, stderr } = await spawn(
+      const { stdout, stderr } = await launch(
         this.roverPath,
         ['init', '--yes'],
-        this.getSpawnOptions()
+        this.getLaunchOptions()
       );
       return { success: true };
     } catch (error) {

@@ -17,7 +17,7 @@ npm run watch:tsc       # Watch mode for TypeScript compilation only
 npm run package         # Build for production (used by vscode:prepublish)
 
 # Quality assurance
-npm run check-types     # Run TypeScript type checking without emit
+npm run check          # Run TypeScript type checking without emit
 npm run lint           # Run ESLint on source files
 npm test               # Run VS Code extension tests
 npm run pretest        # Prepare for testing (compile + lint)

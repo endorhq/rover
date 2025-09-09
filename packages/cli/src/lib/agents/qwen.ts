@@ -6,27 +6,17 @@ import {
 } from './index.js';
 import { PromptBuilder, IPromptTask } from '../prompts/index.js';
 import { parseJsonResponse } from '../../utils/json-parser.js';
-import { homedir, tmpdir, platform } from 'node:os';
+import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 
-const findKeychainCredentials = (key: string): string => {
-  const result = launchSync('security', [
-    'find-generic-password',
-    '-s',
-    key,
-    '-w',
-  ]);
-  return result.stdout?.toString() || '';
-};
-
-class ClaudeAI implements AIAgentTool {
+class QwenAI implements AIAgentTool {
   // constants
-  public AGENT_BIN = 'claude';
-  private promptBuilder = new PromptBuilder('claude');
+  public AGENT_BIN = 'qwen';
+  private promptBuilder = new PromptBuilder('qwen');
 
   constructor() {
-    // Check Claude CLI is available
+    // Check Qwen CLI is available
     try {
       launchSync(this.AGENT_BIN, ['--version']);
     } catch (err) {
@@ -35,40 +25,21 @@ class ClaudeAI implements AIAgentTool {
   }
 
   async invoke(prompt: string, json: boolean = false): Promise<string> {
-    const claudeArgs = ['-p'];
+    const qwenArgs = ['-p'];
 
     if (json) {
-      claudeArgs.push('--output-format');
-      claudeArgs.push('json');
-
+      // Qwen does not have any way to force the JSON output at CLI level.
+      // Trying to force it via prompting
       prompt = `${prompt}
 
 You MUST output a valid JSON string as an output. Just output the JSON string and nothing else. If you had any error, still return a JSON string with an "error" property.`;
     }
 
     try {
-      const { stdout } = await launch(this.AGENT_BIN, claudeArgs, {
+      const { stdout } = await launch(this.AGENT_BIN, qwenArgs, {
         input: prompt,
-        env: {
-          ...process.env,
-          // Ensure non-interactive mode
-          CLAUDE_NON_INTERACTIVE: 'true',
-        },
       });
-
-      // Result
-      const result = stdout?.toString().trim() || '';
-
-      if (json) {
-        try {
-          const parsed = JSON.parse(result);
-          return `${parsed.result}`;
-        } catch (_err) {
-          throw new InvokeAIAgentError(this.AGENT_BIN, 'Invalid JSON output');
-        }
-      } else {
-        return result;
-      }
+      return stdout?.toString().trim() || '';
     } catch (error) {
       throw new InvokeAIAgentError(this.AGENT_BIN, error);
     }
@@ -84,7 +55,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
       const response = await this.invoke(prompt, true);
       return parseJsonResponse<IPromptTask>(response);
     } catch (error) {
-      console.error('Failed to expand task with Claude:', error);
+      console.error('Failed to expand task with Qwen:', error);
       return null;
     }
   }
@@ -105,7 +76,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
       return parseJsonResponse<IPromptTask>(response);
     } catch (error) {
       console.error(
-        'Failed to expand iteration instructions with Claude:',
+        'Failed to expand iteration instructions with Qwen:',
         error
       );
       return null;
@@ -162,30 +133,15 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
 
   getContainerMounts(): string[] {
     const dockerMounts: string[] = [];
-    const claudeFile = join(homedir(), '.claude.json');
-    const claudeCreds = join(homedir(), '.claude', '.credentials.json');
+    const qwenFolder = join(homedir(), '.qwen');
 
-    dockerMounts.push(`-v`, `${claudeFile}:/.claude.json:Z,ro`);
-
-    if (existsSync(claudeCreds)) {
-      dockerMounts.push(`-v`, `${claudeCreds}:/.credentials.json:Z,ro`);
-    } else if (platform() === 'darwin') {
-      const claudeCredsData = findKeychainCredentials(
-        'Claude Code-credentials'
-      );
-      const userCredentialsTempPath = mkdtempSync(join(tmpdir(), 'rover-'));
-      const claudeCredsFile = join(
-        userCredentialsTempPath,
-        '.credentials.json'
-      );
-      writeFileSync(claudeCredsFile, claudeCredsData);
-      // Do not mount credentials as RO, as they will be
-      // shredded by the setup script when it finishes
-      dockerMounts.push(`-v`, `${claudeCredsFile}:/.credentials.json:Z`);
+    // Only mount if the folder exists
+    if (existsSync(qwenFolder)) {
+      dockerMounts.push(`-v`, `${qwenFolder}:/.qwen:Z,ro`);
     }
 
     return dockerMounts;
   }
 }
 
-export default ClaudeAI;
+export default QwenAI;

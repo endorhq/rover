@@ -8,7 +8,8 @@ import { showRoverChat } from '../utils/display.js';
 import { statusColor } from '../utils/task-status.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
 import { CLIJsonOutput } from '../types.js';
-import Git from '../lib/git.js';
+import { Git } from 'rover-common';
+import { findProjectRoot } from 'rover-common';
 
 const { prompt } = enquirer;
 
@@ -42,7 +43,7 @@ export const deleteCommand = async (
     // Load task using TaskDescription
     const task = TaskDescription.load(numericTaskId);
     const taskPath = join(
-      process.cwd(),
+      findProjectRoot(),
       '.rover',
       'tasks',
       numericTaskId.toString()

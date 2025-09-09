@@ -1,4 +1,4 @@
-import { ChildProcessByStdio, spawn, spawnSync } from 'node:child_process';
+import { launch, launchSync } from 'rover-common';
 import Stream from 'node:stream';
 
 export class DockerError extends Error {
@@ -14,7 +14,7 @@ export class DockerError extends Error {
 export class Docker {
   constructor() {
     // Check docker is available
-    if (spawnSync('docker', ['--version'], { stdio: 'pipe' }).error) {
+    if (launchSync('docker', ['--version']).exitCode !== 0) {
       throw new DockerError(
         'Docker is not installed or the daemon is stopped.'
       );
@@ -56,9 +56,9 @@ export class Docker {
       ...cmd,
     ];
 
-    const result = spawnSync('docker', args, { stdio: 'pipe' });
+    const result = launchSync('docker', args);
 
-    return result.error == null && result.status === 0;
+    return result?.exitCode === 0;
   }
 
   /**
@@ -67,9 +67,9 @@ export class Docker {
    * @param name Container name
    */
   stopContainer(name: string): boolean {
-    const result = spawnSync('docker', ['stop', name], { stdio: 'pipe' });
+    const result = launchSync('docker', ['stop', name]);
 
-    return result.error == null && result.status === 0;
+    return result?.exitCode === 0;
   }
 
   /**
@@ -78,18 +78,15 @@ export class Docker {
    * @param name Container name
    */
   logsContainer(name: string): string {
-    const result = spawnSync('docker', ['logs', name], {
-      stdio: 'pipe',
-      encoding: 'utf8',
-    });
+    const result = launchSync('docker', ['logs', name]);
 
-    if (result.error != null || result.status !== 0) {
+    if (result.exitCode !== 0) {
       return '';
     }
 
     // Combine stdout and stderr
-    const stdout = result.stdout || '';
-    const stderr = result.stderr || '';
+    const stdout = result.stdout?.toString() || '';
+    const stderr = result.stderr?.toString() || '';
 
     return stdout + stderr;
   }
@@ -99,13 +96,9 @@ export class Docker {
    *
    * @param name Container name
    */
-  logsFollowContainer(
-    name: string
-  ): ChildProcessByStdio<null, Stream.Readable, Stream.Readable> {
+  logsFollowContainer(name: string) {
     // Start docker logs with follow flag
-    const logsProcess = spawn('docker', ['logs', '-f', name], {
-      stdio: ['ignore', 'pipe', 'pipe'],
-    }) as ChildProcessByStdio<null, Stream.Readable, Stream.Readable>;
+    const logsProcess = launch('docker', ['logs', '-f', name]);
 
     return logsProcess;
   }
@@ -117,9 +110,9 @@ export class Docker {
    * @returns True when the docker command does not return any error
    */
   removeContainer(name: string): boolean {
-    const result = spawnSync('docker', ['rm', '-f', name], { stdio: 'pipe' });
+    const result = launchSync('docker', ['rm', '-f', name]);
 
-    return result.error == null;
+    return result?.exitCode == null;
   }
 }
 

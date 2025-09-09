@@ -22,6 +22,37 @@ describe('TaskDescription', () => {
     rmSync(testDir, { recursive: true, force: true });
   });
 
+  describe('agent and sourceBranch fields', () => {
+    it('should store agent and sourceBranch when creating task', () => {
+      const task = TaskDescription.create({
+        id: 1,
+        title: 'Test Task',
+        description: 'Test description',
+        agent: 'claude',
+        sourceBranch: 'main',
+      });
+
+      expect(task.agent).toBe('claude');
+      expect(task.sourceBranch).toBe('main');
+
+      // Verify persistence
+      const reloaded = TaskDescription.load(1);
+      expect(reloaded.agent).toBe('claude');
+      expect(reloaded.sourceBranch).toBe('main');
+    });
+
+    it('should handle tasks without agent and sourceBranch fields', () => {
+      const task = TaskDescription.create({
+        id: 2,
+        title: 'Test Task',
+        description: 'Test description',
+      });
+
+      expect(task.agent).toBeUndefined();
+      expect(task.sourceBranch).toBeUndefined();
+    });
+  });
+
   describe('new status types', () => {
     it('should support MERGED status', () => {
       const task = TaskDescription.create({

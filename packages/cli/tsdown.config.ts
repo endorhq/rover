@@ -12,7 +12,6 @@ export default defineConfig({
   target: 'node20',
   platform: 'node',
   minify: isProd,
-  bundle: true,
   sourcemap: !isProd,
   loader: {
     '.md': 'text',

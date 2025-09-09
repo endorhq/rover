@@ -8,7 +8,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { execSync } from 'node:child_process';
+import { launchSync } from 'rover-common';
 import { initCommand } from '../init.js';
 
 // Mock only the external tool checks (except Git which should be available)
@@ -43,10 +43,10 @@ describe('init command', () => {
     process.chdir(testDir);
 
     // Initialize a git repo for testing
-    execSync('git init', { stdio: 'pipe' });
-    execSync('git config user.email "test@test.com"', { stdio: 'pipe' });
-    execSync('git config user.name "Test User"', { stdio: 'pipe' });
-    execSync('git config commit.gpgsign false', { stdio: 'pipe' });
+    launchSync('git', ['init']);
+    launchSync('git', ['config', 'user.email', 'test@test.com']);
+    launchSync('git', ['config', 'user.name', 'Test User']);
+    launchSync('git', ['config', 'commit.gpgsign', 'false']);
   });
 
   afterEach(() => {

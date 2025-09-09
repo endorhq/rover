@@ -9,6 +9,7 @@ import {
   checkClaude,
   checkDocker,
   checkGemini,
+  checkQwen,
   checkGit,
 } from '../utils/system.js';
 import { AI_AGENT, ProjectConfig, UserSettings } from '../lib/config.js';
@@ -101,8 +102,14 @@ export const initCommand = async (
 
   const geminiInstalled = await checkGemini();
 
+  reqSpinner.text = 'Checking Qwen';
+
+  const qwenInstalled = await checkQwen();
+
   const completeInstallation =
-    gitInstalled && dockerInstalled && (claudeInstalled || geminiInstalled);
+    gitInstalled &&
+    dockerInstalled &&
+    (claudeInstalled || geminiInstalled || qwenInstalled);
 
   if (completeInstallation) {
     reqSpinner.succeed('Your system is ready!');
@@ -123,7 +130,10 @@ export const initCommand = async (
     `├── Claude: ${claudeInstalled ? colors.green('✓ Installed') : colors.red('✗ Missing')}`
   );
   console.log(
-    `└── Gemini: ${geminiInstalled ? colors.green('✓ Installed') : colors.red('✗ Missing')}`
+    `├── Gemini: ${geminiInstalled ? colors.green('✓ Installed') : colors.red('✗ Missing')}`
+  );
+  console.log(
+    `└── Qwen: ${qwenInstalled ? colors.green('✓ Installed') : colors.red('✗ Missing')}`
   );
 
   if (!completeInstallation) {
@@ -171,6 +181,10 @@ export const initCommand = async (
       availableAgents.push(AI_AGENT.Gemini);
     }
 
+    if (qwenInstalled) {
+      availableAgents.push(AI_AGENT.Qwen);
+    }
+
     // If multiple AI agents are available, ask user to select one
     if (availableAgents.length > 1 && !options.yes) {
       try {
@@ -200,11 +214,37 @@ export const initCommand = async (
       defaultAIAgent = availableAgents[0];
     }
 
+    let attribution = true;
+
+    if (!options.yes) {
+      console.log(colors.white.bold('\nAttribution'));
+      // Confirm attribution
+      console.log(
+        colors.gray(
+          '├── Rover can add itself as a co-author on commits it helps create'
+        )
+      );
+      console.log(
+        colors.gray(
+          '└── This helps track AI-assisted work in your repository\n'
+        )
+      );
+      const { confirm } = await prompt<{ confirm: boolean }>({
+        type: 'confirm',
+        name: 'confirm',
+        message:
+          'Would you like to enable commit attribution? (can change anytime)',
+        initial: true,
+      });
+      attribution = confirm;
+    }
+
     // Send telemetry information
     telemetry?.eventInit(
       availableAgents,
       defaultAIAgent,
-      environment.languages
+      environment.languages,
+      attribution
     );
 
     // Save configuration to .rover directory
@@ -224,8 +264,10 @@ export const initCommand = async (
         environment.taskManagers.forEach(tm =>
           projectConfig.addTaskManager(tm)
         );
+        projectConfig.setAttribution(attribution);
       } else {
         projectConfig = ProjectConfig.create();
+        projectConfig.setAttribution(attribution);
         // Set detected values
         environment.languages.forEach(lang => projectConfig.addLanguage(lang));
         environment.packageManagers.forEach(pm =>

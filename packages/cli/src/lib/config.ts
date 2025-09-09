@@ -2,9 +2,10 @@
  * Define the project, user configuration files and constants
  * related to those.
  */
-import { join } from 'node:path';
+import { join, dirname, resolve } from 'node:path';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { FileNotFoundError, InvalidFormatError } from '../errors.js';
+import { findProjectRoot, Git } from 'rover-common';
 
 // Supported languages
 export enum LANGUAGE {
@@ -47,6 +48,9 @@ export interface ProjectConfigSchema {
   languages: LANGUAGE[];
   packageManagers: PACKAGE_MANAGER[];
   taskManagers: TASK_MANAGER[];
+
+  // Attribution
+  attribution: boolean;
 }
 
 const PROJECT_CONFIG_FILE = 'rover.json';
@@ -62,11 +66,8 @@ export class ProjectConfig {
    * Load an existing configuration from disk
    */
   static load(): ProjectConfig {
-    const filePath = join(process.cwd(), PROJECT_CONFIG_FILE);
-
-    if (!existsSync(filePath)) {
-      throw new FileNotFoundError(filePath);
-    }
+    const projectRoot = findProjectRoot();
+    const filePath = join(projectRoot, PROJECT_CONFIG_FILE);
 
     try {
       const rawData = readFileSync(filePath, 'utf8');
@@ -101,6 +102,7 @@ export class ProjectConfig {
       languages: [],
       packageManagers: [],
       taskManagers: [],
+      attribution: true,
     };
 
     const instance = new ProjectConfig(schema);
@@ -112,7 +114,8 @@ export class ProjectConfig {
    * Check if a project configuration exists
    */
   static exists(): boolean {
-    const filePath = join(process.cwd(), PROJECT_CONFIG_FILE);
+    const projectRoot = findProjectRoot();
+    const filePath = join(projectRoot, PROJECT_CONFIG_FILE);
     return existsSync(filePath);
   }
 
@@ -131,6 +134,7 @@ export class ProjectConfig {
       languages: data.languages || [],
       packageManagers: data.packageManagers || [],
       taskManagers: data.taskManagers || [],
+      attribution: data.attribution || true,
     };
 
     return migrated;
@@ -140,7 +144,8 @@ export class ProjectConfig {
    * Save current configuration to disk
    */
   save(): void {
-    const filePath = join(process.cwd(), PROJECT_CONFIG_FILE);
+    const projectRoot = findProjectRoot();
+    const filePath = join(projectRoot, PROJECT_CONFIG_FILE);
     try {
       const json = JSON.stringify(this.data, null, 2);
       writeFileSync(filePath, json, 'utf8');
@@ -169,6 +174,9 @@ export class ProjectConfig {
   }
   get taskManagers(): TASK_MANAGER[] {
     return this.data.taskManagers;
+  }
+  get attribution(): boolean {
+    return this.data.attribution;
   }
 
   // Data Modification (Setters)
@@ -217,6 +225,11 @@ export class ProjectConfig {
     }
   }
 
+  setAttribution(value: boolean): void {
+    this.data.attribution = value;
+    this.save();
+  }
+
   /**
    * Get raw JSON data
    */
@@ -228,6 +241,7 @@ export class ProjectConfig {
 export enum AI_AGENT {
   Claude = 'claude',
   Gemini = 'gemini',
+  Qwen = 'qwen',
 }
 
 const CURRENT_USER_SCHEMA_VERSION = '1.0';
@@ -314,7 +328,8 @@ export class UserSettings {
    * Get the path to the settings file
    */
   private static getSettingsPath(): string {
-    return join(process.cwd(), '.rover', 'settings.json');
+    const projectRoot = findProjectRoot();
+    return join(projectRoot, '.rover', 'settings.json');
   }
 
   /**
@@ -343,7 +358,8 @@ export class UserSettings {
    */
   save(): void {
     const filePath = UserSettings.getSettingsPath();
-    const dirPath = join(process.cwd(), '.rover');
+    const projectRoot = findProjectRoot();
+    const dirPath = join(projectRoot, '.rover');
 
     try {
       // Ensure .rover directory exists

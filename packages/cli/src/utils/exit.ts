@@ -25,12 +25,12 @@ type ExitWithSuccessOpts = {
  */
 export const exitWithError = (
   jsonOutput: CLIJsonOutput,
-  json: boolean,
+  json: boolean | undefined,
   options: ExitWithErrorOpts = {}
 ) => {
   const { tips, tipsConfig, exitCode } = options;
 
-  if (json) {
+  if (json === true) {
     console.log(JSON.stringify(jsonOutput, null, 2));
   } else {
     console.log(colors.red(`\n✗ ${jsonOutput.error}`));
@@ -48,12 +48,12 @@ export const exitWithError = (
 export const exitWithWarn = (
   warnMessage: string,
   jsonOutput: CLIJsonOutput,
-  json: boolean,
+  json: boolean | undefined,
   options: ExitWithWarnOpts = {}
 ) => {
   const { tips, tipsConfig, exitCode } = options;
 
-  if (json) {
+  if (json === true) {
     console.log(JSON.stringify(jsonOutput, null, 2));
   } else {
     console.log(colors.yellow(`\n⚠ ${warnMessage}`));
@@ -71,12 +71,12 @@ export const exitWithWarn = (
 export const exitWithSuccess = (
   successMessage: string,
   jsonOutput: CLIJsonOutput,
-  json: boolean,
+  json: boolean | undefined,
   options: ExitWithSuccessOpts = {}
 ) => {
   const { tips, tipsConfig } = options;
 
-  if (json) {
+  if (json === true) {
     console.log(JSON.stringify(jsonOutput, null, 2));
   } else {
     console.log(colors.green(`\n✓ ${successMessage}`));

@@ -1,11 +1,10 @@
 import colors from 'ansi-colors';
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { spawn } from 'node:child_process';
-import { spawnSync } from '../lib/os.js';
+import { findProjectRoot, launch, launchSync } from 'rover-common';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
 import { getTelemetry } from '../lib/telemetry.js';
-import { showTips, TIP_TITLES } from '../utils/display.js';
+import { showTips } from '../utils/display.js';
 import { CLIJsonOutput } from '../types.js';
 import { exitWithError, exitWithWarn } from '../utils/exit.js';
 
@@ -21,7 +20,7 @@ interface TaskLogsOutput extends CLIJsonOutput {
  */
 const getAvailableIterations = (taskId: string): number[] => {
   try {
-    const roverPath = join(process.cwd(), '.rover');
+    const roverPath = join(findProjectRoot(), '.rover');
     const taskPath = join(roverPath, 'tasks', taskId);
     const iterationsPath = join(taskPath, 'iterations');
 
@@ -137,39 +136,34 @@ export const logsCommand = async (
       console.log('');
 
       try {
-        const logsProcess = spawn('docker', ['logs', '-f', containerId], {
-          stdio: ['inherit', 'pipe', 'pipe'],
-        });
+        const controller = new AbortController();
+        const cancelSignal = controller.signal;
 
-        // Handle stdout
-        logsProcess.stdout?.on('data', data => {
-          process.stdout.write(data);
-        });
-
-        // Handle stderr
-        logsProcess.stderr?.on('data', data => {
-          process.stderr.write(data);
-        });
-
-        // Handle process completion
-        logsProcess.on('close', code => {
-          if (code === 0) {
-            console.log(colors.green('\n✓ Log following completed'));
-          } else {
-            console.log(
-              colors.yellow(`\n⚠ Log following ended with code ${code}`)
-            );
+        const logsProcess = await launch(
+          'docker',
+          ['logs', '-f', containerId],
+          {
+            stdout: ['inherit'],
+            stderr: ['inherit'],
+            cancelSignal,
           }
-        });
+        );
 
-        logsProcess.on('error', error => {
-          console.error(colors.red('\nError following logs:'), error.message);
-        });
+        // Done
+        if (logsProcess.exitCode === 0) {
+          console.log(colors.green('\n✓ Log following completed'));
+        } else {
+          console.log(
+            colors.yellow(
+              `\n⚠ Log following ended with code ${logsProcess.exitCode}`
+            )
+          );
+        }
 
         // Handle process interruption (Ctrl+C)
         process.on('SIGINT', () => {
           console.log(colors.yellow('\n\n⚠ Stopping log following...'));
-          logsProcess.kill('SIGTERM');
+          controller.abort();
           process.exit(0);
         });
       } catch (error: any) {
@@ -186,10 +180,8 @@ export const logsCommand = async (
     } else {
       // Get logs using docker logs command (one-time)
       try {
-        const logs = spawnSync('docker', ['logs', containerId], {
-          encoding: 'utf8',
-          stdio: 'pipe',
-        }).stdout.toString();
+        const logs =
+          launchSync('docker', ['logs', containerId])?.stdout?.toString() || '';
 
         if (logs.trim() === '') {
           exitWithWarn(

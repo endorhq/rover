@@ -61,7 +61,11 @@ export const showRoverChat = (
   if (buildConfig.breaklineBefore) console.log('');
 
   for (const message of messages) {
-    console.log(`🤖 ${colors.green('Rover')}:`, message);
+    // Use teal-400 (45, 212, 191) when true colors are supported
+    const roverName = supportsTrueColor()
+      ? rgb(45, 212, 191, 'Rover')
+      : colors.cyan('Rover');
+    console.log(`🤖 ${roverName}:`, message);
   }
 
   if (buildConfig.breaklineAfter) console.log('');
@@ -97,35 +101,30 @@ export const showRoverBanner = () => {
   let banner;
 
   if (supportsTrueColor()) {
-    // True color green gradient from bright green to dark green
+    // True color teal gradient from top to bottom (vertical)
     const colorSteps = [
-      [144, 238, 144], // Light green
-      [102, 205, 102], // Medium green
-      [60, 179, 113], // Sea green
-      [34, 139, 34], // Forest green
-      [0, 100, 0], // Dark green
+      [94, 234, 212], // Teal 300 - top
+      [45, 212, 191], // Teal 400
+      [20, 184, 166], // Teal 500
+      [13, 148, 136], // Teal 600 - bottom
     ];
 
     banner = bannerText
-      .map(line => {
-        const chars = line.split('');
-        const step = Math.ceil(chars.length / colorSteps.length);
+      .map((line, lineIndex) => {
+        // Apply color based on line index (vertical gradient)
+        const colorIndex = Math.min(lineIndex, colorSteps.length - 1);
+        const [r, g, b] = colorSteps[colorIndex];
 
-        return chars
-          .map((char, i) => {
-            const colorIndex = Math.min(
-              Math.floor(i / step),
-              colorSteps.length - 1
-            );
-            const [r, g, b] = colorSteps[colorIndex];
-            return rgb(r, g, b, char);
-          })
+        // Apply the same color to all characters in the line
+        return line
+          .split('')
+          .map(char => rgb(r, g, b, char))
           .join('');
       })
       .join('\n');
   } else {
-    // Fallback to simple green
-    banner = bannerText.map(line => colors.white(line)).join('\n');
+    // Fallback to simple cyan
+    banner = bannerText.map(line => colors.cyan(line)).join('\n');
   }
 
   console.log(banner);
