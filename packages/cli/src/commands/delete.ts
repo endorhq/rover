@@ -12,8 +12,7 @@ import {
   exitWithWarn,
 } from '../utils/exit.js';
 import { CLIJsonOutputWithErrors } from '../types.js';
-import Git from '../lib/git.js';
-import { findProjectRoot } from 'rover-common';
+import { findProjectRoot, Git } from 'rover-common';
 
 const { prompt } = enquirer;
 
