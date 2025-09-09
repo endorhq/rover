@@ -41,10 +41,9 @@ export const deleteCommand = async (
     const numericTaskId = parseInt(taskId, 10);
     if (isNaN(numericTaskId)) {
       jsonOutput.errors?.push(`Invalid task ID '${taskId}' - must be a number`);
-      exitWithErrors(jsonOutput, json);
-      return; // Add explicit return to prevent further execution
+    } else {
+      numericTaskIds.push(numericTaskId);
     }
-    numericTaskIds.push(numericTaskId);
   }
 
   // Load all tasks and validate they exist
@@ -132,9 +131,6 @@ export const deleteCommand = async (
     } catch (_err) {
       // User cancelled, exit without doing anything
       jsonOutput.errors?.push('Task deletion cancelled');
-      exitWithErrors(jsonOutput, json);
-      await telemetry?.shutdown();
-      return;
     }
   }
 
