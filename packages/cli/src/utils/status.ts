@@ -106,7 +106,7 @@ export const getAllTaskStatuses = (): {
         // Ignore task data read errors
       }
 
-      if (['MERGED', 'PUSHED'].includes(taskData?.status)) {
+      if (['MERGED', 'PUSHED', 'COMPLETED'].includes(taskData?.status)) {
         latestStatus = taskData.status;
       } else {
         if (existsSync(iterationsPath)) {

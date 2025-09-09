@@ -165,7 +165,9 @@ export const listCommand = async (
         status,
         taskData,
         attribute: 'status',
-      });
+      })
+        .toString()
+        .toLowerCase();
       const startedAt = lastIterationOrTaskProperty({
         status,
         taskData,
