@@ -131,7 +131,7 @@ program
 // Restart a task
 program
   .command('restart')
-  .description('Restart a task')
+  .description('Restart a new or failed task')
   .argument('<taskId>', 'Task ID to restart')
   .option('--json', 'Output the result in JSON format')
   .action(restartCommand);

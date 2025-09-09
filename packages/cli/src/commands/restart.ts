@@ -58,8 +58,8 @@ export const restartCommand = async (
         tips: [
           'Only NEW and FAILED tasks can be restarted',
           'Use ' +
-            colors.cyan(`rover restart ${taskId}`) +
-            colors.gray(' for NEW and FAILED tasks'),
+            colors.cyan(`rover inspect ${taskId}`) +
+            colors.gray(' to find out the current task status'),
         ],
       });
       return;
@@ -68,16 +68,6 @@ export const restartCommand = async (
     // Restart the task (resets to NEW status and tracks restart attempt)
     const restartedAt = new Date().toISOString();
     task.restart(restartedAt);
-
-    if (!json) {
-      console.log(colors.bold.white('Restarting Task'));
-      console.log(colors.gray('├── ID: ') + colors.cyan(task.id.toString()));
-      console.log(colors.gray('├── Title: ') + colors.white(task.title));
-      console.log(colors.gray('├── Status: ') + colors.red(task.status));
-      console.log(colors.gray('└── Reset to: ') + colors.yellow('NEW'));
-      console.log(colors.green('✓ Task reset successfully'));
-      console.log('');
-    }
 
     // Load AI agent selection from user settings
     let selectedAiAgent = AI_AGENT.Claude; // default
@@ -94,13 +84,6 @@ export const restartCommand = async (
         );
       }
       selectedAiAgent = AI_AGENT.Claude;
-    }
-
-    if (!json) {
-      console.log(colors.bold.white('Starting Task'));
-      console.log(colors.gray('├── ID: ') + colors.cyan(task.id.toString()));
-      console.log(colors.gray('├── Title: ') + colors.white(task.title));
-      console.log(colors.gray('├── Status: ') + colors.yellow(task.status));
     }
 
     const taskPath = join(
@@ -155,13 +138,20 @@ export const restartCommand = async (
       );
     }
 
+    if (!json) {
+      console.log(colors.bold.white('Restarting Task'));
+      console.log(colors.gray('├── ID: ') + colors.cyan(task.id.toString()));
+      console.log(colors.gray('├── Title: ') + colors.white(task.title));
+      console.log(colors.gray('├── Status: ') + colors.red(task.status));
+      console.log(colors.gray('├── Workspace: ') + colors.cyan(worktreePath));
+      console.log(colors.gray('├── Branch: ') + colors.cyan(branchName));
+      console.log(colors.gray('└── Reset to: ') + colors.yellow('NEW'));
+      console.log(colors.green('\n✓ Task reset successfully'));
+      console.log('');
+    }
+
     // Mark task as in progress
     task.markInProgress();
-
-    if (!json) {
-      console.log(colors.gray('├── Workspace: ') + colors.cyan(worktreePath));
-      console.log(colors.gray('└── Branch: ') + colors.cyan(branchName));
-    }
 
     // Start Docker container for task execution
     try {

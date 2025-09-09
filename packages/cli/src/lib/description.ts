@@ -121,9 +121,9 @@ export class TaskFileError extends Error {
  * TaskDescription class - Centralized management of task metadata
  */
 export class TaskDescription {
-  data: TaskDescriptionSchema;
-  taskId: number;
-  filePath: string;
+  private data: TaskDescriptionSchema;
+  private taskId: number;
+  private filePath: string;
 
   constructor(data: TaskDescriptionSchema, taskId: number) {
     this.data = data;
@@ -557,6 +557,12 @@ export class TaskDescription {
   }
   get error(): string | undefined {
     return this.data.error;
+  }
+  get restartCount(): number | undefined {
+    return this.data.restartCount;
+  }
+  get lastRestartAt(): string | undefined {
+    return this.data.lastRestartAt;
   }
   get version(): string {
     return this.data.version;

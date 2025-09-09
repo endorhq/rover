@@ -104,8 +104,8 @@ describe('restart command', async () => {
       // Verify task was restarted
       const reloadedTask = TaskDescription.load(taskId);
       expect(reloadedTask.status).toBe('IN_PROGRESS');
-      expect(reloadedTask.data.restartCount).toBe(1);
-      expect(reloadedTask.data.lastRestartAt).toBeDefined();
+      expect(reloadedTask.restartCount).toBe(1);
+      expect(reloadedTask.lastRestartAt).toBeDefined();
 
       // Verify Docker execution was called
       expect(mockStartDockerExecution).toHaveBeenCalledWith(
@@ -135,14 +135,14 @@ describe('restart command', async () => {
       await restartCommand(taskId.toString(), { json: true });
 
       const firstRestart = TaskDescription.load(taskId);
-      expect(firstRestart.data.restartCount).toBe(1);
+      expect(firstRestart.restartCount).toBe(1);
 
       // Set back to failed and restart again
       firstRestart.markFailed('This task failed');
       await restartCommand(taskId.toString(), { json: true });
 
       const secondRestart = TaskDescription.load(taskId);
-      expect(secondRestart.data.restartCount).toBe(2);
+      expect(secondRestart.restartCount).toBe(2);
       expect(mockStartDockerExecution).toHaveBeenCalledTimes(2);
     });
   });
@@ -168,7 +168,7 @@ describe('restart command', async () => {
       // Verify task was restarted successfully
       const reloadedTask = TaskDescription.load(taskId);
       expect(reloadedTask.status).toBe('IN_PROGRESS');
-      expect(reloadedTask.data.restartCount).toBe(1);
+      expect(reloadedTask.restartCount).toBe(1);
 
       // Verify Docker execution was called
       expect(mockStartDockerExecution).toHaveBeenCalledWith(
