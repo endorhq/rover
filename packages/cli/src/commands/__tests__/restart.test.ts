@@ -19,8 +19,8 @@ vi.mock('../../lib/telemetry.js', () => ({
   }),
 }));
 
-// Mock restart command to prevent actual execution
-vi.mock('../restart.js', () => ({
+// Mock Docker execution and task execution to prevent actual execution
+vi.mock('../task.js', () => ({
   startDockerExecution: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -34,9 +34,9 @@ vi.mock('../../utils/exit.js', () => ({
 describe('restart command', async () => {
   let testDir: string;
   let originalCwd: string;
-  const mockRestartCommand = vi.mocked(
-    await import('../restart.js')
-  ).restartCommand;
+  const mockStartDockerExecution = vi.mocked(
+    await import('../task.js')
+  ).startDockerExecution;
 
   beforeEach(() => {
     // Create temporary directory for test
@@ -107,10 +107,15 @@ describe('restart command', async () => {
       expect(reloadedTask.data.restartCount).toBe(1);
       expect(reloadedTask.data.lastRestartAt).toBeDefined();
 
-      // Verify start command was called
-      expect(mockRestartCommand).toHaveBeenCalledWith(taskId.toString(), {
-        json: true,
-      });
+      // Verify Docker execution was called
+      expect(mockStartDockerExecution).toHaveBeenCalledWith(
+        taskId,
+        expect.any(Object), // task object
+        expect.any(String), // workspace path
+        expect.any(String), // iteration path
+        expect.any(String), // AI agent
+        true // json flag
+      );
     });
 
     it('should track multiple restart attempts', async () => {
@@ -138,45 +143,81 @@ describe('restart command', async () => {
 
       const secondRestart = TaskDescription.load(taskId);
       expect(secondRestart.data.restartCount).toBe(2);
-      expect(mockRestartCommand).toHaveBeenCalledTimes(2);
+      expect(mockStartDockerExecution).toHaveBeenCalledTimes(2);
     });
   });
 
   describe('error handling', () => {
-    it('should reject restarting non-failed tasks', async () => {
-      const { exitWithError } = await import('../../utils/exit.js');
-      const mockExitWithError = vi.mocked(exitWithError);
-
+    it('should successfully restart NEW tasks', async () => {
       // Create a task in NEW status
       const taskId = 789;
       const taskDir = join(testDir, '.rover', 'tasks', taskId.toString());
       mkdirSync(taskDir, { recursive: true });
 
-      TaskDescription.create({
+      const task = TaskDescription.create({
         id: taskId,
         title: 'Test Task',
         description: 'A test task',
       });
 
-      // Try to restart a NEW task
+      expect(task.status).toBe('NEW');
+
+      // Restart a NEW task should work
+      await restartCommand(taskId.toString(), { json: true });
+
+      // Verify task was restarted successfully
+      const reloadedTask = TaskDescription.load(taskId);
+      expect(reloadedTask.status).toBe('IN_PROGRESS');
+      expect(reloadedTask.data.restartCount).toBe(1);
+
+      // Verify Docker execution was called
+      expect(mockStartDockerExecution).toHaveBeenCalledWith(
+        taskId,
+        expect.any(Object), // task object
+        expect.any(String), // workspace path
+        expect.any(String), // iteration path
+        expect.any(String), // AI agent
+        true // json flag
+      );
+    });
+
+    it('should reject restarting tasks not in NEW or FAILED status', async () => {
+      const { exitWithError } = await import('../../utils/exit.js');
+      const mockExitWithError = vi.mocked(exitWithError);
+
+      // Create a task and set it to IN_PROGRESS status
+      const taskId = 790;
+      const taskDir = join(testDir, '.rover', 'tasks', taskId.toString());
+      mkdirSync(taskDir, { recursive: true });
+
+      const task = TaskDescription.create({
+        id: taskId,
+        title: 'Test Task',
+        description: 'A test task',
+      });
+
+      // Manually set to IN_PROGRESS
+      task.markInProgress();
+      expect(task.status).toBe('IN_PROGRESS');
+
+      // Try to restart an IN_PROGRESS task
       await restartCommand(taskId.toString(), { json: true });
 
       // Verify error was called
       expect(mockExitWithError).toHaveBeenCalledWith(
         expect.objectContaining({
-          error: expect.stringContaining('not in FAILED status'),
+          error: expect.stringContaining('not in NEW or FAILED status'),
         }),
         true,
         expect.objectContaining({
           tips: expect.arrayContaining([
-            'Only FAILED tasks can be restarted',
-            expect.stringContaining('rover start'),
+            'Only NEW and FAILED tasks can be restarted',
           ]),
         })
       );
 
-      // Verify restart command was NOT called
-      expect(mockRestartCommand).not.toHaveBeenCalled();
+      // Verify Docker execution was NOT called
+      expect(mockStartDockerExecution).not.toHaveBeenCalled();
     });
 
     it('should handle invalid task IDs', async () => {
@@ -194,8 +235,8 @@ describe('restart command', async () => {
         true
       );
 
-      // Verify restart command was NOT called
-      expect(mockRestartCommand).not.toHaveBeenCalled();
+      // Verify Docker execution was NOT called
+      expect(mockStartDockerExecution).not.toHaveBeenCalled();
     });
 
     it('should handle non-existent tasks', async () => {
@@ -213,8 +254,8 @@ describe('restart command', async () => {
         true
       );
 
-      // Verify restart command was NOT called
-      expect(mockRestartCommand).not.toHaveBeenCalled();
+      // Verify Docker execution was NOT called
+      expect(mockStartDockerExecution).not.toHaveBeenCalled();
     });
   });
 });
