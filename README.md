@@ -16,7 +16,9 @@
 
 Rover is a **manager for AI coding agents that works with Claude Code, Gemini, and Qwen**.
 
-It helps you get more done, faster, by allowing **multiple agents to work on your codebase in the background** without interfering with your work or each other. Everything runs locally, under your control, and using your already installed tools.
+It helps you get more done, faster, by allowing **multiple agents to work on your codebase simultaneously**. The agents work in the background in separate, isolated environments: they don't interfere with your work or each other.
+
+**Rover does not change how you work**: everything runs locally, under your control, and using your already installed tools.
 
 ## Getting Started
 
@@ -29,6 +31,8 @@ npm install -g @endorhq/rover@latest
 # Initialize
 cd <your-project> && rover init .
 ```
+
+_The init step does not change anything on your codebase or operating system. Rover checks what type of project it is and which coding agents and development tools you use (such as Docker)._
 
 Then, run `rover task` to create a task describing what you want to accomplish and hand it to Rover.
 
@@ -44,11 +48,11 @@ Depending on the task complexity, it might take a few minutes. Meanwhile, you **
 
 ## Why Rover?
 
-Running and managing multiple AI coding agents at the same time is overwhelming. You need to run them isolated and they constantly ask for attention. **Context switching becomes overwhelming**.
+Running and managing multiple AI coding agents simultaneously can be overwhelming. You need to run them isolated from each other and they constantly ask for attention. **Context switching quickly becomes a productivity drain**.
 
-At the same time, **parallel execution is one of the most powerful capabilities of AI coding agents**. You can focus on a task while agents complete small issues or just write some new documentation.
+At the same time, **parallel execution is one of the most powerful capabilities of AI coding agents**. You can focus on a task while a team of agents complete small issues or just write some new documentation.
 
-To simplify this process, **Rover manages AI coding agents for you**. It integrates with both your terminal and VSCode (as an extension). Configure Rover in your repository, set up your preferred AI coding agent and create new tasks with a single command. Rover will take care of setting up an environment for every task and configure your AI agent to complete it.
+To simplify this process, **Rover manages AI coding agents on your behalf**. It integrates with both your terminal and VSCode (as an extension). Configure Rover in your repository, set up your preferred AI coding agent and create new tasks with a single command. Rover will take care of setting up an environment for every task and configure your AI agent to complete it.
 
 ```mermaid
 block-beta
@@ -95,6 +99,7 @@ columns 1
 - 🔒 **Isolated**: Prevent AI Agents from overriding your changes, accessing private information or deleting system files
 - 🤖 **Bring your AI agents**: Use your existing AI agents like Claude Code, Gemini, and Qwen. **No new subscriptions needed**
 - 💻 **Local**: Everything runs on your computer. No new apps and permissions in your repositories
+- 👐 **Open Source**: Released under the Apache 2 license
 
 ## Quickstart
 
