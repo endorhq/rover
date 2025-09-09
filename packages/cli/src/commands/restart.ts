@@ -9,7 +9,6 @@ import { UserSettings, AI_AGENT } from '../lib/config.js';
 import { Git } from 'rover-common';
 import { CLIJsonOutput } from '../types.js';
 import { IterationConfig } from '../lib/iteration.js';
-import { startCommand } from './start.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import yoctoSpinner from 'yocto-spinner';
 import { copyEnvironmentFiles } from '../utils/env-files.js';
