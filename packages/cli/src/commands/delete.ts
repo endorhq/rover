@@ -68,8 +68,14 @@ export const deleteCommand = async (
 
   // If there are invalid task IDs, add them to errors
   if (invalidTaskIds.length > 0) {
-    for (const taskId of invalidTaskIds) {
-      jsonOutput.errors?.push(`The task with ID ${taskId} was not found`);
+    if (invalidTaskIds.length > 1) {
+      jsonOutput.errors?.push(
+        `Tasks with IDs ${invalidTaskIds.join(', ')} were not found`
+      );
+    } else {
+      jsonOutput.errors?.push(
+        `Task with ID ${invalidTaskIds[0]} was not found`
+      );
     }
   }
 
@@ -184,42 +190,15 @@ export const deleteCommand = async (
 
     jsonOutput.success = allSucceeded;
 
-    // Group output messages
-    if (!json) {
-      if (succeededTasks.length > 0) {
-        console.log(
-          colors.green(
-            `✓ Successfully deleted task${succeededTasks.length > 1 ? 's' : ''}: ${succeededTasks.join(', ')}`
-          )
-        );
-      }
-
-      if (warningTasks.length > 0) {
-        console.log(
-          colors.yellow(
-            `⚠ Task${warningTasks.length > 1 ? 's' : ''} deleted but with warnings: ${warningTasks.join(', ')}`
-          )
-        );
-      }
-
-      if (failedTasks.length > 0) {
-        console.log(
-          colors.red(
-            `✗ Failed to delete task${failedTasks.length > 1 ? 's' : ''}: ${failedTasks.join(', ')}`
-          )
-        );
-      }
-    }
-
     if (allSucceeded) {
       exitWithSuccess(
-        `Task${succeededTasks.length > 1 ? 's' : ''} deleted successfully`,
+        `All task${succeededTasks.length > 1 ? 's' : ''} (${succeededTasks.join(', ')}) deleted successfully`,
         jsonOutput,
         json
       );
     } else if (someSucceeded) {
       exitWithWarn(
-        `Some task${succeededTasks.length > 1 ? 's' : ''} deleted successfully`,
+        `Some task${succeededTasks.length > 1 ? 's' : ''} (${succeededTasks.join(', ')}) deleted successfully`,
         jsonOutput,
         json
       );
