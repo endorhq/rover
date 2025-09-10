@@ -151,13 +151,6 @@ async function main() {
     await Promise.all([extensionCtx.rebuild(), webviewCtx.rebuild()]);
     await Promise.all([extensionCtx.dispose(), webviewCtx.dispose()]);
   }
-
-  // if (watch) {
-  //   await Promise.all([extensionCtx.watch()]);
-  // } else {
-  //   await Promise.all([extensionCtx.rebuild()]);
-  //   await Promise.all([extensionCtx.dispose()]);
-  // }
 }
 
 main().catch(e => {
