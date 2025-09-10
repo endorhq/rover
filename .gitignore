@@ -147,3 +147,5 @@ vite.config.ts.timestamp-*
 # Demos
 demos/*
 !demos/*.tape
+!demos/README.md
+!demos/run.sh
