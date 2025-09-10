@@ -38,7 +38,6 @@ Then, run `rover task` to create a task describing what you want to accomplish a
 
 ![A screencast showing rover task](https://github.com/user-attachments/assets/e7bbfa18-dd75-4b15-9f2b-50b0be53cdad)
 
-
 Rover will:
 
 - 🔒 Prepare a **local isolated environment** (using containers) with an independent copy of your project code

@@ -40,33 +40,6 @@ const validations = (
   selectedAiAgent?: string,
   isJsonMode?: boolean
 ): validationResult => {
-  // Check if we're in a git repository
-  try {
-    const git = new Git();
-
-    if (!git.isGitRepo()) {
-      return {
-        error: 'Not in a git repository',
-        tips: ['Rover requires the project to be in a git repository'],
-      };
-    }
-
-    // Check if git repository has at least one commit
-    if (!git.hasCommits()) {
-      return {
-        error: 'No commits found in git repository',
-        tips: ['Git worktree requires at least one commit in the repository'],
-      };
-    }
-  } catch (error) {
-    return {
-      error: 'Git repository validation failed',
-      tips: [
-        'Please ensure git is installed and the repository is properly initialized',
-      ],
-    };
-  }
-
   // Check AI agent credentials based on selected agent
   if (selectedAiAgent === 'claude') {
     const claudeFile = join(homedir(), '.claude.json');

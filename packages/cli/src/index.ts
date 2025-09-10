@@ -4,6 +4,7 @@ import { ProjectConfig, UserSettings } from './lib/config.js';
 import { initCommand } from './commands/init.js';
 import { listCommand } from './commands/list.js';
 import { getVersion } from './utils/version.js';
+import { exitWithError } from './utils/exit.js';
 import { taskCommand } from './commands/task.js';
 import { diffCommand } from './commands/diff.js';
 import { logsCommand } from './commands/logs.js';
@@ -18,7 +19,7 @@ import colors from 'ansi-colors';
 import { pushCommand } from './commands/push.js';
 import { stopCommand } from './commands/stop.js';
 import { showTips, TIP_TITLES } from './utils/display.js';
-import { setVerbose } from 'rover-common';
+import { Git, setVerbose } from 'rover-common';
 
 const program = new Command();
 
@@ -51,6 +52,52 @@ program
       );
 
       process.exit(1);
+    }
+  })
+  .hook('preAction', (thisCommand, actionCommand) => {
+    const git = new Git();
+    try {
+      git.version();
+    } catch (error) {
+      exitWithError(
+        {
+          error: 'Git is not installed',
+          success: false,
+        },
+        actionCommand.opts().json === true,
+        {
+          tips: ['Install git and try again'],
+        }
+      );
+    }
+    if (!git.isGitRepo()) {
+      exitWithError(
+        {
+          error: 'Not in a git repository',
+          success: false,
+        },
+        actionCommand.opts().json === true,
+        {
+          tips: [
+            'Rover requires the project to be in a git repository. You can initialize a git repository by running ' +
+              colors.cyan('git init'),
+          ],
+        }
+      );
+    }
+    if (!git.hasCommits()) {
+      exitWithError(
+        {
+          error: 'No commits found in git repository',
+          success: false,
+        },
+        actionCommand.opts().json === true,
+        {
+          tips: [
+            'Git worktree requires at least one commit in the repository in order to have common history',
+          ],
+        }
+      );
     }
   })
   .hook('preAction', (thisCommand, actionCommand) => {

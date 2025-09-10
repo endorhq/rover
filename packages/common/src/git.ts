@@ -49,11 +49,8 @@ export type GitRemoteUrlOptions = {
  * A class to manage and run docker commands
  */
 export class Git {
-  constructor() {
-    // Check git is available
-    if (launchSync('git', ['--version'], { reject: false }).exitCode !== 0) {
-      throw new GitError('Git is not installed.');
-    }
+  version(): string {
+    return launchSync('git', ['--version']).stdout?.toString() || 'unknown';
   }
 
   isGitRepo(): boolean {
