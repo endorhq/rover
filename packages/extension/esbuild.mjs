@@ -100,7 +100,7 @@ const webviewComponentsConfig = {
   minify: production,
   sourcemap: !production,
   sourcesContent: false,
-  platform: 'browser',
+  platform: 'node',
   target: 'es2022',
   outdir: 'dist/views',
   loader: {
@@ -123,9 +123,10 @@ async function main() {
     sourcemap: !production,
     sourcesContent: false,
     platform: 'node',
+    target: 'es2022',
     outfile: 'dist/extension.js',
     external: ['vscode'],
-    logLevel: 'silent',
+    define: { 'import.meta.url': '_importMetaUrl' },
     // Add loader for handling Lit decorators and ES modules
     loader: {
       '.mts': 'ts',
@@ -136,6 +137,9 @@ async function main() {
       /* add to the end of plugins array */
       esbuildProblemMatcherPlugin,
     ],
+    banner: {
+      js: "const _importMetaUrl=require('url').pathToFileURL(__filename)",
+    },
   });
 
   // Build webview components
@@ -147,6 +151,13 @@ async function main() {
     await Promise.all([extensionCtx.rebuild(), webviewCtx.rebuild()]);
     await Promise.all([extensionCtx.dispose(), webviewCtx.dispose()]);
   }
+
+  // if (watch) {
+  //   await Promise.all([extensionCtx.watch()]);
+  // } else {
+  //   await Promise.all([extensionCtx.rebuild()]);
+  //   await Promise.all([extensionCtx.dispose()]);
+  // }
 }
 
 main().catch(e => {
