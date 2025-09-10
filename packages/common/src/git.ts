@@ -50,14 +50,16 @@ export type GitRemoteUrlOptions = {
  */
 export class Git {
   constructor() {
-    // Check docker is available
-    if (launchSync('git', ['--version']).exitCode !== 0) {
+    // Check git is available
+    if (launchSync('git', ['--version'], { reject: false }).exitCode !== 0) {
       throw new GitError('Git is not installed.');
     }
   }
 
   isGitRepo(): boolean {
-    const result = launchSync('git', ['rev-parse', '--is-inside-work-tree']);
+    const result = launchSync('git', ['rev-parse', '--is-inside-work-tree'], {
+      reject: false,
+    });
     return result.exitCode === 0;
   }
 
@@ -65,19 +67,19 @@ export class Git {
    * Get the root directory of the Git repository
    */
   getRepositoryRoot(): string | null {
-    try {
-      const result = launchSync('git', ['rev-parse', '--show-toplevel']);
-      if (result.exitCode === 0) {
-        return result.stdout?.toString().trim() || null;
-      }
-      return null;
-    } catch {
-      return null;
+    const result = launchSync('git', ['rev-parse', '--show-toplevel'], {
+      reject: false,
+    });
+    if (result.exitCode === 0) {
+      return result.stdout?.toString().trim() || null;
     }
+    return null;
   }
 
   hasCommits(): boolean {
-    const result = launchSync('git', ['rev-list', '--count', 'HEAD']);
+    const result = launchSync('git', ['rev-list', '--count', 'HEAD'], {
+      reject: false,
+    });
     return result.exitCode === 0;
   }
 
@@ -110,6 +112,7 @@ export class Git {
         ['ls-files', '--others', '--exclude-standard'],
         {
           cwd: options.worktreePath,
+          reject: false,
         }
       );
 
@@ -210,9 +213,7 @@ export class Git {
         cwd: options.worktreePath,
       });
 
-      return result?.exitCode == 0
-        ? result?.stdout?.toString().trim() || ''
-        : '';
+      return result?.stdout?.toString().trim() || '';
     } catch (_err) {
       return '';
     }
@@ -402,12 +403,11 @@ export class Git {
   branchExists(branch: string): boolean {
     try {
       return (
-        launchSync('git', [
-          'show-ref',
-          '--verify',
-          '--quiet',
-          `refs/heads/${branch}`,
-        ]).exitCode === 0
+        launchSync(
+          'git',
+          ['show-ref', '--verify', '--quiet', `refs/heads/${branch}`],
+          { reject: false }
+        ).exitCode === 0
       );
     } catch (error) {
       return false;
@@ -424,14 +424,16 @@ export class Git {
   ): boolean {
     if (this.branchExists(branchName)) {
       return (
-        launchSync('git', ['worktree', 'add', path, branchName]).exitCode == 0
+        launchSync('git', ['worktree', 'add', path, branchName], {
+          reject: false,
+        }).exitCode == 0
       );
     }
     // Create new branch from base branch if specified, otherwise from current branch
     const args = baseBranch
       ? ['worktree', 'add', path, '-b', branchName, baseBranch]
       : ['worktree', 'add', path, '-b', branchName];
-    return launchSync('git', args).exitCode == 0;
+    return launchSync('git', args, { reject: false }).exitCode == 0;
   }
 
   /**
@@ -524,6 +526,7 @@ export class Git {
 
     const result = launchSync('git', args, {
       cwd: options.worktreePath,
+      reject: false,
     });
 
     if (result.exitCode !== 0) {

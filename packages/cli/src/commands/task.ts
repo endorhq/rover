@@ -53,14 +53,6 @@ const validations = (
 
     // Check if git repository has at least one commit
     if (!git.hasCommits()) {
-      if (!isJsonMode) {
-        console.log(colors.red('✗ No commits found in git repository'));
-        console.log(
-          colors.gray(
-            '  Git worktree requires at least one commit in the repository'
-          )
-        );
-      }
       return {
         error: 'No commits found in git repository',
         tips: ['Git worktree requires at least one commit in the repository'],
