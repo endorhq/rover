@@ -21,6 +21,11 @@ export class TasksWebview extends LitElement {
   @state() private initializationStatus: any = null;
   @state() private showingSetupGuide = false;
   @state() private initializationCheckInterval: number | null = null;
+  @state() private selectedAgent = '';
+  @state() private selectedBranch = '';
+  @state() private availableAgents: string[] = [];
+  @state() private availableBranches: string[] = [];
+  @state() private defaultAgent = '';
 
   static styles = css`
     :host {
@@ -138,6 +143,36 @@ export class TasksWebview extends LitElement {
       margin-bottom: 6px;
     }
 
+    .form-row {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+
+    .form-select {
+      flex: 1;
+      padding: 6px;
+      border: 1px solid var(--vscode-input-border);
+      border-radius: 3px;
+      background-color: var(--vscode-input-background);
+      color: var(--vscode-input-foreground);
+      font-family: var(--vscode-font-family);
+      font-size: 12px;
+      box-sizing: border-box;
+    }
+
+    .form-select:focus {
+      outline: none;
+      border-color: var(--vscode-focusBorder);
+    }
+
+    .form-label {
+      font-size: 11px;
+      color: var(--vscode-descriptionForeground);
+      margin-bottom: 2px;
+      display: block;
+    }
+
     .form-textarea:focus {
       outline: none;
       border-color: var(--vscode-focusBorder);
@@ -233,6 +268,7 @@ export class TasksWebview extends LitElement {
       window.addEventListener('message', this.handleMessage.bind(this));
       window.addEventListener('keydown', this.handleKeyDown.bind(this));
       this.vscode.postMessage({ command: 'checkInitialization' });
+      this.vscode.postMessage({ command: 'getFormData' });
     }
   }
 
@@ -279,6 +315,24 @@ export class TasksWebview extends LitElement {
           this.vscode.postMessage({ command: 'refreshTasks' });
         }
         break;
+      case 'updateFormData':
+        if (message.agents) {
+          this.availableAgents = message.agents.agents || [];
+          this.defaultAgent = message.agents.defaultAgent || '';
+          this.selectedAgent = this.defaultAgent;
+        }
+        if (message.branches) {
+          this.availableBranches = message.branches || [];
+          // Set default branch to current branch first, then 'main', then first available
+          if (message.currentBranch && this.availableBranches.includes(message.currentBranch)) {
+            this.selectedBranch = message.currentBranch;
+          } else if (this.availableBranches.includes('main')) {
+            this.selectedBranch = 'main';
+          } else {
+            this.selectedBranch = this.availableBranches[0] || 'main';
+          }
+        }
+        break;
     }
   }
 
@@ -300,12 +354,28 @@ export class TasksWebview extends LitElement {
       return;
     }
 
+    // Validate agent selection
+    if (this.selectedAgent && !this.availableAgents.includes(this.selectedAgent)) {
+      console.warn(`Selected agent "${this.selectedAgent}" is not in available agents:`, this.availableAgents);
+      // Reset to default agent if invalid
+      this.selectedAgent = this.defaultAgent || this.availableAgents[0] || 'claude';
+    }
+
+    // Validate branch selection
+    if (this.selectedBranch && !this.availableBranches.includes(this.selectedBranch)) {
+      console.warn(`Selected branch "${this.selectedBranch}" is not in available branches:`, this.availableBranches);
+      // Reset to first available branch if invalid
+      this.selectedBranch = this.availableBranches[0] || 'main';
+    }
+
     this.creatingTask = true;
 
     if (this.vscode) {
       this.vscode.postMessage({
         command: 'createTask',
         description: description,
+        agent: this.selectedAgent || undefined,
+        sourceBranch: this.selectedBranch || undefined,
       });
     }
 
@@ -639,6 +709,41 @@ export class TasksWebview extends LitElement {
           @input=${(e: InputEvent) =>
             (this.taskInput = (e.target as HTMLTextAreaElement).value)}
         ></textarea>
+        
+        <div class="form-row">
+          <div style="flex: 1;">
+            <label class="form-label">AI Agent</label>
+            <select 
+              class="form-select"
+              .value=${this.selectedAgent}
+              @change=${(e: Event) =>
+                (this.selectedAgent = (e.target as HTMLSelectElement).value)}
+            >
+              ${this.availableAgents.map(agent => 
+                html`<option value=${agent} ?selected=${agent === this.selectedAgent}>
+                  ${agent.charAt(0).toUpperCase() + agent.slice(1)}
+                </option>`
+              )}
+            </select>
+          </div>
+          
+          <div style="flex: 1;">
+            <label class="form-label">Source Branch</label>
+            <select 
+              class="form-select"
+              .value=${this.selectedBranch}
+              @change=${(e: Event) =>
+                (this.selectedBranch = (e.target as HTMLSelectElement).value)}
+            >
+              ${this.availableBranches.map(branch => 
+                html`<option value=${branch} ?selected=${branch === this.selectedBranch}>
+                  ${branch}
+                </option>`
+              )}
+            </select>
+          </div>
+        </div>
+        
         <button
           class="form-button"
           @click=${this.createTask}

@@ -16,7 +16,7 @@ import {
 
 export class RoverCLI {
   private roverPath: string;
-  private workspaceRoot: vscode.Uri | undefined;
+  public workspaceRoot: vscode.Uri | undefined;
 
   constructor() {
     // Try to find rover in PATH or use configuration
@@ -73,10 +73,21 @@ export class RoverCLI {
   /**
    * Create a new task
    */
-  async createTask(description: string): Promise<RoverTask> {
+  async createTask(description: string, agent?: string, sourceBranch?: string): Promise<RoverTask> {
+    const args = ['task', description, '--yes', '--json'];
+    
+    if (agent) {
+      args.push('--agent', agent);
+    }
+    
+    if (sourceBranch) {
+      // Branch names with special characters need to be quoted properly
+      args.push('--source-branch', sourceBranch);
+    }
+
     const { stdout, stderr, exitCode } = await launch(
       this.roverPath,
-      ['task', description, '--yes', '--json'],
+      args,
       this.getLaunchOptions()
     );
     if (exitCode != 0 || !stdout) {

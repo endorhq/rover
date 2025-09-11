@@ -42,7 +42,7 @@ export function activate(context: vscode.ExtensionContext) {
   // Register the create task command
   const createTaskCommand = vscode.commands.registerCommand(
     'rover.createTask',
-    async (description?: string) => {
+    async (description?: string, agent?: string, sourceBranch?: string) => {
       // If no description provided, show input box (existing behavior)
       if (!description) {
         description = await vscode.window.showInputBox({
@@ -94,7 +94,7 @@ export function activate(context: vscode.ExtensionContext) {
               });
               statusBarItem!.text = '$(loading~spin) Expanding task with AI...';
 
-              const createdTask = await cli.createTask(description);
+              const createdTask = await cli.createTask(description, agent, sourceBranch);
 
               // Step 4: Finalizing
               progress.report({
