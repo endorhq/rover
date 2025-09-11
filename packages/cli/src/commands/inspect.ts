@@ -321,6 +321,12 @@ export const inspectCommand = async (
 
       const tips = [];
 
+      if (task.status === 'NEW' || task.status === 'FAILED') {
+        tips.push(
+          'Use ' + colors.cyan(`rover restart ${taskId}`) + ' to retry it'
+        );
+      }
+
       if (task.iterations > 1) {
         tips.push(
           'Use ' +
