@@ -16,7 +16,7 @@
 				"${workspaceFolder}/packages/extension/dist/*.js",
 				"${workspaceFolder}/packages/extension/dist/*.map",
 				"${workspaceFolder}/packages/extension/dist/**/*.js",
-				"${workspaceFolder}/packages/extension/dist/**/*.map",
+				"${workspaceFolder}/packages/extension/dist/**/*.map"
 			],
 			"preLaunchTask": "${defaultBuildTask}"
 		},

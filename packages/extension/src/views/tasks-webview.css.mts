@@ -23,7 +23,6 @@ const styles = css`
     min-height: 0;
   }
 
-
   .create-form {
     border-top: 1px solid var(--vscode-sideBar-border);
     padding: 1em 0 15px 0;
@@ -108,7 +107,6 @@ const styles = css`
     background-color: var(--vscode-button-secondaryBackground);
     color: var(--vscode-button-secondaryForeground);
   }
-
 `;
 
 export default styles;

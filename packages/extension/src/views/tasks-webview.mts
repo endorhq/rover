@@ -150,6 +150,16 @@ export class TasksWebview extends LitElement {
     }
   }
 
+  private handleShowMoreActions(event: CustomEvent) {
+    // For now, we'll just handle the actions directly
+    // In a full implementation, you might show a context menu
+    const { actions } = event.detail;
+
+    // This is a simplified implementation - in production you'd show a proper menu
+    // For now, we'll just log the available actions
+    console.log('More actions available:', actions);
+  }
+
   private handleInstallCLI(event: Event) {
     if (this.vscode) {
       this.vscode.postMessage({
@@ -173,7 +183,6 @@ export class TasksWebview extends LitElement {
       });
     }
   }
-
 
   private startInitializationPolling() {
     // Only start polling if not already running
@@ -219,9 +228,9 @@ export class TasksWebview extends LitElement {
                 task => html`
                   <task-card
                     .task=${task}
-                    .vscode=${this.vscode}
                     @inspect-task=${this.handleInspectTask}
                     @task-action=${this.handleTaskAction}
+                    @show-more-actions=${this.handleShowMoreActions}
                   ></task-card>
                 `
               )}

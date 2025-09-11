@@ -1,31 +1,35 @@
-import { LitElement, html, css } from 'lit';
+import { LitElement, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import styles from './task-card.css.mjs';
 
 @customElement('task-card')
 export class TaskCard extends LitElement {
   @property({ type: Object }) task: any = null;
-  @property({ type: Object }) vscode: any = null;
 
   static styles = styles;
 
   private getStatusIcon(status?: string): string {
-    switch (status) {
+    switch (status?.toUpperCase()) {
       case 'COMPLETED':
+        return 'codicon-pass-filled';
       case 'MERGED':
+        return 'codicon-git-merge';
       case 'PUSHED':
-        return 'codicon-pass success';
+        return 'codicon-repo-push';
       case 'FAILED':
-        return 'codicon-error failed';
+        return 'codicon-error';
       case 'RUNNING':
-        return 'codicon-play-circle running';
       case 'INITIALIZING':
-        return 'codicon-play-circle running';
+        return 'codicon-sync~spin';
       case 'INSTALLING':
-        return 'codicon-desktop-download running';
+        return 'codicon-desktop-download';
       default:
-        return 'codicon-circle';
+        return 'codicon-circle-large-outline';
     }
+  }
+
+  private getStatusClass(status?: string): string {
+    return status?.toLowerCase() || 'pending';
   }
 
   private formatTimeInfo(task: any): string {
@@ -83,16 +87,12 @@ export class TaskCard extends LitElement {
     const event = new CustomEvent('inspect-task', {
       detail: { taskId: this.task.id, taskTitle: this.task.title },
       bubbles: true,
-      composed: true
+      composed: true,
     });
     this.dispatchEvent(event);
   }
 
-  private executeTaskAction(
-    event: Event,
-    action: string,
-    taskStatus?: string
-  ) {
+  private executeTaskAction(event: Event, action: string, taskStatus?: string) {
     event.stopPropagation();
 
     const customEvent = new CustomEvent('task-action', {
@@ -100,10 +100,43 @@ export class TaskCard extends LitElement {
         action,
         taskId: this.task.id,
         taskTitle: this.task.title,
-        taskStatus: taskStatus || this.task.status
+        taskStatus: taskStatus || this.task.status,
       },
       bubbles: true,
-      composed: true
+      composed: true,
+    });
+    this.dispatchEvent(customEvent);
+  }
+
+  private showMoreActions(event: Event) {
+    event.stopPropagation();
+
+    // Create a custom event for showing more actions menu
+    // The parent component can handle this to show a context menu
+    const customEvent = new CustomEvent('show-more-actions', {
+      detail: {
+        taskId: this.task.id,
+        taskTitle: this.task.title,
+        taskStatus: this.task.status,
+        actions: [
+          {
+            action: 'openWorkspace',
+            label: 'Open Workspace',
+            icon: 'folder-opened',
+          },
+          { action: 'pushBranch', label: 'Push Branch', icon: 'repo-push' },
+          {
+            action: 'iterateTask',
+            label: 'Iterate Task',
+            icon: 'debug-restart',
+          },
+          { action: 'deleteTask', label: 'Delete Task', icon: 'trash' },
+        ],
+        x: (event as MouseEvent).clientX,
+        y: (event as MouseEvent).clientY,
+      },
+      bubbles: true,
+      composed: true,
     });
     this.dispatchEvent(customEvent);
   }
@@ -112,104 +145,129 @@ export class TaskCard extends LitElement {
     if (!this.task) return html``;
 
     const timeInfo = this.formatTimeInfo(this.task);
-    const details = [this.task.status.toUpperCase()];
-
-    if (timeInfo) details.push(timeInfo);
-    if (this.task.progress !== undefined && this.task.progress > 0)
-      details.push(`${this.task.progress}%`);
-    if (this.task.currentStep && this.task.status === 'RUNNING')
-      details.push(`Step: ${this.task.currentStep}`);
-
-    const isRunning = [
-      'RUNNING',
-      'INITIALIZING',
-      'INSTALLING',
-    ].includes(this.task.status?.toLowerCase());
-    const isCompleted = ['COMPLETED', 'MERGED', 'PUSHED'].includes(
+    const isRunning = ['running', 'initializing', 'installing'].includes(
       this.task.status?.toLowerCase()
     );
+    const isCompleted = ['completed', 'merged', 'pushed'].includes(
+      this.task.status?.toLowerCase()
+    );
+    const isFailed = this.task.status?.toLowerCase() === 'failed';
 
     return html`
-      <div class="task-item" @click=${this.inspectTask}>
-        <div class="task-icon">
-          <i class="codicon ${this.getStatusIcon(this.task.status)}"></i>
-        </div>
-        <div class="task-content">
+      <div class="task-card">
+        <!-- Header with Task ID and Title -->
+        <div class="task-header">
+          <span class="task-id">#${this.task.id}</span>
           <div class="task-title">${this.task.title}</div>
-          <div class="task-details">${details.join(' • ')}</div>
         </div>
+
+        <!-- Metadata line with status badge and timestamp -->
+        <div class="task-metadata">
+          <span class="status-badge ${this.getStatusClass(this.task.status)}">
+            <i class="codicon ${this.getStatusIcon(this.task.status)}"></i>
+            ${this.task.status}
+          </span>
+          ${timeInfo
+            ? html`<span class="task-timestamp">${timeInfo}</span>`
+            : ''}
+          ${this.task.progress !== undefined && this.task.progress > 0
+            ? html`<span class="task-progress">${this.task.progress}%</span>`
+            : ''}
+          ${this.task.currentStep && isRunning
+            ? html`<span class="task-progress">${this.task.currentStep}</span>`
+            : ''}
+        </div>
+
+        <!-- Action buttons -->
         <div class="task-actions">
-          ${isCompleted
-        ? html`
-                <button
-                  class="action-btn"
-                  @click=${(e: Event) =>
-            this.executeTaskAction(e, 'gitCompare')}
-                  title="Compare Task Changes"
-                >
-                  <i class="codicon codicon-diff-multiple"></i>
-                </button>
-                <button
-                  class="action-btn"
-                  @click=${(e: Event) =>
-            this.executeTaskAction(e, 'iterateTask')}
-                  title="Iterate Task"
-                >
-                  <i class="codicon codicon-debug-rerun"></i>
-                </button>
-                <button
-                  class="action-btn"
-                  @click=${(e: Event) =>
-            this.executeTaskAction(e, 'mergeTask')}
-                  title="Merge Task"
-                >
-                  <i class="codicon codicon-git-merge"></i>
-                </button>
-                <button
-                  class="action-btn"
-                  @click=${(e: Event) =>
-            this.executeTaskAction(e, 'pushBranch')}
-                  title="Push Task Branch"
-                >
-                  <i class="codicon codicon-repo-push"></i>
-                </button>
-              `
-        : ''}
+          <!-- Left side: Quick actions + More actions -->
+          <div class="action-group">
+            <!-- Primary actions based on status -->
+            ${isCompleted
+              ? html`
+                  <button
+                    class="action-button"
+                    @click=${(e: Event) =>
+                      this.executeTaskAction(e, 'gitCompare')}
+                    title="Compare changes made by this task"
+                  >
+                    <i class="codicon codicon-diff"></i>
+                    Compare
+                  </button>
+                  <button
+                    class="action-button"
+                    @click=${(e: Event) =>
+                      this.executeTaskAction(e, 'mergeTask')}
+                    title="Merge task changes into main branch"
+                  >
+                    <i class="codicon codicon-git-merge"></i>
+                    Merge
+                  </button>
+                `
+              : ''}
+            ${isRunning
+              ? html`
+                  <button
+                    class="action-button"
+                    @click=${(e: Event) =>
+                      this.executeTaskAction(e, 'viewLogs', this.task.status)}
+                    title="View task execution logs"
+                  >
+                    <i class="codicon codicon-output"></i>
+                    Logs
+                  </button>
+                  <button
+                    class="action-button"
+                    @click=${(e: Event) =>
+                      this.executeTaskAction(e, 'openShell')}
+                    title="Open shell in task workspace"
+                  >
+                    <i class="codicon codicon-terminal"></i>
+                    Shell
+                  </button>
+                `
+              : ''}
+            ${isFailed
+              ? html`
+                  <button
+                    class="action-button"
+                    @click=${(e: Event) =>
+                      this.executeTaskAction(e, 'viewLogs', this.task.status)}
+                    title="View error logs"
+                  >
+                    <i class="codicon codicon-output"></i>
+                    Error Logs
+                  </button>
+                  <button
+                    class="action-button"
+                    @click=${(e: Event) =>
+                      this.executeTaskAction(e, 'iterateTask')}
+                    title="Retry or fix this task"
+                  >
+                    <i class="codicon codicon-debug-restart"></i>
+                    Retry
+                  </button>
+                `
+              : ''}
+
+            <!-- More actions button -->
+            <button
+              class="action-button"
+              @click=${(e: Event) => this.showMoreActions(e)}
+              title="More actions"
+            >
+              <i class="codicon codicon-ellipsis"></i>
+            </button>
+          </div>
+
+          <!-- Right side: Details button -->
           <button
-            class="action-btn"
-            @click=${(e: Event) =>
-        this.executeTaskAction(e, 'viewLogs', this.task.status)}
-            title="View Logs"
+            class="details-button"
+            @click=${this.inspectTask}
+            title="View detailed task information"
           >
-            <i class="codicon codicon-file"></i>
-          </button>
-          ${isRunning || isCompleted
-        ? html`
-                <button
-                  class="action-btn"
-                  @click=${(e: Event) =>
-            this.executeTaskAction(e, 'openShell')}
-                  title="Open Shell"
-                >
-                  <i class="codicon codicon-terminal"></i>
-                </button>
-              `
-        : ''}
-          <button
-            class="action-btn"
-            @click=${(e: Event) =>
-        this.executeTaskAction(e, 'openWorkspace')}
-            title="Open Workspace"
-          >
-            <i class="codicon codicon-folder"></i>
-          </button>
-          <button
-            class="action-btn"
-            @click=${(e: Event) =>
-        this.executeTaskAction(e, 'deleteTask')}
-            title="Delete Task"
-          >
-            <i class="codicon codicon-trash"></i>
+            <i class="codicon codicon-info"></i>
+            Details
           </button>
         </div>
       </div>

@@ -95,7 +95,7 @@ const webviewComponentsConfig = {
     'tasks-webview': 'src/views/tasks-webview.mts',
     'task-details': 'src/views/task-details.mts',
   },
-  bundle: true,
+  bundle: production,
   format: 'iife',
   minify: production,
   sourcemap: !production,
@@ -117,7 +117,7 @@ async function main() {
   // Build the extension
   const extensionCtx = await esbuild.context({
     entryPoints: ['src/extension.mts'],
-    bundle: true,
+    bundle: production,
     format: 'cjs',
     minify: production,
     sourcemap: !production,
