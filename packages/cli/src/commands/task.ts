@@ -50,6 +50,21 @@ const validations = (
         tips: ['Run ' + colors.cyan('claude') + ' first to configure it'],
       };
     }
+  } else if (selectedAiAgent === 'codex') {
+    const codexCreds = join(homedir(), '.codex', 'auth.json');
+
+    if (!existsSync(codexCreds)) {
+      return {
+        error: 'Codex credentials not found',
+        tips: [
+          'Run ' +
+            colors.cyan('codex') +
+            ' first to set up credentials, using the' +
+            colors.cyan('/auth') +
+            ' command',
+        ],
+      };
+    }
   } else if (selectedAiAgent === 'gemini') {
     // Check Gemini credentials if needed
     const geminiFile = join(homedir(), '.gemini', 'settings.json');
@@ -399,12 +414,14 @@ export const taskCommand = async (
     const agentLower = agent.toLowerCase();
     if (agentLower === 'claude') {
       selectedAiAgent = AI_AGENT.Claude;
+    } else if (agentLower === 'codex') {
+      selectedAiAgent = AI_AGENT.Codex;
     } else if (agentLower === 'gemini') {
       selectedAiAgent = AI_AGENT.Gemini;
     } else if (agentLower === 'qwen') {
       selectedAiAgent = AI_AGENT.Qwen;
     } else {
-      jsonOutput.error = `Invalid agent: ${agent}. Valid options are: claude, gemini, qwen`;
+      jsonOutput.error = `Invalid agent: ${agent}. Valid options are: claude, codex, gemini, qwen`;
       exitWithError(jsonOutput, json);
       return;
     }

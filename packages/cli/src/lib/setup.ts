@@ -36,6 +36,22 @@ configure-mcp-servers() {
   mv /tmp/agent-settings.json /home/agent/.claude.json
 }
 `;
+      case 'codex':
+        return `# Function to configure MCP servers for codex
+configure-mcp-servers() {
+  # Ensure configuration file exists
+  if [ ! -f /home/agent/.codex/config.toml ]; then
+    echo '' > /home/agent/.codex/config.toml
+    chown agent:agent /home/agent/.codex/config.toml
+  fi
+
+  cat <<'EOF' >> /home/agent/.codex/config.toml
+[mcp_servers.package-manager]
+command = "mcp-remote"
+args = ["http://127.0.0.1:8090/mcp"]
+EOF
+}
+`;
       case 'gemini':
         return `# Function to configure MCP servers for gemini
 configure-mcp-servers() {
@@ -341,6 +357,8 @@ setup_agent_environment() {
     switch (this.agent) {
       case 'claude':
         return 'claude --dangerously-skip-permissions -p --debug';
+      case 'codex':
+        return 'RUST_LOG=debug codex exec --dangerously-bypass-approvals-and-sandbox --skip-git-repo-check';
       case 'gemini':
         return 'gemini --yolo -p --debug';
       case 'qwen':
@@ -425,6 +443,29 @@ fi
 # Update permissions
 chown -R agent:agent /home/agent/.claude
 `;
+    } else if (this.agent == 'codex') {
+      return `npm install -g @openai/codex
+
+# Codex does not support Streamable HTTP server yet, only stdio; use
+# mcp-remote for proxying.
+ensure_mcp_remote
+
+# Configure the CLI
+# Process and copy Gemini credentials
+if [ -d "/.codex" ]; then
+    echo "📝 Processing Codex credentials..."
+    write_status "installing" "Process Codex credentials" 20
+
+    mkdir -p /home/agent/.codex
+    cp /.codex/auth.json /home/agent/.codex/
+    cp /.codex/config.json /home/agent/.codex/
+    chown -R agent:agent /home/agent/.codex
+    echo "✅ Codex credentials processed and copied to agent user"
+else
+    echo "❌  No Codex configuration found at /.codex"
+    safe_exit 1 "Missing codex credentials"
+fi
+`;
     } else if (this.agent == 'gemini') {
       return `npm install -g @google/gemini-cli
 
@@ -491,6 +532,19 @@ check_command() {
     return 0
 }
 
+# Function to install mcp-remote if not available
+ensure_mcp_remote() {
+  if ! check_command mcp-remote; then
+    COMMAND="npm install -g mcp-remote@0.1.29"
+    if $COMMAND; then
+      write_status "initializing" "Installed mcp-remote for MCP proxying" 5
+    else
+      echo "❌ Failed to install mcp-remote"
+      safe_exit 1 "$COMMAND failed"
+    fi
+  fi
+}
+
 # Function to install jq if not available
 ensure_jq() {
     if ! check_command jq; then
@@ -531,6 +585,11 @@ gid=$2
 
 echo "UID is $uid"
 echo "GID is $gid"
+
+# Some tools might be installed under /root/local/.bin conditionally
+# depending on the chosen agent and requirements, make this directory
+# available in the $PATH
+export PATH=/root/local/.bin:$PATH
 
 ${this.generateCommonFunctions()}
 

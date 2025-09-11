@@ -1,4 +1,5 @@
 import ClaudeAI from './claude.js';
+import CodexAI from './codex.js';
 import GeminiAI from './gemini.js';
 import QwenAI from './qwen.js';
 import type { IPromptTask } from '../prompts/index.js';
@@ -70,6 +71,8 @@ export const getAIAgentTool = (agent: string): AIAgentTool => {
   switch (agent.toLowerCase()) {
     case 'claude':
       return new ClaudeAI();
+    case 'codex':
+      return new CodexAI();
     case 'gemini':
       return new GeminiAI();
     case 'qwen':

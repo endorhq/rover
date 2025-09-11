@@ -38,6 +38,7 @@
   "devDependencies": {
     "@types/node": "^24.1.0",
     "@types/react": "^19.1.8",
+    "@types/tmp": "^0.2.6",
     "@vitest/ui": "^2.1.8",
     "tsdown": "^0.13.0",
     "typescript": "^5.8.3",

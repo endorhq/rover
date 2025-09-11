@@ -7,6 +7,7 @@ import { detectEnvironment } from '../utils/environment.js';
 import type { Environment } from '../types.js';
 import {
   checkClaude,
+  checkCodex,
   checkDocker,
   checkGemini,
   checkQwen,
@@ -98,6 +99,10 @@ export const initCommand = async (
 
   const claudeInstalled = await checkClaude();
 
+  reqSpinner.text = 'Checking Codex';
+
+  const codexInstalled = await checkCodex();
+
   reqSpinner.text = 'Checking Gemini';
 
   const geminiInstalled = await checkGemini();
@@ -128,6 +133,9 @@ export const initCommand = async (
   console.log(colors.white.bold('\nAI Agents (at least one)'));
   console.log(
     `├── Claude: ${claudeInstalled ? colors.green('✓ Installed') : colors.red('✗ Missing')}`
+  );
+  console.log(
+    `├── Codex: ${codexInstalled ? colors.green('✓ Installed') : colors.red('✗ Missing')}`
   );
   console.log(
     `├── Gemini: ${geminiInstalled ? colors.green('✓ Installed') : colors.red('✗ Missing')}`
@@ -175,6 +183,10 @@ export const initCommand = async (
     const availableAgents: AI_AGENT[] = [];
     if (claudeInstalled) {
       availableAgents.push(AI_AGENT.Claude);
+    }
+
+    if (codexInstalled) {
+      availableAgents.push(AI_AGENT.Codex);
     }
 
     if (geminiInstalled) {
@@ -229,14 +241,22 @@ export const initCommand = async (
           '└── This helps track AI-assisted work in your repository\n'
         )
       );
-      const { confirm } = await prompt<{ confirm: boolean }>({
-        type: 'confirm',
-        name: 'confirm',
-        message:
-          'Would you like to enable commit attribution? (can change anytime)',
-        initial: true,
-      });
-      attribution = confirm;
+      try {
+        const { confirm } = await prompt<{ confirm: boolean }>({
+          type: 'confirm',
+          name: 'confirm',
+          message:
+            'Would you like to enable commit attribution? (can change anytime)',
+          initial: true,
+        });
+        attribution = confirm;
+      } catch (error) {
+        console.log(
+          'Attribution was ' +
+            colors.white.bold(attribution ? 'enabled' : 'disabled') +
+            ' due to the lack of confirmation'
+        );
+      }
     }
 
     // Send telemetry information
