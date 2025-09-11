@@ -270,53 +270,56 @@ export const inspectCommand = async (
         console.log(colors.white(task.error));
       }
 
-      console.log(
-        colors.bold.white('\nIteration Details ') +
-          colors.gray(`${iterationNumber}/${task.iterations}`)
-      );
-
-      console.log('└── ' + colors.white('Files:'));
       const discoveredFiles = discoverIterationFiles(
         numericTaskId,
         iterationNumber
       );
-      for (const file of discoveredFiles) {
-        console.log(colors.white(`     └── ${colors.cyan(file)}`));
-      }
 
-      const fileFilter = options.file || ['summary.md'];
-
-      const iterationFileContents = iterationFiles(
-        numericTaskId,
-        iterationNumber,
-        fileFilter
-      );
-      if (iterationFileContents.size === 0) {
+      if (discoveredFiles.length > 0) {
         console.log(
-          colors.gray(
-            `\nNo content for the ${fileFilter.join(', ')} files found for iteration ${iterationNumber}.`
-          )
+          colors.bold.white('\nIteration Details ') +
+            colors.gray(`${iterationNumber}/${task.iterations}`)
         );
-      } else {
-        console.log(colors.white.bold('\nOutput content:'));
-        iterationFileContents.forEach((contents, file) => {
-          console.log(`└── ${colors.cyan(file)}:`);
-          contents.split('\n').forEach(line => {
-            let chunks = [line];
-            if (line.length > process.stdout.columns) {
-              chunks = line.split(
-                new RegExp(
-                  '(.{' + (process.stdout.columns - 8).toString() + '})'
-                )
-              );
-            }
 
-            chunks.forEach(chunk =>
-              console.log(colors.white('    | ' + chunk))
-            );
+        console.log('└── ' + colors.white('Files:'));
+        for (const file of discoveredFiles) {
+          console.log(colors.white(`     └── ${colors.cyan(file)}`));
+        }
+
+        const fileFilter = options.file || ['summary.md'];
+
+        const iterationFileContents = iterationFiles(
+          numericTaskId,
+          iterationNumber,
+          fileFilter
+        );
+        if (iterationFileContents.size === 0) {
+          console.log(
+            colors.gray(
+              `\nNo content for the ${fileFilter.join(', ')} files found for iteration ${iterationNumber}.`
+            )
+          );
+        } else {
+          console.log(colors.white.bold('\nOutput content:'));
+          iterationFileContents.forEach((contents, file) => {
+            console.log(`└── ${colors.cyan(file)}:`);
+            contents.split('\n').forEach(line => {
+              let chunks = [line];
+              if (line.length > process.stdout.columns) {
+                chunks = line.split(
+                  new RegExp(
+                    '(.{' + (process.stdout.columns - 8).toString() + '})'
+                  )
+                );
+              }
+
+              chunks.forEach(chunk =>
+                console.log(colors.white('    | ' + chunk))
+              );
+            });
+            console.log();
           });
-          console.log();
-        });
+        }
       }
 
       const tips = [];
@@ -335,7 +338,7 @@ export const inspectCommand = async (
         );
       }
 
-      if (options.file == null) {
+      if (options.file == null && discoveredFiles.length > 0) {
         tips.push(
           'Use ' +
             colors.cyan(
