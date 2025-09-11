@@ -150,16 +150,6 @@ export class TasksWebview extends LitElement {
     }
   }
 
-  private handleShowMoreActions(event: CustomEvent) {
-    // For now, we'll just handle the actions directly
-    // In a full implementation, you might show a context menu
-    const { actions } = event.detail;
-
-    // This is a simplified implementation - in production you'd show a proper menu
-    // For now, we'll just log the available actions
-    console.log('More actions available:', actions);
-  }
-
   private handleInstallCLI(event: Event) {
     if (this.vscode) {
       this.vscode.postMessage({
@@ -221,7 +211,17 @@ export class TasksWebview extends LitElement {
     return html`
       <div class="tasks-container">
         ${this.loading
-          ? html` <div class="empty-state">Loading tasks...</div> `
+          ? html`
+              <div class="loading-state">
+                <div class="loading-spinner">
+                  <i class="codicon codicon-loading spinner-icon"></i>
+                </div>
+                <div class="loading-text">Loading tasks...</div>
+                <div class="loading-subtext">
+                  Please wait while we fetch your tasks
+                </div>
+              </div>
+            `
           : this.tasks.length === 0
             ? html` <tasks-intro></tasks-intro> `
             : this.tasks.map(
@@ -230,7 +230,6 @@ export class TasksWebview extends LitElement {
                     .task=${task}
                     @inspect-task=${this.handleInspectTask}
                     @task-action=${this.handleTaskAction}
-                    @show-more-actions=${this.handleShowMoreActions}
                   ></task-card>
                 `
               )}

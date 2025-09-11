@@ -83,6 +83,59 @@ const styles = css`
     color: var(--vscode-descriptionForeground);
   }
 
+  .loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    color: var(--vscode-descriptionForeground);
+  }
+
+  .loading-spinner {
+    width: 36px;
+    height: 36px;
+    margin-bottom: 8px;
+    position: relative;
+  }
+
+  .spinner-icon {
+    position: absolute;
+    animation: spin 1.5s linear infinite;
+    font-size: 36px;
+    color: var(--vscode-progressBar-background);
+  }
+
+  @keyframes spin {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .loading-text {
+    font-size: 13px;
+    margin-bottom: 4px;
+  }
+
+  .loading-subtext {
+    font-size: 11px;
+    opacity: 0.7;
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%,
+    100% {
+      opacity: 0.5;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+
   .status-badge {
     padding: 1px 4px;
     border-radius: 8px;
@@ -107,6 +160,9 @@ const styles = css`
     background-color: var(--vscode-button-secondaryBackground);
     color: var(--vscode-button-secondaryForeground);
   }
+
+  /* Codicon definitions */
+  ${codiconsIcons}
 `;
 
 export default styles;

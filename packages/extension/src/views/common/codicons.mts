@@ -1,6 +1,11 @@
 import { css } from 'lit';
 
 export const codiconsIcons = css`
+  .codicon {
+    font-family: codicon;
+    font-style: normal;
+  }
+
   .codicon-add:before {
     content: '\\ea60';
   }

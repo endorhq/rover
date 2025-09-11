@@ -1,17 +1,36 @@
 import { LitElement, html } from 'lit';
-import { customElement, property } from 'lit/decorators.js';
+import { customElement, property, state } from 'lit/decorators.js';
 import styles from './task-card.css.mjs';
 
 @customElement('task-card')
 export class TaskCard extends LitElement {
   @property({ type: Object }) task: any = null;
+  @state() private showDropdown = false;
 
   static styles = styles;
+
+  connectedCallback() {
+    super.connectedCallback();
+    // Add global click listener to close dropdown when clicking outside
+    document.addEventListener('click', this.handleDocumentClick.bind(this));
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    document.removeEventListener('click', this.handleDocumentClick.bind(this));
+  }
+
+  private handleDocumentClick(event: Event) {
+    // Close dropdown if clicking outside the component
+    if (!this.contains(event.target as Node)) {
+      this.showDropdown = false;
+    }
+  }
 
   private getStatusIcon(status?: string): string {
     switch (status?.toUpperCase()) {
       case 'COMPLETED':
-        return 'codicon-pass-filled';
+        return 'codicon-pass';
       case 'MERGED':
         return 'codicon-git-merge';
       case 'PUSHED':
@@ -30,6 +49,15 @@ export class TaskCard extends LitElement {
 
   private getStatusClass(status?: string): string {
     return status?.toLowerCase() || 'pending';
+  }
+
+  private getStatusName(status?: string): string {
+    if (!status) return 'Unknown';
+
+    // Capitalize
+    const label = `${status.charAt(0)}${status.substring(1).toLowerCase()}`;
+
+    return label;
   }
 
   private formatTimeInfo(task: any): string {
@@ -110,35 +138,38 @@ export class TaskCard extends LitElement {
 
   private showMoreActions(event: Event) {
     event.stopPropagation();
+    this.showDropdown = !this.showDropdown;
+  }
 
-    // Create a custom event for showing more actions menu
-    // The parent component can handle this to show a context menu
-    const customEvent = new CustomEvent('show-more-actions', {
-      detail: {
-        taskId: this.task.id,
-        taskTitle: this.task.title,
-        taskStatus: this.task.status,
-        actions: [
-          {
-            action: 'openWorkspace',
-            label: 'Open Workspace',
-            icon: 'folder-opened',
-          },
-          { action: 'pushBranch', label: 'Push Branch', icon: 'repo-push' },
-          {
-            action: 'iterateTask',
-            label: 'Iterate Task',
-            icon: 'debug-restart',
-          },
-          { action: 'deleteTask', label: 'Delete Task', icon: 'trash' },
-        ],
-        x: (event as MouseEvent).clientX,
-        y: (event as MouseEvent).clientY,
+  private getMoreActions() {
+    const isCompleted = ['completed', 'merged', 'pushed'].includes(
+      this.task.status?.toLowerCase()
+    );
+
+    const actions = [
+      {
+        action: 'openWorkspace',
+        label: 'Open Workspace',
+        icon: 'folder-opened',
       },
-      bubbles: true,
-      composed: true,
-    });
-    this.dispatchEvent(customEvent);
+    ];
+
+    if (isCompleted) {
+      actions.push(
+        { action: 'pushBranch', label: 'Push Branch', icon: 'repo-push' },
+        { action: 'iterateTask', label: 'Iterate Task', icon: 'debug-restart' }
+      );
+    }
+
+    actions.push({ action: 'deleteTask', label: 'Delete Task', icon: 'trash' });
+
+    return actions;
+  }
+
+  private handleMoreAction(event: Event, action: string) {
+    event.stopPropagation();
+    this.showDropdown = false;
+    this.executeTaskAction(event, action);
   }
 
   render() {
@@ -165,7 +196,7 @@ export class TaskCard extends LitElement {
         <div class="task-metadata">
           <span class="status-badge ${this.getStatusClass(this.task.status)}">
             <i class="codicon ${this.getStatusIcon(this.task.status)}"></i>
-            ${this.task.status}
+            ${this.getStatusName(this.task.status)}
           </span>
           ${timeInfo
             ? html`<span class="task-timestamp">${timeInfo}</span>`
@@ -251,13 +282,38 @@ export class TaskCard extends LitElement {
               : ''}
 
             <!-- More actions button -->
-            <button
-              class="action-button"
-              @click=${(e: Event) => this.showMoreActions(e)}
-              title="More actions"
-            >
-              <i class="codicon codicon-ellipsis"></i>
-            </button>
+            <div class="more-actions-container">
+              <button
+                class="action-button"
+                @click=${(e: Event) => this.showMoreActions(e)}
+                title="More actions"
+              >
+                <i class="codicon codicon-ellipsis"></i>
+              </button>
+
+              ${this.showDropdown
+                ? html`
+                    <div class="more-actions-dropdown">
+                      ${this.getMoreActions().map(
+                        action => html`
+                          <button
+                            class="dropdown-item ${action.action ===
+                            'deleteTask'
+                              ? 'danger'
+                              : ''}"
+                            @click=${(e: Event) =>
+                              this.handleMoreAction(e, action.action)}
+                            title=${action.label}
+                          >
+                            <i class="codicon codicon-${action.icon}"></i>
+                            ${action.label}
+                          </button>
+                        `
+                      )}
+                    </div>
+                  `
+                : ''}
+            </div>
           </div>
 
           <!-- Right side: Details button -->

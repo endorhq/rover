@@ -23,17 +23,15 @@ const styles = css`
     display: flex;
     align-items: flex-start;
     gap: 8px;
-    margin-bottom: 8px;
+    margin-bottom: 4px;
   }
 
   .task-id {
     font-family: var(--vscode-editor-font-family, monospace);
-    font-size: 11px;
+    font-size: 13px;
     color: var(--vscode-descriptionForeground);
-    background-color: var(--vscode-textBlockQuote-background);
-    border: 1px solid var(--vscode-textBlockQuote-border);
-    padding: 2px 6px;
-    border-radius: 3px;
+    padding-top: 1px;
+    line-height: 1.4;
     flex-shrink: 0;
   }
 
@@ -57,13 +55,9 @@ const styles = css`
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    padding: 2px 8px;
-    border-radius: 11px;
     font-size: 11px;
     font-weight: 600;
-    text-transform: uppercase;
     flex-shrink: 0;
-    border: 1px solid transparent;
   }
 
   .status-badge .codicon {
@@ -71,41 +65,29 @@ const styles = css`
   }
 
   .status-badge.completed {
-    background-color: rgba(73, 214, 155, 0.15);
     color: var(--vscode-testing-iconPassed);
-    border-color: rgba(73, 214, 155, 0.3);
   }
 
   .status-badge.merged {
-    background-color: rgba(139, 92, 246, 0.15);
     color: var(--vscode-gitDecoration-modifiedResourceForeground);
-    border-color: rgba(139, 92, 246, 0.3);
   }
 
   .status-badge.pushed {
-    background-color: rgba(34, 197, 94, 0.15);
     color: var(--vscode-gitDecoration-addedResourceForeground);
-    border-color: rgba(34, 197, 94, 0.3);
   }
 
   .status-badge.failed {
-    background-color: rgba(248, 113, 113, 0.15);
     color: var(--vscode-testing-iconFailed);
-    border-color: rgba(248, 113, 113, 0.3);
   }
 
   .status-badge.running,
   .status-badge.initializing,
   .status-badge.installing {
-    background-color: rgba(59, 130, 246, 0.15);
     color: var(--vscode-testing-iconQueued);
-    border-color: rgba(59, 130, 246, 0.3);
   }
 
   .status-badge.pending {
-    background-color: var(--vscode-badge-background);
     color: var(--vscode-badge-foreground);
-    border-color: var(--vscode-contrastBorder, transparent);
   }
 
   .task-timestamp {
@@ -124,6 +106,7 @@ const styles = css`
     display: flex;
     align-items: center;
     justify-content: space-between;
+    margin-top: 8px;
     gap: 8px;
   }
 
@@ -178,16 +161,61 @@ const styles = css`
     gap: 4px;
     transition: opacity 0.1s;
     text-decoration: none;
-    border-radius: 2px;
+    border-radius: 4px;
   }
 
   .details-button:hover {
     background: var(--vscode-toolbar-hoverBackground);
   }
 
-  .codicon {
-    font-family: codicon;
-    font-style: normal;
+  .more-actions-container {
+    position: relative;
+  }
+
+  .more-actions-dropdown {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background: var(--vscode-dropdown-background);
+    border: 1px solid var(--vscode-dropdown-border);
+    border-radius: 3px;
+    box-shadow: 0 2px 8px var(--vscode-widget-shadow);
+    z-index: 1000;
+    min-width: 140px;
+    padding: 4px 0;
+    margin-top: 2px;
+  }
+
+  .dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: transparent;
+    border: none;
+    color: var(--vscode-dropdown-foreground);
+    font-size: 11px;
+    font-family: var(--vscode-font-family);
+    cursor: pointer;
+    width: 100%;
+    text-align: left;
+  }
+
+  .dropdown-item:hover {
+    background: var(--vscode-list-hoverBackground);
+  }
+
+  .dropdown-item .codicon {
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  .dropdown-item.danger {
+    color: var(--vscode-errorForeground);
+  }
+
+  .dropdown-item.danger:hover {
+    background: rgba(248, 113, 113, 0.1);
   }
 
   /* Codicon definitions */
