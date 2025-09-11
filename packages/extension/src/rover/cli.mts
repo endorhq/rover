@@ -6,13 +6,7 @@ import {
   TaskDetails,
   IterateResult,
 } from './types.js';
-import {
-  findProjectRoot,
-  launch,
-  launchSync,
-  type Options,
-  type Result,
-} from 'rover-common';
+import { findProjectRoot, launch, type Options } from 'rover-common';
 
 export class RoverCLI {
   private roverPath: string;

@@ -180,18 +180,18 @@ export class TasksWebview extends LitElement {
   }
 
   private getStatusIcon(status?: string): string {
-    switch (status?.toLowerCase()) {
-      case 'completed':
-      case 'merged':
-      case 'pushed':
+    switch (status) {
+      case 'COMPLETED':
+      case 'MERGED':
+      case 'PUSHED':
         return 'codicon-pass success';
-      case 'failed':
+      case 'FAILED':
         return 'codicon-error failed';
-      case 'running':
+      case 'RUNNING':
         return 'codicon-play-circle running';
-      case 'initializing':
+      case 'INITIALIZING':
         return 'codicon-play-circle running';
-      case 'installing':
+      case 'INSTALLING':
         return 'codicon-desktop-download running';
       default:
         return 'codicon-circle';
@@ -205,15 +205,15 @@ export class TasksWebview extends LitElement {
     }
 
     if (
-      task.status === 'running' ||
-      task.status === 'initializing' ||
-      task.status === 'installing'
+      task.status === 'RUNNING' ||
+      task.status === 'INITIALIZING' ||
+      task.status === 'INSTALLING'
     ) {
       const started = new Date(task.startedAt);
       return `Started ${this.formatRelativeTime(started)}`;
     }
 
-    if (task.status === 'failed') {
+    if (task.status === 'FAILED') {
       const started = new Date(task.startedAt);
       return `Failed after ${this.formatDuration(started)}`;
     }
@@ -296,15 +296,15 @@ export class TasksWebview extends LitElement {
                 if (timeInfo) details.push(timeInfo);
                 if (task.progress !== undefined && task.progress > 0)
                   details.push(`${task.progress}%`);
-                if (task.currentStep && task.status === 'running')
+                if (task.currentStep && task.status === 'RUNNING')
                   details.push(`Step: ${task.currentStep}`);
 
                 const isRunning = [
-                  'running',
-                  'initializing',
-                  'installing',
+                  'RUNNING',
+                  'INITIALIZING',
+                  'INSTALLING',
                 ].includes(task.status?.toLowerCase());
-                const isCompleted = ['completed', 'merged', 'pushed'].includes(
+                const isCompleted = ['COMPLETED', 'MERGED', 'PUSHED'].includes(
                   task.status?.toLowerCase()
                 );
 

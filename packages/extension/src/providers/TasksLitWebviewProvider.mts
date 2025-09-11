@@ -1,18 +1,15 @@
 import * as vscode from 'vscode';
 import { RoverCLI } from '../rover/cli.mjs';
-import { FileSystemHelper } from '../rover/fileSystem.js';
 
 export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'roverTasks';
 
   private _view?: vscode.WebviewView;
   private cli: RoverCLI;
-  private fileSystem: FileSystemHelper;
   private autoRefreshInterval: NodeJS.Timeout | undefined;
 
   constructor(private readonly extensionUri: vscode.Uri) {
     this.cli = new RoverCLI();
-    this.fileSystem = new FileSystemHelper();
   }
 
   public resolveWebviewView(
