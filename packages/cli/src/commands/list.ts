@@ -253,6 +253,9 @@ export const listCommand = async (
         'Use ' +
           colors.cyan('rover logs <id> --follow') +
           ' to read the task logs',
+        'Use ' +
+          colors.cyan('rover restart <id>') +
+          ' to retry tasks in new or failed statuses',
       ]);
     }
   } catch (error) {
