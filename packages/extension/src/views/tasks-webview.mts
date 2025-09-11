@@ -1,7 +1,7 @@
 // This file is specifically designed to be bundled for webview consumption
-import { LitElement, html, css } from 'lit';
+import { LitElement, html } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
-import codiconsIcons from './common/codicons.mjs';
+import styles from './tasks-webview.css.mjs';
 import './components/tasks-intro.mjs';
 import './components/initialization-guide.mjs';
 
@@ -22,210 +22,8 @@ export class TasksWebview extends LitElement {
   @state() private showingSetupGuide = false;
   @state() private initializationCheckInterval: number | null = null;
 
-  static styles = css`
-    :host {
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-      font-family: var(--vscode-font-family);
-      margin: 0;
-      padding: 8px;
-      background-color: var(--vscode-sideBar-background);
-      color: var(--vscode-sideBar-foreground);
-      font-size: 13px;
-      overflow: hidden;
-    }
-
-    .tasks-container {
-      flex: 1;
-      overflow-y: auto;
-      overflow-x: hidden;
-      margin-bottom: 8px;
-      min-height: 0;
-    }
-
-    .task-item {
-      padding: 8px;
-      border-bottom: 1px solid var(--vscode-sideBar-border);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      position: relative;
-    }
-
-    .task-item:hover {
-      background-color: var(--vscode-list-hoverBackground);
-    }
-
-    .task-icon {
-      flex-shrink: 0;
-    }
-
-    .task-content {
-      flex: 1;
-      min-width: 0;
-    }
-
-    .task-title {
-      font-weight: 500;
-      margin-bottom: 2px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .task-details {
-      font-size: 11px;
-      color: var(--vscode-descriptionForeground);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .task-actions {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      opacity: 0;
-      transition: opacity 0.2s;
-      background: var(--vscode-list-hoverBackground);
-      box-shadow: -7px 0 28px var(--vscode-sideBar-background);
-      position: absolute;
-      height: 100%;
-      padding: 0 8px;
-      right: 0;
-    }
-
-    .task-item:hover .task-actions {
-      opacity: 1;
-    }
-
-    .action-btn {
-      background: none;
-      border: none;
-      color: var(--vscode-button-foreground);
-      cursor: pointer;
-      padding: 3px 2px;
-      border-radius: 2px;
-      font-size: 12px;
-      display: flex;
-    }
-
-    .action-btn:hover {
-      background-color: var(--vscode-button-hoverBackground);
-    }
-
-    .create-form {
-      border-top: 1px solid var(--vscode-sideBar-border);
-      padding: 1em 0 15px 0;
-      background-color: var(--vscode-sideBar-background);
-      flex-shrink: 0;
-    }
-
-    .form-textarea {
-      width: 100%;
-      min-height: 60px;
-      padding: 6px;
-      border: 1px solid var(--vscode-input-border);
-      border-radius: 3px;
-      background-color: var(--vscode-input-background);
-      color: var(--vscode-input-foreground);
-      font-family: var(--vscode-font-family);
-      font-size: 12px;
-      resize: vertical;
-      box-sizing: border-box;
-      margin-bottom: 6px;
-    }
-
-    .form-textarea:focus {
-      outline: none;
-      border-color: var(--vscode-focusBorder);
-    }
-
-    .form-textarea::placeholder {
-      color: var(--vscode-input-placeholderForeground);
-    }
-
-    .form-button {
-      width: 100%;
-      padding: 6px 12px;
-      border: none;
-      border-radius: 3px;
-      background-color: var(--vscode-button-background);
-      color: var(--vscode-button-foreground);
-      font-family: var(--vscode-font-family);
-      font-size: 12px;
-      cursor: pointer;
-    }
-
-    .form-button:hover {
-      background-color: var(--vscode-button-hoverBackground);
-    }
-
-    .form-button:disabled {
-      background-color: var(--vscode-button-secondaryBackground);
-      color: var(--vscode-button-secondaryForeground);
-      cursor: not-allowed;
-      opacity: 0.6;
-    }
-
-    .empty-state {
-      text-align: center;
-      padding: 20px;
-      color: var(--vscode-descriptionForeground);
-    }
-
-    .status-badge {
-      padding: 1px 4px;
-      border-radius: 8px;
-      font-size: 9px;
-      font-weight: 600;
-      text-transform: uppercase;
-    }
-
-    .status-completed {
-      background-color: var(--vscode-testing-iconPassed);
-      color: white;
-    }
-    .status-failed {
-      background-color: var(--vscode-testing-iconFailed);
-      color: white;
-    }
-    .status-running {
-      background-color: var(--vscode-testing-iconQueued);
-      color: white;
-    }
-    .status-new {
-      background-color: var(--vscode-button-secondaryBackground);
-      color: var(--vscode-button-secondaryForeground);
-    }
-
-    .codicon {
-      font-size: 16px;
-      font-family: codicon;
-      font-style: normal;
-    }
-
-    .codicon.success {
-      color: var(--vscode-testing-iconPassed);
-    }
-
-    .codicon.failed {
-      color: var(--vscode-testing-iconFailed);
-    }
-
-    .codicon.running {
-      color: var(--vscode-testing-iconQueued);
-    }
-
-    .codicon.other {
-      color: var(--vscode-testing-iconUnset);
-    }
-
-    /* Codicon definitions */
-    ${codiconsIcons}
-  `;
+  // Component styles
+  static styles = styles;
 
   connectedCallback() {
     super.connectedCallback();
@@ -254,13 +52,17 @@ export class TasksWebview extends LitElement {
         this.initializationStatus = message.status;
         this.showingSetupGuide =
           !message.status.cliInstalled || !message.status.roverInitialized;
-        this.loading = false;
 
         // Start polling for rover initialization if CLI is installed but rover is not initialized
         if (message.status.cliInstalled && !message.status.roverInitialized) {
           this.startInitializationPolling();
         } else {
           this.stopInitializationPolling();
+        }
+
+        // Only stop loading if we already know we need to show the setup
+        if (this.showingSetupGuide) {
+          this.loading = false;
         }
 
         if (message.status.cliInstalled && message.status.roverInitialized) {
@@ -380,6 +182,8 @@ export class TasksWebview extends LitElement {
   private getStatusIcon(status?: string): string {
     switch (status?.toLowerCase()) {
       case 'completed':
+      case 'merged':
+      case 'pushed':
         return 'codicon-pass success';
       case 'failed':
         return 'codicon-error failed';
@@ -391,21 +195,6 @@ export class TasksWebview extends LitElement {
         return 'codicon-desktop-download running';
       default:
         return 'codicon-circle';
-    }
-  }
-
-  private getStatusClass(status?: string): string {
-    switch (status?.toLowerCase()) {
-      case 'completed':
-        return 'status-completed';
-      case 'failed':
-        return 'status-failed';
-      case 'running':
-      case 'initializing':
-      case 'installing':
-        return 'status-running';
-      default:
-        return 'status-new';
     }
   }
 
@@ -514,8 +303,10 @@ export class TasksWebview extends LitElement {
                   'running',
                   'initializing',
                   'installing',
-                ].includes(task.status);
-                const isCompleted = task.status === 'completed';
+                ].includes(task.status?.toLowerCase());
+                const isCompleted = ['completed', 'merged', 'pushed'].includes(
+                  task.status?.toLowerCase()
+                );
 
                 return html`
                   <div

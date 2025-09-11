@@ -6,6 +6,8 @@ export interface RoverTask {
     | 'installing'
     | 'running'
     | 'completed'
+    | 'merged'
+    | 'pushed'
     | 'failed'
     | 'unknown';
   progress?: number;

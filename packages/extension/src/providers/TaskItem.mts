@@ -161,6 +161,8 @@ export class TaskItem extends vscode.TreeItem {
       case 'installing':
         return 'task-running';
       case 'completed':
+      case 'pushed':
+      case 'merged':
         return 'task-completed';
       case 'failed':
         return 'task-failed';
