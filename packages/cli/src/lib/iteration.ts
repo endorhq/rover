@@ -42,19 +42,19 @@ export interface IterationStatus {
   taskId: string;
 
   // Status name
-  status: string
+  status: string;
 
   // Current step name and progress
-  currentStep: string
-  progress: number
+  currentStep: string;
+  progress: number;
 
   // Timstamps
-  startedAt: string
-  updatedAt: string
-  completedAt: string
+  startedAt: string;
+  updatedAt: string;
+  completedAt: string;
 
   // Other
-  error?: string
+  error?: string;
 }
 
 /**
@@ -67,7 +67,11 @@ export class IterationConfig {
   private iterationPath: string;
   private statusCache: IterationStatus | undefined;
 
-  constructor(data: IterationConfigSchema, iterationPath: string, filePath: string) {
+  constructor(
+    data: IterationConfigSchema,
+    iterationPath: string,
+    filePath: string
+  ) {
     this.data = data;
     this.filePath = filePath;
     this.iterationPath = iterationPath;
@@ -147,7 +151,11 @@ export class IterationConfig {
       // Migrate if necessary
       const migratedData = IterationConfig.migrate(parsedData);
 
-      const instance = new IterationConfig(migratedData, iterationPath, filePath);
+      const instance = new IterationConfig(
+        migratedData,
+        iterationPath,
+        filePath
+      );
 
       // If migration occurred, save the updated data
       if (migratedData.version !== parsedData.version) {
@@ -301,17 +309,25 @@ export const getTaskIterations = (task: TaskDescription): IterationConfig[] => {
 
       iterationsIds.forEach(id => {
         try {
-          iterations.push(IterationConfig.load(join(iterationsPath, id.toString())));
+          iterations.push(
+            IterationConfig.load(join(iterationsPath, id.toString()))
+          );
         } catch (err) {
           // For now, just logging
           if (VERBOSE) {
-            console.error(colors.gray(`Error loading iteration ${id} for task ${task.id}: ` + err));
+            console.error(
+              colors.gray(
+                `Error loading iteration ${id} for task ${task.id}: ` + err
+              )
+            );
           }
         }
-      })
+      });
     } catch (err) {
       if (VERBOSE) {
-        console.error(colors.gray(`Error retrieving iterations for task ${task.id}: ` + err));
+        console.error(
+          colors.gray(`Error retrieving iterations for task ${task.id}: ` + err)
+        );
       }
 
       throw new Error('There was an error retrieving the task iterations');
@@ -319,12 +335,14 @@ export const getTaskIterations = (task: TaskDescription): IterationConfig[] => {
   }
 
   return iterations;
-}
+};
 
 /**
  * Retrieve the lastest iteration for a given task
  */
-export const getLastTaskIteration = (task: TaskDescription): IterationConfig | undefined => {
+export const getLastTaskIteration = (
+  task: TaskDescription
+): IterationConfig | undefined => {
   let taskIteration: IterationConfig | undefined;
   const iterationsPath = task.iterationsPath();
 
@@ -339,15 +357,21 @@ export const getLastTaskIteration = (task: TaskDescription): IterationConfig | u
         .sort((a, b) => b - a); // Sort descending to get latest first
 
       if (iterationsIds.length > 0) {
-        taskIteration = IterationConfig.load(join(iterationsPath, iterationsIds[0].toString()));
+        taskIteration = IterationConfig.load(
+          join(iterationsPath, iterationsIds[0].toString())
+        );
       } else {
         if (VERBOSE) {
-          console.error(colors.gray(`Did not find any iteration for task ${task.id}`));
+          console.error(
+            colors.gray(`Did not find any iteration for task ${task.id}`)
+          );
         }
       }
     } catch (err) {
       if (VERBOSE) {
-        console.error(colors.gray(`Error retrieving iterations for task ${task.id}: ` + err));
+        console.error(
+          colors.gray(`Error retrieving iterations for task ${task.id}: ` + err)
+        );
       }
 
       throw new Error('There was an error retrieving the task iterations');
@@ -355,4 +379,4 @@ export const getLastTaskIteration = (task: TaskDescription): IterationConfig | u
   }
 
   return taskIteration;
-}
+};

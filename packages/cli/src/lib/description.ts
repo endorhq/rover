@@ -534,7 +534,13 @@ export class TaskDescription {
 
   // Other helpers
   iterationsPath(): string {
-    return join(findProjectRoot(), '.rover', 'tasks', this.taskId.toString(), 'iterations');
+    return join(
+      findProjectRoot(),
+      '.rover',
+      'tasks',
+      this.taskId.toString(),
+      'iterations'
+    );
   }
 
   // Data Access (Getters)
@@ -841,4 +847,4 @@ export const getDescriptions = (): TaskDescription[] => {
   }
 
   return tasks;
-}
+};

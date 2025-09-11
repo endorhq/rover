@@ -4,7 +4,11 @@ import { showTips } from '../utils/display.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { getDescriptions, TaskDescriptionSchema } from '../lib/description.js';
 import { VERBOSE } from 'rover-common';
-import { getLastTaskIteration, getTaskIterations, IterationConfig } from '../lib/iteration.js';
+import {
+  getLastTaskIteration,
+  getTaskIterations,
+  IterationConfig,
+} from '../lib/iteration.js';
 
 /**
  * Format duration from start to now or completion
@@ -83,8 +87,8 @@ export const listCommand = async (
 
         showTips([
           'Use ' +
-          colors.cyan('rover task') +
-          ' to assign a new task to an agent',
+            colors.cyan('rover task') +
+            ' to assign a new task to an agent',
         ]);
       }
       return;
@@ -96,7 +100,9 @@ export const listCommand = async (
         task.updateStatus();
       } catch (err) {
         if (!options.json) {
-          console.log(`\n${colors.yellow(`⚠ Failed to update the status of task ${task.id}`)}`)
+          console.log(
+            `\n${colors.yellow(`⚠ Failed to update the status of task ${task.id}`)}`
+          );
         }
 
         if (VERBOSE) {
@@ -107,7 +113,9 @@ export const listCommand = async (
 
     // JSON output mode
     if (options.json) {
-      const jsonOutput: Array<TaskDescriptionSchema & { iterationsData: IterationConfig[] }> = [];
+      const jsonOutput: Array<
+        TaskDescriptionSchema & { iterationsData: IterationConfig[] }
+      > = [];
 
       tasks.forEach(task => {
         let iterationsData: IterationConfig[] = [];
@@ -115,14 +123,18 @@ export const listCommand = async (
           iterationsData = getTaskIterations(task);
         } catch (err) {
           if (VERBOSE) {
-            console.error(colors.gray(`Failed to retrieve the iterations details for task ${task.id}`));
+            console.error(
+              colors.gray(
+                `Failed to retrieve the iterations details for task ${task.id}`
+              )
+            );
             console.error(colors.gray(`Error details: ${err}`));
           }
         }
 
         jsonOutput.push({
           ...task.rawData,
-          iterationsData
+          iterationsData,
         });
       });
 
@@ -185,13 +197,15 @@ export const listCommand = async (
       );
       row += colors.gray(agent.padEnd(columnWidths[2]));
       row += colorFunc(formatTaskStatus(taskStatus).padEnd(columnWidths[3])); // +10 for ANSI codes
-      row += formatProgress(taskStatus, lastIteration?.status()?.progress || 0).padEnd(
-        columnWidths[4] + 10
-      );
+      row += formatProgress(
+        taskStatus,
+        lastIteration?.status()?.progress || 0
+      ).padEnd(columnWidths[4] + 10);
       row += colors.gray(
-        truncateText(lastIteration?.status()?.currentStep || '-', columnWidths[5] - 1).padEnd(
-          columnWidths[5]
-        )
+        truncateText(
+          lastIteration?.status()?.currentStep || '-',
+          columnWidths[5] - 1
+        ).padEnd(columnWidths[5])
       );
       row += colors.gray(lastIteration?.status() ? duration : '-');
       console.log(row);
@@ -227,15 +241,15 @@ export const listCommand = async (
     if (!options.watch && !options.watching) {
       showTips([
         'Use ' +
-        colors.cyan('rover list --watch') +
-        ' to monitor the task status',
+          colors.cyan('rover list --watch') +
+          ' to monitor the task status',
         'Use ' +
-        colors.cyan('rover task') +
-        ' to assign a new task to an agent',
+          colors.cyan('rover task') +
+          ' to assign a new task to an agent',
         'Use ' + colors.cyan('rover inspect <id>') + ' to see the task details',
         'Use ' +
-        colors.cyan('rover logs <id> --follow') +
-        ' to read the task logs',
+          colors.cyan('rover logs <id> --follow') +
+          ' to read the task logs',
       ]);
     }
   } catch (error) {
