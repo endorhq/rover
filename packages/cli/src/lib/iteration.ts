@@ -2,12 +2,15 @@
  * Define the iteration file that Rover will use to generate the setup script and
  * the prompts.
  */
-
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import colors from 'ansi-colors';
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { TaskDescription } from './description.js';
+import { VERBOSE } from 'rover-common';
 
 const CURRENT_ITERATION_SCHEMA_VERSION = '1.0';
 export const ITERATION_FILENAME = 'iteration.json';
+export const ITERATION_STATUS_FILENAME = 'status.json';
 
 export interface IterationConfigSchema {
   // Schema version for migrations
@@ -34,6 +37,26 @@ export interface IterationConfigSchema {
   };
 }
 
+export interface IterationStatus {
+  // Original Task ID
+  taskId: string;
+
+  // Status name
+  status: string
+
+  // Current step name and progress
+  currentStep: string
+  progress: number
+
+  // Timstamps
+  startedAt: string
+  updatedAt: string
+  completedAt: string
+
+  // Other
+  error?: string
+}
+
 /**
  * Iteration configuration. It provides the agent with enough information to iterate over
  * the given task.
@@ -41,10 +64,13 @@ export interface IterationConfigSchema {
 export class IterationConfig {
   private data: IterationConfigSchema;
   private filePath: string;
+  private iterationPath: string;
+  private statusCache: IterationStatus | undefined;
 
-  constructor(data: IterationConfigSchema, filePath: string) {
+  constructor(data: IterationConfigSchema, iterationPath: string, filePath: string) {
     this.data = data;
     this.filePath = filePath;
+    this.iterationPath = iterationPath;
     this.validate();
   }
 
@@ -68,7 +94,7 @@ export class IterationConfig {
     };
 
     const filePath = join(iterationPath, ITERATION_FILENAME);
-    const instance = new IterationConfig(schema, filePath);
+    const instance = new IterationConfig(schema, iterationPath, filePath);
     instance.save();
     return instance;
   }
@@ -99,7 +125,7 @@ export class IterationConfig {
     };
 
     const filePath = join(iterationPath, ITERATION_FILENAME);
-    const instance = new IterationConfig(schema, filePath);
+    const instance = new IterationConfig(schema, iterationPath, filePath);
     instance.save();
     return instance;
   }
@@ -121,7 +147,7 @@ export class IterationConfig {
       // Migrate if necessary
       const migratedData = IterationConfig.migrate(parsedData);
 
-      const instance = new IterationConfig(migratedData, filePath);
+      const instance = new IterationConfig(migratedData, iterationPath, filePath);
 
       // If migration occurred, save the updated data
       if (migratedData.version !== parsedData.version) {
@@ -156,6 +182,29 @@ export class IterationConfig {
 
     // For now, just return the data as-is since we're starting fresh
     return data as IterationConfigSchema;
+  }
+
+  /**
+   * Load the iteration status
+   */
+  status(): IterationStatus {
+    if (this.statusCache) return this.statusCache;
+
+    const statusPath = join(this.iterationPath, ITERATION_STATUS_FILENAME);
+
+    if (existsSync(statusPath)) {
+      try {
+        const content = readFileSync(statusPath, 'utf8');
+        const status = JSON.parse(content) as IterationStatus;
+        this.statusCache = status;
+
+        return status;
+      } catch (err) {
+        throw new Error('There was an error loading the status.json file');
+      }
+    } else {
+      throw new Error('The status.json file is missing for this iteration');
+    }
   }
 
   /**
@@ -231,4 +280,79 @@ export class IterationConfig {
   toJSON(): IterationConfigSchema {
     return { ...this.data };
   }
+}
+
+/**
+ * Load all the iterations for a given task
+ */
+export const getTaskIterations = (task: TaskDescription): IterationConfig[] => {
+  const iterations: IterationConfig[] = [];
+  const iterationsPath = task.iterationsPath();
+
+  if (existsSync(iterationsPath)) {
+    try {
+      const iterationsIds = readdirSync(iterationsPath, {
+        withFileTypes: true,
+      })
+        .filter(dirent => dirent.isDirectory())
+        .map(dirent => parseInt(dirent.name, 10))
+        .filter(num => !isNaN(num))
+        .sort((a, b) => b - a); // Sort descending to get latest first
+
+      iterationsIds.forEach(id => {
+        try {
+          iterations.push(IterationConfig.load(join(iterationsPath, id.toString())));
+        } catch (err) {
+          // For now, just logging
+          if (VERBOSE) {
+            console.error(colors.gray(`Error loading iteration ${id} for task ${task.id}: ` + err));
+          }
+        }
+      })
+    } catch (err) {
+      if (VERBOSE) {
+        console.error(colors.gray(`Error retrieving iterations for task ${task.id}: ` + err));
+      }
+
+      throw new Error('There was an error retrieving the task iterations');
+    }
+  }
+
+  return iterations;
+}
+
+/**
+ * Retrieve the lastest iteration for a given task
+ */
+export const getLastTaskIteration = (task: TaskDescription): IterationConfig | undefined => {
+  let taskIteration: IterationConfig | undefined;
+  const iterationsPath = task.iterationsPath();
+
+  if (existsSync(iterationsPath)) {
+    try {
+      const iterationsIds = readdirSync(iterationsPath, {
+        withFileTypes: true,
+      })
+        .filter(dirent => dirent.isDirectory())
+        .map(dirent => parseInt(dirent.name, 10))
+        .filter(num => !isNaN(num))
+        .sort((a, b) => b - a); // Sort descending to get latest first
+
+      if (iterationsIds.length > 0) {
+        taskIteration = IterationConfig.load(join(iterationsPath, iterationsIds[0].toString()));
+      } else {
+        if (VERBOSE) {
+          console.error(colors.gray(`Did not find any iteration for task ${task.id}`));
+        }
+      }
+    } catch (err) {
+      if (VERBOSE) {
+        console.error(colors.gray(`Error retrieving iterations for task ${task.id}: ` + err));
+      }
+
+      throw new Error('There was an error retrieving the task iterations');
+    }
+  }
+
+  return taskIteration;
 }

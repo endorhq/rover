@@ -1,13 +1,15 @@
 import colors from 'ansi-colors';
-import { getAllTaskStatuses, updateTaskWithStatus } from '../utils/status.js';
 import { formatTaskStatus, statusColor } from '../utils/task-status.js';
 import { showTips } from '../utils/display.js';
 import { getTelemetry } from '../lib/telemetry.js';
+import { getDescriptions, TaskDescriptionSchema } from '../lib/description.js';
+import { VERBOSE } from 'rover-common';
+import { getLastTaskIteration, getTaskIterations, IterationConfig } from '../lib/iteration.js';
 
 /**
  * Format duration from start to now or completion
  */
-const formatDuration = (startTime: string, endTime?: string): string => {
+const formatDuration = (startTime?: string, endTime?: string): string => {
   if (!startTime) {
     return 'never';
   }
@@ -39,9 +41,9 @@ const formatProgress = (step?: string, progress?: number): string => {
   const filled = Math.round((progress / 100) * barLength);
   const bar = '█'.repeat(filled) + '░'.repeat(barLength - filled);
 
-  if (step === 'failed') {
+  if (step === 'FAILED') {
     return colors.red(bar);
-  } else if (['completed', 'merged', 'pushed'].includes(step)) {
+  } else if (['COMPLETED', 'MERGED', 'PUSHED'].includes(step)) {
     return colors.green(bar);
   } else {
     return colors.cyan(bar);
@@ -65,14 +67,15 @@ export const listCommand = async (
   } = {}
 ) => {
   const telemetry = getTelemetry();
+
   try {
-    const allStatuses = getAllTaskStatuses();
+    const tasks = getDescriptions();
 
     if (!options.watching) {
       telemetry?.eventListTasks();
     }
 
-    if (allStatuses.length === 0) {
+    if (tasks.length === 0) {
       if (options.json) {
         console.log(JSON.stringify([]));
       } else {
@@ -80,32 +83,49 @@ export const listCommand = async (
 
         showTips([
           'Use ' +
-            colors.cyan('rover task') +
-            ' to assign a new task to an agent',
+          colors.cyan('rover task') +
+          ' to assign a new task to an agent',
         ]);
       }
       return;
     }
-    // Update task metadata with latest status information
-    for (const { taskId, status } of allStatuses) {
-      if (status) {
-        updateTaskWithStatus(taskId, status);
+
+    // Update task status
+    tasks.forEach(task => {
+      try {
+        task.updateStatus();
+      } catch (err) {
+        if (!options.json) {
+          console.log(`\n${colors.yellow(`⚠ Failed to update the status of task ${task.id}`)}`)
+        }
+
+        if (VERBOSE) {
+          console.error(colors.gray(`Error details: ${err}`));
+        }
       }
-    }
+    });
 
     // JSON output mode
     if (options.json) {
-      const jsonOutput = allStatuses.map(({ taskId, status, taskData }) => ({
-        id: taskId,
-        title: taskData?.title || 'Unknown Task',
-        status: status?.status || 'unknown',
-        agent: taskData?.agent || '-',
-        progress: status?.progress,
-        currentStep: status?.currentStep || '',
-        startedAt: status?.startedAt,
-        completedAt: status?.completedAt,
-        error: status?.error,
-      }));
+      const jsonOutput: Array<TaskDescriptionSchema & { iterationsData: IterationConfig[] }> = [];
+
+      tasks.forEach(task => {
+        let iterationsData: IterationConfig[] = [];
+        try {
+          iterationsData = getTaskIterations(task);
+        } catch (err) {
+          if (VERBOSE) {
+            console.error(colors.gray(`Failed to retrieve the iterations details for task ${task.id}`));
+            console.error(colors.gray(`Error details: ${err}`));
+          }
+        }
+
+        jsonOutput.push({
+          ...task.rawData,
+          iterationsData
+        });
+      });
+
       console.log(JSON.stringify(jsonOutput, null, 2));
       return;
     }
@@ -138,84 +158,47 @@ export const listCommand = async (
     });
     console.log(colors.gray(separatorRow));
 
-    const lastIterationOrTaskProperty = ({
-      status,
-      taskData,
-      attribute,
-      defaultValue,
-    }: {
-      status?: any;
-      taskData: any;
-      attribute: string;
-      defaultValue?: any;
-    }): any => {
-      if (status && status[attribute]) {
-        return status[attribute];
-      }
-      if (taskData && taskData[attribute]) {
-        return taskData[attribute];
-      }
-      return defaultValue;
-    };
-
     // Print rows
-    for (const { taskId, status, taskData } of allStatuses) {
-      const title = taskData?.title || 'Unknown Task';
-      const taskStatus = lastIterationOrTaskProperty({
-        status,
-        taskData,
-        attribute: 'status',
-      })
-        .toString()
-        .toLowerCase();
-      const startedAt = lastIterationOrTaskProperty({
-        status,
-        taskData,
-        attribute: 'startedAt',
-      });
+    for (const task of tasks) {
+      const lastIteration = getLastTaskIteration(task);
+      const title = task.title || 'Unknown Task';
+      const taskStatus = task.status;
+      const startedAt = task.startedAt;
 
       // Determine end time based on task status
       let endTime: string | undefined;
-      if (taskStatus === 'failed') {
-        endTime = lastIterationOrTaskProperty({
-          status,
-          taskData,
-          attribute: 'failedAt',
-        });
-      } else if (['completed', 'merged', 'pushed'].includes(taskStatus)) {
-        endTime = lastIterationOrTaskProperty({
-          status,
-          taskData,
-          attribute: 'completedAt',
-        });
+      if (taskStatus === 'FAILED') {
+        endTime = task.failedAt;
+      } else if (['COMPLETED', 'MERGED', 'PUSHED'].includes(taskStatus)) {
+        endTime = task.completedAt;
       }
 
       const duration = formatDuration(startedAt, endTime);
       const colorFunc = statusColor(taskStatus);
 
-      const agent = taskData?.agent || '-';
+      const agent = task.agent || '-';
 
       let row = '';
-      row += colors.cyan(taskId.padEnd(columnWidths[0]));
+      row += colors.cyan(task.id.toString().padEnd(columnWidths[0]));
       row += colors.white(
         truncateText(title, columnWidths[1] - 1).padEnd(columnWidths[1])
       );
       row += colors.gray(agent.padEnd(columnWidths[2]));
       row += colorFunc(formatTaskStatus(taskStatus).padEnd(columnWidths[3])); // +10 for ANSI codes
-      row += formatProgress(taskStatus, status?.progress || 0).padEnd(
+      row += formatProgress(taskStatus, lastIteration?.status()?.progress || 0).padEnd(
         columnWidths[4] + 10
       );
       row += colors.gray(
-        truncateText(status?.currentStep || '-', columnWidths[5] - 1).padEnd(
+        truncateText(lastIteration?.status()?.currentStep || '-', columnWidths[5] - 1).padEnd(
           columnWidths[5]
         )
       );
-      row += colors.gray(status ? duration : '-');
+      row += colors.gray(lastIteration?.status() ? duration : '-');
       console.log(row);
 
       // Show error in verbose mode
-      if (options.verbose && status?.error) {
-        console.log(colors.red(`    Error: ${status.error}`));
+      if (options.verbose && task.error) {
+        console.log(colors.red(`    Error: ${task.error}`));
       }
     }
 
@@ -244,15 +227,15 @@ export const listCommand = async (
     if (!options.watch && !options.watching) {
       showTips([
         'Use ' +
-          colors.cyan('rover list --watch') +
-          ' to monitor the task status',
+        colors.cyan('rover list --watch') +
+        ' to monitor the task status',
         'Use ' +
-          colors.cyan('rover task') +
-          ' to assign a new task to an agent',
+        colors.cyan('rover task') +
+        ' to assign a new task to an agent',
         'Use ' + colors.cyan('rover inspect <id>') + ' to see the task details',
         'Use ' +
-          colors.cyan('rover logs <id> --follow') +
-          ' to read the task logs',
+        colors.cyan('rover logs <id> --follow') +
+        ' to read the task logs',
       ]);
     }
   } catch (error) {

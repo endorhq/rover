@@ -5,10 +5,13 @@ import {
   copyFileSync,
   mkdirSync,
   rmSync,
+  readdirSync,
 } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { findProjectRoot } from 'rover-common';
+import { findProjectRoot, VERBOSE } from 'rover-common';
+import colors from 'ansi-colors';
+import { getLastTaskIteration } from './iteration.js';
 
 // Schema version for migrations
 const CURRENT_SCHEMA_VERSION = '1.0';
@@ -342,6 +345,45 @@ export class TaskDescription {
   }
 
   /**
+   * Update the current status based on the latest iteration
+   */
+  updateStatus(): void {
+    const iteration = getLastTaskIteration(this);
+
+    if (iteration != null) {
+      const status = iteration.status();
+      let statusName: TaskStatus;
+      let timestamp;
+      let error;
+
+      switch (status.status) {
+        case 'completed':
+        case 'merged':
+        case 'pushed':
+          statusName = status.status.toUpperCase() as TaskStatus;
+          timestamp = status.completedAt;
+          break;
+        case 'failed':
+          statusName = 'FAILED';
+          timestamp = status.completedAt;
+          error = status.error;
+          break;
+        case 'running':
+          statusName = 'ITERATING';
+          timestamp = status.updatedAt;
+          break;
+        default:
+          statusName = 'IN_PROGRESS';
+          timestamp = status.updatedAt;
+          break;
+      }
+
+      const metadata = { timestamp, error };
+      this.setStatus(statusName, metadata);
+    }
+  }
+
+  /**
    * Delete the task file
    */
   delete(): void {
@@ -490,6 +532,11 @@ export class TaskDescription {
     this.save();
   }
 
+  // Other helpers
+  iterationsPath(): string {
+    return join(findProjectRoot(), '.rover', 'tasks', this.taskId.toString(), 'iterations');
+  }
+
   // Data Access (Getters)
 
   get id(): number {
@@ -566,6 +613,9 @@ export class TaskDescription {
   }
   get version(): string {
     return this.data.version;
+  }
+  get rawData(): TaskDescriptionSchema {
+    return this.data;
   }
 
   // Data Modification (Setters)
@@ -753,4 +803,42 @@ export class TaskDescription {
       throw new TaskValidationError(errors.join(', '));
     }
   }
+}
+
+/**
+ * Retrieves all tasks description from the given folder.
+ */
+export const getDescriptions = (): TaskDescription[] => {
+  const tasks: TaskDescription[] = [];
+
+  try {
+    const roverPath = join(findProjectRoot(), '.rover');
+    const tasksPath = join(roverPath, 'tasks');
+
+    if (existsSync(tasksPath)) {
+      const taskIds = readdirSync(tasksPath, { withFileTypes: true })
+        .filter(dirent => dirent.isDirectory())
+        .map(dirent => parseInt(dirent.name, 10))
+        .filter(name => !isNaN(name)) // Only numeric task IDs
+        .sort((a, b) => b - a); // Sort descending
+
+      taskIds.forEach(id => {
+        try {
+          tasks.push(TaskDescription.load(id));
+        } catch (err) {
+          if (VERBOSE) {
+            console.error(colors.gray(`Error loading task ${id}: ` + err));
+          }
+        }
+      });
+    }
+  } catch (err) {
+    if (VERBOSE) {
+      console.error(colors.gray('Error retrieving descriptions: ' + err));
+    }
+
+    throw new Error('There was an error retrieving the task descriptions');
+  }
+
+  return tasks;
 }
