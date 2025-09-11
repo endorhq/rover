@@ -4,6 +4,7 @@ import { customElement, property, state } from 'lit/decorators.js';
 import styles from './tasks-webview.css.mjs';
 import './components/tasks-intro.mjs';
 import './components/initialization-guide.mjs';
+import './components/task-card.mjs';
 
 declare global {
   interface Window {
@@ -118,7 +119,8 @@ export class TasksWebview extends LitElement {
     }, 1000);
   }
 
-  private inspectTask(taskId: string, taskTitle: string) {
+  private handleInspectTask(event: CustomEvent) {
+    const { taskId, taskTitle } = event.detail;
     if (this.vscode) {
       this.vscode.postMessage({
         command: 'inspectTask',
@@ -128,15 +130,8 @@ export class TasksWebview extends LitElement {
     }
   }
 
-  private executeTaskAction(
-    event: Event,
-    action: string,
-    taskId: string,
-    taskTitle?: string,
-    taskStatus?: string
-  ) {
-    event.stopPropagation();
-
+  private handleTaskAction(event: CustomEvent) {
+    const { action, taskId, taskTitle, taskStatus } = event.detail;
     if (this.vscode) {
       const message: any = {
         command: action,
@@ -179,75 +174,6 @@ export class TasksWebview extends LitElement {
     }
   }
 
-  private getStatusIcon(status?: string): string {
-    switch (status) {
-      case 'COMPLETED':
-      case 'MERGED':
-      case 'PUSHED':
-        return 'codicon-pass success';
-      case 'FAILED':
-        return 'codicon-error failed';
-      case 'RUNNING':
-        return 'codicon-play-circle running';
-      case 'INITIALIZING':
-        return 'codicon-play-circle running';
-      case 'INSTALLING':
-        return 'codicon-desktop-download running';
-      default:
-        return 'codicon-circle';
-    }
-  }
-
-  private formatTimeInfo(task: any): string {
-    if (task.completedAt) {
-      const completed = new Date(task.completedAt);
-      return `Completed ${this.formatRelativeTime(completed)}`;
-    }
-
-    if (
-      task.status === 'RUNNING' ||
-      task.status === 'INITIALIZING' ||
-      task.status === 'INSTALLING'
-    ) {
-      const started = new Date(task.startedAt);
-      return `Started ${this.formatRelativeTime(started)}`;
-    }
-
-    if (task.status === 'FAILED') {
-      const started = new Date(task.startedAt);
-      return `Failed after ${this.formatDuration(started)}`;
-    }
-
-    return '';
-  }
-
-  private formatRelativeTime(date: Date): string {
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / (1000 * 60));
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
-
-    if (diffMins < 1) return 'just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays === 1) return 'yesterday';
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString();
-  }
-
-  private formatDuration(startDate: Date): string {
-    const now = new Date();
-    const diffMs = now.getTime() - startDate.getTime();
-    const diffMins = Math.floor(diffMs / (1000 * 60));
-    const diffHours = Math.floor(diffMins / 60);
-
-    if (diffMins < 60) return `${diffMins}m`;
-    const remainingMins = diffMins % 60;
-    return remainingMins > 0
-      ? `${diffHours}h ${remainingMins}m`
-      : `${diffHours}h`;
-  }
 
   private startInitializationPolling() {
     // Only start polling if not already running
@@ -289,137 +215,16 @@ export class TasksWebview extends LitElement {
           ? html` <div class="empty-state">Loading tasks...</div> `
           : this.tasks.length === 0
             ? html` <tasks-intro></tasks-intro> `
-            : this.tasks.map(task => {
-                const timeInfo = this.formatTimeInfo(task);
-                const details = [task.status.toUpperCase()];
-
-                if (timeInfo) details.push(timeInfo);
-                if (task.progress !== undefined && task.progress > 0)
-                  details.push(`${task.progress}%`);
-                if (task.currentStep && task.status === 'RUNNING')
-                  details.push(`Step: ${task.currentStep}`);
-
-                const isRunning = [
-                  'RUNNING',
-                  'INITIALIZING',
-                  'INSTALLING',
-                ].includes(task.status?.toLowerCase());
-                const isCompleted = ['COMPLETED', 'MERGED', 'PUSHED'].includes(
-                  task.status?.toLowerCase()
-                );
-
-                return html`
-                  <div
-                    class="task-item"
-                    @click=${() => this.inspectTask(task.id, task.title)}
-                  >
-                    <div class="task-icon">
-                      <i class="codicon ${this.getStatusIcon(task.status)}"></i>
-                    </div>
-                    <div class="task-content">
-                      <div class="task-title">${task.title}</div>
-                      <div class="task-details">${details.join(' • ')}</div>
-                    </div>
-                    <div class="task-actions">
-                      ${isCompleted
-                        ? html`
-                            <button
-                              class="action-btn"
-                              @click=${(e: Event) =>
-                                this.executeTaskAction(
-                                  e,
-                                  'gitCompare',
-                                  task.id
-                                )}
-                              title="Compare Task Changes"
-                            >
-                              <i class="codicon codicon-diff-multiple"></i>
-                            </button>
-                            <button
-                              class="action-btn"
-                              @click=${(e: Event) =>
-                                this.executeTaskAction(
-                                  e,
-                                  'iterateTask',
-                                  task.id
-                                )}
-                              title="Iterate Task"
-                            >
-                              <i class="codicon codicon-debug-rerun"></i>
-                            </button>
-                            <button
-                              class="action-btn"
-                              @click=${(e: Event) =>
-                                this.executeTaskAction(e, 'mergeTask', task.id)}
-                              title="Merge Task"
-                            >
-                              <i class="codicon codicon-git-merge"></i>
-                            </button>
-                            <button
-                              class="action-btn"
-                              @click=${(e: Event) =>
-                                this.executeTaskAction(
-                                  e,
-                                  'pushBranch',
-                                  task.id
-                                )}
-                              title="Push Task Branch"
-                            >
-                              <i class="codicon codicon-repo-push"></i>
-                            </button>
-                          `
-                        : ''}
-                      <button
-                        class="action-btn"
-                        @click=${(e: Event) =>
-                          this.executeTaskAction(
-                            e,
-                            'viewLogs',
-                            task.id,
-                            undefined,
-                            task.status
-                          )}
-                        title="View Logs"
-                      >
-                        <i class="codicon codicon-file"></i>
-                      </button>
-                      ${isRunning || isCompleted
-                        ? html`
-                            <button
-                              class="action-btn"
-                              @click=${(e: Event) =>
-                                this.executeTaskAction(e, 'openShell', task.id)}
-                              title="Open Shell"
-                            >
-                              <i class="codicon codicon-terminal"></i>
-                            </button>
-                          `
-                        : ''}
-                      <button
-                        class="action-btn"
-                        @click=${(e: Event) =>
-                          this.executeTaskAction(e, 'openWorkspace', task.id)}
-                        title="Open Workspace"
-                      >
-                        <i class="codicon codicon-folder"></i>
-                      </button>
-                      <button
-                        class="action-btn"
-                        @click=${(e: Event) =>
-                          this.executeTaskAction(
-                            e,
-                            'deleteTask',
-                            task.id,
-                            task.title
-                          )}
-                        title="Delete Task"
-                      >
-                        <i class="codicon codicon-trash"></i>
-                      </button>
-                    </div>
-                  </div>
-                `;
-              })}
+            : this.tasks.map(
+                task => html`
+                  <task-card
+                    .task=${task}
+                    .vscode=${this.vscode}
+                    @inspect-task=${this.handleInspectTask}
+                    @task-action=${this.handleTaskAction}
+                  ></task-card>
+                `
+              )}
       </div>
 
       <div class="create-form">
