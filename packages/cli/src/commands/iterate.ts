@@ -18,7 +18,7 @@ import { getTelemetry } from '../lib/telemetry.js';
 import { showRoverChat } from '../utils/display.js';
 import { readFromStdin, stdinIsAvailable } from '../utils/stdin.js';
 import { CLIJsonOutput } from '../types.js';
-import { exitWithError, exitWithWarn } from '../utils/exit.js';
+import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
 import { fa } from 'zod/locales';
 
 const { prompt } = enquirer;
@@ -446,9 +446,18 @@ export const iterateCommand = async (
     );
 
     result.success = true;
-    if (options.json) {
-      console.log(JSON.stringify(result, null, 2));
-    }
+
+    exitWithSuccess('Iteration started successfully', result, json, {
+      tips: [
+        'Use ' + colors.cyan('rover list') + ' to check the list of tasks',
+        'Use ' +
+          colors.cyan(`rover logs -f ${task.id}`) +
+          ' to watch the task logs',
+        'Use ' +
+          colors.cyan(`rover inspect ${task.id}`) +
+          ' to check the task status',
+      ],
+    });
   } catch (error) {
     if (error instanceof TaskNotFoundError) {
       result.error = error.message;

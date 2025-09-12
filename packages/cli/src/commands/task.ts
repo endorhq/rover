@@ -253,17 +253,6 @@ export const startDockerExecution = async (
         .trim();
 
       if (spinner) spinner.success('Container started in background');
-      if (!jsonMode) {
-        showTips([
-          'Use ' + colors.cyan(`rover logs -f ${task.id}`) + ` to monitor logs`,
-          'Use ' +
-            colors.cyan(`rover inspect ${task.id}`) +
-            ` to get task details`,
-          'Use ' +
-            colors.cyan(`rover list`) +
-            ` to check the status of all tasks`,
-        ]);
-      }
 
       // Update task metadata with container ID
       updateTaskMetadata(
