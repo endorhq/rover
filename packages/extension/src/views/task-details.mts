@@ -18,6 +18,7 @@ export class TaskDetailsView extends LitElement {
   @state() private loading = true;
   @state() private error: string | null = null;
   @state() private expandedSections = new Set(['iterations']);
+  @state() private activeTab = 'summary';
 
   static styles = styles;
 
@@ -98,6 +99,10 @@ export class TaskDetailsView extends LitElement {
 
   private handleDropdownAction(event: CustomEvent) {
     this.executeAction(event.detail.action);
+  }
+
+  private switchTab(tabId: string) {
+    this.activeTab = tabId;
   }
 
   private getStatusClass(status?: string): string {
@@ -298,20 +303,102 @@ export class TaskDetailsView extends LitElement {
 
     const latestIteration =
       this.taskData.iterations[this.taskData.iterations.length - 1];
-    if (!latestIteration.summaryContent) {
+
+    if (!latestIteration.files || latestIteration.files.length === 0) {
       return '';
     }
+
+    // Create tabs array with summary and files
+    const tabs: { id: string; label: string; icon: string; content: string }[] =
+      [];
+
+    // Add file tabs
+    if (latestIteration.files && latestIteration.files.length > 0) {
+      latestIteration.files.forEach((file: any) => {
+        tabs.push({
+          id: `file-${file.path}`,
+          label: file.name || file.path.split('/').pop(),
+          icon: 'file',
+          content: file.content || null,
+        });
+      });
+    }
+
+    if (tabs.length === 0) {
+      return '';
+    }
+
+    // Set default active tab if current active tab doesn't exist
+    if (!tabs.some(tab => tab.id === this.activeTab)) {
+      this.activeTab = tabs[0].id;
+    }
+
+    const activeTabData =
+      tabs.find(tab => tab.id === this.activeTab) || tabs[0];
 
     return html`
       <div class="section">
         <div class="section-header">
           <span class="codicon codicon-book"></span>
-          <span>Latest Summary</span>
+          <span>Latest Iteration Files</span>
         </div>
         <div class="section-content">
-          <div class="summary-content">
-            ${latestIteration.summaryContent || '-'}
+          <p>
+            These are the files that the AI Coding Agent generated while
+            completing the task.
+          </p>
+          <div class="tabs-container">
+            <div class="tab-bar">
+              ${tabs.map(
+                tab => html`
+                  <button
+                    class="tab ${this.activeTab === tab.id ? 'active' : ''}"
+                    @click=${() => this.switchTab(tab.id)}
+                    title=${tab.label}
+                  >
+                    <span class="codicon codicon-${tab.icon}"></span>
+                    <span class="tab-label">${tab.label}</span>
+                  </button>
+                `
+              )}
+            </div>
+            <div class="tab-content">
+              ${this.renderTabContent(activeTabData)}
+            </div>
           </div>
+        </div>
+      </div>
+    `;
+  }
+
+  private renderTabContent(tab: any) {
+    if (!tab) {
+      return html`<div class="tab-panel">No content available</div>`;
+    }
+
+    if (tab.id === 'summary') {
+      return html`
+        <div class="tab-panel">
+          <div class="summary-content">${tab.content || '-'}</div>
+        </div>
+      `;
+    }
+
+    if (!tab.content) {
+      return html`
+        <div class="tab-panel">
+          <div class="file-missing">
+            <span class="codicon codicon-info"></span>
+            <span>No content available for this file</span>
+          </div>
+        </div>
+      `;
+    }
+
+    return html`
+      <div class="tab-panel">
+        <div class="file-content">
+          <pre><code>${tab.content}</code></pre>
         </div>
       </div>
     `;

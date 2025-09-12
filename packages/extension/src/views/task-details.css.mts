@@ -226,14 +226,15 @@ const styles = css`
   .status-badge {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    margin-right: 6px;
+    gap: 3px;
     font-size: 12px;
     font-weight: 500;
     flex-shrink: 0;
   }
 
   .status-badge .codicon {
-    font-size: 14px;
+    font-size: 12px;
   }
 
   .status-completed {
@@ -553,6 +554,153 @@ const styles = css`
 
   .summary-label .codicon {
     font-size: 12px;
+  }
+
+  /* Tab styling */
+  .tabs-container {
+    border: 1px solid var(--vscode-widget-border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .tab-bar {
+    display: flex;
+    background: var(
+      --vscode-tab-inactiveBackground,
+      var(--vscode-editor-background)
+    );
+    border-bottom: 1px solid var(--vscode-widget-border);
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .tab {
+    background: transparent;
+    color: var(--vscode-tab-inactiveForeground);
+    border: none;
+    border-right: 1px solid var(--vscode-widget-border);
+    padding: 8px 12px;
+    font-size: 11px;
+    font-family: var(--vscode-font-family);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.1s;
+    white-space: nowrap;
+    flex-shrink: 0;
+    min-width: 0;
+  }
+
+  .tab:last-child {
+    border-right: none;
+  }
+
+  .tab:hover {
+    background: var(
+      --vscode-tab-hoverBackground,
+      var(--vscode-toolbar-hoverBackground)
+    );
+    color: var(--vscode-tab-hoverForeground, var(--vscode-foreground));
+  }
+
+  .tab.active {
+    background: var(
+      --vscode-tab-activeBackground,
+      var(--vscode-editor-background)
+    );
+    color: var(--vscode-tab-activeForeground, var(--vscode-foreground));
+  }
+
+  .tab .codicon {
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+
+  .tab-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+
+  .tab-content {
+    background: var(
+      --vscode-tab-inactiveBackground,
+      var(--vscode-editor-background)
+    );
+    min-height: 200px;
+    max-height: 400px;
+    overflow: auto;
+  }
+
+  .tab-panel {
+    padding: 12px;
+  }
+
+  .file-content {
+    font-family: var(--vscode-editor-font-family, monospace);
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--vscode-editor-foreground);
+  }
+
+  .file-content pre {
+    margin: 0;
+    padding: 0;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+
+  .file-content code {
+    font-family: inherit;
+    font-size: inherit;
+    background: transparent;
+    padding: 0;
+  }
+
+  .file-missing {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 16px;
+    color: var(--vscode-descriptionForeground);
+    background: var(--vscode-editor-inactiveSelectionBackground);
+    border-radius: 3px;
+    font-size: 12px;
+  }
+
+  .file-missing .codicon {
+    font-size: 16px;
+    color: var(
+      --vscode-notificationsWarningIcon-foreground,
+      var(--vscode-descriptionForeground)
+    );
+  }
+
+  /* Responsive tabs */
+  @media (max-width: 600px) {
+    .tab {
+      padding: 6px 10px;
+      font-size: 10px;
+    }
+
+    .tab-label {
+      display: none;
+    }
+
+    .tab .codicon {
+      font-size: 14px;
+    }
+
+    .tab-content {
+      min-height: 150px;
+      max-height: 300px;
+    }
+
+    .tab-panel {
+      padding: 8px;
+    }
   }
 
   /* Codicon definitions */

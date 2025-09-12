@@ -157,23 +157,14 @@ export class TaskDetailsPanel {
         ];
         const files = commonFiles.map(fileName => {
           const filePath = path.join(iterationPath, fileName);
+          const exists = fs.existsSync(filePath);
           return {
             name: fileName,
             path: filePath,
-            exists: fs.existsSync(filePath),
+            content: exists ? fs.readFileSync(filePath, 'utf8') : null,
+            exists,
           };
         });
-
-        // Read summary.md content if it exists
-        let summaryContent = null;
-        const summaryPath = path.join(iterationPath, 'summary.md');
-        if (fs.existsSync(summaryPath)) {
-          try {
-            summaryContent = fs.readFileSync(summaryPath, 'utf8');
-          } catch (error) {
-            console.warn('Error reading summary.md:', error);
-          }
-        }
 
         // Try to get iteration metadata if available
         const metadataPath = path.join(iterationPath, 'status.json');
@@ -197,7 +188,6 @@ export class TaskDetailsPanel {
         iterations.push({
           ...iterationMeta,
           files,
-          summaryContent,
         });
       }
     } catch (error) {
