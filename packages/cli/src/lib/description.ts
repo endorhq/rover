@@ -358,8 +358,6 @@ export class TaskDescription {
 
       switch (status.status) {
         case 'completed':
-        case 'merged':
-        case 'pushed':
           statusName = status.status.toUpperCase() as TaskStatus;
           timestamp = status.completedAt;
           break;
@@ -376,6 +374,14 @@ export class TaskDescription {
           statusName = 'IN_PROGRESS';
           timestamp = status.updatedAt;
           break;
+      }
+
+      // The merged / pushed status is already a completed state
+      if (
+        statusName === 'COMPLETED' &&
+        ['MERGED', 'PUSHED'].includes(this.status)
+      ) {
+        return;
       }
 
       const metadata = { timestamp, error };
