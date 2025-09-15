@@ -358,7 +358,7 @@ setup_agent_environment() {
       case 'claude':
         return 'claude --dangerously-skip-permissions -p --debug';
       case 'codex':
-        return 'RUST_LOG=debug codex exec --dangerously-bypass-approvals-and-sandbox --skip-git-repo-check';
+        return 'RUST_LOG=info codex exec --dangerously-bypass-approvals-and-sandbox --skip-git-repo-check';
       case 'gemini':
         return 'gemini --yolo -p --debug';
       case 'qwen':
