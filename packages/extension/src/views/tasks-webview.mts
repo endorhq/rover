@@ -188,6 +188,17 @@ export class TasksWebview extends LitElement {
     }
   }
 
+  private renderCreateForm() {
+    return html`<create-form
+      .vscode=${this.vscode}
+      .agents=${this.agents}
+      .defaultAgent=${this.defaultAgent}
+      .branches=${this.branches}
+      .defaultBranch=${this.defaultBranch}
+      dropdownDirection="auto"
+    ></create-form>`;
+  }
+
   render() {
     // Show initialization guide if CLI not installed or Rover not initialized
     if (this.showingSetupGuide && this.initializationStatus) {
@@ -216,7 +227,7 @@ export class TasksWebview extends LitElement {
               </div>
             `
           : this.tasks.length === 0
-            ? html` <tasks-intro></tasks-intro> `
+            ? html`<tasks-intro></tasks-intro> ${this.renderCreateForm()}`
             : this.tasks.map(
                 task => html`
                   <task-card
@@ -228,14 +239,7 @@ export class TasksWebview extends LitElement {
               )}
       </div>
 
-      <create-form
-        .vscode=${this.vscode}
-        .agents=${this.agents}
-        .defaultAgent=${this.defaultAgent}
-        .branches=${this.branches}
-        .defaultBranch=${this.defaultBranch}
-        dropdownDirection="auto"
-      ></create-form>
+      ${!this.loading && this.tasks.length > 0 ? this.renderCreateForm() : null}
     `;
   }
 }

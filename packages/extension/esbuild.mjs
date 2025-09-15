@@ -106,6 +106,7 @@ const webviewComponentsConfig = {
   loader: {
     '.ts': 'ts',
     '.mts': 'ts',
+    '.svg': 'dataurl',
   },
   external: [],
   define: {
@@ -131,6 +132,7 @@ async function main() {
     loader: {
       '.mts': 'ts',
       '.mjs': 'js',
+      '.svg': 'dataurl',
     },
     plugins: [
       copyCodiconsPlugin,
