@@ -11,12 +11,11 @@ import { join } from 'node:path';
 import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
 
 const findKeychainCredentials = (key: string): string => {
-  const result = launchSync('security', [
-    'find-generic-password',
-    '-s',
-    key,
-    '-w',
-  ]);
+  const result = launchSync(
+    'security',
+    ['find-generic-password', '-s', key, '-w'],
+    { mightLogSensitiveInformation: true }
+  );
   return result.stdout?.toString() || '';
 };
 

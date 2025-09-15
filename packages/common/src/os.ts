@@ -14,6 +14,14 @@ import { Git } from './git.js';
 
 import { PROJECT_CONFIG_FILE, VERBOSE } from './index.js';
 
+export type LaunchOptions = Options & {
+  mightLogSensitiveInformation?: boolean;
+};
+
+export type LaunchSyncOptions = SyncOptions & {
+  mightLogSensitiveInformation?: boolean;
+};
+
 /**
  * Find the project root directory by searching for rover.json in parent directories
  * up to the Git repository root
@@ -24,21 +32,28 @@ export function findProjectRoot(): string {
 }
 
 const log = (stream: string) => {
-  return function* (chunk: unknown) {
-    const data = String(chunk);
-    const now = new Date();
-    if (process.stderr.isTTY) {
-      console.error(
-        colors.gray(now.toISOString()) +
-          ' ' +
-          colors.cyan(stream) +
-          ' ' +
-          colors.gray(data)
-      );
-    } else {
-      console.error(`${now.toISOString()} ${stream} ${data}`);
-    }
-    yield chunk;
+  return (options: { mightLogSensitiveInformation?: boolean }) => {
+    return function* (chunk: unknown) {
+      let data;
+      if (options.mightLogSensitiveInformation) {
+        data = '**** redacted output ****';
+      } else {
+        data = String(chunk);
+      }
+      const now = new Date();
+      if (process.stderr.isTTY) {
+        console.error(
+          colors.gray(now.toISOString()) +
+            ' ' +
+            colors.cyan(stream) +
+            ' ' +
+            colors.gray(data)
+        );
+      } else {
+        console.error(`${now.toISOString()} ${stream} ${data}`);
+      }
+      yield chunk;
+    };
   };
 };
 
@@ -76,7 +91,7 @@ const shouldAddLogging = (stream: string, options?: Options | SyncOptions) => {
 export function launch(
   command: string,
   args?: ReadonlyArray<string>,
-  options?: Options
+  options?: LaunchOptions
 ): ReturnType<typeof execa> {
   if (VERBOSE) {
     const now = new Date();
@@ -93,8 +108,19 @@ export function launch(
 
     if (shouldAddLogging('stdout', options)) {
       const stdout = options?.stdout
-        ? [logStdout, options.stdout].flat()
-        : [logStdout];
+        ? [
+            logStdout({
+              mightLogSensitiveInformation:
+                options?.mightLogSensitiveInformation,
+            }),
+            options.stdout,
+          ].flat()
+        : [
+            logStdout({
+              mightLogSensitiveInformation:
+                options?.mightLogSensitiveInformation,
+            }),
+          ];
 
       newOpts = {
         ...newOpts,
@@ -104,8 +130,19 @@ export function launch(
 
     if (shouldAddLogging('stderr', options)) {
       const stderr = options?.stderr
-        ? [logStderr, options.stderr].flat()
-        : [logStderr];
+        ? [
+            logStderr({
+              mightLogSensitiveInformation:
+                options?.mightLogSensitiveInformation,
+            }),
+            options.stderr,
+          ].flat()
+        : [
+            logStderr({
+              mightLogSensitiveInformation:
+                options?.mightLogSensitiveInformation,
+            }),
+          ];
 
       newOpts = {
         ...newOpts,
@@ -122,7 +159,7 @@ export function launch(
 export function launchSync(
   command: string,
   args?: ReadonlyArray<string>,
-  options?: SyncOptions
+  options?: LaunchSyncOptions
 ): ReturnType<typeof execaSync> {
   if (VERBOSE) {
     const now = new Date();
@@ -139,8 +176,19 @@ export function launchSync(
 
     if (shouldAddLogging('stdout', options)) {
       const stdout = options?.stdout
-        ? [logStdout, options.stdout].flat()
-        : [logStdout];
+        ? [
+            logStdout({
+              mightLogSensitiveInformation:
+                options?.mightLogSensitiveInformation,
+            }),
+            options.stdout,
+          ].flat()
+        : [
+            logStdout({
+              mightLogSensitiveInformation:
+                options?.mightLogSensitiveInformation,
+            }),
+          ];
 
       newOpts = {
         ...newOpts,
@@ -150,8 +198,19 @@ export function launchSync(
 
     if (shouldAddLogging('stderr', options)) {
       const stderr = options?.stderr
-        ? [logStderr, options.stderr].flat()
-        : [logStderr];
+        ? [
+            logStderr({
+              mightLogSensitiveInformation:
+                options?.mightLogSensitiveInformation,
+            }),
+            options.stderr,
+          ].flat()
+        : [
+            logStderr({
+              mightLogSensitiveInformation:
+                options?.mightLogSensitiveInformation,
+            }),
+          ];
 
       newOpts = {
         ...newOpts,
