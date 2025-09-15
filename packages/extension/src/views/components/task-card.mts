@@ -40,6 +40,7 @@ export class TaskCard extends LitElement {
       case 'RUNNING':
       case 'ITERATING':
       case 'INITIALIZING':
+      case 'IN_PROGRESS':
         return 'codicon-sync spin';
       case 'INSTALLING':
         return 'codicon-desktop-download';
@@ -56,7 +57,11 @@ export class TaskCard extends LitElement {
     if (!status) return 'Unknown';
 
     // Capitalize
-    const label = `${status.charAt(0)}${status.substring(1).toLowerCase()}`;
+    const label =
+      `${status.charAt(0)}${status.substring(1).toLowerCase()}`.replaceAll(
+        '_',
+        ' '
+      );
 
     return label;
   }
@@ -70,7 +75,9 @@ export class TaskCard extends LitElement {
     if (
       task.status === 'RUNNING' ||
       task.status === 'INITIALIZING' ||
-      task.status === 'INSTALLING'
+      task.status === 'INSTALLING' ||
+      task.status === 'ITERATING' ||
+      task.status === 'IN_PROGRESS'
     ) {
       const started = new Date(task.startedAt);
       return `Started ${this.formatRelativeTime(started)}`;
@@ -182,6 +189,7 @@ export class TaskCard extends LitElement {
       'initializing',
       'installing',
       'iterating',
+      'in_progress',
     ].includes(this.task.status?.toLowerCase());
     const isCompleted = ['completed', 'merged', 'pushed'].includes(
       this.task.status?.toLowerCase()

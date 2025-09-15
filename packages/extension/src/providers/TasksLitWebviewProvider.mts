@@ -99,18 +99,42 @@ export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
     agent?: string,
     branch?: string
   ) {
-    if (!description || description.trim().length === 0) {
-      vscode.window.showErrorMessage('Please enter a task description');
-      return;
-    }
-
     try {
-      // Call the CLI directly with the new parameters
-      await this.cli.createTask(description.trim(), agent, branch);
-      // Refresh tasks after creation
-      setTimeout(() => this.refreshTasks(), 1000);
+      // Show progress bar while creating task
+      await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: 'Creating task with Rover...',
+          cancellable: false,
+        },
+        async () => {
+          // Call the CLI directly with the new parameters
+          const task = await this.cli.createTask(
+            description.trim(),
+            agent,
+            branch
+          );
+
+          // Send success message back to webview
+          this._view?.webview.postMessage({
+            command: 'taskCreated',
+            task: task,
+          });
+
+          // Refresh tasks after creation
+          setTimeout(() => this.refreshTasks(), 500);
+        }
+      );
     } catch (error) {
-      vscode.window.showErrorMessage(`Failed to create task: ${error}`);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      vscode.window.showErrorMessage(`Failed to create task: ${errorMessage}`);
+
+      // Send failure message back to webview
+      this._view?.webview.postMessage({
+        command: 'taskCreationFailed',
+        error: errorMessage,
+      });
     }
   }
 

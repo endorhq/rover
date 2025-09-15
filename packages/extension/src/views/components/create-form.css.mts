@@ -45,6 +45,25 @@ const styles = css`
     color: var(--vscode-input-placeholderForeground);
   }
 
+  /* Error Message */
+  .error-message {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    margin-bottom: 8px;
+    background-color: var(--vscode-inputValidation-errorBackground);
+    border: 1px solid var(--vscode-inputValidation-errorBorder);
+    border-radius: 3px;
+    color: var(--vscode-inputValidation-errorForeground);
+    font-size: 11px;
+  }
+
+  .error-message .codicon {
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+
   /* Form Controls Container */
   .form-controls {
     display: flex;
@@ -194,7 +213,7 @@ const styles = css`
   }
 
   .spin {
-    animation: spin 5s linear infinite;
+    animation: spin 1.5s linear infinite;
   }
 
   /* Codicon definitions */

@@ -58,6 +58,22 @@ export class TasksWebview extends LitElement {
         this.branches = message.branches?.branches;
         this.defaultBranch = message.branches?.defaultBranch;
         break;
+      case 'taskCreated':
+        // Forward success message to create-form
+        this.shadowRoot?.querySelector('create-form')?.dispatchEvent(
+          new CustomEvent('task-created', {
+            detail: { task: message.task },
+          })
+        );
+        break;
+      case 'taskCreationFailed':
+        // Forward failure message to create-form
+        this.shadowRoot?.querySelector('create-form')?.dispatchEvent(
+          new CustomEvent('task-creation-failed', {
+            detail: { error: message.error },
+          })
+        );
+        break;
       case 'updateInitializationStatus':
         this.initializationStatus = message.status;
         this.showingSetupGuide =

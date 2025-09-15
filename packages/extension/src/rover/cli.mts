@@ -275,7 +275,7 @@ export class RoverCLI {
   async deleteTask(taskId: string): Promise<void> {
     const { stdout, stderr, exitCode } = await launch(
       this.roverPath,
-      ['delete', taskId.toString(), '--force'],
+      ['delete', taskId.toString(), '--yes'],
       this.getLaunchOptions()
     );
 

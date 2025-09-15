@@ -19,6 +19,7 @@ export class CreateForm extends LitElement {
   @state() private showBranchDropdown = false;
   @state() private agentDropdownDirection: 'up' | 'down' = 'down';
   @state() private branchDropdownDirection: 'up' | 'down' = 'down';
+  @state() private errorMessage = '';
 
   private getAgentsList() {
     return this.agents.map(agent => ({
@@ -38,6 +39,11 @@ export class CreateForm extends LitElement {
     super.connectedCallback();
     window.addEventListener('keydown', this.handleKeyDown.bind(this));
     document.addEventListener('click', this.handleDocumentClick.bind(this));
+    this.addEventListener('task-created', this.handleTaskCreated.bind(this));
+    this.addEventListener(
+      'task-creation-failed',
+      this.handleTaskCreationFailed.bind(this)
+    );
 
     // Set default selected agent and branch
     if (!this.selectedAgent) {
@@ -78,8 +84,17 @@ export class CreateForm extends LitElement {
 
   disconnectedCallback() {
     super.disconnectedCallback();
-    window.removeEventListener('keydown', this.handleKeyDown.bind(this));
-    document.removeEventListener('click', this.handleDocumentClick.bind(this));
+    // Store bound functions to properly remove them
+    const boundKeyDown = this.handleKeyDown.bind(this);
+    const boundDocClick = this.handleDocumentClick.bind(this);
+    window.removeEventListener('keydown', boundKeyDown);
+    document.removeEventListener('click', boundDocClick);
+    // For custom events, we don't need to store references as they're component-scoped
+    this.removeEventListener('task-created', this.handleTaskCreated.bind(this));
+    this.removeEventListener(
+      'task-creation-failed',
+      this.handleTaskCreationFailed.bind(this)
+    );
   }
 
   private handleDocumentClick(event: Event) {
@@ -108,6 +123,8 @@ export class CreateForm extends LitElement {
       return;
     }
 
+    // Clear any previous error and start creating
+    this.errorMessage = '';
     this.creatingTask = true;
 
     if (this.vscode) {
@@ -118,12 +135,20 @@ export class CreateForm extends LitElement {
         branch: this.selectedBranch,
       });
     }
+  }
 
-    // Reset form after a short delay
-    setTimeout(() => {
-      this.taskInput = '';
-      this.creatingTask = false;
-    }, 5000);
+  private handleTaskCreated(event: Event) {
+    // Task created successfully, reset the form
+    this.taskInput = '';
+    this.creatingTask = false;
+    this.errorMessage = '';
+  }
+
+  private handleTaskCreationFailed(event: Event) {
+    // Task creation failed, show error and keep form state
+    const customEvent = event as CustomEvent;
+    this.creatingTask = false;
+    this.errorMessage = customEvent.detail?.error || 'Failed to create task';
   }
 
   private toggleAgentDropdown(event: Event) {
@@ -202,6 +227,15 @@ export class CreateForm extends LitElement {
           @input=${(e: InputEvent) =>
             (this.taskInput = (e.target as HTMLTextAreaElement).value)}
         ></textarea>
+
+        ${this.errorMessage
+          ? html`
+              <div class="error-message">
+                <i class="codicon codicon-error"></i>
+                ${this.errorMessage}
+              </div>
+            `
+          : ''}
 
         <div class="form-controls">
           <div class="form-controls-left">

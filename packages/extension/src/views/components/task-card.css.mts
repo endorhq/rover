@@ -88,7 +88,7 @@ const styles = css`
   }
 
   .spin {
-    animation: spin 5s linear infinite;
+    animation: spin 1.5s linear infinite;
   }
 
   @keyframes spin {
