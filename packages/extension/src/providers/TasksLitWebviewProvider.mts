@@ -33,10 +33,20 @@ export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
     webviewView.webview.onDidReceiveMessage(async data => {
       switch (data.command) {
         case 'createTask':
-          await this.handleCreateTask(data.description);
+          await this.handleCreateTask(
+            data.description,
+            data.agent,
+            data.branch
+          );
           break;
         case 'refreshTasks':
           await this.refreshTasks();
+          break;
+        case 'loadSettings':
+          await this.loadSettings();
+          break;
+        case 'loadBranches':
+          await this.loadBranches();
           break;
         case 'checkInitialization':
           await this.checkInitializationStatus();
@@ -84,17 +94,19 @@ export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
     this.checkInitializationStatus();
   }
 
-  private async handleCreateTask(description: string) {
+  private async handleCreateTask(
+    description: string,
+    agent?: string,
+    branch?: string
+  ) {
     if (!description || description.trim().length === 0) {
       vscode.window.showErrorMessage('Please enter a task description');
       return;
     }
 
     try {
-      await vscode.commands.executeCommand(
-        'rover.createTask',
-        description.trim()
-      );
+      // Call the CLI directly with the new parameters
+      await this.cli.createTask(description.trim(), agent, branch);
       // Refresh tasks after creation
       setTimeout(() => this.refreshTasks(), 1000);
     } catch (error) {
@@ -190,10 +202,12 @@ export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
         status: status,
       });
 
-      // If everything is initialized, start auto-refresh and load tasks
+      // If everything is initialized, start auto-refresh, load tasks, settings and branches
       if (status.cliInstalled && status.roverInitialized) {
         this.startAutoRefresh();
         this.refreshTasks();
+        this.loadSettings();
+        this.loadBranches();
       }
     } catch (error) {
       console.error('Failed to check initialization status:', error);
@@ -260,6 +274,54 @@ export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
 
   public refresh(): void {
     this.checkInitializationStatus();
+  }
+
+  private async loadSettings() {
+    if (!this._view) {
+      return;
+    }
+
+    try {
+      const settings = await this.cli.getSettings();
+      this._view.webview.postMessage({
+        command: 'updateSettings',
+        settings: settings,
+      });
+    } catch (error) {
+      console.error('Failed to load settings:', error);
+      // Send default settings if loading fails
+      this._view.webview.postMessage({
+        command: 'updateSettings',
+        settings: {
+          aiAgents: ['claude'],
+          defaultAgent: 'claude',
+        },
+      });
+    }
+  }
+
+  private async loadBranches() {
+    if (!this._view) {
+      return;
+    }
+
+    try {
+      const branchData = await this.cli.getGitBranches();
+      this._view.webview.postMessage({
+        command: 'updateBranches',
+        branches: branchData,
+      });
+    } catch (error) {
+      console.error('Failed to load git branches:', error);
+      // Send default branches if loading fails
+      this._view.webview.postMessage({
+        command: 'updateBranches',
+        branches: {
+          branches: ['main'],
+          defaultBranch: 'main',
+        },
+      });
+    }
   }
 
   private async checkRoverInitialized() {

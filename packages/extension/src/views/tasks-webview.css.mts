@@ -23,60 +23,6 @@ const styles = css`
     min-height: 0;
   }
 
-  .create-form {
-    border-top: 1px solid var(--vscode-sideBar-border);
-    padding: 1em 0 15px 0;
-    background-color: var(--vscode-sideBar-background);
-    flex-shrink: 0;
-  }
-
-  .form-textarea {
-    width: 100%;
-    min-height: 60px;
-    padding: 6px;
-    border: 1px solid var(--vscode-input-border);
-    border-radius: 3px;
-    background-color: var(--vscode-input-background);
-    color: var(--vscode-input-foreground);
-    font-family: var(--vscode-font-family);
-    font-size: 12px;
-    resize: vertical;
-    box-sizing: border-box;
-    margin-bottom: 6px;
-  }
-
-  .form-textarea:focus {
-    outline: none;
-    border-color: var(--vscode-focusBorder);
-  }
-
-  .form-textarea::placeholder {
-    color: var(--vscode-input-placeholderForeground);
-  }
-
-  .form-button {
-    width: 100%;
-    padding: 6px 12px;
-    border: none;
-    border-radius: 3px;
-    background-color: var(--vscode-button-background);
-    color: var(--vscode-button-foreground);
-    font-family: var(--vscode-font-family);
-    font-size: 12px;
-    cursor: pointer;
-  }
-
-  .form-button:hover {
-    background-color: var(--vscode-button-hoverBackground);
-  }
-
-  .form-button:disabled {
-    background-color: var(--vscode-button-secondaryBackground);
-    color: var(--vscode-button-secondaryForeground);
-    cursor: not-allowed;
-    opacity: 0.6;
-  }
-
   .empty-state {
     text-align: center;
     padding: 20px;

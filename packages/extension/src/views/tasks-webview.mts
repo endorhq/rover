@@ -5,6 +5,7 @@ import styles from './tasks-webview.css.mjs';
 import './components/tasks-intro.mjs';
 import './components/initialization-guide.mjs';
 import './components/task-card.mjs';
+import './components/create-form.mjs';
 
 declare global {
   interface Window {
@@ -17,11 +18,13 @@ export class TasksWebview extends LitElement {
   @property({ type: Object }) vscode: any = null;
   @state() private tasks: any[] = [];
   @state() private loading = true;
-  @state() private taskInput = '';
-  @state() private creatingTask = false;
   @state() private initializationStatus: any = null;
   @state() private showingSetupGuide = false;
   @state() private initializationCheckInterval: number | null = null;
+  @state() private agents: string[] = ['...'];
+  @state() private defaultAgent: string = '...';
+  @state() private branches: string[] = ['...'];
+  @state() private defaultBranch: string = '...';
 
   // Component styles
   static styles = styles;
@@ -30,7 +33,6 @@ export class TasksWebview extends LitElement {
     super.connectedCallback();
     if (this.vscode) {
       window.addEventListener('message', this.handleMessage.bind(this));
-      window.addEventListener('keydown', this.handleKeyDown.bind(this));
       this.vscode.postMessage({ command: 'checkInitialization' });
     }
   }
@@ -38,7 +40,6 @@ export class TasksWebview extends LitElement {
   disconnectedCallback() {
     super.disconnectedCallback();
     window.removeEventListener('message', this.handleMessage.bind(this));
-    window.removeEventListener('keydown', this.handleKeyDown.bind(this));
     this.stopInitializationPolling();
   }
 
@@ -48,6 +49,14 @@ export class TasksWebview extends LitElement {
       case 'updateTasks':
         this.tasks = message.tasks || [];
         this.loading = false;
+        break;
+      case 'updateSettings':
+        this.agents = message.settings?.aiAgents;
+        this.defaultAgent = message.settings?.defaultAgent;
+        break;
+      case 'updateBranches':
+        this.branches = message.branches?.branches;
+        this.defaultBranch = message.branches?.defaultBranch;
         break;
       case 'updateInitializationStatus':
         this.initializationStatus = message.status;
@@ -68,6 +77,8 @@ export class TasksWebview extends LitElement {
 
         if (message.status.cliInstalled && message.status.roverInitialized) {
           this.vscode.postMessage({ command: 'refreshTasks' });
+          this.vscode.postMessage({ command: 'loadSettings' });
+          this.vscode.postMessage({ command: 'loadBranches' });
         }
         break;
       case 'roverInitializationChecked':
@@ -83,40 +94,6 @@ export class TasksWebview extends LitElement {
         }
         break;
     }
-  }
-
-  private handleKeyDown(event: KeyboardEvent) {
-    if (event.ctrlKey && event.key === 'Enter') {
-      const textarea = this.shadowRoot?.querySelector(
-        '.form-textarea'
-      ) as HTMLTextAreaElement;
-      if (textarea === event.target) {
-        this.createTask();
-      }
-    }
-  }
-
-  private createTask() {
-    const description = this.taskInput.trim();
-
-    if (!description) {
-      return;
-    }
-
-    this.creatingTask = true;
-
-    if (this.vscode) {
-      this.vscode.postMessage({
-        command: 'createTask',
-        description: description,
-      });
-    }
-
-    // Reset form after a short delay
-    setTimeout(() => {
-      this.taskInput = '';
-      this.creatingTask = false;
-    }, 1000);
   }
 
   private handleInspectTask(event: CustomEvent) {
@@ -235,22 +212,14 @@ export class TasksWebview extends LitElement {
               )}
       </div>
 
-      <div class="create-form">
-        <textarea
-          class="form-textarea"
-          placeholder="Describe what you want Rover to accomplish..."
-          .value=${this.taskInput}
-          @input=${(e: InputEvent) =>
-            (this.taskInput = (e.target as HTMLTextAreaElement).value)}
-        ></textarea>
-        <button
-          class="form-button"
-          @click=${this.createTask}
-          ?disabled=${this.creatingTask}
-        >
-          ${this.creatingTask ? 'Creating...' : 'Create Task'}
-        </button>
-      </div>
+      <create-form
+        .vscode=${this.vscode}
+        .agents=${this.agents}
+        .defaultAgent=${this.defaultAgent}
+        .branches=${this.branches}
+        .defaultBranch=${this.defaultBranch}
+        dropdownDirection="auto"
+      ></create-form>
     `;
   }
 }

@@ -39,6 +39,118 @@ export class RoverCLI {
   }
 
   /**
+   * Get git branches for the repository
+   */
+  async getGitBranches(): Promise<{
+    branches: string[];
+    defaultBranch: string;
+  }> {
+    try {
+      const options = this.getLaunchOptions();
+
+      // Get default branch (usually main or master)
+      let defaultBranch = 'main';
+      try {
+        const { stdout: defaultBranchOutput } = await launch(
+          'git',
+          ['symbolic-ref', 'refs/remotes/origin/HEAD'],
+          options
+        );
+
+        if (defaultBranchOutput) {
+          // Extract branch name from refs/remotes/origin/main
+          const match = defaultBranchOutput
+            .toString()
+            .match(/refs\/remotes\/origin\/(.+)/);
+          if (match) {
+            defaultBranch = match[1].trim();
+          }
+        }
+      } catch (error) {
+        // If can't get default branch, try to get current branch
+        try {
+          const { stdout: currentBranchOutput } = await launch(
+            'git',
+            ['branch', '--show-current'],
+            options
+          );
+          if (currentBranchOutput) {
+            defaultBranch = currentBranchOutput.toString().trim();
+          }
+        } catch (currentError) {
+          // Keep default as 'main'
+        }
+      }
+
+      // Get all local branches
+      const { stdout: branchesOutput } = await launch(
+        'git',
+        ['branch', '--format=%(refname:short)'],
+        options
+      );
+
+      let branches: string[] = [];
+      if (branchesOutput) {
+        branches = branchesOutput
+          .toString()
+          .split('\n')
+          .map(b => b.trim())
+          .filter(b => b && !b.startsWith('rover/')) // Filter out rover branches
+          .sort();
+      }
+
+      // Ensure default branch is in the list
+      if (!branches.includes(defaultBranch)) {
+        branches.unshift(defaultBranch);
+      }
+
+      return { branches, defaultBranch };
+    } catch (error) {
+      console.error('Failed to get git branches:', error);
+      // Return sensible defaults if git commands fail
+      return { branches: ['main'], defaultBranch: 'main' };
+    }
+  }
+
+  /**
+   * Get user settings including available agents
+   */
+  async getSettings(): Promise<{ aiAgents: string[]; defaultAgent: string }> {
+    try {
+      // Read the settings file directly from .rover/settings.json
+      const settingsPath = vscode.Uri.joinPath(
+        this.workspaceRoot || vscode.Uri.file(findProjectRoot()),
+        '.rover',
+        'settings.json'
+      );
+
+      try {
+        const settingsContent =
+          await vscode.workspace.fs.readFile(settingsPath);
+        const settings = JSON.parse(new TextDecoder().decode(settingsContent));
+
+        return {
+          aiAgents: settings.aiAgents || ['claude'],
+          defaultAgent: settings.defaults?.aiAgent || 'claude',
+        };
+      } catch (error) {
+        // If file doesn't exist or can't be read, return defaults
+        console.error('Failed to load settings:', error);
+        return {
+          aiAgents: ['claude'],
+          defaultAgent: 'claude',
+        };
+      }
+    } catch (error) {
+      console.error('Failed to load settings:', error);
+      return {
+        aiAgents: ['claude'],
+        defaultAgent: 'claude',
+      };
+    }
+  }
+
+  /**
    * Get list of all tasks
    */
   async getTasks(): Promise<RoverTask[]> {
@@ -67,10 +179,26 @@ export class RoverCLI {
   /**
    * Create a new task
    */
-  async createTask(description: string): Promise<RoverTask> {
+  async createTask(
+    description: string,
+    agent?: string,
+    sourceBranch?: string
+  ): Promise<RoverTask> {
+    const args = ['task', description, '--yes', '--json'];
+
+    // Add agent option if provided
+    if (agent) {
+      args.push('--agent', agent);
+    }
+
+    // Add source branch option if provided
+    if (sourceBranch) {
+      args.push('--source-branch', sourceBranch);
+    }
+
     const { stdout, stderr, exitCode } = await launch(
       this.roverPath,
-      ['task', description, '--yes', '--json'],
+      args,
       this.getLaunchOptions()
     );
     if (exitCode != 0 || !stdout) {

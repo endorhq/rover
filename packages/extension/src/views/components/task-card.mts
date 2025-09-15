@@ -38,8 +38,9 @@ export class TaskCard extends LitElement {
       case 'FAILED':
         return 'codicon-error';
       case 'RUNNING':
+      case 'ITERATING':
       case 'INITIALIZING':
-        return 'codicon-sync~spin';
+        return 'codicon-sync spin';
       case 'INSTALLING':
         return 'codicon-desktop-download';
       default:
@@ -176,9 +177,12 @@ export class TaskCard extends LitElement {
     if (!this.task) return html``;
 
     const timeInfo = this.formatTimeInfo(this.task);
-    const isRunning = ['running', 'initializing', 'installing'].includes(
-      this.task.status?.toLowerCase()
-    );
+    const isRunning = [
+      'running',
+      'initializing',
+      'installing',
+      'iterating',
+    ].includes(this.task.status?.toLowerCase());
     const isCompleted = ['completed', 'merged', 'pushed'].includes(
       this.task.status?.toLowerCase()
     );
