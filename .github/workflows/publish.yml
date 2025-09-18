@@ -1,0 +1,144 @@
+name: Publish
+run-name: (${{ github.event.inputs.project }}) Publish ${{ github.event.inputs.tag_name }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      project:
+        description: 'Select the project to release'
+        required: true
+        type: choice
+        default: cli
+        options:
+          - cli
+          - extension
+      version:
+        description: 'The project version to release'
+        required: true
+      dryRun:
+        description: 'Dry-run job to avoid publishing to NPM or the extension marketplaces'
+        required: true
+        type: boolean
+        default: false
+
+env:
+  TAG_NAME: ${{ inputs.project }}/v${{ inputs.version }}
+
+jobs:
+  publish:
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Echo inputs
+        run: |
+          echo "Project: $PROJECT"
+          echo "Version: $VERSION"
+          echo "Tag name: $TAG_NAME"
+          echo "Dry Run: $DRY_RUN"
+        env:
+          PROJECT: ${{ inputs.project }}
+          VERSION: ${{ inputs.version }}
+          DRY_RUN: ${{ inputs.dryRun }}
+
+      - name: Check if release exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Checking if release exists for tag: ${{ env.TAG_NAME }}"
+          if ! gh release view "${{ env.TAG_NAME }}" --repo ${{ github.repository }}; then
+            echo "Error: Release with tag '${{ env.TAG_NAME }}' does not exist!"
+            echo "Please run the Release workflow first to create the release."
+            exit 1
+          fi
+          echo "✓ Release found for tag: ${{ env.TAG_NAME }}"
+
+      - name: Clone
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Download Release Asset (CLI)
+        if: inputs.project == 'cli'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Downloading CLI release asset (.tgz) from tag: ${{ env.TAG_NAME }}"
+          gh release download "${{ env.TAG_NAME }}" \
+            --repo ${{ github.repository }} \
+            --pattern "*.tgz" \
+            --dir ./
+          ASSET_NAME=$(ls *.tgz | head -1)
+          echo "Downloaded: $ASSET_NAME"
+          echo "ASSET_NAME=$ASSET_NAME" >> $GITHUB_ENV
+
+      - name: Download Release Asset (Extension)
+        if: inputs.project == 'extension'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Downloading Extension release asset (.vsix) from tag: ${{ env.TAG_NAME }}"
+          gh release download "${{ env.TAG_NAME }}" \
+            --repo ${{ github.repository }} \
+            --pattern "*.vsix" \
+            --dir ./
+          ASSET_NAME=$(ls *.vsix | head -1)
+          echo "Downloaded: $ASSET_NAME"
+          echo "ASSET_NAME=$ASSET_NAME" >> $GITHUB_ENV
+
+      - name: Publish NPM (CLI)
+        if: inputs.project == 'cli'
+        run: |
+          npm publish ${{ env.ASSET_NAME }} --access public 
+          echo "✓ Successfully published to NPM"
+        env:
+          NPM_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish VSCode Marketplace (Extension)
+        if: inputs.project == 'extension'
+        run: |
+          npx @vscode/vsce publish --pat ${{ secrets.VSCODE_MARKETPLACE_TOKEN }} --packagePath ${{ github.workspace }}/${{ env.ASSET_NAME }}
+          echo "✓ Successfully published to VSCode Marketplace"
+
+      - name: Notify Google Chat on Success
+        if: success() && inputs.dryRun == false
+        env:
+          WEBHOOK_URL: ${{ secrets.GOOGLE_CHAT_WEBHOOK }}
+          PROJECT: ${{ inputs.project }}
+          VERSION: ${{ inputs.version }}
+          TAG_NAME: ${{ env.TAG_NAME }}
+        run: |
+          if [ "${{ inputs.project }}" == "cli" ]; then
+            REGISTRY="NPM"
+            REGISTRY_URL="https://www.npmjs.com/package/@endorhq/rover"
+          else
+            REGISTRY="VSCode Marketplace"
+            REGISTRY_URL="https://marketplace.visualstudio.com/items?itemName=endorhq.rover"
+          fi
+
+          curl -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d @- <<EOF
+          {
+            "text": "📦 *Package Published Successfully*\n\n*Project:* ${PROJECT}\n*Version:* v${VERSION}\n*Tag:* ${TAG_NAME}\n*Registry:* ${REGISTRY}\n*Registry URL:* ${REGISTRY_URL}\n*Repository:* ${{ github.repository }}\n*Published by:* ${{ github.actor }}"
+          }
+          EOF
+
+      - name: Notify Google Chat on Failure
+        if: failure() && inputs.dryRun == false
+        env:
+          WEBHOOK_URL: ${{ secrets.GOOGLE_CHAT_WEBHOOK }}
+          PROJECT: ${{ inputs.project }}
+          VERSION: ${{ inputs.version }}
+          WORKFLOW_URL: 'https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+        run: |
+          curl -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d @- <<EOF
+          {
+            "text": "❌ *Package Publish Failed*\n\n*Project:* ${PROJECT}\n*Version:* v${VERSION}\n*Repository:* ${{ github.repository }}\n*Failed by:* ${{ github.actor }}\n*Workflow Run:* ${WORKFLOW_URL}\n\nPlease check the workflow logs for details."
+          }
+          EOF
