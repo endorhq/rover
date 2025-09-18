@@ -38,7 +38,7 @@ jobs:
           echo "Project: $PROJECT"
           echo "Version: $VERSION"
           echo "Publish: $PUBLISH"
-          echo "Project: $DRY_RUN"
+          echo "Dry-Run: $DRY_RUN"
         env:
           PROJECT: ${{ inputs.project }}
           VERSION: ${{ inputs.targetVersion }}
