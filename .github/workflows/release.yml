@@ -84,15 +84,13 @@ jobs:
           VERSION: '${{ inputs.targetVersion }}'
           PROJECT: '${{ inputs.project }}'
           TAG_NAME: '${{ inputs.project }}/v${{ inputs.targetVersion }}'
-        with:
-          result-encoding: string
-          run: |
-            git config user.name "EndorBot"
-            git config user.email "noreply@endor.dev"
-            git add .
-            git commit -m "bump: update $PROJECT to $VERSION"
-            git tag -a "$TAG_NAME" -m "$TAG_NAME"
-            git push --tags
+        run: |
+          git config user.name "EndorBot"
+          git config user.email "noreply@endor.dev"
+          git add .
+          git commit -m "bump: update $PROJECT to $VERSION"
+          git tag -a "$TAG_NAME" -m "$TAG_NAME"
+          git push --tags
 
       - name: (Dry Run) Create the release
         if: inputs.dryRun == true
