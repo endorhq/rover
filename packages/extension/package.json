@@ -1,9 +1,9 @@
 {
   "name": "endor-rover",
-  "displayName": "Endor Rover",
+  "displayName": "Rover",
   "description": "Collaborate with AI agents to complete any task",
   "version": "0.3.0",
-  "publisher": "endor",
+  "publisher": "endorhq",
   "engines": {
     "vscode": "^1.102.0"
   },
@@ -13,6 +13,12 @@
   ],
   "icon": "./assets/logo.png",
   "main": "./dist/extension.js",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/endorhq/rover.git",
+    "directory": "packages/extension"
+  },
   "contributes": {
     "configuration": {
       "title": "Rover",

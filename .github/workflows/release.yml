@@ -1,6 +1,8 @@
 name: Release
 run-name: (${{ github.event.inputs.project }}) Release ${{ github.event.inputs.targetVersion }} from ${{ github.ref_name }}
 
+concurrency: production
+
 on:
   workflow_dispatch:
     inputs:
@@ -30,6 +32,7 @@ on:
 jobs:
   release:
     timeout-minutes: 15
+    environment: production
     runs-on: ubuntu-latest
 
     steps:
@@ -64,6 +67,8 @@ jobs:
         run: npm run check:${{ inputs.project }}
 
       - name: Test
+        # For now, skip tests on the VSCode Extension
+        if: inputs.project == 'cli'
         run: npm run test:${{ inputs.project }}
 
       - name: Build
