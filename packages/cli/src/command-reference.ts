@@ -14,9 +14,18 @@ function extractCommandGroups(program: Command): { [key: string]: Command[] } {
   // This should match the commandsGroup() calls in that file
   const commandGroups = {
     'Project configuration': ['init'],
-    'Create and manage tasks': ['task', 'restart', 'stop', 'list', 'inspect', 'logs', 'delete', 'iterate'],
+    'Create and manage tasks': [
+      'task',
+      'restart',
+      'stop',
+      'list',
+      'inspect',
+      'logs',
+      'delete',
+      'iterate',
+    ],
     'Debug a task': ['shell'],
-    'Merge changes': ['diff', 'merge', 'push']
+    'Merge changes': ['diff', 'merge', 'push'],
   };
 
   // Organize commands into groups
@@ -55,17 +64,6 @@ function formatCommandAsMarkdown(command: Command, level: number = 2): string {
     markdown += `**Usage:**\n\`\`\`\nrover ${command.name()} ${usage}\n\`\`\`\n\n`;
   }
 
-  // Arguments
-  const args = command.args;
-  if (args && args.length > 0) {
-    markdown += `**Arguments:**\n\n`;
-    args.forEach(arg => {
-      const required = arg.required ? 'required' : 'optional';
-      markdown += `- \`${arg.name()}\` (${required}): ${arg.description || 'No description'}\n`;
-    });
-    markdown += '\n';
-  }
-
   // Options
   const options = command.options;
   if (options && options.length > 0) {
@@ -92,7 +90,8 @@ function formatCommandAsMarkdown(command: Command, level: number = 2): string {
  */
 function generateCommandReference(program: Command): string {
   let markdown = '# Rover CLI Command Reference\n\n';
-  markdown += 'This document is automatically generated from the CLI command definitions.\n\n';
+  markdown +=
+    'This document is automatically generated from the CLI command definitions.\n\n';
 
   // Add table of contents
   markdown += '## Table of Contents\n\n';
@@ -102,7 +101,10 @@ function generateCommandReference(program: Command): string {
 
   // Generate table of contents
   for (const [groupName, commands] of Object.entries(groupedCommands)) {
-    markdown += `- [${groupName}](#${groupName.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '')})\n`;
+    markdown += `- [${groupName}](#${groupName
+      .toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^\w-]/g, '')})\n`;
     commands.forEach(command => {
       markdown += `  - [\`${command.name()}\`](#${command.name()})\n`;
     });

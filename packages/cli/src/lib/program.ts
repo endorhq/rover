@@ -24,11 +24,15 @@ import { Git, setVerbose } from 'rover-common';
  * This function can be used both by the main CLI entry point and by utilities
  * that need to introspect the command structure.
  */
-export function createProgram(options: { excludeRuntimeHooks?: boolean } = {}): Command {
+export function createProgram(
+  options: { excludeRuntimeHooks?: boolean } = {}
+): Command {
   const program = new Command();
 
-  program
-    .option('-v, --verbose', 'Log verbose information like running commands');
+  program.option(
+    '-v, --verbose',
+    'Log verbose information like running commands'
+  );
 
   // Add runtime hooks only if not excluded (for documentation generation)
   if (!options.excludeRuntimeHooks) {
@@ -120,7 +124,9 @@ export function createProgram(options: { excludeRuntimeHooks?: boolean } = {}): 
               `Rover is not fully initialized in this directory. The command you requested (\`${commandName}\`) was not executed.`
             )
           );
-          console.log(`├── ${colors.gray('Project config (exists):')} rover.json`);
+          console.log(
+            `├── ${colors.gray('Project config (exists):')} rover.json`
+          );
           console.log(
             `└── ${colors.gray('User settings (does not exist):')} .rover/settings.json`
           );
@@ -174,7 +180,10 @@ export function createProgram(options: { excludeRuntimeHooks?: boolean } = {}): 
       '-s, --source-branch <branch>',
       'Base branch for git worktree creation'
     )
-    .option('-t, --target-branch <branch>', 'Custom name for the worktree branch')
+    .option(
+      '-t, --target-branch <branch>',
+      'Custom name for the worktree branch'
+    )
     .option('-a, --agent <agent>', 'AI agent to use (claude, gemini, qwen)')
     .option('--json', 'Output the result in JSON format')
     .option('--debug', 'Show debug information like running commands')
@@ -294,7 +303,9 @@ export function createProgram(options: { excludeRuntimeHooks?: boolean } = {}): 
 
   program
     .command('push')
-    .description('Commit and push task changes to remote, with GitHub PR support')
+    .description(
+      'Commit and push task changes to remote, with GitHub PR support'
+    )
     .argument('<taskId>', 'Task ID to push')
     .option('-m, --message <message>', 'Commit message')
     .option('--json', 'Output in JSON format')
