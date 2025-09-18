@@ -148,3 +148,16 @@ jobs:
             "text": "❌ *Release Failed*\n\n*Project:* ${PROJECT}\n*Version:* v${VERSION}\n*Repository:* ${{ github.repository }}\n*Failed by:* ${{ github.actor }}\n*Workflow Run:* ${WORKFLOW_URL}\n\nPlease check the workflow logs for details."
           }
           EOF
+
+      - name: Trigger Publish Workflow
+        if: success() && inputs.publishRelease == true && inputs.dryRun == false
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Triggering publish workflow for ${{ inputs.project }} v${{ inputs.targetVersion }}"
+          gh workflow run publish.yml \
+            --repo ${{ github.repository }} \
+            --ref ${{ github.ref }} \
+            -f project=${{ inputs.project }} \
+            -f version=${{ inputs.targetVersion }} \
+            -f dryRun=${{ inputs.dryRun }}

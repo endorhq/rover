@@ -90,18 +90,26 @@ jobs:
           echo "ASSET_NAME=$ASSET_NAME" >> $GITHUB_ENV
 
       - name: Publish NPM (CLI)
-        if: inputs.project == 'cli'
+        if: inputs.project == 'cli' && inputs.dryRun == false
         run: |
           npm publish ${{ env.ASSET_NAME }} --access public 
           echo "✓ Successfully published to NPM"
         env:
           NPM_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+      - name: (Dry Run) Publish NPM (CLI)
+        if: inputs.project == 'cli' && inputs.dryRun == false
+        run: echo "Skipping publish phase."
+
       - name: Publish VSCode Marketplace (Extension)
         if: inputs.project == 'extension'
         run: |
           npx @vscode/vsce publish --pat ${{ secrets.VSCODE_MARKETPLACE_TOKEN }} --packagePath ${{ github.workspace }}/${{ env.ASSET_NAME }}
           echo "✓ Successfully published to VSCode Marketplace"
+
+      - name: (Dry Run) Publish VSCode Marketplace (Extension)
+        if: inputs.project == 'extension' && inputs.dryRun == false
+        run: echo "Skipping publish phase"
 
       - name: Notify Google Chat on Success
         if: success() && inputs.dryRun == false
