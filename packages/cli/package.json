@@ -18,6 +18,7 @@
     "clean": "rm -rf dist",
     "check": "tsc --noEmit",
     "format": "prettier --write \"src/**/*.{ts,js,json}\"",
+    "package": "npm pack",
     "test": "vitest --run --silent",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
