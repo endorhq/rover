@@ -358,7 +358,7 @@ setup_agent_environment() {
       case 'claude':
         return `claude --dangerously-skip-permissions -p${VERBOSE ? ' --debug' : ''}`;
       case 'codex':
-        return `${VERBOSE ? 'RUST_LOG=info ' : ''}codex exec --dangerously-bypass-approvals-and-sandbox --skip-git-repo-check`;
+        return `${VERBOSE ? 'RUST_LOG=info ' : ''}codex exec --model gpt-5-codex --dangerously-bypass-approvals-and-sandbox --skip-git-repo-check`;
       case 'gemini':
         return `gemini --yolo -p${VERBOSE ? ' --debug' : ''}`;
       case 'qwen':
