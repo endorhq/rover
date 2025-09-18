@@ -10,8 +10,8 @@ on:
         type: choice
         default: cli
         options:
-        - cli
-        - extension
+          - cli
+          - extension
       targetVersion:
         description: 'Version to publish (e.g. 1.0.0)'
         type: string
@@ -83,7 +83,7 @@ jobs:
     - name: (Dry Run) Commit and tag
       if: inputs.dryRun == true
       run: echo "Skipping commit and tag phase."
-    
+
     - name: Commit and tag
       if: inputs.dryRun == false
       id: commit
