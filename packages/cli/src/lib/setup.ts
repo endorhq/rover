@@ -2,7 +2,7 @@ import colors from 'ansi-colors';
 import { writeFileSync, chmodSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { TaskDescription } from './description.js';
-import { findProjectRoot, launchSync } from 'rover-common';
+import { findProjectRoot, launchSync, VERBOSE } from 'rover-common';
 
 /**
  * SetupBuilder class - Consolidates Docker setup script generation
@@ -356,15 +356,15 @@ setup_agent_environment() {
   private getAgentCommand(): string {
     switch (this.agent) {
       case 'claude':
-        return 'claude --dangerously-skip-permissions -p --debug';
+        return `claude --dangerously-skip-permissions -p${VERBOSE ? ' --debug' : ''}`;
       case 'codex':
-        return 'RUST_LOG=info codex exec --dangerously-bypass-approvals-and-sandbox --skip-git-repo-check';
+        return `${VERBOSE ? 'RUST_LOG=info ' : ''}codex exec --dangerously-bypass-approvals-and-sandbox --skip-git-repo-check`;
       case 'gemini':
-        return 'gemini --yolo -p --debug';
+        return `gemini --yolo -p${VERBOSE ? ' --debug' : ''}`;
       case 'qwen':
-        return 'qwen --yolo -p --debug';
+        return `qwen --yolo -p${VERBOSE ? ' --debug' : ''}`;
       default:
-        return 'claude --dangerously-skip-permissions -p --debug';
+        return `claude --dangerously-skip-permissions -p${VERBOSE ? ' --debug' : ''}`;
     }
   }
 
