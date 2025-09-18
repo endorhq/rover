@@ -1,4 +1,4 @@
-name: Release from main
+name: Release
 run-name: Release ${{ github.event.inputs.targetVersion }} from ${{ github.ref_name }}
 
 on:
@@ -32,121 +32,121 @@ jobs:
     timeout-minutes: 15
     runs-on: ubuntu-latest
 
-  steps:
-    - name: Echo inputs
-      run: |
-        echo "Project: $PROJECT"
-        echo "Version: $VERSION"
-        echo "Publish: $PUBLISH"
-        echo "Project: $DRY_RUN"
-      env:
-        PROJECT: ${{ inputs.project }}
-        VERSION: ${{ inputs.targetVersion }}
-        PUBLISH: ${{ inputs.publishRelease }}
-        DRY_RUN: ${{ inputs.dryRun }}
-
-    - name: Clone
-      uses: actions/checkout@v4
-
-    - name: Setup Node.js 22
-      uses: actions/setup-node@v4
-      with:
-        node-version: 22
-
-    - name: Bump Version
-      run: npm version ${{ inputs.targetVersion }}
-      working-directory: ./packages/${{ inputs.project }}
-
-    - name: Install dependencies
-      run: npm ci
-
-    - name: Check
-      run: npm run check:${{ inputs.project }}
-
-    - name: Test
-      run: npm run test:${{ inputs.project }}
-
-    - name: Build
-      run: npm run build:${{ inputs.project }}
-
-    - name: Package
-      run: npm run package:${{ inputs.project }}
-
-    - name: (Dry Run) Commit and tag
-      if: inputs.dryRun == true
-      run: echo "Skipping commit and tag phase."
-
-    - name: Commit and tag
-      if: inputs.dryRun == false
-      id: commit
-      env:
-        REPO_NAME: 'rover'
-        VERSION: '${{ inputs.targetVersion }}'
-        PROJECT: '${{ inputs.project }}'
-        TAG_NAME: '${{ inputs.project }}/v${{ inputs.targetVersion }}'
-      with:
-        result-encoding: string
+    steps:
+      - name: Echo inputs
         run: |
-          git config user.name "EndorBot"
-          git config user.email "noreply@endor.dev"
-          git add .
-          git commit -m "bump: update $PROJECT to $VERSION"
-          git tag -a "$TAG_NAME" -m "$TAG_NAME"
-          git push --tags
+          echo "Project: $PROJECT"
+          echo "Version: $VERSION"
+          echo "Publish: $PUBLISH"
+          echo "Project: $DRY_RUN"
+        env:
+          PROJECT: ${{ inputs.project }}
+          VERSION: ${{ inputs.targetVersion }}
+          PUBLISH: ${{ inputs.publishRelease }}
+          DRY_RUN: ${{ inputs.dryRun }}
 
-    - name: (Dry Run) Create the release
-      if: inputs.dryRun == true
-      run: echo "Skipping create release phase."
+      - name: Clone
+        uses: actions/checkout@v4
 
-    - name: Create the release
-      if: inputs.dryRun == false
-      env:
-        GH_TOKEN: ${{ github.token }}
-        TAG_NAME: '${{ inputs.project }}/v${{ inputs.targetVersion }}'
-      run: |
-        # Find the artifact based on the project type
-        if [ "${{ inputs.project }}" == "cli" ]; then
-          ARTIFACT=$(find ./packages/cli -name "*.tgz" -type f | head -1)
-        elif [ "${{ inputs.project }}" == "extension" ]; then
-          ARTIFACT=$(find ./packages/extension -name "*.vsix" -type f | head -1)
-        fi
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
 
-        # Create release with artifact
-        gh release create "$TAG_NAME" \
-          --title "${{ inputs.project }} v${{ inputs.targetVersion }}" \
-          --generate-notes \
-          --target "$TAG_NAME" \
-          "$ARTIFACT"
+      - name: Bump Version
+        run: npm version ${{ inputs.targetVersion }}
+        working-directory: ./packages/${{ inputs.project }}
 
-    - name: Notify Google Chat on Success
-      if: success() && inputs.dryRun == false
-      env:
-        WEBHOOK_URL: ${{ secrets.GOOGLE_CHAT_WEBHOOK }}
-        PROJECT: ${{ inputs.project }}
-        VERSION: ${{ inputs.targetVersion }}
-        TAG_NAME: '${{ inputs.project }}/v${{ inputs.targetVersion }}'
-        RELEASE_URL: 'https://github.com/${{ github.repository }}/releases/tag/${{ inputs.project }}/v${{ inputs.targetVersion }}'
-      run: |
-        curl -X POST "$WEBHOOK_URL" \
-          -H "Content-Type: application/json" \
-          -d @- <<EOF
-        {
-          "text": "🚀 *New Release Published*\n\n*Project:* ${PROJECT}\n*Version:* v${VERSION}\n*Tag:* ${TAG_NAME}\n*Release URL:* ${RELEASE_URL}\n*Repository:* ${{ github.repository }}\n*Released by:* ${{ github.actor }}"
-        }
-        EOF
+      - name: Install dependencies
+        run: npm ci
 
-    - name: Notify Google Chat on Failure
-      if: failure() && inputs.dryRun == false
-      env:
-        WEBHOOK_URL: ${{ secrets.GOOGLE_CHAT_WEBHOOK }}
-        PROJECT: ${{ inputs.project }}
-        VERSION: ${{ inputs.targetVersion }}
-        WORKFLOW_URL: 'https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}'
-      run: |
-        curl -X POST "$WEBHOOK_URL" \
-          -H "Content-Type: application/json" \
-          -d @- <<EOF
-        {
-          "text": "❌ *Release Failed*\n\n*Project:* ${PROJECT}\n*Version:* v${VERSION}\n*Repository:* ${{ github.repository }}\n*Failed by:* ${{ github.actor }}\n*Workflow Run:* ${WORKFLOW_URL}\n\nPlease check the workflow logs for details."
-        }
-        EOF
+      - name: Check
+        run: npm run check:${{ inputs.project }}
+
+      - name: Test
+        run: npm run test:${{ inputs.project }}
+
+      - name: Build
+        run: npm run build:${{ inputs.project }}
+
+      - name: Package
+        run: npm run package:${{ inputs.project }}
+
+      - name: (Dry Run) Commit and tag
+        if: inputs.dryRun == true
+        run: echo "Skipping commit and tag phase."
+
+      - name: Commit and tag
+        if: inputs.dryRun == false
+        id: commit
+        env:
+          REPO_NAME: 'rover'
+          VERSION: '${{ inputs.targetVersion }}'
+          PROJECT: '${{ inputs.project }}'
+          TAG_NAME: '${{ inputs.project }}/v${{ inputs.targetVersion }}'
+        with:
+          result-encoding: string
+          run: |
+            git config user.name "EndorBot"
+            git config user.email "noreply@endor.dev"
+            git add .
+            git commit -m "bump: update $PROJECT to $VERSION"
+            git tag -a "$TAG_NAME" -m "$TAG_NAME"
+            git push --tags
+
+      - name: (Dry Run) Create the release
+        if: inputs.dryRun == true
+        run: echo "Skipping create release phase."
+
+      - name: Create the release
+        if: inputs.dryRun == false
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: '${{ inputs.project }}/v${{ inputs.targetVersion }}'
+        run: |
+          # Find the artifact based on the project type
+          if [ "${{ inputs.project }}" == "cli" ]; then
+            ARTIFACT=$(find ./packages/cli -name "*.tgz" -type f | head -1)
+          elif [ "${{ inputs.project }}" == "extension" ]; then
+            ARTIFACT=$(find ./packages/extension -name "*.vsix" -type f | head -1)
+          fi
+
+          # Create release with artifact
+          gh release create "$TAG_NAME" \
+            --title "${{ inputs.project }} v${{ inputs.targetVersion }}" \
+            --generate-notes \
+            --target "$TAG_NAME" \
+            "$ARTIFACT"
+
+      - name: Notify Google Chat on Success
+        if: success() && inputs.dryRun == false
+        env:
+          WEBHOOK_URL: ${{ secrets.GOOGLE_CHAT_WEBHOOK }}
+          PROJECT: ${{ inputs.project }}
+          VERSION: ${{ inputs.targetVersion }}
+          TAG_NAME: '${{ inputs.project }}/v${{ inputs.targetVersion }}'
+          RELEASE_URL: 'https://github.com/${{ github.repository }}/releases/tag/${{ inputs.project }}/v${{ inputs.targetVersion }}'
+        run: |
+          curl -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d @- <<EOF
+          {
+            "text": "🚀 *New Release Published*\n\n*Project:* ${PROJECT}\n*Version:* v${VERSION}\n*Tag:* ${TAG_NAME}\n*Release URL:* ${RELEASE_URL}\n*Repository:* ${{ github.repository }}\n*Released by:* ${{ github.actor }}"
+          }
+          EOF
+
+      - name: Notify Google Chat on Failure
+        if: failure() && inputs.dryRun == false
+        env:
+          WEBHOOK_URL: ${{ secrets.GOOGLE_CHAT_WEBHOOK }}
+          PROJECT: ${{ inputs.project }}
+          VERSION: ${{ inputs.targetVersion }}
+          WORKFLOW_URL: 'https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+        run: |
+          curl -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d @- <<EOF
+          {
+            "text": "❌ *Release Failed*\n\n*Project:* ${PROJECT}\n*Version:* v${VERSION}\n*Repository:* ${{ github.repository }}\n*Failed by:* ${{ github.actor }}\n*Workflow Run:* ${WORKFLOW_URL}\n\nPlease check the workflow logs for details."
+          }
+          EOF
