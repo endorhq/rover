@@ -213,11 +213,15 @@ export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
     try {
       const cliStatus = await this.cli.checkInstallation();
       const roverInitialized = await this.cli.checkInitialization();
+      const workspaceOpen =
+        vscode.workspace.workspaceFolders &&
+        vscode.workspace.workspaceFolders.length > 0;
 
       const status = {
         cliInstalled: cliStatus.installed,
         cliVersion: cliStatus.version,
         roverInitialized,
+        workspaceOpen: !!workspaceOpen,
         error: cliStatus.error,
       };
 
@@ -240,6 +244,9 @@ export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
         status: {
           cliInstalled: false,
           roverInitialized: false,
+          workspaceOpen:
+            vscode.workspace.workspaceFolders &&
+            vscode.workspace.workspaceFolders.length > 0,
           error: error instanceof Error ? error.message : 'Unknown error',
         },
       });

@@ -6,6 +6,7 @@ import logo from '../common/logo.svg';
 export interface InitializationStatus {
   cliInstalled: boolean;
   roverInitialized: boolean;
+  workspaceOpen: boolean;
   cliVersion?: string;
   error?: string;
 }
@@ -72,7 +73,8 @@ export class InitializationGuide extends LitElement {
       `;
     }
 
-    const { cliInstalled, roverInitialized, cliVersion, error } = this.status;
+    const { cliInstalled, roverInitialized, workspaceOpen, cliVersion, error } =
+      this.status;
 
     return html`
       <div class="guide-container">
@@ -168,20 +170,26 @@ export class InitializationGuide extends LitElement {
                     </div>
                   `
                 : cliInstalled
-                  ? html`
-                      <div class="step-actions">
-                        <button
-                          class="action-button"
-                          @click=${this.handleInitializeRover}
-                          ?disabled=${this.isInitializing}
-                        >
-                          ${this.isInitializing
-                            ? html`<div class="loading-spinner"></div>`
-                            : ''}
-                          Initialize Rover
-                        </button>
-                      </div>
-                    `
+                  ? workspaceOpen
+                    ? html`
+                        <div class="step-actions">
+                          <button
+                            class="action-button"
+                            @click=${this.handleInitializeRover}
+                            ?disabled=${this.isInitializing}
+                          >
+                            ${this.isInitializing
+                              ? html`<div class="loading-spinner"></div>`
+                              : ''}
+                            Initialize Rover
+                          </button>
+                        </div>
+                      `
+                    : html`
+                        <div class="step-description">
+                          Please open a workspace folder to initialize Rover.
+                        </div>
+                      `
                   : html`
                       <div class="step-description">
                         Install the CLI first to continue with initialization.
