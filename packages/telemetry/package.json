@@ -4,6 +4,10 @@
   "description": "Provide basic telemetry to the rover CLI and extension",
   "main": "dist/index.js",
   "type": "module",
+  "files": [
+    "LICENSE.md",
+    "dist/*"
+  ],
   "scripts": {
     "build": "tsdown --env.TSUP_DEV=false src/index.ts",
     "dev": "TSUP_DEV=true tsdown --env.TSUP_DEV=true --watch src/ src/index.ts",

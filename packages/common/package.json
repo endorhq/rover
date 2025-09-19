@@ -5,6 +5,10 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "type": "module",
+  "files": [
+    "LICENSE.md",
+    "dist/*"
+  ],
   "scripts": {
     "build": "tsdown --env.TSUP_DEV=false src/index.ts",
     "dev": "TSUP_DEV=true tsdown --env.TSUP_DEV=true --watch src/ src/index.ts",
