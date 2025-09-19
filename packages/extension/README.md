@@ -34,11 +34,13 @@ This VSCode extension brings Rover's power directly to your editor. Run multiple
 ## Commands
 
 ### Setup & Configuration
+
 - `Rover: Initialize Project` - Set up Rover in your project
 - `Rover: Install Rover CLI` - Install the Rover CLI globally
 - `Rover: Show Setup Guide` - Open the setup guide for getting started
 
 ### Task Management
+
 - `Rover: Create Task` - Start a new AI agent task
 - `Rover: Create Task from GitHub` - Create a task from a GitHub issue
 - `Rover: Iterate Task` - Add new instructions to an existing task
@@ -46,6 +48,7 @@ This VSCode extension brings Rover's power directly to your editor. Run multiple
 - `Rover: Refresh Tasks` - Update the task list
 
 ### Task Actions
+
 - `Rover: Inspect Task` - View detailed task information and outputs
 - `Rover: Open Task Terminal` - Jump into a task's workspace shell
 - `Rover: Open Task Workspace` - Open task workspace in a new VSCode window
