@@ -425,7 +425,7 @@ export class RoverCLI {
    */
   async checkInitialization(): Promise<boolean> {
     if (!this.workspaceRoot) {
-      throw new Error('unknown workspace root');
+      return false;
     }
 
     try {
