@@ -29,9 +29,9 @@ vi.mock('enquirer', () => ({
 
 // Mock exit utilities to prevent process.exit
 vi.mock('../../utils/exit.js', () => ({
-  exitWithErrors: vi.fn().mockImplementation(() => { }),
-  exitWithSuccess: vi.fn().mockImplementation(() => { }),
-  exitWithWarn: vi.fn().mockImplementation(() => { }),
+  exitWithErrors: vi.fn().mockImplementation(() => {}),
+  exitWithSuccess: vi.fn().mockImplementation(() => {}),
+  exitWithWarn: vi.fn().mockImplementation(() => {}),
 }));
 
 // Mock display utilities to suppress output
@@ -269,7 +269,9 @@ describe('delete command', () => {
 
       // Mock enquirer to throw an error simulating Ctrl-C
       const enquirer = await import('enquirer');
-      vi.mocked(enquirer.default.prompt).mockRejectedValue(new Error('User cancelled'));
+      vi.mocked(enquirer.default.prompt).mockRejectedValue(
+        new Error('User cancelled')
+      );
 
       const { exitWithErrors } = await import('../../utils/exit.js');
 
