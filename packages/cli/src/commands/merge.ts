@@ -447,13 +447,13 @@ export const mergeCommand = async (
         if (spinner) spinner.text = 'Committing changes in worktree...';
 
         // Switch to worktree and commit changes
-        const commitResult = git.addAndCommit(finalCommitMessage, {
-          worktreePath: task.worktreePath,
-        });
-
-        jsonOutput.committed = commitResult;
-
-        if (!commitResult) {
+        try {
+          git.addAndCommit(finalCommitMessage, {
+            worktreePath: task.worktreePath,
+          });
+          jsonOutput.committed = true;
+        } catch (error) {
+          jsonOutput.committed = false;
           spinner?.error('Failed to commit changes');
           jsonOutput.error =
             'Failed to add and commit changes in the workspace';

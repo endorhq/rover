@@ -183,20 +183,14 @@ export class Git {
   /**
    * Add all files and commit it
    */
-  addAndCommit(message: string, options: GitWorktreeOptions = {}): boolean {
-    try {
-      launchSync('git', ['add', '-A'], {
-        cwd: options.worktreePath,
-      });
+  addAndCommit(message: string, options: GitWorktreeOptions = {}): void {
+    launchSync('git', ['add', '-A'], {
+      cwd: options.worktreePath,
+    });
 
-      launchSync('git', ['commit', '-m', message], {
-        cwd: options.worktreePath,
-      });
-
-      return true;
-    } catch (_err) {
-      return false;
-    }
+    launchSync('git', ['commit', '-m', message], {
+      cwd: options.worktreePath,
+    });
   }
 
   /**
