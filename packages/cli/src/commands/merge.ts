@@ -9,6 +9,8 @@ import { UserSettings, AI_AGENT, ProjectConfig } from '../lib/config.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { Git } from 'rover-common';
 import { showRoverChat, showTips } from '../utils/display.js';
+import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
+import { CLIJsonOutput } from '../types.js';
 import { findProjectRoot } from 'rover-common';
 
 const { prompt } = enquirer;
@@ -16,7 +18,10 @@ const { prompt } = enquirer;
 /**
  * Get summaries from all iterations of a task
  */
-const getTaskIterationSummaries = (taskId: string): string[] => {
+const getTaskIterationSummaries = (
+  taskId: string,
+  options: { json?: boolean } = {}
+): string[] => {
   try {
     const roverPath = join(findProjectRoot(), '.rover');
     const taskPath = join(roverPath, 'tasks', taskId);
@@ -45,20 +50,24 @@ const getTaskIterationSummaries = (taskId: string): string[] => {
             summaries.push(`Iteration ${iteration}: ${summary}`);
           }
         } catch (error) {
-          console.warn(
-            colors.yellow(
-              `Warning: Could not read summary for iteration ${iteration}`
-            )
-          );
+          if (!options.json) {
+            console.warn(
+              colors.yellow(
+                `Warning: Could not read summary for iteration ${iteration}`
+              )
+            );
+          }
         }
       }
     }
 
     return summaries;
   } catch (error) {
-    console.warn(
-      colors.yellow('Warning: Could not retrieve iteration summaries')
-    );
+    if (!options.json) {
+      console.warn(
+        colors.yellow('Warning: Could not retrieve iteration summaries')
+      );
+    }
     return [];
   }
 };
@@ -71,7 +80,8 @@ const generateCommitMessage = async (
   taskDescription: string,
   recentCommits: string[],
   summaries: string[],
-  aiAgent: AIAgentTool
+  aiAgent: AIAgentTool,
+  options: { json?: boolean } = {}
 ): Promise<string | null> => {
   try {
     const commitMessage = await aiAgent.generateCommitMessage(
@@ -82,16 +92,20 @@ const generateCommitMessage = async (
     );
 
     if (commitMessage == null || commitMessage.length === 0) {
-      console.warn(
-        colors.yellow('Warning: Could not generate AI commit message')
-      );
+      if (!options.json) {
+        console.warn(
+          colors.yellow('Warning: Could not generate AI commit message')
+        );
+      }
     }
 
     return commitMessage;
   } catch (error) {
-    console.warn(
-      colors.yellow('Warning: Could not generate AI commit message')
-    );
+    if (!options.json) {
+      console.warn(
+        colors.yellow('Warning: Could not generate AI commit message')
+      );
+    }
     return null;
   }
 };
@@ -172,20 +186,21 @@ interface MergeOptions {
   json?: boolean;
 }
 
-interface MergeResult {
-  success: boolean;
-  taskId: number;
-  taskTitle: string;
-  branchName: string;
-  currentBranch: string;
-  hasWorktreeChanges: boolean;
-  hasUnmergedCommits: boolean;
-  committed: boolean;
+/**
+ * Interface for JSON output
+ */
+interface TaskMergeOutput extends CLIJsonOutput {
+  taskId?: number;
+  taskTitle?: string;
+  branchName?: string;
+  currentBranch?: string;
+  hasWorktreeChanges?: boolean;
+  hasUnmergedCommits?: boolean;
+  committed?: boolean;
   commitMessage?: string;
-  merged: boolean;
+  merged?: boolean;
   conflictsResolved?: boolean;
   cleanedUp?: boolean;
-  error?: string;
 }
 
 export const mergeCommand = async (
@@ -194,48 +209,32 @@ export const mergeCommand = async (
 ) => {
   const telemetry = getTelemetry();
   const git = new Git();
-  const result: MergeResult = {
+  const jsonOutput: TaskMergeOutput = {
     success: false,
-    taskId: 0,
-    taskTitle: '',
-    branchName: '',
-    currentBranch: '',
-    hasWorktreeChanges: false,
-    hasUnmergedCommits: false,
-    committed: false,
-    merged: false,
   };
 
   // Convert string taskId to number
   const numericTaskId = parseInt(taskId, 10);
   if (isNaN(numericTaskId)) {
-    result.error = `Invalid task ID '${taskId}' - must be a number`;
-    if (options.json) {
-      console.log(JSON.stringify(result, null, 2));
-    } else {
-      console.log(colors.red(`✗ ${result.error}`));
-    }
-    process.exit(1);
+    jsonOutput.error = `Invalid task ID '${taskId}' - must be a number`;
+    exitWithError(jsonOutput, options.json);
+    return;
   }
 
   if (!git.isGitRepo()) {
-    result.error = 'No worktree found for this task';
-    if (options.json) {
-      console.log(JSON.stringify(result, null, 2));
-    } else {
-      console.log('');
-      console.log(colors.red('✗ No worktree found for this task'));
-      console.log(colors.gray('The task has no workspace to merge.'));
-    }
-    process.exit(1);
+    jsonOutput.error = 'No worktree found for this task';
+    exitWithError(jsonOutput, options.json);
+    return;
   }
 
-  showRoverChat([
-    'We are ready to go',
-    "Let's merge the task changes and ship it!",
-  ]);
+  if (!options.json) {
+    showRoverChat([
+      'We are ready to go',
+      "Let's merge the task changes and ship it!",
+    ]);
+  }
 
-  result.taskId = numericTaskId;
+  jsonOutput.taskId = numericTaskId;
 
   // Load AI agent selection from user settings
   let selectedAiAgent = 'claude'; // default
@@ -281,8 +280,8 @@ export const mergeCommand = async (
     // Load task using TaskDescription
     const task = TaskDescription.load(numericTaskId);
 
-    result.taskTitle = task.title;
-    result.branchName = task.branchName;
+    jsonOutput.taskTitle = task.title;
+    jsonOutput.branchName = task.branchName;
 
     if (!options.json) {
       console.log(colors.white.bold('Merge Task'));
@@ -296,62 +295,48 @@ export const mergeCommand = async (
     }
 
     if (task.isPushed()) {
-      console.log(colors.yellow('\nThe task is already merged and pushed.'));
-      process.exit(1);
+      jsonOutput.error = 'The task is already merged and pushed';
+      exitWithError(jsonOutput, options.json);
+      return;
     }
 
     if (task.isMerged()) {
-      console.log(colors.yellow('\nThe task is already merged.'));
-      process.exit(1);
+      jsonOutput.error = 'The task is already merged';
+      exitWithError(jsonOutput, options.json);
+      return;
     }
 
     if (!task.isCompleted()) {
-      console.log(colors.yellow('\nThe task is not completed yet.'));
-
-      showTips([
-        'Use ' +
-          colors.cyan(`rover inspect ${numericTaskId}`) +
-          ' to check its status',
-        'Use ' +
-          colors.cyan(`rover logs ${numericTaskId}`) +
-          ' to check the logs',
-      ]);
-
-      process.exit(1);
+      jsonOutput.error = 'The task is not completed yet';
+      exitWithError(jsonOutput, options.json, {
+        tips: [
+          'Use ' +
+            colors.cyan(`rover inspect ${numericTaskId}`) +
+            ' to check its status',
+          'Use ' +
+            colors.cyan(`rover logs ${numericTaskId}`) +
+            ' to check the logs',
+        ],
+      });
+      return;
     }
 
     // Check if worktree exists
     if (!task.worktreePath || !existsSync(task.worktreePath)) {
-      result.error = 'No worktree found for this task';
-      if (options.json) {
-        console.log(JSON.stringify(result, null, 2));
-      } else {
-        console.log('');
-        console.log(colors.red('✗ No worktree found for this task'));
-        console.log(colors.gray('The task has no workspace to merge.'));
-      }
+      jsonOutput.error = 'No worktree found for this task';
+      exitWithError(jsonOutput, options.json);
       return;
     }
 
     // Get current branch name
-    result.currentBranch = git.getCurrentBranch();
+    jsonOutput.currentBranch = git.getCurrentBranch();
 
     // Check for uncommitted changes in main repo
     if (git.hasUncommittedChanges()) {
-      result.error = `Current branch (${git.getCurrentBranch()}) has uncommitted changes`;
-      if (options.json) {
-        console.log(JSON.stringify(result, null, 2));
-      } else {
-        console.log('');
-        console.log(
-          colors.red(
-            `✗ Current branch (${git.getCurrentBranch()}) has uncommitted changes`
-          )
-        );
-        console.log(
-          colors.gray('  Please commit or stash your changes before merging')
-        );
-      }
+      jsonOutput.error = `Current branch (${git.getCurrentBranch()}) has uncommitted changes`;
+      exitWithError(jsonOutput, options.json, {
+        tips: ['Please commit or stash your changes before merging'],
+      });
       return;
     }
 
@@ -362,22 +347,16 @@ export const mergeCommand = async (
     const taskBranch = task.branchName;
     const hasUnmerged = git.hasUnmergedCommits(taskBranch);
 
-    result.hasWorktreeChanges = hasWorktreeChanges;
-    result.hasUnmergedCommits = hasUnmerged;
+    jsonOutput.hasWorktreeChanges = hasWorktreeChanges;
+    jsonOutput.hasUnmergedCommits = hasUnmerged;
 
     if (!hasWorktreeChanges && !hasUnmerged) {
-      result.success = true;
-      if (options.json) {
-        console.log(JSON.stringify(result, null, 2));
-      } else {
-        console.log('');
-        console.log(colors.green('✓ No changes to merge'));
-        console.log(
-          colors.gray(
-            '  The task worktree has no uncommitted changes nor unmerged commits'
-          )
-        );
-      }
+      jsonOutput.success = true;
+      exitWithSuccess('No changes to merge', jsonOutput, options.json, {
+        tips: [
+          'The task worktree has no uncommitted changes nor unmerged commits',
+        ],
+      });
       return;
     }
 
@@ -408,17 +387,20 @@ export const mergeCommand = async (
         });
 
         if (!confirm) {
-          result.success = true; // User cancelled, not an error
-          console.log(colors.yellow('\n⚠ Task merge cancelled'));
+          jsonOutput.success = true; // User cancelled, not an error
+          exitWithWarn('Task merge cancelled', jsonOutput, options.json);
           return;
         }
       } catch (err) {
-        console.log(colors.yellow('\n⚠ Task merge cancelled'));
+        jsonOutput.success = true; // User cancelled, not an error
+        exitWithWarn('Task merge cancelled', jsonOutput, options.json);
         return;
       }
     }
 
-    console.log(''); // breakline
+    if (!options.json) {
+      console.log(''); // breakline
+    }
 
     const spinner = !options.json
       ? yoctoSpinner({ text: 'Preparing merge...' }).start()
@@ -434,7 +416,10 @@ export const mergeCommand = async (
       // Only commit if there are worktree changes
       if (hasWorktreeChanges) {
         // Get iteration summaries
-        const summaries = getTaskIterationSummaries(numericTaskId.toString());
+        const summaries = getTaskIterationSummaries(
+          numericTaskId.toString(),
+          options
+        );
 
         // Generate AI commit message
         if (spinner) spinner.text = 'Generating commit message with AI...';
@@ -443,7 +428,8 @@ export const mergeCommand = async (
           task.description,
           recentCommits,
           summaries,
-          aiAgent
+          aiAgent,
+          options
         );
 
         // Fallback commit message if AI fails
@@ -456,7 +442,7 @@ export const mergeCommand = async (
           finalCommitMessage = commitMessage;
         }
 
-        result.commitMessage = finalCommitMessage; // Store first line for result
+        jsonOutput.commitMessage = finalCommitMessage.split('\n')[0]; // Store first line for JSON output
 
         if (spinner) spinner.text = 'Committing changes in worktree...';
 
@@ -465,19 +451,14 @@ export const mergeCommand = async (
           worktreePath: task.worktreePath,
         });
 
-        result.committed = commitResult;
+        jsonOutput.committed = commitResult;
 
         if (!commitResult) {
-          if (options.json) {
-            throw new Error(
-              'Failed to add and commit changes in the workspace'
-            );
-          } else {
-            spinner?.error(
-              'There was an error adding changes and committing them in the workspace'
-            );
-            process.exit(1);
-          }
+          spinner?.error('Failed to commit changes');
+          jsonOutput.error =
+            'Failed to add and commit changes in the workspace';
+          exitWithError(jsonOutput, options.json);
+          return;
         }
       }
 
@@ -494,7 +475,7 @@ export const mergeCommand = async (
       if (merge) {
         // Update status
         mergeSuccessful = true;
-        result.merged = true;
+        jsonOutput.merged = true;
         task.markMerged(); // Set status to MERGED
 
         spinner?.success('Task merged successfully');
@@ -534,7 +515,7 @@ export const mergeCommand = async (
           );
 
           if (resolutionSuccessful) {
-            result.conflictsResolved = true;
+            jsonOutput.conflictsResolved = true;
 
             if (!options.json) {
               showRoverChat([
@@ -559,12 +540,12 @@ export const mergeCommand = async (
               }
 
               if (!applyChanges) {
-                console.log(
-                  colors.yellow(
-                    '\n⚠ User rejected AI resolution. Aborting merge...'
-                  )
-                );
                 git.abortMerge();
+                exitWithWarn(
+                  'User rejected AI resolution. Merge aborted',
+                  jsonOutput,
+                  options.json
+                );
                 return;
               }
             }
@@ -574,7 +555,7 @@ export const mergeCommand = async (
               git.continueMerge();
 
               mergeSuccessful = true;
-              result.merged = true;
+              jsonOutput.merged = true;
               task.markMerged();
 
               if (!options.json) {
@@ -585,35 +566,16 @@ export const mergeCommand = async (
                 );
               }
             } catch (commitError) {
-              result.error = `Error completing merge after conflict resolution: ${commitError}`;
-
               // Cleanup
               git.abortMerge();
 
-              if (!options.json) {
-                console.error(
-                  colors.red(
-                    'Error completing merge after conflict resolution:'
-                  ),
-                  commitError
-                );
-              } else {
-                console.log(JSON.stringify(result, null, 2));
-              }
-
-              process.exit(1);
+              jsonOutput.error = `Error completing merge after conflict resolution: ${commitError}`;
+              exitWithError(jsonOutput, options.json);
+              return;
             }
           } else {
-            result.error = 'AI failed to resolve merge conflicts';
-            if (options.json) {
-              console.log(JSON.stringify(result, null, 2));
-            } else {
-              console.log(
-                colors.red(
-                  '\n✗ AI failed to resolve conflicts. Aborting merge...'
-                )
-              );
-
+            jsonOutput.error = 'AI failed to resolve merge conflicts';
+            if (!options.json) {
               console.log(
                 colors.yellow('\n⚠ Merge aborted due to conflicts.')
               );
@@ -634,7 +596,8 @@ export const mergeCommand = async (
               console.log(colors.white('\nIf you prefer to stop the process:'));
               console.log(colors.cyan(`└── 1. Run: git merge --abort`));
             }
-            process.exit(1);
+            exitWithError(jsonOutput, options.json);
+            return;
           }
         } else {
           // Other merge error, not conflicts
@@ -643,54 +606,34 @@ export const mergeCommand = async (
       }
 
       if (mergeSuccessful) {
-        result.success = true;
-
-        if (!options.json) {
-          console.log(
-            colors.green(
-              '\n✓ Task has been successfully merged into your current branch'
-            )
-          );
-
-          showTips([
-            'Run ' +
-              colors.cyan(`rover del ${numericTaskId}`) +
-              ' to cleanup the workspace, task and git branch.',
-          ]);
-        }
+        jsonOutput.success = true;
+        exitWithSuccess(
+          'Task has been successfully merged into your current branch',
+          jsonOutput,
+          options.json,
+          {
+            tips: [
+              'Run ' +
+                colors.cyan(`rover del ${numericTaskId}`) +
+                ' to cleanup the workspace, task and git branch.',
+            ],
+          }
+        );
+        return;
       }
     } catch (error: any) {
-      result.error = `Error during merge: ${error.message}`;
-      if (options.json) {
-        console.log(JSON.stringify(result, null, 2));
-      } else {
-        if (spinner) spinner.error('Merge failed');
-        console.log('');
-        console.error(colors.bold.red('✗ Error during merge'));
-        console.error(colors.gray('└── ') + error.message);
-      }
-      process.exit(1);
-    }
-
-    // Output final result
-    if (options.json) {
-      console.log(JSON.stringify(result, null, 2));
+      if (spinner) spinner.error('Merge failed');
+      jsonOutput.error = `Error during merge: ${error.message}`;
+      exitWithError(jsonOutput, options.json);
+      return;
     }
   } catch (error) {
     if (error instanceof TaskNotFoundError) {
-      result.error = error.message;
-      if (options.json) {
-        console.log(JSON.stringify(result, null, 2));
-      } else {
-        console.log(colors.red(`✗ ${error.message}`));
-      }
+      jsonOutput.error = error.message;
+      exitWithError(jsonOutput, options.json);
     } else {
-      result.error = `Error merging task: ${error}`;
-      if (options.json) {
-        console.log(JSON.stringify(result, null, 2));
-      } else {
-        console.error(colors.red('Error merging task:'), error);
-      }
+      jsonOutput.error = `Error merging task: ${error}`;
+      exitWithError(jsonOutput, options.json);
     }
   } finally {
     await telemetry?.shutdown();
