@@ -260,7 +260,6 @@ program
     '[instructions]',
     'New requirements or refinement instructions to apply (will prompt if not provided)'
   )
-  .option('-f, --follow', 'Follow execution logs in real-time')
   .option('--json', 'Output JSON and skip confirmation prompts')
   .action(iterateCommand);
 

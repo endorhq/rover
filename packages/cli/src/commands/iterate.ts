@@ -19,7 +19,6 @@ import { showRoverChat } from '../utils/display.js';
 import { readFromStdin, stdinIsAvailable } from '../utils/stdin.js';
 import { CLIJsonOutput } from '../types.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
-import { fa } from 'zod/locales';
 
 const { prompt } = enquirer;
 
@@ -138,7 +137,7 @@ const expandIterationInstructions = async (
 export const iterateCommand = async (
   taskId: string,
   instructions?: string,
-  options: { follow?: boolean; json?: boolean } = {}
+  options: { json?: boolean } = {}
 ): Promise<void> => {
   const telemetry = getTelemetry();
   const json = options.json === true;
@@ -441,7 +440,6 @@ export const iterateCommand = async (
       task.worktreePath,
       iterationPath,
       selectedAiAgent,
-      options.follow,
       options.json
     );
 
