@@ -19,7 +19,7 @@ const { prompt } = enquirer;
 /**
  * Interface for JSON output
  */
-interface TaskDeleteOutput extends CLIJsonOutputWithErrors {}
+interface TaskDeleteOutput extends CLIJsonOutputWithErrors { }
 
 export const deleteCommand = async (
   taskIds: string[],
@@ -106,19 +106,19 @@ export const deleteCommand = async (
 
       console.log(
         colors.gray(`${prefix} ID: `) +
-          colors.cyan(task.id.toString()) +
-          colors.gray(' | Title: ') +
-          colors.white(task.title) +
-          colors.gray(' | Status: ') +
-          colorFunc(task.status)
+        colors.cyan(task.id.toString()) +
+        colors.gray(' | Title: ') +
+        colors.white(task.title) +
+        colors.gray(' | Status: ') +
+        colorFunc(task.status)
       );
     });
 
     console.log(
       '\n' +
-        colors.white(
-          `This action will delete the task${tasksToDelete.length > 1 ? 's' : ''} metadata and workspace${tasksToDelete.length > 1 ? 's' : ''} (git worktree${tasksToDelete.length > 1 ? 's' : ''})`
-        )
+      colors.white(
+        `This action will delete the task${tasksToDelete.length > 1 ? 's' : ''} metadata and workspace${tasksToDelete.length > 1 ? 's' : ''} (git worktree${tasksToDelete.length > 1 ? 's' : ''})`
+      )
     );
   }
 
@@ -135,7 +135,7 @@ export const deleteCommand = async (
       confirmDeletion = confirm;
     } catch (_err) {
       // User cancelled, exit without doing anything
-      jsonOutput.errors?.push('Task deletion cancelled');
+      confirmDeletion = false;
     }
   }
 

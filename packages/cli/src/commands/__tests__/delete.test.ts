@@ -29,9 +29,9 @@ vi.mock('enquirer', () => ({
 
 // Mock exit utilities to prevent process.exit
 vi.mock('../../utils/exit.js', () => ({
-  exitWithErrors: vi.fn().mockImplementation(() => {}),
-  exitWithSuccess: vi.fn().mockImplementation(() => {}),
-  exitWithWarn: vi.fn().mockImplementation(() => {}),
+  exitWithErrors: vi.fn().mockImplementation(() => { }),
+  exitWithSuccess: vi.fn().mockImplementation(() => { }),
+  exitWithWarn: vi.fn().mockImplementation(() => { }),
 }));
 
 // Mock display utilities to suppress output
@@ -262,6 +262,29 @@ describe('delete command', () => {
 
       // Task should still exist
       expect(existsSync('.rover/tasks/5')).toBe(true);
+    });
+
+    it('should treat Ctrl-C as cancellation', async () => {
+      createTestTask(26, 'Ctrl-C Task');
+
+      // Mock enquirer to throw an error simulating Ctrl-C
+      const enquirer = await import('enquirer');
+      vi.mocked(enquirer.default.prompt).mockRejectedValue(new Error('User cancelled'));
+
+      const { exitWithErrors } = await import('../../utils/exit.js');
+
+      await deleteCommand(['26']);
+
+      expect(exitWithErrors).toHaveBeenCalledWith(
+        {
+          success: false,
+          errors: ['Task deletion cancelled'],
+        },
+        false
+      );
+
+      // Task should still exist (not deleted)
+      expect(existsSync('.rover/tasks/26')).toBe(true);
     });
 
     it('should proceed when user confirms deletion', async () => {
