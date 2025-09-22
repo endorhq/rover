@@ -8,6 +8,7 @@ import {
   getLastTaskIteration,
   getTaskIterations,
   IterationConfig,
+  IterationStatus,
 } from '../lib/iteration.js';
 
 /**
@@ -190,6 +191,16 @@ export const listCommand = async (
 
       const agent = task.agent || '-';
 
+      const maybeIterationStatus: (
+        iteration?: IterationConfig
+      ) => IterationStatus | undefined = iteration => {
+        try {
+          return iteration?.status();
+        } catch (e) {
+          return undefined;
+        }
+      };
+
       let row = '';
       row += colors.cyan(task.id.toString().padEnd(columnWidths[0]));
       row += colors.white(
@@ -199,15 +210,15 @@ export const listCommand = async (
       row += colorFunc(formatTaskStatus(taskStatus).padEnd(columnWidths[3])); // +10 for ANSI codes
       row += formatProgress(
         taskStatus,
-        lastIteration?.status()?.progress || 0
+        maybeIterationStatus(lastIteration)?.progress || 0
       ).padEnd(columnWidths[4] + 10);
       row += colors.gray(
         truncateText(
-          lastIteration?.status()?.currentStep || '-',
+          maybeIterationStatus(lastIteration)?.currentStep || '-',
           columnWidths[5] - 1
         ).padEnd(columnWidths[5])
       );
-      row += colors.gray(lastIteration?.status() ? duration : '-');
+      row += colors.gray(maybeIterationStatus(lastIteration) ? duration : '-');
       console.log(row);
 
       // Show error in verbose mode
