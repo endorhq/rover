@@ -1,0 +1,30 @@
+{
+  "name": "@endorhq/agent",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Provide a library to define and manage AI agent workflows for Rover",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "files": [
+    "LICENSE.md",
+    "dist/*"
+  ],
+  "scripts": {
+    "build": "tsdown --env.TSUP_DEV=false src/index.ts",
+    "dev": "TSUP_DEV=true tsdown --env.TSUP_DEV=true --watch src/ src/index.ts",
+    "format": "prettier --write \"src/**/*.{ts,js,json}\"",
+    "start": "node dist/index.js",
+    "clean": "rm -rf dist",
+    "check": "tsc --noEmit"
+  },
+  "author": "The Endor team",
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^24.1.0",
+    "@vitest/ui": "^2.1.8",
+    "tsdown": "^0.13.0",
+    "typescript": "^5.8.3",
+    "vitest": "^2.1.8"
+  }
+}
