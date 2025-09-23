@@ -12,7 +12,7 @@ import {
   exitWithWarn,
 } from '../utils/exit.js';
 import { CLIJsonOutputWithErrors } from '../types.js';
-import { findProjectRoot, Git } from 'rover-common';
+import { findProjectRoot, git } from 'rover-common';
 
 const { prompt } = enquirer;
 
@@ -26,7 +26,6 @@ export const deleteCommand = async (
   options: { json?: boolean; yes?: boolean } = {}
 ) => {
   const telemetry = getTelemetry();
-  const git = new Git();
 
   const json = options.json === true;
   const skipConfirmation = options.yes === true || json;
@@ -155,7 +154,7 @@ export const deleteCommand = async (
     for (const task of tasksToDelete) {
       try {
         const taskPath = join(
-          findProjectRoot(),
+          await findProjectRoot(),
           '.rover',
           'tasks',
           task.id.toString()
@@ -167,14 +166,13 @@ export const deleteCommand = async (
         rmSync(taskPath, { recursive: true, force: true });
 
         // Prune the git workspace
-        const prune = git.pruneWorktree();
-
-        if (prune) {
+        try {
+          await git.pruneWorktree();
           succeededTasks.push(task.id);
-        } else {
+        } catch (error) {
           warningTasks.push(task.id);
           jsonOutput.errors?.push(
-            `There was an error pruning task ${task.id.toString()} worktree`
+            `There was an error pruning task ${task.id.toString()} worktree: ${error}`
           );
         }
       } catch (error) {
