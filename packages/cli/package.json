@@ -5,7 +5,7 @@
   "main": "index.js",
   "type": "module",
   "bin": {
-    "rover": "dist/index.js"
+    "rover": "dist/src/index.js"
   },
   "license": "Apache-2.0",
   "keywords": [
@@ -36,7 +36,7 @@
   "scripts": {
     "build": "tsdown",
     "dev": "TSUP_DEV=true tsdown --watch src/",
-    "start": "node dist/index.js",
+    "start": "node dist/src/index.js",
     "clean": "rm -rf dist",
     "check": "tsc --noEmit",
     "format": "prettier --write \"src/**/*.{ts,js,json}\"",
