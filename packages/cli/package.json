@@ -5,7 +5,7 @@
   "main": "index.js",
   "type": "module",
   "bin": {
-    "rover": "dist/index.js",
+    "rover": "dist/index.js"
   },
   "license": "Apache-2.0",
   "keywords": [
