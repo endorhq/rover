@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
-import { createProgram } from '../src/index.js';
+import { createProgram } from '../src/program.js';
 
 /**
  * Extracts command groups from the program structure
