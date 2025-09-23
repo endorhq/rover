@@ -4,7 +4,10 @@ const isProd = process.env.TSUP_DEV !== 'true';
 
 let entryPoints = { index: './src/index.ts' };
 if (!isProd) {
-  entryPoints = { ...entryPoints, 'utils/command-reference': './utils/command-reference.ts' };
+  entryPoints = {
+    ...entryPoints,
+    'utils/command-reference': './utils/command-reference.ts',
+  };
 }
 
 export default defineConfig({
