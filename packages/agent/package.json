@@ -19,7 +19,9 @@
     "check": "tsc --noEmit"
   },
   "author": "The Endor team",
-  "dependencies": {},
+  "dependencies": {
+    "yaml": "^2.8.1"
+  },
   "devDependencies": {
     "@types/node": "^24.1.0",
     "@vitest/ui": "^2.1.8",

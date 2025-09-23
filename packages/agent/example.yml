@@ -1,0 +1,85 @@
+# agent-definition.yaml
+version: "1.0"
+name: "code-reviewer"
+description: "Reviews code and provides feedback on quality and best practices"
+
+inputs:
+  - name: repository_url
+    description: "The GitHub repository to review"
+    type: string
+    required: true
+  
+  - name: file_types
+    description: "File extensions to include in review"
+    type: list
+    default: [".py", ".js", ".ts"]
+    required: false
+
+outputs:
+  - name: review_report
+    description: "Markdown file with the complete review"
+    type: file
+    path: "review-report.md"
+  - name: issues_count
+    description: "Number of issues found"
+    type: number
+
+steps:
+  - id: analyze_structure
+    type: agent
+    name: "Analyze Repository Structure"
+    tool: claude  # Optional: claude, gemini, openai, etc.
+    model: claude-3-sonnet  # Optional: specific model version
+    prompt: |
+      Analyze the repository at {{inputs.repository_url}}.
+      
+      List all files with extensions: {{inputs.file_types}}
+      
+      Provide:
+      1. Project structure overview
+      2. Main components identified
+      3. List of files to review
+    outputs:
+      - name: file_list
+        description: "List of files to review"
+      - name: project_overview
+        description: "Summary of the project structure"
+  
+  - id: review_files
+    type: agent
+    name: "Review Code Files"
+    tool: gemini  # Can use different tool for different steps
+    model: gemini-pro
+    prompt: |
+      Review the following files for code quality:
+      {{steps.analyze_structure.outputs.file_list}}
+      
+      For each file, check:
+      - Code style and formatting
+      - Potential bugs
+      - Best practices
+      
+      Context about the project:
+      {{steps.analyze_structure.outputs.project_overview}}
+    outputs:
+      - name: review_details
+        description: "Detailed review for each file"
+      - name: issues
+        description: "List of issues found"
+  
+  - id: create_report
+    type: agent
+    name: "Generate Final Report"
+    # No tool/model specified - uses defaults
+    prompt: |
+      Create a markdown report based on this review:
+      {{steps.review_files.outputs.review_details}}
+      
+      Include:
+      - Executive summary
+      - Issues found (total: {{steps.review_files.outputs.issues.length}})
+      - Recommendations
+      - Code quality metrics
+    outputs:
+      - name: report_content
+        description: "The final markdown report"
