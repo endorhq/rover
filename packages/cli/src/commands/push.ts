@@ -8,7 +8,7 @@ import { CLIJsonOutput } from '../types.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
 import { showRoverChat, TIP_TITLES } from '../utils/display.js';
 import { statusColor } from '../utils/task-status.js';
-import { Git } from 'rover-common';
+import { git } from 'rover-common';
 import { ProjectConfig } from '../lib/config.js';
 
 const { prompt } = enquirer;
@@ -58,7 +58,6 @@ interface PushResult extends CLIJsonOutput {
 export const pushCommand = async (taskId: string, options: PushOptions) => {
   const telemetry = getTelemetry();
   const json = options.json === true;
-  const git = new Git();
   const result: PushResult = {
     success: false,
     taskId: 0,
@@ -117,7 +116,7 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
     }
 
     // Check for changes
-    const fileChanges = git.uncommittedChanges({
+    const fileChanges = await git.uncommittedChanges({
       worktreePath: task.worktreePath,
     });
     const hasChanges = fileChanges.length > 0;
@@ -126,7 +125,7 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
     if (!hasChanges) {
       // Check if there are unpushed commits
       try {
-        const unpushedCommits = git.hasUnmergedCommits(task.branchName, {
+        const unpushedCommits = await git.hasUnmergedCommits(task.branchName, {
           targetBranch: `origin/${task.branchName}`,
           worktreePath: task.worktreePath,
         });
@@ -180,7 +179,7 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
         ? yoctoSpinner({ text: 'Committing changes...' }).start()
         : null;
       try {
-        git.addAndCommit(commitMessage, {
+        await git.addAndCommit(commitMessage, {
           worktreePath: task.worktreePath,
         });
         result.committed = true;
@@ -202,7 +201,7 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
         }).start()
       : null;
     try {
-      git.push(task.branchName, {
+      await git.push(task.branchName, {
         worktreePath: task.worktreePath,
       });
       result.pushed = true;
@@ -219,7 +218,7 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
         }
 
         try {
-          git.push(task.branchName, {
+          await git.push(task.branchName, {
             setUpstream: true,
             worktreePath: task.worktreePath,
           });
@@ -247,7 +246,7 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
     // Check if this is a GitHub repo
     // if (options.pr === true) {
     //     try {
-    //         const remoteUrl = git.remoteUrl();
+    //         const remoteUrl = await git.remoteUrl();
     //         const repoInfo = getGitHubRepoInfo(remoteUrl);
 
     //         if (repoInfo) {
@@ -327,7 +326,7 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
     let repoInfo;
 
     try {
-      const remoteUrl = git.remoteUrl();
+      const remoteUrl = await git.remoteUrl();
       repoInfo = getGitHubRepoInfo(remoteUrl);
     } catch (_err) {
       // Ignore the error

@@ -18,9 +18,9 @@ interface TaskLogsOutput extends CLIJsonOutput {
 /**
  * Get available iterations for a task
  */
-const getAvailableIterations = (taskId: string): number[] => {
+const getAvailableIterations = async (taskId: string): Promise<number[]> => {
   try {
-    const roverPath = join(findProjectRoot(), '.rover');
+    const roverPath = join(await findProjectRoot(), '.rover');
     const taskPath = join(roverPath, 'tasks', taskId);
     const iterationsPath = join(taskPath, 'iterations');
 
@@ -78,7 +78,7 @@ export const logsCommand = async (
     }
 
     // Get available iterations for context
-    const availableIterations = getAvailableIterations(
+    const availableIterations = await getAvailableIterations(
       numericTaskId.toString()
     );
 

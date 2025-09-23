@@ -265,7 +265,7 @@ export const iterateCommand = async (
     // Create AI agent instance
     const aiAgent = getAIAgentTool(selectedAiAgent);
     const taskPath = join(
-      findProjectRoot(),
+      await findProjectRoot(),
       '.rover',
       'tasks',
       numericTaskId.toString()

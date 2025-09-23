@@ -27,9 +27,9 @@ export class RoverCLI {
     }
   }
 
-  private getLaunchOptions(): Options {
+  private async getLaunchOptions(): Promise<Options> {
     return {
-      cwd: this.workspaceRoot?.fsPath || findProjectRoot(),
+      cwd: this.workspaceRoot?.fsPath || (await findProjectRoot()),
       env: {
         ...process.env,
         // For now, disable the CLI telemetry as we will add it to the extension
@@ -46,7 +46,7 @@ export class RoverCLI {
     defaultBranch: string;
   }> {
     try {
-      const options = this.getLaunchOptions();
+      const options = await await this.getLaunchOptions();
 
       // Get default branch (usually main or master)
       let defaultBranch = 'main';
@@ -119,7 +119,7 @@ export class RoverCLI {
     try {
       // Read the settings file directly from .rover/settings.json
       const settingsPath = vscode.Uri.joinPath(
-        this.workspaceRoot || vscode.Uri.file(findProjectRoot()),
+        this.workspaceRoot || vscode.Uri.file(await findProjectRoot()),
         '.rover',
         'settings.json'
       );
@@ -158,7 +158,7 @@ export class RoverCLI {
       const { stdout, stderr, exitCode } = await launch(
         this.roverPath,
         ['list', '--json'],
-        this.getLaunchOptions()
+        await this.getLaunchOptions()
       );
       if (exitCode != 0 || !stdout) {
         throw new Error(
@@ -199,7 +199,7 @@ export class RoverCLI {
     const { stdout, stderr, exitCode } = await launch(
       this.roverPath,
       args,
-      this.getLaunchOptions()
+      await this.getLaunchOptions()
     );
     if (exitCode != 0 || !stdout) {
       throw new Error(
@@ -216,7 +216,7 @@ export class RoverCLI {
     const { stdout, stderr, exitCode } = await launch(
       this.roverPath,
       ['push', taskId.toString(), '--message', commit, '--json'],
-      this.getLaunchOptions()
+      await this.getLaunchOptions()
     );
     if (exitCode != 0 || !stdout) {
       throw new Error(
@@ -233,7 +233,7 @@ export class RoverCLI {
     const { stdout, stderr, exitCode } = await launch(
       this.roverPath,
       ['iterate', taskId.toString(), instructions, '--json'],
-      this.getLaunchOptions()
+      await this.getLaunchOptions()
     );
     if (exitCode != 0 || !stdout) {
       throw new Error(
@@ -250,7 +250,7 @@ export class RoverCLI {
     const { stdout, stderr, exitCode } = await launch(
       this.roverPath,
       ['inspect', taskId.toString(), '--json'],
-      this.getLaunchOptions()
+      await this.getLaunchOptions()
     );
 
     if (exitCode != 0 || !stdout) {
@@ -276,7 +276,7 @@ export class RoverCLI {
     const { stdout, stderr, exitCode } = await launch(
       this.roverPath,
       ['delete', taskId.toString(), '--yes'],
-      this.getLaunchOptions()
+      await this.getLaunchOptions()
     );
 
     if (exitCode != 0 || !stdout) {
@@ -317,7 +317,7 @@ export class RoverCLI {
       const { stdout, stderr, exitCode } = await launch(
         this.roverPath,
         ['logs', `${taskId}${follow ? ' --follow' : ''}`],
-        this.getLaunchOptions()
+        await this.getLaunchOptions()
       );
 
       if (stdout) {
@@ -345,7 +345,7 @@ export class RoverCLI {
     const { stdout, stderr, exitCode } = await launch(
       this.roverPath,
       ['diff', taskId.toString(), '--only-files'],
-      this.getLaunchOptions()
+      await this.getLaunchOptions()
     );
     if (exitCode != 0 || !stdout) {
       throw new Error(
@@ -366,7 +366,7 @@ export class RoverCLI {
     const { stdout, stderr, exitCode } = await launch(
       this.roverPath,
       ['merge', taskId.toString(), '--force', '--json'],
-      this.getLaunchOptions()
+      await this.getLaunchOptions()
     );
     if (exitCode != 0 || !stdout) {
       throw new Error(
@@ -408,7 +408,7 @@ export class RoverCLI {
       const { stdout, exitCode } = await launch(
         this.roverPath,
         ['--version'],
-        this.getLaunchOptions()
+        await this.getLaunchOptions()
       );
       if (exitCode !== 0 || !stdout) {
         throw new Error('could not retrieve rover version');
@@ -472,7 +472,7 @@ export class RoverCLI {
       const { stdout, stderr } = await launch(
         this.roverPath,
         ['init', '--yes'],
-        this.getLaunchOptions()
+        await this.getLaunchOptions()
       );
       return { success: true };
     } catch (error) {

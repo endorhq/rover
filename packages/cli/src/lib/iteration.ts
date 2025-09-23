@@ -293,9 +293,9 @@ export class IterationConfig {
 /**
  * Load all the iterations for a given task
  */
-export const getTaskIterations = (task: TaskDescription): IterationConfig[] => {
+export const getTaskIterations = async (task: TaskDescription): Promise<IterationConfig[]> => {
   const iterations: IterationConfig[] = [];
-  const iterationsPath = task.iterationsPath();
+  const iterationsPath = await task.iterationsPath();
 
   if (existsSync(iterationsPath)) {
     try {
@@ -340,11 +340,11 @@ export const getTaskIterations = (task: TaskDescription): IterationConfig[] => {
 /**
  * Retrieve the lastest iteration for a given task
  */
-export const getLastTaskIteration = (
+export const getLastTaskIteration = async (
   task: TaskDescription
-): IterationConfig | undefined => {
+): Promise<IterationConfig | undefined> => {
   let taskIteration: IterationConfig | undefined;
-  const iterationsPath = task.iterationsPath();
+  const iterationsPath = await task.iterationsPath();
 
   if (existsSync(iterationsPath)) {
     try {

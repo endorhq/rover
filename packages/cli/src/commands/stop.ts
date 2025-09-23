@@ -161,7 +161,7 @@ export const stopCommand = async (
 
     // Delete the iterations
     const taskPath = join(
-      findProjectRoot(),
+      await findProjectRoot(),
       '.rover',
       'tasks',
       numericTaskId.toString()

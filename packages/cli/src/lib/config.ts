@@ -65,8 +65,8 @@ export class ProjectConfig {
   /**
    * Load an existing configuration from disk
    */
-  static load(): ProjectConfig {
-    const projectRoot = findProjectRoot();
+  static async load(): Promise<ProjectConfig> {
+    const projectRoot = await findProjectRoot();
     const filePath = join(projectRoot, PROJECT_CONFIG_FILE);
 
     try {
@@ -113,8 +113,8 @@ export class ProjectConfig {
   /**
    * Check if a project configuration exists
    */
-  static exists(): boolean {
-    const projectRoot = findProjectRoot();
+  static async exists(): Promise<boolean> {
+    const projectRoot = await findProjectRoot();
     const filePath = join(projectRoot, PROJECT_CONFIG_FILE);
     return existsSync(filePath);
   }
@@ -143,8 +143,8 @@ export class ProjectConfig {
   /**
    * Save current configuration to disk
    */
-  save(): void {
-    const projectRoot = findProjectRoot();
+  async save(): Promise<void> {
+    const projectRoot = await findProjectRoot();
     const filePath = join(projectRoot, PROJECT_CONFIG_FILE);
     try {
       const json = JSON.stringify(this.data, null, 2);
@@ -157,8 +157,8 @@ export class ProjectConfig {
   /**
    * Reload configuration from disk
    */
-  reload(): void {
-    const reloaded = ProjectConfig.load();
+  async reload(): Promise<void> {
+    const reloaded = await ProjectConfig.load();
     this.data = reloaded.data;
   }
 
@@ -270,8 +270,8 @@ export class UserSettings {
   /**
    * Load user settings from disk
    */
-  static load(): UserSettings {
-    const filePath = UserSettings.getSettingsPath();
+  static async load(): Promise<UserSettings> {
+    const filePath = await UserSettings.getSettingsPath();
 
     if (!existsSync(filePath)) {
       // Return default settings if file doesn't exist
@@ -320,16 +320,16 @@ export class UserSettings {
   /**
    * Check if user settings exist
    */
-  static exists(): boolean {
-    const filePath = UserSettings.getSettingsPath();
+  static async exists(): Promise<boolean> {
+    const filePath = await UserSettings.getSettingsPath();
     return existsSync(filePath);
   }
 
   /**
    * Get the path to the settings file
    */
-  private static getSettingsPath(): string {
-    const projectRoot = findProjectRoot();
+  private static async getSettingsPath(): Promise<string> {
+    const projectRoot = await findProjectRoot();
     return join(projectRoot, '.rover', 'settings.json');
   }
 
@@ -357,9 +357,9 @@ export class UserSettings {
   /**
    * Save current settings to disk
    */
-  save(): void {
-    const filePath = UserSettings.getSettingsPath();
-    const projectRoot = findProjectRoot();
+  async save(): Promise<void> {
+    const filePath = await UserSettings.getSettingsPath();
+    const projectRoot = await findProjectRoot();
     const dirPath = join(projectRoot, '.rover');
 
     try {
@@ -378,8 +378,8 @@ export class UserSettings {
   /**
    * Reload settings from disk
    */
-  reload(): void {
-    const reloaded = UserSettings.load();
+  async reload(): Promise<void> {
+    const reloaded = await UserSettings.load();
     this.data = reloaded.data;
   }
 

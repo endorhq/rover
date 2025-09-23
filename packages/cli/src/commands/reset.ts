@@ -25,7 +25,7 @@ export const resetCommand = async (
     // Load task using TaskDescription
     const task = TaskDescription.load(numericTaskId);
     const taskPath = join(
-      findProjectRoot(),
+      await findProjectRoot(),
       '.rover',
       'tasks',
       numericTaskId.toString()

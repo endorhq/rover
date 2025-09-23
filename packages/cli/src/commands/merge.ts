@@ -7,7 +7,7 @@ import { getAIAgentTool, type AIAgentTool } from '../lib/agents/index.js';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
 import { UserSettings, AI_AGENT, ProjectConfig } from '../lib/config.js';
 import { getTelemetry } from '../lib/telemetry.js';
-import { Git } from 'rover-common';
+import { git } from 'rover-common';
 import { showRoverChat, showTips } from '../utils/display.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
 import { CLIJsonOutput } from '../types.js';
@@ -18,12 +18,12 @@ const { prompt } = enquirer;
 /**
  * Get summaries from all iterations of a task
  */
-const getTaskIterationSummaries = (
+const getTaskIterationSummaries = async (
   taskId: string,
   options: { json?: boolean } = {}
-): string[] => {
+): Promise<string[]> => {
   try {
-    const roverPath = join(findProjectRoot(), '.rover');
+    const roverPath = join(await findProjectRoot(), '.rover');
     const taskPath = join(roverPath, 'tasks', taskId);
     const iterationsPath = join(taskPath, 'iterations');
 
@@ -114,7 +114,6 @@ const generateCommitMessage = async (
  * AI-powered merge conflict resolver
  */
 const resolveMergeConflicts = async (
-  git: Git,
   conflictedFiles: string[],
   aiAgent: AIAgentTool,
   json: boolean
@@ -141,11 +140,11 @@ const resolveMergeConflicts = async (
       const conflictedContent = readFileSync(filePath, 'utf8');
 
       // Get git diff context for better understanding
-      const diffContext = git
-        .getRecentCommits({
-          branch: git.getCurrentBranch(),
+      const diffContext = (
+        await git.getRecentCommits({
+          branch: await git.getCurrentBranch(),
         })
-        .join('\n');
+      ).join('\n');
 
       try {
         const resolvedContent = await aiAgent.resolveMergeConflicts(
@@ -163,7 +162,9 @@ const resolveMergeConflicts = async (
         writeFileSync(filePath, resolvedContent);
 
         // Stage the resolved file
-        if (!git.add(filePath)) {
+        try {
+          await git.add(filePath);
+        } catch (error) {
           spinner?.error(`Error adding ${filePath} to the git commit`);
           return false;
         }
@@ -208,7 +209,6 @@ export const mergeCommand = async (
   options: MergeOptions = {}
 ) => {
   const telemetry = getTelemetry();
-  const git = new Git();
   const jsonOutput: TaskMergeOutput = {
     success: false,
   };
@@ -221,7 +221,7 @@ export const mergeCommand = async (
     return;
   }
 
-  if (!git.isGitRepo()) {
+  if (!(await git.isGitRepo())) {
     jsonOutput.error = 'No worktree found for this task';
     exitWithError(jsonOutput, options.json);
     return;
@@ -329,11 +329,11 @@ export const mergeCommand = async (
     }
 
     // Get current branch name
-    jsonOutput.currentBranch = git.getCurrentBranch();
+    jsonOutput.currentBranch = await git.getCurrentBranch();
 
     // Check for uncommitted changes in main repo
-    if (git.hasUncommittedChanges()) {
-      jsonOutput.error = `Current branch (${git.getCurrentBranch()}) has uncommitted changes`;
+    if (await git.hasUncommittedChanges()) {
+      jsonOutput.error = `Current branch (${await git.getCurrentBranch()}) has uncommitted changes`;
       exitWithError(jsonOutput, options.json, {
         tips: ['Please commit or stash your changes before merging'],
       });
@@ -341,11 +341,11 @@ export const mergeCommand = async (
     }
 
     // Check if worktree has changes to commit or if there are unmerged commits
-    const hasWorktreeChanges = git.hasUncommittedChanges({
+    const hasWorktreeChanges = await git.hasUncommittedChanges({
       worktreePath: task.worktreePath,
     });
     const taskBranch = task.branchName;
-    const hasUnmerged = git.hasUnmergedCommits(taskBranch);
+    const hasUnmerged = await git.hasUnmergedCommits(taskBranch);
 
     jsonOutput.hasWorktreeChanges = hasWorktreeChanges;
     jsonOutput.hasUnmergedCommits = hasUnmerged;
@@ -409,14 +409,14 @@ export const mergeCommand = async (
     try {
       // Get recent commit messages for AI context
       if (spinner) spinner.text = 'Gathering commit context...';
-      const recentCommits = git.getRecentCommits();
+      const recentCommits = await git.getRecentCommits();
 
       let finalCommitMessage = '';
 
       // Only commit if there are worktree changes
       if (hasWorktreeChanges) {
         // Get iteration summaries
-        const summaries = getTaskIterationSummaries(
+        const summaries = await getTaskIterationSummaries(
           numericTaskId.toString(),
           options
         );
@@ -448,7 +448,7 @@ export const mergeCommand = async (
 
         // Switch to worktree and commit changes
         try {
-          git.addAndCommit(finalCommitMessage, {
+          await git.addAndCommit(finalCommitMessage, {
             worktreePath: task.worktreePath,
           });
           jsonOutput.committed = true;
@@ -470,18 +470,22 @@ export const mergeCommand = async (
 
       telemetry?.eventMergeTask();
 
-      const merge = git.mergeBranch(taskBranch, `merge: ${task.title}`);
+      try {
+        await git.mergeBranch(taskBranch, `merge: ${task.title}`);
+        const merge = true;
 
-      if (merge) {
-        // Update status
-        mergeSuccessful = true;
-        jsonOutput.merged = true;
-        task.markMerged(); // Set status to MERGED
+        if (merge) {
+          // Update status
+          mergeSuccessful = true;
+          jsonOutput.merged = true;
+          task.markMerged(); // Set status to MERGED
 
-        spinner?.success('Task merged successfully');
-      } else {
+          spinner?.success('Task merged successfully');
+        }
+      } catch (mergeError) {
         // Failed merge! Check if this is a merge conflict
-        const mergeConflicts = git.getMergeConflicts();
+        const merge = false;
+        const mergeConflicts = await git.getMergeConflicts();
 
         if (mergeConflicts.length > 0) {
           if (spinner) spinner.error('Merge conflicts detected');
@@ -508,7 +512,6 @@ export const mergeCommand = async (
           }
 
           const resolutionSuccessful = await resolveMergeConflicts(
-            git,
             mergeConflicts,
             aiAgent,
             options.json === true
@@ -540,7 +543,7 @@ export const mergeCommand = async (
               }
 
               if (!applyChanges) {
-                git.abortMerge();
+                await git.abortMerge();
                 exitWithWarn(
                   'User rejected AI resolution. Merge aborted',
                   jsonOutput,
@@ -552,7 +555,7 @@ export const mergeCommand = async (
 
             // Complete the merge with the resolved conflicts
             try {
-              git.continueMerge();
+              await git.continueMerge();
 
               mergeSuccessful = true;
               jsonOutput.merged = true;

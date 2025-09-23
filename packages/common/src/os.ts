@@ -10,7 +10,7 @@ import type {
 export type { Options, Result, SyncOptions, SyncResult };
 
 import colors from 'ansi-colors';
-import { Git } from './git.js';
+import { git } from './index.js';
 
 import { PROJECT_CONFIG_FILE, VERBOSE } from './index.js';
 
@@ -26,9 +26,13 @@ export type LaunchSyncOptions = SyncOptions & {
  * Find the project root directory by searching for rover.json in parent directories
  * up to the Git repository root
  */
-export function findProjectRoot(): string {
-  const git = new Git();
-  return git.getRepositoryRoot() || process.cwd();
+export async function findProjectRoot(): Promise<string> {
+  try {
+    return await git.getRepositoryRoot();
+  } catch (error) {
+    // If not in a git repository, return current working directory
+    return process.cwd();
+  }
 }
 
 const log = (stream: string) => {

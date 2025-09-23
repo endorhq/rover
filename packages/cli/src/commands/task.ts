@@ -19,7 +19,7 @@ import { checkGitHubCLI } from '../utils/system.js';
 import { showRoverBanner, showRoverChat, showTips } from '../utils/display.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { NewTaskProvider } from 'rover-telemetry';
-import { Git } from 'rover-common';
+import { git } from 'rover-common';
 import { readFromStdin, stdinIsAvailable } from '../utils/stdin.js';
 import { CLIJsonOutput } from '../types.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
@@ -188,7 +188,7 @@ export const startDockerExecution = async (
 
   // Generate prompts using PromptBuilder
   const promptsDir = join(
-    findProjectRoot(),
+    await findProjectRoot(),
     '.rover',
     'tasks',
     taskId.toString(),
@@ -387,7 +387,7 @@ export const taskCommand = async (
   };
 
   // Check if rover is initialized
-  const roverPath = join(findProjectRoot(), '.rover');
+  const roverPath = join(await findProjectRoot(), '.rover');
   if (!existsSync(roverPath)) {
     jsonOutput.error = 'Rover is not initialized in this directory';
     exitWithError(jsonOutput, json, {
@@ -449,13 +449,14 @@ export const taskCommand = async (
   let skipExpansion = false;
   let taskData: IPromptTask | null = null;
 
-  const git = new Git();
-
   // Handle --from-github option
   if (fromGithub) {
     const github = new GitHub(false);
     try {
-      const issueData = await github.fetchIssue(fromGithub, git.remoteUrl());
+      const issueData = await github.fetchIssue(
+        fromGithub,
+        await git.remoteUrl()
+      );
       if (issueData) {
         description = `${issueData.title}\n\n${issueData.body}`;
         skipExpansion = true;
@@ -514,10 +515,10 @@ export const taskCommand = async (
     }
   } else {
     // No branch specified, use current branch
-    baseBranch = git.getCurrentBranch();
+    baseBranch = await git.getCurrentBranch();
 
     // Check for uncommitted changes and warn
-    if (git.hasUncommittedChanges()) {
+    if (await git.hasUncommittedChanges()) {
       if (!json) {
         console.log(
           colors.yellow(
@@ -618,7 +619,7 @@ export const taskCommand = async (
       const aiAgent = getAIAgentTool(selectedAiAgent);
       const expanded = await aiAgent.expandTask(
         taskData ? `${taskData.title}: ${taskData.description}` : description,
-        findProjectRoot()
+        await findProjectRoot()
       );
 
       if (expanded) {
@@ -727,7 +728,7 @@ export const taskCommand = async (
     const taskId = getNextTaskId();
 
     // Create .rover/tasks directory structure
-    const endorPath = join(findProjectRoot(), '.rover');
+    const endorPath = join(await findProjectRoot(), '.rover');
     const tasksPath = join(endorPath, 'tasks');
     const taskPath = join(tasksPath, taskId.toString());
 
@@ -757,7 +758,7 @@ export const taskCommand = async (
       git.createWorktree(worktreePath, branchName, baseBranch);
 
       // Copy user .env development files
-      copyEnvironmentFiles(findProjectRoot(), worktreePath);
+      copyEnvironmentFiles(await findProjectRoot(), worktreePath);
     } catch (error) {
       jsonOutput.error = 'Error creating git workspace: ' + error;
       exitWithError(jsonOutput, json);
