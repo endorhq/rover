@@ -6,7 +6,6 @@
   "type": "module",
   "bin": {
     "rover": "dist/index.js",
-    "command-reference": "dist/command-reference.js"
   },
   "license": "Apache-2.0",
   "keywords": [
