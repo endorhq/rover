@@ -36,7 +36,7 @@
   "scripts": {
     "build": "tsdown",
     "dev": "TSUP_DEV=true tsdown --watch src/",
-    "start": "node dist/src/index.js",
+    "start": "node dist/index.js",
     "clean": "rm -rf dist",
     "check": "tsc --noEmit",
     "format": "prettier --write \"src/**/*.{ts,js,json}\"",
