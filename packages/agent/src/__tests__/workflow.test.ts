@@ -10,7 +10,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { AgentWorkflow } from '../workflow.js';
-import type { AgentWorkflowSchema, AgentStep, WorkflowInput, WorkflowOutput } from '../schema.js';
+import type {
+  AgentWorkflowSchema,
+  AgentStep,
+  WorkflowInput,
+  WorkflowOutput,
+} from '../schema.js';
 
 describe('AgentWorkflow', () => {
   let testDir: string;
@@ -76,6 +81,7 @@ describe('AgentWorkflow', () => {
             {
               name: 'result',
               description: 'Processed output',
+              type: 'string',
             },
           ],
         },
@@ -132,6 +138,7 @@ steps:
     outputs:
       - name: result
         description: Processed output
+        type: string
 `;
 
       writeFileSync(workflowPath, yamlContent, 'utf8');
@@ -276,7 +283,9 @@ steps: []
       expect(workflow.config?.timeout).toBe(3600);
 
       // Verify migration was saved
-      const saved = parseYaml(readFileSync(workflowPath, 'utf8')) as AgentWorkflowSchema;
+      const saved = parseYaml(
+        readFileSync(workflowPath, 'utf8')
+      ) as AgentWorkflowSchema;
       expect(saved.version).toBe('1.0');
     });
 
@@ -347,7 +356,9 @@ steps: []
 
       // File should not be modified since no migration was needed
       // (Note: whitespace might differ due to YAML parsing/stringifying)
-      const savedData = parseYaml(readFileSync(workflowPath, 'utf8')) as AgentWorkflowSchema;
+      const savedData = parseYaml(
+        readFileSync(workflowPath, 'utf8')
+      ) as AgentWorkflowSchema;
       const originalData = parseYaml(originalContent) as AgentWorkflowSchema;
       expect(savedData).toEqual(originalData);
     });
@@ -400,6 +411,7 @@ description: test
 inputs: []
 outputs:
   - description: Missing name field
+    type: string
 defaults:
   tool: claude
 steps: []
@@ -410,6 +422,27 @@ steps: []
       expect(() => {
         AgentWorkflow.load(workflowPath);
       }).toThrow('output[0].name is required');
+    });
+
+    it('should validate output type field', () => {
+      const missingTypeYaml = `
+version: '1.0'
+name: test
+description: test
+inputs: []
+outputs:
+  - name: output1
+    description: Missing type field
+defaults:
+  tool: claude
+steps: []
+`;
+
+      writeFileSync(workflowPath, missingTypeYaml, 'utf8');
+
+      expect(() => {
+        AgentWorkflow.load(workflowPath);
+      }).toThrow('output[0].type is required');
     });
 
     it('should validate step fields', () => {
@@ -480,7 +513,9 @@ steps: []
 
       expect(() => {
         AgentWorkflow.load(workflowPath);
-      }).toThrow('Failed to load workflow config: Workflow validation error: inputs must be an array');
+      }).toThrow(
+        'Failed to load workflow config: Workflow validation error: inputs must be an array'
+      );
     });
   });
 
@@ -626,49 +661,6 @@ steps: []
     });
   });
 
-  describe('isStepOptional()', () => {
-    let workflow: AgentWorkflow;
-
-    beforeEach(() => {
-      const steps: AgentStep[] = [
-        {
-          id: 'required-step',
-          type: 'agent',
-          name: 'Required Step',
-          prompt: 'Test',
-          outputs: [],
-        },
-        {
-          id: 'optional-step',
-          type: 'agent',
-          name: 'Optional Step',
-          prompt: 'Test',
-          outputs: [],
-          config: {
-            optional: true,
-          },
-        },
-      ];
-
-      workflow = AgentWorkflow.create(
-        workflowPath,
-        'test-workflow',
-        'Test workflow',
-        [],
-        [],
-        steps
-      );
-    });
-
-    it('should return false for required steps', () => {
-      expect(workflow.isStepOptional('required-step')).toBe(false);
-    });
-
-    it('should return true for optional steps', () => {
-      expect(workflow.isStepOptional('optional-step')).toBe(true);
-    });
-  });
-
   describe('getStepTimeout()', () => {
     let workflow: AgentWorkflow;
 
@@ -780,15 +772,18 @@ steps: []
           id: 'step1',
           type: 'agent',
           name: 'Step 1',
-          prompt: 'A very long prompt that should be wrapped properly to respect line width limits in the YAML output',
+          prompt:
+            'A very long prompt that should be wrapped properly to respect line width limits in the YAML output',
           outputs: [
             {
               name: 'output1',
               description: 'First output',
+              type: 'string',
             },
             {
               name: 'output2',
               description: 'Second output',
+              type: 'string',
             },
           ],
         },
@@ -829,6 +824,7 @@ steps: []
         {
           name: 'output1',
           description: 'Test output',
+          type: 'string',
         },
       ];
 
@@ -896,6 +892,7 @@ steps: []
             {
               name: `output-${i}`,
               description: `Output for step ${i}`,
+              type: 'string',
             },
           ],
         });

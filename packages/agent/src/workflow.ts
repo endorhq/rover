@@ -4,7 +4,12 @@
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
-import { AgentWorkflowSchema, WorkflowInput, WorkflowOutput, AgentStep } from './schema.js';
+import {
+  AgentWorkflowSchema,
+  WorkflowInput,
+  WorkflowOutput,
+  AgentStep,
+} from './schema.js';
 
 const CURRENT_WORKFLOW_SCHEMA_VERSION = '1.0';
 
@@ -16,10 +21,7 @@ export class AgentWorkflow {
   private data: AgentWorkflowSchema;
   filePath: string;
 
-  constructor(
-    data: AgentWorkflowSchema,
-    filePath: string
-  ) {
+  constructor(data: AgentWorkflowSchema, filePath: string) {
     this.data = data;
     this.filePath = filePath;
     this.validate();
@@ -44,13 +46,13 @@ export class AgentWorkflow {
       outputs,
       defaults: {
         tool: 'claude',
-        model: 'claude-3-sonnet'
+        model: 'claude-3-sonnet',
       },
       config: {
         timeout: 3600, // 1 hour default
-        continueOnError: false
+        continueOnError: false,
       },
-      steps
+      steps,
     };
 
     const instance = new AgentWorkflow(schema, filePath);
@@ -109,14 +111,14 @@ export class AgentWorkflow {
     if (!migrated.defaults) {
       migrated.defaults = {
         tool: 'claude',
-        model: 'claude-3-sonnet'
+        model: 'claude-3-sonnet',
       };
     }
 
     if (!migrated.config) {
       migrated.config = {
         timeout: 3600,
-        continueOnError: false
+        continueOnError: false,
       };
     }
 
@@ -132,7 +134,7 @@ export class AgentWorkflow {
       const yamlContent = stringifyYaml(this.data, {
         indent: 2,
         lineWidth: 80,
-        minContentWidth: 20
+        minContentWidth: 20,
       });
       writeFileSync(this.filePath, yamlContent, 'utf8');
     } catch (error) {
@@ -190,6 +192,9 @@ export class AgentWorkflow {
         if (!output.name) {
           errors.push(`output[${index}].name is required`);
         }
+        if (!output.type) {
+          errors.push(`output[${index}].type is required`);
+        }
       });
     }
 
@@ -207,21 +212,35 @@ export class AgentWorkflow {
         }
         if (!Array.isArray(step.outputs)) {
           errors.push(`step[${index}].outputs must be an array`);
+        } else {
+          // Validate each step output
+          step.outputs.forEach((output, outputIndex) => {
+            if (!output.name) {
+              errors.push(
+                `step[${index}].outputs[${outputIndex}].name is required`
+              );
+            }
+            if (!output.type) {
+              errors.push(
+                `step[${index}].outputs[${outputIndex}].type is required`
+              );
+            }
+          });
         }
       });
 
       // Check for duplicate step IDs
       const stepIds = this.data.steps.map(step => step.id);
-      const duplicateIds = stepIds.filter((id, index) => stepIds.indexOf(id) !== index);
+      const duplicateIds = stepIds.filter(
+        (id, index) => stepIds.indexOf(id) !== index
+      );
       if (duplicateIds.length > 0) {
         errors.push(`duplicate step IDs found: ${duplicateIds.join(', ')}`);
       }
     }
 
     if (errors.length > 0) {
-      throw new Error(
-        `Workflow validation error: ${errors.join(', ')}`
-      );
+      throw new Error(`Workflow validation error: ${errors.join(', ')}`);
     }
   }
 
@@ -256,14 +275,6 @@ export class AgentWorkflow {
       throw new Error(`Step not found: ${stepId}`);
     }
     return step;
-  }
-
-  /**
-   * Check if a step is optional (can be skipped on failure)
-   */
-  isStepOptional(stepId: string): boolean {
-    const step = this.getStep(stepId);
-    return step.config?.optional || false;
   }
 
   /**
@@ -322,7 +333,7 @@ export class AgentWorkflow {
     return stringifyYaml(this.data, {
       indent: 2,
       lineWidth: 80,
-      minContentWidth: 20
+      minContentWidth: 20,
     });
   }
 }
