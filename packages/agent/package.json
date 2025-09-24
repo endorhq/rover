@@ -16,7 +16,11 @@
     "format": "prettier --write \"src/**/*.{ts,js,json}\"",
     "start": "node dist/index.js",
     "clean": "rm -rf dist",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest watch",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage"
   },
   "author": "The Endor team",
   "dependencies": {
