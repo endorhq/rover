@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import { exitWithError } from '../utils/exit.js';
 import { createMCPServer } from '../lib/mcp/server.js';
 
-export async function mcpCommand(options: { json?: boolean }) {
+export const mcpCommand = async () => {
   try {
     console.error('Starting Rover MCP server...');
     const { server, transport } = createMCPServer();
@@ -22,7 +22,7 @@ export async function mcpCommand(options: { json?: boolean }) {
         error: `Failed to start MCP server: ${error instanceof Error ? error.message : String(error)}`,
         success: false,
       },
-      options.json === true,
+      false,
       {
         tips: [
           'Ensure the MCP client is properly configured',

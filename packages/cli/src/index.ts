@@ -306,7 +306,6 @@ program.commandsGroup(colors.cyan('MCP Integration:'));
 program
   .command('mcp')
   .description('Start Rover as an MCP server for AI agent integration')
-  .option('--json', 'Output in JSON format')
   .action(mcpCommand);
 
 program.parse(process.argv);
