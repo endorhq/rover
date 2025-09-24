@@ -19,7 +19,7 @@ import colors from 'ansi-colors';
 import { pushCommand } from './commands/push.js';
 import { stopCommand } from './commands/stop.js';
 import { showTips, TIP_TITLES } from './utils/display.js';
-import { Git, setVerbose } from 'rover-common';
+import { git, setVerbose } from 'rover-common';
 
 const program = new Command();
 
@@ -54,10 +54,9 @@ program
       process.exit(1);
     }
   })
-  .hook('preAction', (thisCommand, actionCommand) => {
-    const git = new Git();
+  .hook('preAction', async (thisCommand, actionCommand) => {
     try {
-      git.version();
+      await git.version();
     } catch (error) {
       exitWithError(
         {
@@ -70,7 +69,7 @@ program
         }
       );
     }
-    if (!git.isGitRepo()) {
+    if (!(await git.isGitRepo())) {
       exitWithError(
         {
           error: 'Not in a git repository',
@@ -85,7 +84,7 @@ program
         }
       );
     }
-    if (!git.hasCommits()) {
+    if (!(await git.hasCommits())) {
       exitWithError(
         {
           error: 'No commits found in git repository',

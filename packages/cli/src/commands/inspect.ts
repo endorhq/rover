@@ -68,12 +68,12 @@ const jsonErrorOutput = (
 /**
  * Discover files in iteration directory with tree structure
  */
-const discoverIterationFiles = (
+const discoverIterationFiles = async (
   taskId: number,
   iterationId: number
-): string[] => {
+): Promise<string[]> => {
   const iterationDir = join(
-    findProjectRoot(),
+    await findProjectRoot(),
     '.rover',
     'tasks',
     taskId.toString(),
@@ -111,7 +111,7 @@ const discoverIterationFiles = (
   return files;
 };
 
-export const iterationFiles = (
+export const iterationFiles = async (
   taskId: number,
   iterationNumber: number,
   files?: string[]
@@ -122,12 +122,12 @@ export const iterationFiles = (
 
   let result = new Map<string, string>();
 
-  const discoveredFiles = discoverIterationFiles(taskId, iterationNumber);
+  const discoveredFiles = await discoverIterationFiles(taskId, iterationNumber);
   for (const file of discoveredFiles) {
     if (files.includes(file)) {
       const fileContents = readFileSync(
         join(
-          findProjectRoot(),
+          await findProjectRoot(),
           '.rover',
           'tasks',
           taskId.toString(),
@@ -184,6 +184,10 @@ export const inspectCommand = async (
 
     if (options.json) {
       // Output JSON format
+      const files = await discoverIterationFiles(
+        numericTaskId,
+        iterationNumber
+      );
       const jsonOutput: TaskInspectionOutput = {
         id: task.id,
         uuid: task.uuid,
@@ -202,7 +206,7 @@ export const inspectCommand = async (
         error: task.error,
         taskDirectory: `.rover/tasks/${numericTaskId}/`,
         statusUpdated: false, // TODO: Implement status checking in TaskDescription
-        files: discoverIterationFiles(numericTaskId, iterationNumber),
+        files: files,
       };
 
       console.log(JSON.stringify(jsonOutput, null, 2));
@@ -270,7 +274,7 @@ export const inspectCommand = async (
         console.log(colors.white(task.error));
       }
 
-      const discoveredFiles = discoverIterationFiles(
+      const discoveredFiles = await discoverIterationFiles(
         numericTaskId,
         iterationNumber
       );
@@ -288,7 +292,7 @@ export const inspectCommand = async (
 
         const fileFilter = options.file || ['summary.md'];
 
-        const iterationFileContents = iterationFiles(
+        const iterationFileContents = await iterationFiles(
           numericTaskId,
           iterationNumber,
           fileFilter

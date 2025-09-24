@@ -5,8 +5,8 @@ import { findProjectRoot } from 'rover-common';
 /**
  * Get the next auto-increment task ID
  */
-export const getNextTaskId = (): number => {
-  const endorPath = join(findProjectRoot(), '.rover');
+export const getNextTaskId = async (): Promise<number> => {
+  const endorPath = join(await findProjectRoot(), '.rover');
   const counterPath = join(endorPath, 'task-counter.json');
 
   let counter = { nextId: 1 };
@@ -39,8 +39,8 @@ export const getNextTaskId = (): number => {
 /**
  * Get all existing task IDs as numbers
  */
-export const getExistingTaskIds = (): number[] => {
-  const endorPath = join(findProjectRoot(), '.rover');
+export const getExistingTaskIds = async (): Promise<number[]> => {
+  const endorPath = join(await findProjectRoot(), '.rover');
   const tasksPath = join(endorPath, 'tasks');
 
   if (!existsSync(tasksPath)) {

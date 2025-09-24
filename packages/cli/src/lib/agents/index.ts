@@ -86,10 +86,10 @@ export const getAIAgentTool = (agent: string): AIAgentTool => {
  * Load the user configuration and return the given AI agent
  * or Claude by default.
  */
-export const getUserAIAgent = (): AI_AGENT => {
+export const getUserAIAgent = async (): Promise<AI_AGENT> => {
   try {
-    if (UserSettings.exists()) {
-      const userSettings = UserSettings.load();
+    if (await UserSettings.exists()) {
+      const userSettings = await UserSettings.load();
       return userSettings.defaultAiAgent || AI_AGENT.Claude;
     } else {
       return AI_AGENT.Claude;
