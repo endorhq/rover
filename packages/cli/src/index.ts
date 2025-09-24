@@ -3,7 +3,6 @@ import { Command } from 'commander';
 import { ProjectConfig, UserSettings } from './lib/config.js';
 import { initCommand } from './commands/init.js';
 import { listCommand } from './commands/list.js';
-import { getVersion } from './utils/version.js';
 import { exitWithError } from './utils/exit.js';
 import { taskCommand } from './commands/task.js';
 import { diffCommand } from './commands/diff.js';
@@ -19,7 +18,7 @@ import colors from 'ansi-colors';
 import { pushCommand } from './commands/push.js';
 import { stopCommand } from './commands/stop.js';
 import { showTips, TIP_TITLES } from './utils/display.js';
-import { Git, setVerbose } from 'rover-common';
+import { Git, setVerbose, getVersion } from 'rover-common';
 
 const program = new Command();
 

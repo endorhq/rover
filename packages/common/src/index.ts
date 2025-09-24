@@ -15,4 +15,6 @@ export {
   type SyncResult,
 } from './os.js';
 
+export { getVersion } from './version.js';
+
 export { Git } from './git.js';

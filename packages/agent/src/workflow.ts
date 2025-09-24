@@ -336,4 +336,63 @@ export class AgentWorkflow {
       minContentWidth: 20,
     });
   }
+
+  /**
+   * Validate provided inputs against workflow requirements
+   * @param providedInputs - Map of input name to value
+   * @returns Object with validation result and any errors/warnings
+   */
+  validateInputs(providedInputs: Map<string, string>): {
+    valid: boolean;
+    errors: string[];
+    warnings: string[];
+  } {
+    const errors: string[] = [];
+    const warnings: string[] = [];
+
+    // Check for required inputs
+    for (const input of this.inputs) {
+      const providedValue = providedInputs.get(input.name);
+
+      if (input.required && !providedValue) {
+        if (!input.default) {
+          errors.push(`Required input "${input.name}" is missing`);
+        } else {
+          warnings.push(
+            `Required input "${input.name}" is missing but has default value: ${input.default}`
+          );
+        }
+      }
+    }
+
+    // Check for unknown inputs (inputs not defined in the workflow)
+    const definedInputNames = new Set(this.inputs.map(i => i.name));
+    for (const [providedName] of providedInputs) {
+      if (!definedInputNames.has(providedName)) {
+        warnings.push(
+          `Unknown input "${providedName}" provided (not defined in workflow)`
+        );
+      }
+    }
+
+    // Check for duplicate inputs in workflow definition (validation issue)
+    const inputNameCounts = new Map<string, number>();
+    for (const input of this.inputs) {
+      const count = inputNameCounts.get(input.name) || 0;
+      inputNameCounts.set(input.name, count + 1);
+    }
+    for (const [name, count] of inputNameCounts) {
+      if (count > 1) {
+        errors.push(
+          `Input "${name}" is defined ${count} times in workflow (should be unique)`
+        );
+      }
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors,
+      warnings,
+    };
+  }
 }
