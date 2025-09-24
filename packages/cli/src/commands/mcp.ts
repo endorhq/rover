@@ -5,10 +5,10 @@ import { createMCPServer } from '../lib/mcp/server.js';
 export async function mcpCommand(options: { json?: boolean }) {
   try {
     console.error('Starting Rover MCP server...');
-    const server = createMCPServer();
+    const { server, transport } = createMCPServer();
 
     // Connect server to stdio transport
-    await server.connect(process.stdin, process.stdout);
+    await server.connect(transport);
 
     console.error('MCP server started successfully');
 

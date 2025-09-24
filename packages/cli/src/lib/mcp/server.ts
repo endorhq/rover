@@ -1,36 +1,15 @@
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-} from '@modelcontextprotocol/sdk/types.js';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { roverTools, handleToolCall } from './tools.js';
 
-export function createMCPServer(): Server {
-  const server = new Server(
-    {
-      name: 'rover',
-      version: '1.0.0',
-    },
-    {
-      capabilities: {
-        tools: {},
-      },
-    }
-  );
-
-  // Handle tool listing
-  server.setRequestHandler(ListToolsRequestSchema, async () => {
-    return {
-      tools: roverTools,
-    };
-  });
-
-  // Handle tool calls
-  server.setRequestHandler(CallToolRequestSchema, async (request) => {
-    const { name, arguments: args } = request.params;
-
+function registerRoverTool(server: McpServer, toolName: string, description: string, inputSchema: any) {
+  server.registerTool(toolName, {
+    title: toolName,
+    description: description,
+    inputSchema: inputSchema,
+  }, async (args) => {
     try {
-      const result = await handleToolCall(name, args || {});
+      const result = await handleToolCall(toolName, args);
       return {
         content: [
           {
@@ -44,13 +23,34 @@ export function createMCPServer(): Server {
         content: [
           {
             type: 'text',
-            text: `Error executing ${name}: ${error instanceof Error ? error.message : String(error)}`,
+            text: `Error executing ${toolName}: ${error instanceof Error ? error.message : String(error)}`,
           },
         ],
         isError: true,
       };
     }
   });
+}
+
+export function createMCPServer(): { server: McpServer; transport: StdioServerTransport } {
+  const server = new McpServer(
+    {
+      name: 'rover',
+      version: '1.0.0',
+    },
+    {
+      capabilities: {
+        tools: {},
+      },
+    }
+  );
+
+  const transport = new StdioServerTransport();
+
+  // Register all rover tools
+  for (const tool of roverTools) {
+    registerRoverTool(server, tool.name, tool.description, tool.inputSchema);
+  }
 
   // Error handling
   server.onerror = (error) => {
@@ -62,6 +62,5 @@ export function createMCPServer(): Server {
     process.exit(0);
   });
 
-  return server;
+  return { server, transport };
 }
-
