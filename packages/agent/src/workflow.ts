@@ -170,46 +170,52 @@ export class AgentWorkflow {
     }
 
     // Validate inputs
-    this.data.inputs.forEach((input, index) => {
-      if (!input.name) {
-        errors.push(`input[${index}].name is required`);
-      }
-      if (!input.type) {
-        errors.push(`input[${index}].type is required`);
-      }
-      if (typeof input.required !== 'boolean') {
-        errors.push(`input[${index}].required must be boolean`);
-      }
-    });
+    if (Array.isArray(this.data.inputs)) {
+      this.data.inputs.forEach((input, index) => {
+        if (!input.name) {
+          errors.push(`input[${index}].name is required`);
+        }
+        if (!input.type) {
+          errors.push(`input[${index}].type is required`);
+        }
+        if (typeof input.required !== 'boolean') {
+          errors.push(`input[${index}].required must be boolean`);
+        }
+      });
+    }
 
     // Validate outputs
-    this.data.outputs.forEach((output, index) => {
-      if (!output.name) {
-        errors.push(`output[${index}].name is required`);
-      }
-    });
+    if (Array.isArray(this.data.outputs)) {
+      this.data.outputs.forEach((output, index) => {
+        if (!output.name) {
+          errors.push(`output[${index}].name is required`);
+        }
+      });
+    }
 
     // Validate steps
-    this.data.steps.forEach((step, index) => {
-      if (!step.id) {
-        errors.push(`step[${index}].id is required`);
-      }
-      if (!step.name) {
-        errors.push(`step[${index}].name is required`);
-      }
-      if (!step.prompt) {
-        errors.push(`step[${index}].prompt is required`);
-      }
-      if (!Array.isArray(step.outputs)) {
-        errors.push(`step[${index}].outputs must be an array`);
-      }
-    });
+    if (Array.isArray(this.data.steps)) {
+      this.data.steps.forEach((step, index) => {
+        if (!step.id) {
+          errors.push(`step[${index}].id is required`);
+        }
+        if (!step.name) {
+          errors.push(`step[${index}].name is required`);
+        }
+        if (!step.prompt) {
+          errors.push(`step[${index}].prompt is required`);
+        }
+        if (!Array.isArray(step.outputs)) {
+          errors.push(`step[${index}].outputs must be an array`);
+        }
+      });
 
-    // Check for duplicate step IDs
-    const stepIds = this.data.steps.map(step => step.id);
-    const duplicateIds = stepIds.filter((id, index) => stepIds.indexOf(id) !== index);
-    if (duplicateIds.length > 0) {
-      errors.push(`duplicate step IDs found: ${duplicateIds.join(', ')}`);
+      // Check for duplicate step IDs
+      const stepIds = this.data.steps.map(step => step.id);
+      const duplicateIds = stepIds.filter((id, index) => stepIds.indexOf(id) !== index);
+      if (duplicateIds.length > 0) {
+        errors.push(`duplicate step IDs found: ${duplicateIds.join(', ')}`);
+      }
     }
 
     if (errors.length > 0) {
