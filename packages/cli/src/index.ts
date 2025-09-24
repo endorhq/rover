@@ -18,6 +18,7 @@ import { mergeCommand } from './commands/merge.js';
 import colors from 'ansi-colors';
 import { pushCommand } from './commands/push.js';
 import { stopCommand } from './commands/stop.js';
+import { mcpCommand } from './commands/mcp.js';
 import { showTips, TIP_TITLES } from './utils/display.js';
 import { Git, setVerbose } from 'rover-common';
 
@@ -299,6 +300,14 @@ program
   .option('-m, --message <message>', 'Commit message')
   .option('--json', 'Output in JSON format')
   .action(pushCommand);
+
+program.commandsGroup(colors.cyan('MCP Integration:'));
+
+program
+  .command('mcp')
+  .description('Start Rover as an MCP server for AI agent integration')
+  .option('--json', 'Output in JSON format')
+  .action(mcpCommand);
 
 program.parse(process.argv);
 
