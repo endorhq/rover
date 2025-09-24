@@ -7,13 +7,13 @@ function registerRoverTool(server: McpServer, toolName: string, description: str
     title: toolName,
     description: description,
     inputSchema: inputSchema,
-  }, async (args) => {
+  }, async (args: any) => {
     try {
       const result = await handleToolCall(toolName, args);
       return {
         content: [
           {
-            type: 'text',
+            type: 'text' as const,
             text: typeof result === 'string' ? result : JSON.stringify(result, null, 2),
           },
         ],
@@ -22,7 +22,7 @@ function registerRoverTool(server: McpServer, toolName: string, description: str
       return {
         content: [
           {
-            type: 'text',
+            type: 'text' as const,
             text: `Error executing ${toolName}: ${error instanceof Error ? error.message : String(error)}`,
           },
         ],
@@ -49,13 +49,10 @@ export function createMCPServer(): { server: McpServer; transport: StdioServerTr
 
   // Register all rover tools
   for (const tool of roverTools) {
-    registerRoverTool(server, tool.name, tool.description, tool.inputSchema);
+    registerRoverTool(server, tool.name, tool.description ?? '', tool.inputSchema);
   }
 
-  // Error handling
-  server.onerror = (error) => {
-    console.error('[MCP Error]', error);
-  };
+  // Error handling will be done at the transport level
 
   process.on('SIGINT', async () => {
     await server.close();

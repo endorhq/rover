@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import { exitWithError } from '../utils/exit.js';
 import { createMCPServer } from '../lib/mcp/server.js';
 
-export const mcpCommand = async () => {
+export const mcpCommand = async (): Promise<void> => {
   try {
     console.error('Starting Rover MCP server...');
     const { server, transport } = createMCPServer();
@@ -13,7 +13,7 @@ export const mcpCommand = async () => {
     console.error('MCP server started successfully');
 
     // Keep the process running
-    return new Promise(() => {
+    await new Promise<void>(() => {
       // Server will handle all communication through stdio
     });
   } catch (error) {
