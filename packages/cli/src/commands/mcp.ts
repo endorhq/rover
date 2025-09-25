@@ -32,4 +32,4 @@ export const mcpCommand = async (): Promise<void> => {
       }
     );
   }
-}
+};

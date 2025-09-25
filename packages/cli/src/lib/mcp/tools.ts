@@ -97,7 +97,8 @@ const shellSchema = z.object({
 export const roverTools: Tool[] = [
   {
     name: 'rover_task',
-    description: 'Start a new task for an AI Agent. It will spawn a new environment to complete it.',
+    description:
+      'Start a new task for an AI Agent. It will spawn a new environment to complete it.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -279,7 +280,8 @@ export const roverTools: Tool[] = [
   },
   {
     name: 'rover_push',
-    description: 'Commit and push task changes to remote, with GitHub PR support',
+    description:
+      'Commit and push task changes to remote, with GitHub PR support',
     inputSchema: {
       type: 'object',
       properties: {
@@ -329,7 +331,8 @@ export const roverTools: Tool[] = [
         },
         removeAll: {
           type: 'boolean',
-          description: 'Remove container, git worktree and branch if they exist',
+          description:
+            'Remove container, git worktree and branch if they exist',
         },
         removeContainer: {
           type: 'boolean',
@@ -396,18 +399,15 @@ export async function handleToolCall(name: string, args: any): Promise<any> {
     switch (name) {
       case 'rover_task': {
         const parsed = taskSchema.parse(args);
-        return await taskCommand(
-          parsed.description,
-          {
-            fromGithub: parsed.fromGithub,
-            yes: parsed.yes,
-            sourceBranch: parsed.sourceBranch,
-            targetBranch: parsed.targetBranch,
-            agent: parsed.agent,
-            json: parsed.json,
-            debug: parsed.debug,
-          }
-        );
+        return await taskCommand(parsed.description, {
+          fromGithub: parsed.fromGithub,
+          yes: parsed.yes,
+          sourceBranch: parsed.sourceBranch,
+          targetBranch: parsed.targetBranch,
+          agent: parsed.agent,
+          json: parsed.json,
+          debug: parsed.debug,
+        });
       }
 
       case 'rover_list': {
@@ -417,69 +417,49 @@ export async function handleToolCall(name: string, args: any): Promise<any> {
 
       case 'rover_inspect': {
         const parsed = inspectSchema.parse(args);
-        return await inspectCommand(
-          parsed.taskId,
-          parsed.iterationNumber,
-          {
-            file: parsed.file,
-            json: parsed.json,
-          }
-        );
+        return await inspectCommand(parsed.taskId, parsed.iterationNumber, {
+          file: parsed.file,
+          json: parsed.json,
+        });
       }
 
       case 'rover_iterate': {
         const parsed = iterateSchema.parse(args);
-        return await iterateCommand(
-          parsed.taskId,
-          parsed.instructions,
-          { json: parsed.json }
-        );
+        return await iterateCommand(parsed.taskId, parsed.instructions, {
+          json: parsed.json,
+        });
       }
 
       case 'rover_logs': {
         const parsed = logsSchema.parse(args);
-        return await logsCommand(
-          parsed.taskId,
-          parsed.iterationNumber,
-          {
-            follow: parsed.follow,
-            json: parsed.json,
-          }
-        );
+        return await logsCommand(parsed.taskId, parsed.iterationNumber, {
+          follow: parsed.follow,
+          json: parsed.json,
+        });
       }
 
       case 'rover_diff': {
         const parsed = diffSchema.parse(args);
-        return await diffCommand(
-          parsed.taskId,
-          parsed.filePath,
-          {
-            branch: parsed.branch,
-            onlyFiles: parsed.onlyFiles,
-          }
-        );
+        return await diffCommand(parsed.taskId, parsed.filePath, {
+          branch: parsed.branch,
+          onlyFiles: parsed.onlyFiles,
+        });
       }
 
       case 'rover_merge': {
         const parsed = mergeSchema.parse(args);
-        return await mergeCommand(
-          parsed.taskId,
-          {
-            force: parsed.force,
-            json: parsed.json,
-          }
-        );
+        return await mergeCommand(parsed.taskId, {
+          force: parsed.force,
+          json: parsed.json,
+        });
       }
 
       case 'rover_push': {
         const parsed = pushSchema.parse(args);
-        return await pushCommand(
-          parsed.taskId,
-          {
-            message: parsed.message,
-            json: parsed.json,
-          }
-        );
+        return await pushCommand(parsed.taskId, {
+          message: parsed.message,
+          json: parsed.json,
+        });
       }
 
       case 'rover_restart': {
@@ -489,15 +469,12 @@ export async function handleToolCall(name: string, args: any): Promise<any> {
 
       case 'rover_stop': {
         const parsed = stopSchema.parse(args);
-        return await stopCommand(
-          parsed.taskId,
-          {
-            removeAll: parsed.removeAll,
-            removeContainer: parsed.removeContainer,
-            removeGitWorktreeAndBranch: parsed.removeGitWorktreeAndBranch,
-            json: parsed.json,
-          }
-        );
+        return await stopCommand(parsed.taskId, {
+          removeAll: parsed.removeAll,
+          removeContainer: parsed.removeContainer,
+          removeGitWorktreeAndBranch: parsed.removeGitWorktreeAndBranch,
+          json: parsed.json,
+        });
       }
 
       case 'rover_delete': {
