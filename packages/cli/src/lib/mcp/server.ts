@@ -6,10 +6,10 @@ function registerRoverTool(server: McpServer, toolName: string, description: str
   server.registerTool(toolName, {
     title: toolName,
     description: description,
-    inputSchema: inputSchema,
+    inputSchema: {},
   }, async (args: any) => {
     try {
-      const result = await handleToolCall(toolName, args);
+      const result = await handleToolCall(toolName, {});
       return {
         content: [
           {

@@ -5,6 +5,7 @@ import { createMCPServer } from '../lib/mcp/server.js';
 export const mcpCommand = async (): Promise<void> => {
   try {
     console.error('Starting Rover MCP server...');
+
     const { server, transport } = createMCPServer();
 
     // Connect server to stdio transport
