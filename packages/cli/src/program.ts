@@ -17,6 +17,7 @@ import { mergeCommand } from './commands/merge.js';
 import colors from 'ansi-colors';
 import { pushCommand } from './commands/push.js';
 import { stopCommand } from './commands/stop.js';
+import { mcpCommand } from './commands/mcp.js';
 import { showTips, TIP_TITLES } from './utils/display.js';
 import { Git, setVerbose } from 'rover-common';
 
@@ -287,7 +288,6 @@ export function createProgram(
 
   program.commandsGroup(colors.cyan('Merge changes:'));
 
-  // Diff command to show changes in the task
   program
     .command('diff')
     .description('Show git diff between task worktree and main branch')
@@ -314,6 +314,10 @@ export function createProgram(
     .option('-m, --message <message>', 'Commit message')
     .option('--json', 'Output in JSON format')
     .action(pushCommand);
+
+  program.commandsGroup(colors.cyan('Model Context Protocol:'));
+
+  program.command('mcp').description('Start an MCP server').action(mcpCommand);
 
   return program;
 }
