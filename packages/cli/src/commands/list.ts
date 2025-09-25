@@ -71,6 +71,8 @@ export const listCommand = async (
     watching?: boolean;
   } = {}
 ) => {
+  console.log('listCommand options is', options);
+
   const telemetry = getTelemetry();
 
   try {

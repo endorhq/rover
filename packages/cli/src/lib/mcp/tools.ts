@@ -395,6 +395,7 @@ export const roverTools: Tool[] = [
 
 // Tool handlers
 export async function handleToolCall(name: string, args: any): Promise<any> {
+  console.error('tool name', name);
   try {
     switch (name) {
       case 'rover_task': {
@@ -411,8 +412,10 @@ export async function handleToolCall(name: string, args: any): Promise<any> {
       }
 
       case 'rover_list': {
-        const parsed = listSchema.parse(args);
-        return await listCommand(parsed);
+          // const parsed = listSchema.parse(args);
+          const res = await listCommand({ json: true });
+          console.error('rover_list result is', res);
+        return res;
       }
 
       case 'rover_inspect': {

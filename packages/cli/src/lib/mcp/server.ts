@@ -12,7 +12,7 @@ function registerRoverTool(
     toolName,
     {
       title: toolName,
-      description: description,
+      description,
       inputSchema: {},
     },
     async (args: any) => {
@@ -21,6 +21,7 @@ function registerRoverTool(
         console.log = console.error;
         const result = await handleToolCall(toolName, {});
         console.log = originalLog;
+        console.error('result of tool call is', result);
         return {
           content: [
             {
