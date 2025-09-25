@@ -3,6 +3,7 @@
 import { Command } from 'commander';
 import { setVerbose, getVersion } from 'rover-common';
 import { runCommand } from './commands/run.js';
+import { installCommand } from './commands/install.js';
 
 // Common types
 export interface CommandOutput {
@@ -43,6 +44,14 @@ program
   )
   .option('--inputs-json <jsonPath>', 'Load the input values from a JSON file')
   .option('--inputs-yaml <yamlPath>', 'Load the input values from a YAML file')
+  .option(
+    '--agent-tool <agent>',
+    'Agent tool to use. It overrides defaults, but prioritize step tools if available.'
+  )
+  .option(
+    '--agent-model <agent>',
+    'Agent model to use. It overrides defaults, but prioritize step tools if available.'
+  )
   .action(runCommand);
 
 // Install workflow dependencies
@@ -50,7 +59,7 @@ program
   .command('install')
   .description('Install workflow dependencies, like missing AI coding agents')
   .argument('<workflowPath>', 'Path to the Agent Workflow YAML file')
-  .action(runCommand);
+  .action(installCommand);
 
 program.parse(process.argv);
 

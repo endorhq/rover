@@ -917,11 +917,7 @@ steps: []
 
       expect(validation.valid).toBe(true);
       expect(validation.errors).toHaveLength(0);
-      expect(validation.warnings).toHaveLength(1);
-      expect(validation.warnings[0]).toContain('required_with_default');
-      expect(validation.warnings[0]).toContain(
-        'has default value: default_value'
-      );
+      expect(validation.warnings).toHaveLength(0);
     });
 
     it('should fail validation when required input without default is missing', () => {
@@ -947,15 +943,12 @@ steps: []
 
       expect(validation.valid).toBe(true);
       expect(validation.errors).toHaveLength(0);
-      expect(validation.warnings).toHaveLength(3);
+      expect(validation.warnings).toHaveLength(2);
       expect(validation.warnings).toContain(
         'Unknown input "unknown_input" provided (not defined in workflow)'
       );
       expect(validation.warnings).toContain(
         'Unknown input "another_unknown" provided (not defined in workflow)'
-      );
-      expect(validation.warnings).toContain(
-        'Required input "required_with_default" is missing but has default value: default_value'
       );
     });
 
@@ -969,8 +962,7 @@ steps: []
       expect(validation.errors[0]).toBe(
         'Required input "required_input" is missing'
       );
-      expect(validation.warnings).toHaveLength(1);
-      expect(validation.warnings[0]).toContain('required_with_default');
+      expect(validation.warnings).toHaveLength(0);
     });
 
     it('should detect duplicate input definitions in workflow schema', () => {

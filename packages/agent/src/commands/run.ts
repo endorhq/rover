@@ -1,7 +1,8 @@
 import { CommandOutput } from '../cli.js';
 import colors from 'ansi-colors';
 import { AgentWorkflow } from '../workflow.js';
-import { parseCollectOptions } from '../utils/options.js';
+import { parseCollectOptions } from '../lib/options.js';
+import { Runner } from '../lib/runner.js';
 
 interface RunCommandOptions {
   // Inputs. Take precedence over files
@@ -10,6 +11,10 @@ interface RunCommandOptions {
   inputYaml?: string;
   // Load the inputs from a JSON file
   inputJson?: string;
+  // Tool to use instead of workflow defaults
+  agentTool?: string;
+  // Model to use instead of workflow defaults
+  agentModel?: string;
 }
 
 interface RunCommandOutput extends CommandOutput {}
@@ -20,7 +25,7 @@ interface RunCommandOutput extends CommandOutput {}
  */
 export const runCommand = async (
   workflowPath: string,
-  options: RunCommandOptions
+  options: RunCommandOptions = { input: [] }
 ) => {
   const output: RunCommandOutput = {
     success: false,
@@ -29,9 +34,21 @@ export const runCommand = async (
   try {
     // Load the agent workflow
     const agentWorkflow = AgentWorkflow.load(workflowPath);
-    const inputs = parseCollectOptions(options.input);
+    const providedInputs = parseCollectOptions(options.input);
 
-    console.log(colors.white.bold('Running Agent Workflow'));
+    // Merge provided inputs with defaults
+    const inputs = new Map(providedInputs);
+    const defaultInputs: Array<string> = [];
+
+    // Add default values for required inputs that weren't provided
+    for (const input of agentWorkflow.inputs) {
+      if (!inputs.has(input.name) && input.default !== undefined) {
+        inputs.set(input.name, String(input.default));
+        defaultInputs.push(input.name);
+      }
+    }
+
+    console.log(colors.white.bold('Agent Workflow'));
     console.log(colors.gray('├── Name: ') + colors.cyan(agentWorkflow.name));
     console.log(
       colors.gray('└── Description: ') + colors.white(agentWorkflow.description)
@@ -41,7 +58,11 @@ export const runCommand = async (
     const inputEntries = Array.from(inputs.entries());
     inputEntries.forEach(([key, value], idx) => {
       const prefix = idx == inputEntries.length - 1 ? '└──' : '├──';
-      console.log(colors.white(`${prefix} ${key}=`) + colors.cyan(`${value}`));
+      const isDefault = defaultInputs.includes(key);
+      const suffix = isDefault ? colors.gray(' (default)') : '';
+      console.log(
+        colors.white(`${prefix} ${key}=`) + colors.cyan(`${value}`) + suffix
+      );
     });
 
     // Validate inputs against workflow requirements
@@ -65,8 +86,134 @@ export const runCommand = async (
       output.error = `Input validation failed: ${validation.errors.join(', ')}`;
     } else {
       // Continue with workflow run
+      const stepsOutput: Map<string, Map<string, string>> = new Map();
 
-      // TODO: CONTINUE
+      // Print Steps
+      console.log(colors.white.bold('\nSteps'));
+      agentWorkflow.steps.forEach((step, idx) => {
+        const prefix = idx == agentWorkflow.steps.length - 1 ? '└──' : '├──';
+        console.log(
+          colors.white(`${prefix} ${idx}. `) + colors.white(`${step.name}`)
+        );
+      });
+
+      for (const step of agentWorkflow.steps) {
+        const runner = new Runner(
+          agentWorkflow,
+          step.id,
+          inputs,
+          stepsOutput,
+          options.agentTool,
+          options.agentModel
+        );
+
+        // Run it
+        const result = await runner.run();
+
+        // Display step results
+        console.log(colors.white.bold(`\n📊 Step Results: ${step.name}`));
+        console.log(colors.gray('├── ID: ') + colors.cyan(result.id));
+        console.log(
+          colors.gray('├── Status: ') +
+            (result.success
+              ? colors.green('✅ Success')
+              : colors.red('❌ Failed'))
+        );
+        console.log(
+          colors.gray('├── Duration: ') +
+            colors.yellow(`${result.duration.toFixed(2)}s`)
+        );
+
+        if (result.tokens) {
+          console.log(
+            colors.gray('├── Tokens: ') + colors.cyan(result.tokens.toString())
+          );
+        }
+        if (result.price) {
+          console.log(
+            colors.gray('├── Price: ') +
+              colors.cyan(`$${result.price.toFixed(4)}`)
+          );
+        }
+        if (result.error) {
+          console.log(colors.gray('├── Error: ') + colors.red(result.error));
+        }
+
+        // Display outputs
+        const outputEntries = Array.from(result.outputs.entries()).filter(
+          ([key]) =>
+            !key.startsWith('raw_') &&
+            !key.startsWith('input_') &&
+            key !== 'error'
+        );
+
+        if (outputEntries.length > 0) {
+          console.log(colors.gray('└── Outputs:'));
+          outputEntries.forEach(([key, value], idx) => {
+            const prefix =
+              idx === outputEntries.length - 1 ? '    └──' : '    ├──';
+            // Truncate long values for display
+            const displayValue =
+              value.length > 100 ? value.substring(0, 100) + '...' : value;
+            console.log(
+              colors.gray(`${prefix} ${key}: `) + colors.cyan(displayValue)
+            );
+          });
+        } else {
+          console.log(colors.gray('└── No outputs extracted'));
+        }
+
+        // Store step outputs for next steps to use
+        if (result.success) {
+          stepsOutput.set(step.id, result.outputs);
+        } else {
+          // If step failed, decide whether to continue based on workflow config
+          const continueOnError =
+            agentWorkflow.config?.continueOnError || false;
+          if (!continueOnError) {
+            console.log(
+              colors.red(
+                `\n❌ Step '${step.name}' failed and continueOnError is false. Stopping workflow execution.`
+              )
+            );
+            output.success = false;
+            output.error = `Workflow stopped due to step failure: ${result.error}`;
+          } else {
+            console.log(
+              colors.yellow(
+                `\n⚠️  Step '${step.name}' failed but continueOnError is true. Continuing with next step.`
+              )
+            );
+            // Store empty outputs for failed step
+            stepsOutput.set(step.id, new Map());
+          }
+        }
+      }
+
+      // Display workflow completion summary
+      console.log(colors.white.bold('\n🎉 Workflow Execution Summary'));
+      console.log(
+        colors.gray('├── Total Steps: ') +
+          colors.cyan(agentWorkflow.steps.length.toString())
+      );
+
+      const successfulSteps = Array.from(stepsOutput.keys()).length;
+      console.log(
+        colors.gray('├── Successful Steps: ') +
+          colors.green(successfulSteps.toString())
+      );
+
+      const failedSteps = agentWorkflow.steps.length - successfulSteps;
+      if (failedSteps > 0) {
+        console.log(
+          colors.gray('├── Failed Steps: ') + colors.red(failedSteps.toString())
+        );
+      }
+
+      console.log(
+        colors.gray('└── Status: ') +
+          colors.green('✅ Workflow Completed Successfully')
+      );
 
       output.success = true;
     }

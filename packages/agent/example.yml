@@ -19,6 +19,7 @@ outputs:
   - name: review_report
     description: 'Markdown file with the complete review'
     type: file
+    filename: 'review_report.md'
   - name: issues_count
     description: 'Number of issues found'
     type: string
@@ -95,3 +96,4 @@ steps:
       - name: report_content
         description: 'The final markdown report'
         type: file
+        filename: 'final_report.md'
