@@ -180,7 +180,10 @@ export function createProgram(
       '-t, --target-branch <branch>',
       'Custom name for the worktree branch'
     )
-    .option('-a, --agent <agent>', 'AI agent to use (claude, gemini, qwen)')
+    .option(
+      '-a, --agent <agent>',
+      'AI agent to use (claude, codex, gemini, qwen)'
+    )
     .option('--json', 'Output the result in JSON format')
     .option('--debug', 'Show debug information like running commands')
     .argument(
