@@ -46,8 +46,8 @@ describe('AgentWorkflow', () => {
       expect(workflow.name).toBe('test-workflow');
       expect(workflow.description).toBe('Test workflow description');
       expect(workflow.version).toBe('1.0');
-      expect(workflow.defaults.tool).toBe('claude');
-      expect(workflow.defaults.model).toBe('claude-3-sonnet');
+      expect(workflow.defaults?.tool).toBe('claude');
+      expect(workflow.defaults?.model).toBe('claude-3-sonnet');
       expect(workflow.config?.timeout).toBe(3600);
       expect(workflow.config?.continueOnError).toBe(false);
       expect(existsSync(workflowPath)).toBe(true);
@@ -278,8 +278,8 @@ steps: []
       const workflow = AgentWorkflow.load(workflowPath);
 
       expect(workflow.version).toBe('1.0');
-      expect(workflow.defaults.tool).toBe('claude');
-      expect(workflow.defaults.model).toBe('claude-3-sonnet');
+      expect(workflow.defaults?.tool).toBe('claude');
+      expect(workflow.defaults?.model).toBe('claude-3-sonnet');
       expect(workflow.config?.timeout).toBe(3600);
 
       // Verify migration was saved
@@ -302,8 +302,8 @@ steps: []
       writeFileSync(workflowPath, oldYaml, 'utf8');
       const workflow = AgentWorkflow.load(workflowPath);
 
-      expect(workflow.defaults.tool).toBe('claude');
-      expect(workflow.defaults.model).toBe('claude-3-sonnet');
+      expect(workflow.defaults?.tool).toBe('claude');
+      expect(workflow.defaults?.model).toBe('claude-3-sonnet');
     });
 
     it('should migrate workflow without config', () => {
@@ -349,8 +349,8 @@ steps: []
       const workflow = AgentWorkflow.load(workflowPath);
 
       // Should preserve custom values
-      expect(workflow.defaults.tool).toBe('custom-tool');
-      expect(workflow.defaults.model).toBe('custom-model');
+      expect(workflow.defaults?.tool).toBe('custom-tool');
+      expect(workflow.defaults?.model).toBe('custom-model');
       expect(workflow.config?.timeout).toBe(7200);
       expect(workflow.config?.continueOnError).toBe(true);
 
@@ -855,7 +855,7 @@ steps: []
       expect(workflow.inputs).toHaveLength(1);
       expect(workflow.outputs).toHaveLength(1);
       expect(workflow.steps).toHaveLength(1);
-      expect(workflow.defaults.tool).toBe('claude');
+      expect(workflow.defaults?.tool).toBe('claude');
       expect(workflow.config?.timeout).toBe(3600);
     });
   });
