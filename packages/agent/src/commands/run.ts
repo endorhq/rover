@@ -97,6 +97,8 @@ export const runCommand = async (
         );
       });
 
+      let runSteps = 0;
+
       for (const step of agentWorkflow.steps) {
         const runner = new Runner(
           agentWorkflow,
@@ -107,6 +109,8 @@ export const runCommand = async (
           options.agentModel
         );
 
+        runSteps++;
+
         // Run it
         const result = await runner.run();
 
@@ -116,8 +120,8 @@ export const runCommand = async (
         console.log(
           colors.gray('├── Status: ') +
             (result.success
-              ? colors.green('✅ Success')
-              : colors.red('❌ Failed'))
+              ? colors.green('✓ Success')
+              : colors.red('✗ Failed'))
         );
         console.log(
           colors.gray('├── Duration: ') +
@@ -173,15 +177,16 @@ export const runCommand = async (
           if (!continueOnError) {
             console.log(
               colors.red(
-                `\n❌ Step '${step.name}' failed and continueOnError is false. Stopping workflow execution.`
+                `\n✗ Step '${step.name}' failed and continueOnError is false. Stopping workflow execution.`
               )
             );
             output.success = false;
             output.error = `Workflow stopped due to step failure: ${result.error}`;
+            break;
           } else {
             console.log(
               colors.yellow(
-                `\n⚠️  Step '${step.name}' failed but continueOnError is true. Continuing with next step.`
+                `\n⚠ Step '${step.name}' failed but continueOnError is true. Continuing with next step.`
               )
             );
             // Store empty outputs for failed step
@@ -203,17 +208,28 @@ export const runCommand = async (
           colors.green(successfulSteps.toString())
       );
 
-      const failedSteps = agentWorkflow.steps.length - successfulSteps;
+      const failedSteps = runSteps - successfulSteps;
+      console.log(
+        colors.gray('├── Failed Steps: ') + colors.red(failedSteps.toString())
+      );
+
+      const skippedSteps = agentWorkflow.steps.length - runSteps;
+      console.log(
+        colors.gray('├── Skipped Steps: ') +
+          colors.yellow(failedSteps.toString())
+      );
+
+      let status = colors.green('✓ Workflow Completed Successfully');
+
       if (failedSteps > 0) {
-        console.log(
-          colors.gray('├── Failed Steps: ') + colors.red(failedSteps.toString())
-        );
+        status = colors.red('✗ Workflow Completed with Errors');
+      } else if (skippedSteps > 0) {
+        status =
+          colors.green('✓ Workflow Completed Successfully ') +
+          colors.yellow('(Some steps were skipped)');
       }
 
-      console.log(
-        colors.gray('└── Status: ') +
-          colors.green('✅ Workflow Completed Successfully')
-      );
+      console.log(colors.gray('└── Status: ') + status);
 
       output.success = true;
     }

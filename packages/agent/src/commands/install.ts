@@ -7,4 +7,6 @@ interface InstallCommandOptions {}
 export const installCommand = async (
   workflowPath: string,
   options: InstallCommandOptions = {}
-) => {};
+) => {
+  // TODO
+};

@@ -9,6 +9,13 @@ import colors from 'ansi-colors';
 import { existsSync, readFileSync } from 'node:fs';
 import { AgentStep } from '../schema.js';
 import { AgentWorkflow } from '../workflow.js';
+import {
+  parseAgentError,
+  isWaitingForAuthentication,
+  AgentError,
+  AuthenticationError,
+  TimeoutError,
+} from './errors.js';
 
 export interface RunnerStepResult {
   // Step ID
@@ -87,6 +94,7 @@ export class Runner {
   async run(): Promise<RunnerStepResult> {
     const start = performance.now();
     const outputs = new Map<string, string>();
+    let agentError: AgentError | undefined;
 
     try {
       // Get the processed prompt
@@ -97,8 +105,8 @@ export class Runner {
 
       // Execute the AI tool with the prompt
       console.log(
-        colors.blue.bold(
-          `\n🤖 Running ${this.tool} for step: ${this.step.name}`
+        colors.blue(
+          `\n🤖 Running ${colors.blue.bold(this.step.name)} ${colors.grey('>')} ${colors.cyan(this.tool)}`
         )
       );
 
@@ -110,10 +118,52 @@ export class Runner {
         );
       }
 
-      const result = await launch(this.tool, args, {
+      // Create abort controller for killing process if auth detected
+      const abortController = new AbortController();
+      let authDetected = false;
+      let stderrBuffer = '';
+
+      /**
+       * Detects if the otuput includes a "Waiting for authentication" kind of message
+       * to abort the current execution without waiting for the timeout. Tools like
+       * Gemini and Qwen behaves this way
+       */
+      const authWaitingDetector = function* (chunk: unknown) {
+        const chunkStr = String(chunk);
+        stderrBuffer += chunkStr;
+
+        // Check for authentication prompts
+        if (isWaitingForAuthentication(stderrBuffer) && !authDetected) {
+          authDetected = true;
+          console.log(
+            colors.yellow(
+              '\n⚠ Authentication prompt detected, terminating process...'
+            )
+          );
+          abortController.abort();
+        }
+      };
+
+      // Launch the process with proper timeout and abort signal
+      const launchPromise = launch(this.tool, args, {
         input: finalPrompt,
         timeout: this.workflow.getStepTimeout(this.step.id) * 1000, // Convert to milliseconds
+        cancelSignal: abortController.signal,
+        reject: true, // Reject on non-zero exit codes
+        buffer: true, // Buffer output for error parsing
+        // Capture stderr in real-time to detect auth prompts
+        stderr: ['pipe', authWaitingDetector],
       });
+
+      const result = await launchPromise;
+
+      // Check if authentication was detected
+      if (authDetected) {
+        throw new AuthenticationError(
+          'Agent requires authentication - process was terminated',
+          this.tool
+        );
+      }
 
       // Store common outputs
       const rawOutput = result.stdout ? result.stdout.toString() : '';
@@ -129,20 +179,73 @@ export class Runner {
       }
 
       console.log(
-        colors.green(`✅ Step '${this.step.name}' completed successfully`)
+        colors.green(`✓ Step '${this.step.name}' completed successfully`)
       );
     } catch (error) {
+      // Handle different error types
+      if (error instanceof AgentError) {
+        agentError = error;
+      } else if (error && typeof error === 'object' && 'exitCode' in error) {
+        // Execa error with exit code
+        const execaError = error as any;
+        const stderr = execaError.stderr || '';
+        const stdout = execaError.stdout || '';
+        const exitCode = execaError.exitCode;
+
+        // Check for timeout
+        if (execaError.timedOut) {
+          agentError = new TimeoutError(
+            `Step '${this.step.name}' exceeded timeout of ${this.workflow.getStepTimeout(this.step.id)}s`,
+            this.workflow.getStepTimeout(this.step.id) * 1000
+          );
+        } else if (execaError.isCanceled) {
+          // Process was canceled (likely due to auth prompt)
+          agentError = new AuthenticationError(
+            'Agent requires authentication - process was terminated',
+            this.tool
+          );
+        } else {
+          // Parse the error from stderr/stdout
+          agentError = parseAgentError(stderr, stdout, exitCode, this.tool);
+        }
+      } else if (error instanceof Error) {
+        // Generic error
+        const errorMessage = error.message;
+        if (errorMessage.includes('timeout')) {
+          agentError = new TimeoutError(
+            `Step '${this.step.name}' exceeded timeout`,
+            this.workflow.getStepTimeout(this.step.id) * 1000
+          );
+        } else {
+          agentError = parseAgentError(errorMessage, '', null, this.tool);
+        }
+      } else {
+        // Unknown error type
+        agentError = parseAgentError(String(error), '', null, this.tool);
+      }
+
       console.log(
-        colors.red(
-          `❌ Step '${this.step.name}' failed: ${error instanceof Error ? error.message : String(error)}`
-        )
+        colors.red(`✗ Step '${this.step.name}' failed: ${agentError.message}`)
       );
 
+      // Add error classification info
+      if (agentError instanceof AuthenticationError) {
+        console.log(colors.gray(`  Error type: Authentication required`));
+        console.log(
+          colors.cyan(`  Please authenticate with ${this.tool} and try again`)
+        );
+      } else if (agentError.isRetryable) {
+        console.log(
+          colors.gray(`  Error type: ${agentError.code} (retryable)`)
+        );
+      } else {
+        console.log(colors.gray(`  Error type: ${agentError.code}`));
+      }
+
       // Store error information
-      outputs.set(
-        'error',
-        error instanceof Error ? error.message : String(error)
-      );
+      outputs.set('error', agentError.message);
+      outputs.set('error_code', agentError.code);
+      outputs.set('error_retryable', String(agentError.isRetryable));
     }
 
     const result: RunnerStepResult = {
