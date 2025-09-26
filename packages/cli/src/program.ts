@@ -320,7 +320,7 @@ export function createProgram(
 
   program.commandsGroup(colors.cyan('Model Context Protocol:'));
 
-  program.command('mcp').description('Start an MCP server').action(mcpCommand);
+  program.command('mcp').description('Start Rover as an MCP server').action(mcpCommand);
 
   return program;
 }
