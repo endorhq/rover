@@ -43,10 +43,20 @@ export const mcpCommand = async () => {
           .join(' ') + '\n';
     };
 
+    class ExceptionAsProcessExit extends Error {
+      code?: number;
+
+      constructor(code?: number) {
+        super();
+
+        this.code = code;
+      }
+    }
+
     // Intercept process.exit calls to prevent actual exit
     process.exit = function (code?: number) {
-      // Don't actually exit, just return silently
-      return undefined as never;
+      // Don't actually exit, just throw an exception that we catch
+      throw new ExceptionAsProcessExit(code);
     } as any;
 
     try {
