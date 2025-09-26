@@ -1,4 +1,4 @@
-# agent-definition.yaml
+# code-reviewer.yml
 version: '1.0'
 name: 'code-reviewer'
 description: 'Reviews code and provides feedback on quality and best practices'
@@ -11,25 +11,31 @@ inputs:
 
   - name: file_types
     description: 'File extensions to include in review'
-    type: list
-    default: ['.py', '.js', '.ts']
+    type: string
+    default: '.py,.js,.ts'
     required: false
 
 outputs:
   - name: review_report
     description: 'Markdown file with the complete review'
     type: file
-    path: 'review-report.md'
+    filename: 'review_report.md'
   - name: issues_count
     description: 'Number of issues found'
-    type: number
+    type: string
+
+defaults:
+  tool: claude
+  model: claude-3-sonnet
+
+config:
+  timeout: 3600
+  continueOnError: false
 
 steps:
   - id: analyze_structure
     type: agent
     name: 'Analyze Repository Structure'
-    tool: claude # Optional: claude, gemini, openai, etc.
-    model: claude-3-sonnet # Optional: specific model version
     prompt: |
       Analyze the repository at {{inputs.repository_url}}.
 
@@ -42,13 +48,15 @@ steps:
     outputs:
       - name: file_list
         description: 'List of files to review'
+        type: string
       - name: project_overview
         description: 'Summary of the project structure'
+        type: string
 
   - id: review_files
     type: agent
     name: 'Review Code Files'
-    tool: gemini # Can use different tool for different steps
+    tool: gemini # Override default tool for this step
     model: gemini-pro
     prompt: |
       Review the following files for code quality:
@@ -64,22 +72,28 @@ steps:
     outputs:
       - name: review_details
         description: 'Detailed review for each file'
+        type: string
       - name: issues
         description: 'List of issues found'
+        type: string
+    config:
+      timeout: 1800 # 30 minutes for this step
+      retries: 2
 
   - id: create_report
     type: agent
     name: 'Generate Final Report'
-    # No tool/model specified - uses defaults
     prompt: |
       Create a markdown report based on this review:
       {{steps.review_files.outputs.review_details}}
 
       Include:
       - Executive summary
-      - Issues found (total: {{steps.review_files.outputs.issues.length}})
+      - Issues found: {{steps.review_files.outputs.issues}}
       - Recommendations
       - Code quality metrics
     outputs:
       - name: report_content
         description: 'The final markdown report'
+        type: file
+        filename: 'final_report.md'

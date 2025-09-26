@@ -13,6 +13,9 @@ import {
 
 const CURRENT_WORKFLOW_SCHEMA_VERSION = '1.0';
 
+// Default step timeout in seconds
+const DEFAULT_STEP_TIMEOUT = 60 * 30; // 30 minutes
+
 /**
  * Workflow configuration class for loading and managing agent workflow definitions.
  * Provides validation, loading, and execution preparation for YAML-based workflows.
@@ -195,6 +198,12 @@ export class AgentWorkflow {
         if (!output.type) {
           errors.push(`output[${index}].type is required`);
         }
+        // Validate that file outputs have a filename
+        if (output.type === 'file' && !output.filename) {
+          errors.push(
+            `output[${index}].filename is required for file type outputs`
+          );
+        }
       });
     }
 
@@ -225,6 +234,12 @@ export class AgentWorkflow {
                 `step[${index}].outputs[${outputIndex}].type is required`
               );
             }
+            // Validate that file outputs have a filename
+            if (output.type === 'file' && !output.filename) {
+              errors.push(
+                `step[${index}].outputs[${outputIndex}].filename is required for file type outputs`
+              );
+            }
           });
         }
       });
@@ -247,23 +262,23 @@ export class AgentWorkflow {
   /**
    * Get the effective tool for a step (step-specific or default)
    */
-  getStepTool(stepId: string): string {
+  getStepTool(stepId: string, defaultTool?: string): string | undefined {
     const step = this.data.steps.find(s => s.id === stepId);
     if (!step) {
       throw new Error(`Step not found: ${stepId}`);
     }
-    return step.tool || this.data.defaults.tool || 'claude';
+    return step.tool || defaultTool || this.data.defaults?.tool;
   }
 
   /**
    * Get the effective model for a step (step-specific or default)
    */
-  getStepModel(stepId: string): string | undefined {
+  getStepModel(stepId: string, defaultModel?: string): string | undefined {
     const step = this.data.steps.find(s => s.id === stepId);
     if (!step) {
       throw new Error(`Step not found: ${stepId}`);
     }
-    return step.model || this.data.defaults.model;
+    return step.model || defaultModel || this.data.defaults?.model;
   }
 
   /**
@@ -282,7 +297,9 @@ export class AgentWorkflow {
    */
   getStepTimeout(stepId: string): number {
     const step = this.getStep(stepId);
-    return step.config?.timeout || this.data.config?.timeout || 3600;
+    return (
+      step.config?.timeout || this.data.config?.timeout || DEFAULT_STEP_TIMEOUT
+    );
   }
 
   /**
@@ -318,7 +335,7 @@ export class AgentWorkflow {
     return this.data.steps;
   }
 
-  get defaults(): { tool?: string; model?: string } {
+  get defaults(): { tool?: string; model?: string } | undefined {
     return this.data.defaults;
   }
 
@@ -335,5 +352,58 @@ export class AgentWorkflow {
       lineWidth: 80,
       minContentWidth: 20,
     });
+  }
+
+  /**
+   * Validate provided inputs against workflow requirements
+   * @param providedInputs - Map of input name to value
+   * @returns Object with validation result and any errors/warnings
+   */
+  validateInputs(providedInputs: Map<string, string>): {
+    valid: boolean;
+    errors: string[];
+    warnings: string[];
+  } {
+    const errors: string[] = [];
+    const warnings: string[] = [];
+
+    // Check for required inputs
+    for (const input of this.inputs) {
+      const providedValue = providedInputs.get(input.name);
+
+      if (input.required && !providedValue && !input.default) {
+        errors.push(`Required input "${input.name}" is missing`);
+      }
+    }
+
+    // Check for unknown inputs (inputs not defined in the workflow)
+    const definedInputNames = new Set(this.inputs.map(i => i.name));
+    for (const [providedName] of providedInputs) {
+      if (!definedInputNames.has(providedName)) {
+        warnings.push(
+          `Unknown input "${providedName}" provided (not defined in workflow)`
+        );
+      }
+    }
+
+    // Check for duplicate inputs in workflow definition (validation issue)
+    const inputNameCounts = new Map<string, number>();
+    for (const input of this.inputs) {
+      const count = inputNameCounts.get(input.name) || 0;
+      inputNameCounts.set(input.name, count + 1);
+    }
+    for (const [name, count] of inputNameCounts) {
+      if (count > 1) {
+        errors.push(
+          `Input "${name}" is defined ${count} times in workflow (should be unique)`
+        );
+      }
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors,
+      warnings,
+    };
   }
 }

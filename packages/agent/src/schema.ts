@@ -35,6 +35,8 @@ export interface WorkflowOutput {
   description: string;
   /** Data type */
   type: DataType;
+  /** Filename where the output should be saved (required for 'file' type) */
+  filename?: string;
   /** Required fields for object outputs */
   required?: boolean;
 }
@@ -81,7 +83,7 @@ export interface AgentWorkflowSchema {
   /** Expected outputs from the workflow */
   outputs: WorkflowOutput[];
   /** Default configuration when it's not specified. Users will set it using the agent tool */
-  defaults: {
+  defaults?: {
     /** Default AI tool if not specified in steps */
     tool?: AgentTool;
     /** Default model if not specified in steps */

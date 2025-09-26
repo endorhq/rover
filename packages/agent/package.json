@@ -6,15 +6,18 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "type": "module",
+  "bin": {
+    "rover-agent": "dist/cli.js"
+  },
   "files": [
     "LICENSE.md",
     "dist/*"
   ],
   "scripts": {
-    "build": "tsdown --env.TSUP_DEV=false src/index.ts",
-    "dev": "TSUP_DEV=true tsdown --env.TSUP_DEV=true --watch src/ src/index.ts",
+    "build": "tsdown --env.TSUP_DEV=false",
+    "dev": "TSUP_DEV=true tsdown --env.TSUP_DEV=true --watch src/",
     "format": "prettier --write \"src/**/*.{ts,js,json}\"",
-    "start": "node dist/index.js",
+    "start": "node dist/cli.js",
     "clean": "rm -rf dist",
     "check": "tsc --noEmit",
     "test": "vitest run",
@@ -24,7 +27,11 @@
   },
   "author": "The Endor team",
   "dependencies": {
-    "yaml": "^2.8.1"
+    "yaml": "^2.8.1",
+    "ansi-colors": "^4.1.3",
+    "commander": "^14.0.0",
+    "execa": "^9.6.0",
+    "ora": "^8.2.0"
   },
   "devDependencies": {
     "@types/node": "^24.1.0",
