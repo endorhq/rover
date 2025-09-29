@@ -183,8 +183,8 @@ export const startDockerExecution = async (
 
   // Generate setup script using SetupBuilder
   const setupBuilder = new SetupBuilder(task, selectedAiAgent);
-  const setupScriptPath = setupBuilder.generateSetupScript();
-  const setupMcpScriptPath = setupBuilder.generateSetupMcpScript();
+  const setupScriptPath = await setupBuilder.generateSetupScript();
+  const setupMcpScriptPath = await setupBuilder.generateSetupMcpScript();
 
   // Generate prompts using PromptBuilder
   const promptsDir = join(
@@ -508,7 +508,7 @@ export const taskCommand = async (
 
   if (sourceBranch) {
     // Validate specified branch exists
-    if (!git.branchExists(sourceBranch)) {
+    if (!(await git.branchExists(sourceBranch))) {
       jsonOutput.error = `Branch '${sourceBranch}' does not exist`;
       exitWithError(jsonOutput, json);
       return;
@@ -755,7 +755,7 @@ export const taskCommand = async (
     const branchName = targetBranch || generateBranchName(taskId);
 
     try {
-      git.createWorktree(worktreePath, branchName, baseBranch);
+      await git.createWorktree(worktreePath, branchName, baseBranch);
 
       // Copy user .env development files
       copyEnvironmentFiles(await findProjectRoot(), worktreePath);

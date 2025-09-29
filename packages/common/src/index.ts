@@ -17,8 +17,7 @@ export {
 
 export { getVersion } from './version.js';
 
-export { Git } from './git.js';
-
-// Export singleton instance for easier consumption
 import { Git } from './git.js';
+export { Git } from './git.js';
+// Export singleton instance for easier consumption
 export const git = new Git();
