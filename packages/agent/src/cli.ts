@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
-import { Command } from 'commander';
+import { Command, Argument } from 'commander';
 import { setVerbose, getVersion } from 'rover-common';
 import { runCommand } from './commands/run.js';
-import { installCommand } from './commands/install.js';
+import { DEFAUTL_INSTALL_DIRECTORY, DEFAULT_INSTALL_VERSION, installCommand } from './commands/install.js';
 
 // Common types
 export interface CommandOutput {
@@ -57,8 +57,10 @@ program
 // Install workflow dependencies
 program
   .command('install')
-  .description('Install workflow dependencies, like missing AI coding agents')
-  .argument('<workflowPath>', 'Path to the Agent Workflow YAML file')
+  .description('Install agents and configure them')
+  .addArgument(new Argument('<agent>', 'AI Coding Agent to install').choices(['claude', 'codex', 'gemini', 'qwen']))
+  .option('--version <version>', 'Install a specific agent version', DEFAULT_INSTALL_VERSION)
+  .option('--user-dir <directory>', 'User directory to copy credentials', DEFAUTL_INSTALL_DIRECTORY)
   .action(installCommand);
 
 program.parse(process.argv);
