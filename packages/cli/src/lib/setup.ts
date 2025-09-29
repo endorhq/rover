@@ -27,7 +27,6 @@ configure-mcp-servers() {
   # Ensure configuration file exists
   if [ ! -f /home/agent/.claude.json ]; then
     echo '{}' > /home/agent/.claude.json
-    chown agent:agent /home/agent/.claude.json
   fi
 
   jq '.mcpServers //= {}' /home/agent/.claude.json | \
@@ -42,7 +41,6 @@ configure-mcp-servers() {
   # Ensure configuration file exists
   if [ ! -f /home/agent/.codex/config.toml ]; then
     echo '' > /home/agent/.codex/config.toml
-    chown agent:agent /home/agent/.codex/config.toml
   fi
 
   cat <<'EOF' >> /home/agent/.codex/config.toml
@@ -59,7 +57,6 @@ configure-mcp-servers() {
   if [ ! -f /home/agent/.gemini/settings.json ]; then
     mkdir -p /home/agent/.gemini
     echo '{}' > /home/agent/.gemini/settings.json
-    chown -R agent:agent /home/agent/.gemini
   fi
 
   jq '.mcpServers //= {}' /home/agent/.gemini/settings.json | \
@@ -75,7 +72,6 @@ configure-mcp-servers() {
   if [ ! -f /home/agent/.qwen/settings.json ]; then
     mkdir -p /home/agent/.qwen
     echo '{}' > /home/agent/.qwen/settings.json
-    chown -R agent:agent /home/agent/.qwen
   fi
 
   jq '.mcpServers //= {}' /home/agent/.qwen/settings.json | \
@@ -185,31 +181,17 @@ write_status() {
   }
 
   /**
-   * Generate credential shredding and permission recovery function
+   * Generate cleanup functions
    */
   private generateCleanupFunctions(): string {
     let isDockerRootless = true;
-    let recoverPermissions = `
-chown -R $uid:$gid /workspace || true
-chown -R $uid:$gid /output || true
-`;
+
     const dockerInfo = launchSync('docker', ['info', '-f', 'json']).stdout;
     if (dockerInfo) {
       const info = JSON.parse(dockerInfo.toString());
       isDockerRootless = (info?.SecurityOptions || []).some((value: string) =>
         value.includes('rootless')
       );
-      if (isDockerRootless) {
-        recoverPermissions = `
-chown -R root:root /workspace || true
-chown -R root:root /output || true
-`;
-      }
-    } else {
-      recoverPermissions = `
-${recoverPermissions}
-echo "❌ It was not possible to identify Docker installation information on the host, project permissions might be off"
-`;
     }
 
     return `
@@ -224,16 +206,7 @@ shred_secrets() {
     shred -u /.credentials.json &> /dev/null
 }
 
-# Function to recover permissions before exit
-recover_permissions() {
-    echo "🔧 Recovering permissions..."
-
-    ${recoverPermissions}
-
-    echo "✅ Permissions recovered"
-}
-
-# Function to handle script exit with permission recovery
+# Function to handle script exit
 safe_exit() {
     local exit_code="$1"
     local error_message="$2"
@@ -245,7 +218,6 @@ safe_exit() {
     mv /workspace/review.md /output
 
     shred_secrets
-    recover_permissions
 
     if [ -n "$error_message" ]; then
         write_status "failed" "Script failed" 100 "$error_message"
@@ -341,11 +313,6 @@ setup_agent_environment() {
     # Create agent home directory
     mkdir -p /home/agent
 
-    # Set ownership of key directories
-    chown -R agent:agent /home/agent
-    chown -R agent:agent /workspace
-    chown -R agent:agent /output
-
     echo "✅ Agent user environment configured"
     write_status "installing" "Agent environment setup" 15
 }`;
@@ -440,9 +407,6 @@ if [ -f "/.credentials.json" ]; then
 else
     echo "⚠️  No Claude credentials found, continuing..."
 fi
-
-# Update permissions
-chown -R agent:agent /home/agent/.claude
 `;
     } else if (this.agent == 'codex') {
       return `npm install -g @openai/codex
@@ -460,7 +424,7 @@ if [ -d "/.codex" ]; then
     mkdir -p /home/agent/.codex
     cp /.codex/auth.json /home/agent/.codex/
     cp /.codex/config.json /home/agent/.codex/
-    chown -R agent:agent /home/agent/.codex
+
     echo "✅ Codex credentials processed and copied to agent user"
 else
     echo "❌  No Codex configuration found at /.codex"
@@ -479,8 +443,8 @@ if [ -d "/.gemini" ]; then
     mkdir -p /home/agent/.gemini
     cp /.gemini/oauth_creds.json /home/agent/.gemini/
     cp /.gemini/settings.json /home/agent/.gemini/
-    cp /.gemini/user_id /home/agent/.gemini/
-    chown -R agent:agent /home/agent/.gemini
+cp /.gemini/user_id /home/agent/.gemini/
+
     echo "✅ Gemini credentials processed and copied to agent user"
 else
     echo "❌  No Gemini configuration found at /.gemini"
@@ -500,7 +464,7 @@ if [ -d "/.qwen" ]; then
     cp /.qwen/installation_id /home/agent/.qwen/
     cp /.qwen/oauth_creds.json /home/agent/.qwen/
     cp /.qwen/settings.json /home/agent/.qwen/
-    chown -R agent:agent /home/agent/.qwen
+
     echo "✅ Qwen credentials processed and copied to agent user"
 else
     echo "❌  No Qwen configuration found at /.qwen"
@@ -581,12 +545,6 @@ ${this.generateUserSetupFunctions()}`;
 # Task ID: ${this.taskId}
 # Task description is mounted at /task/description.json
 
-uid=$1
-gid=$2
-
-echo "UID is $uid"
-echo "GID is $gid"
-
 # Some tools might be installed under /root/local/.bin conditionally
 # depending on the chosen agent and requirements, make this directory
 # available in the $PATH
@@ -653,9 +611,6 @@ mv /workspace/review.md /output
 
 # Shred secrets after task completion
 shred_secrets
-
-# Recover permissions after task completion
-recover_permissions
 
 write_status "completed" "Task completed" 100
 echo "======================================="

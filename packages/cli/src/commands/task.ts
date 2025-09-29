@@ -236,8 +236,6 @@ export const startDockerExecution = async (
       '-d',
     ];
 
-    const currentUser = userInfo();
-
     dockerArgs.push(
       '-v',
       `${worktreePath}:/workspace:Z,rw`,
@@ -256,9 +254,7 @@ export const startDockerExecution = async (
       '/workspace',
       'node:24-alpine',
       '/bin/sh',
-      '/setup.sh',
-      currentUser.uid.toString(),
-      currentUser.gid.toString()
+      '/setup.sh'
     );
 
     // Background mode execution
