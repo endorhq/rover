@@ -4,12 +4,12 @@ import { createAgent } from '../lib/agents/index.js';
 
 interface InstallCommandOptions {
   // Specific version to install
-  version: string
+  version: string;
   // User directory
-  userDir: string
+  userDir: string;
 }
 
-interface InstallCommandOutput extends CommandOutput { }
+interface InstallCommandOutput extends CommandOutput {}
 
 // Default agent version to install
 export const DEFAULT_INSTALL_VERSION = 'latest';
@@ -22,7 +22,7 @@ export const installCommand = async (
   agentName: string,
   options: InstallCommandOptions = {
     version: DEFAULT_INSTALL_VERSION,
-    userDir: DEFAUTL_INSTALL_DIRECTORY
+    userDir: DEFAUTL_INSTALL_DIRECTORY,
   }
 ) => {
   const output: InstallCommandOutput = {
@@ -49,10 +49,14 @@ export const installCommand = async (
         console.log(colors.red(`${prefix} Missing: ${missing}`));
       });
 
-      console.log(colors.yellow('\n💡 Please ensure all required credential files are present before running the install command.'));
+      console.log(
+        colors.yellow(
+          '\n💡 Please ensure all required credential files are present before running the install command.'
+        )
+      );
 
       output.success = false;
-      output.error = `Credential validation failed: ${validation.missing.join(', ')}`;
+      output.error = 'Credential validation failed';
     } else {
       console.log(colors.green('✓ All required credential files found'));
 

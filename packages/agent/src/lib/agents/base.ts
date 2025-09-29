@@ -1,5 +1,4 @@
-import { existsSync, copyFileSync, mkdirSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { existsSync, mkdirSync } from 'node:fs';
 import colors from 'ansi-colors';
 import { launchSync } from 'rover-common';
 import { Agent, AgentCredentialFile, ValidationResult } from './types.js';
@@ -14,6 +13,7 @@ export abstract class BaseAgent implements Agent {
 
   abstract getRequiredCredentials(): AgentCredentialFile[];
   abstract getInstallCommand(): string;
+  abstract copyCredentials(targetDir: string): Promise<void>;
 
   protected ensureDirectory(dirPath: string): void {
     try {
@@ -23,7 +23,9 @@ export abstract class BaseAgent implements Agent {
       if (error.code === 'EEXIST') {
         return;
       }
-      throw new Error(`Failed to create directory ${dirPath}: ${error.message || error}`);
+      throw new Error(
+        `Failed to create directory ${dirPath}: ${error.message || error}`
+      );
     }
   }
 
@@ -57,7 +59,9 @@ export abstract class BaseAgent implements Agent {
 
       if (result.failed) {
         const errorMessage = result.stderr || result.stdout || 'Unknown error';
-        throw new Error(`Installation command failed with exit code ${result.exitCode}: ${errorMessage}`);
+        throw new Error(
+          `Installation command failed with exit code ${result.exitCode}: ${errorMessage}`
+        );
       }
 
       console.log(colors.green(`✓ ${this.name} CLI installed successfully`));
@@ -67,33 +71,18 @@ export abstract class BaseAgent implements Agent {
         const stderr = error.stderr || '';
         const stdout = error.stdout || '';
         const output = stderr || stdout || error.message;
-        throw new Error(`Failed to install ${this.name} CLI (exit code ${error.exitCode}): ${output}`);
+        throw new Error(
+          `Failed to install ${this.name} CLI (exit code ${error.exitCode}): ${output}`
+        );
       } else if (error.code === 'ENOENT') {
-        throw new Error(`Failed to install ${this.name} CLI: Command '${command.split(' ')[0]}' not found. Please ensure it is installed and in PATH.`);
+        throw new Error(
+          `Failed to install ${this.name} CLI: Command '${command.split(' ')[0]}' not found. Please ensure it is installed and in PATH.`
+        );
       } else {
-        throw new Error(`Failed to install ${this.name} CLI: ${error.message || error}`);
+        throw new Error(
+          `Failed to install ${this.name} CLI: ${error.message || error}`
+        );
       }
     }
-  }
-
-  async copyCredentials(targetDir: string): Promise<void> {
-    console.log(colors.white.bold(`\nCopying ${this.name} credentials`));
-
-    const credentials = this.getRequiredCredentials();
-    for (const cred of credentials) {
-      if (existsSync(cred.path)) {
-        const targetPath = join(targetDir, cred.path.substring(1)); // Remove leading slash
-        const targetDirPath = dirname(targetPath);
-
-        // Create parent directory if needed (but not /home/agent itself)
-        this.ensureDirectory(targetDirPath);
-
-        // Copy the file
-        copyFileSync(cred.path, targetPath);
-        console.log(colors.gray('├── Copied: ') + colors.cyan(cred.path));
-      }
-    }
-
-    console.log(colors.green(`✓ ${this.name} credentials copied successfully`));
   }
 }

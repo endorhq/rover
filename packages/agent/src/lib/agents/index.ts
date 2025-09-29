@@ -10,7 +10,10 @@ export { CodexAgent } from './codex.js';
 export { GeminiAgent } from './gemini.js';
 export { QwenAgent } from './qwen.js';
 
-export function createAgent(agentName: string, version: string = 'latest'): Agent {
+export function createAgent(
+  agentName: string,
+  version: string = 'latest'
+): Agent {
   switch (agentName.toLowerCase()) {
     case 'claude':
       return new ClaudeAgent(version);
@@ -21,7 +24,9 @@ export function createAgent(agentName: string, version: string = 'latest'): Agen
     case 'qwen':
       return new QwenAgent(version);
     default:
-      throw new Error(`Unknown agent: ${agentName}. Supported agents: claude, codex, gemini, qwen`);
+      throw new Error(
+        `Unknown agent: ${agentName}. Supported agents: claude, codex, gemini, qwen`
+      );
   }
 }
 

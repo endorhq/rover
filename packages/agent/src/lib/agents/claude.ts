@@ -17,12 +17,12 @@ export class ClaudeAgent extends BaseAgent {
       {
         path: '/.claude.json',
         description: 'Claude configuration',
-        required: false, // Can work without it
+        required: true,
       },
       {
         path: '/.credentials.json',
         description: 'Claude credentials',
-        required: false, // Can work without it
+        required: true,
       },
     ];
   }
@@ -43,14 +43,25 @@ export class ClaudeAgent extends BaseAgent {
       config.projects = {};
 
       // Write to target
-      writeFileSync(join(targetDir, '.claude.json'), JSON.stringify(config, null, 2));
-      console.log(colors.gray('├── Copied: ') + colors.cyan('.claude.json (projects cleared)'));
+      writeFileSync(
+        join(targetDir, '.claude.json'),
+        JSON.stringify(config, null, 2)
+      );
+      console.log(
+        colors.gray('├── Copied: ') +
+          colors.cyan('.claude.json (projects cleared)')
+      );
     }
 
     // Copy credentials
     if (existsSync('/.credentials.json')) {
-      copyFileSync('/.credentials.json', join(targetClaudeDir, '.credentials.json'));
-      console.log(colors.gray('├── Copied: ') + colors.cyan('.credentials.json'));
+      copyFileSync(
+        '/.credentials.json',
+        join(targetClaudeDir, '.credentials.json')
+      );
+      console.log(
+        colors.gray('├── Copied: ') + colors.cyan('.credentials.json')
+      );
     }
 
     console.log(colors.green(`✓ ${this.name} credentials copied successfully`));

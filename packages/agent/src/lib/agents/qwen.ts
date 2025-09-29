@@ -42,7 +42,6 @@ export class QwenAgent extends BaseAgent {
     const credentials = this.getRequiredCredentials();
     for (const cred of credentials) {
       if (existsSync(cred.path)) {
-
         const filename = cred.path.split('/').pop()!;
         copyFileSync(cred.path, join(targetQwenDir, filename));
         console.log(colors.gray('├── Copied: ') + colors.cyan(cred.path));
