@@ -188,54 +188,54 @@ export class ProjectConfig {
   }
 
   // Data Modification (Setters)
-  addLanguage(language: LANGUAGE): void {
+  async addLanguage(language: LANGUAGE): Promise<void> {
     if (!this.data.languages.includes(language)) {
       this.data.languages.push(language);
-      this.save();
+      await this.save();
     }
   }
 
-  removeLanguage(language: LANGUAGE): void {
+  async removeLanguage(language: LANGUAGE): Promise<void> {
     const index = this.data.languages.indexOf(language);
     if (index > -1) {
       this.data.languages.splice(index, 1);
-      this.save();
+      await this.save();
     }
   }
 
-  addPackageManager(packageManager: PACKAGE_MANAGER): void {
+  async addPackageManager(packageManager: PACKAGE_MANAGER): Promise<void> {
     if (!this.data.packageManagers.includes(packageManager)) {
       this.data.packageManagers.push(packageManager);
-      this.save();
+      await this.save();
     }
   }
 
-  removePackageManager(packageManager: PACKAGE_MANAGER): void {
+  async removePackageManager(packageManager: PACKAGE_MANAGER): Promise<void> {
     const index = this.data.packageManagers.indexOf(packageManager);
     if (index > -1) {
       this.data.packageManagers.splice(index, 1);
-      this.save();
+      await this.save();
     }
   }
 
-  addTaskManager(taskManager: TASK_MANAGER): void {
+  async addTaskManager(taskManager: TASK_MANAGER): Promise<void> {
     if (!this.data.taskManagers.includes(taskManager)) {
       this.data.taskManagers.push(taskManager);
-      this.save();
+      await this.save();
     }
   }
 
-  removeTaskManager(taskManager: TASK_MANAGER): void {
+  async removeTaskManager(taskManager: TASK_MANAGER): Promise<void> {
     const index = this.data.taskManagers.indexOf(taskManager);
     if (index > -1) {
       this.data.taskManagers.splice(index, 1);
-      this.save();
+      await this.save();
     }
   }
 
-  setAttribution(value: boolean): void {
+  async setAttribution(value: boolean): Promise<void> {
     this.data.attribution = value;
-    this.save();
+    await this.save();
   }
 
   /**
@@ -411,23 +411,23 @@ export class UserSettings {
   }
 
   // Data Modification (Setters)
-  setDefaultAiAgent(agent: AI_AGENT): void {
+  async setDefaultAiAgent(agent: AI_AGENT): Promise<void> {
     this.data.defaults.aiAgent = agent;
     // Ensure the agent is in the available agents list
     if (!this.data.aiAgents.includes(agent)) {
       this.data.aiAgents.push(agent);
     }
-    this.save();
+    await this.save();
   }
 
-  addAiAgent(agent: AI_AGENT): void {
+  async addAiAgent(agent: AI_AGENT): Promise<void> {
     if (!this.data.aiAgents.includes(agent)) {
       this.data.aiAgents.push(agent);
-      this.save();
+      await this.save();
     }
   }
 
-  removeAiAgent(agent: AI_AGENT): void {
+  async removeAiAgent(agent: AI_AGENT): Promise<void> {
     const index = this.data.aiAgents.indexOf(agent);
     if (index > -1) {
       this.data.aiAgents.splice(index, 1);
@@ -438,7 +438,7 @@ export class UserSettings {
       ) {
         this.data.defaults.aiAgent = this.data.aiAgents[0];
       }
-      this.save();
+      await this.save();
     }
   }
 

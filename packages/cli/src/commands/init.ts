@@ -309,6 +309,10 @@ export const initCommand = async (
         userSettings.setDefaultAiAgent(defaultAIAgent);
       }
 
+      // Explicitly save both configurations
+      await projectConfig.save();
+      await userSettings.save();
+
       console.log(colors.green('✓ Rover initialization complete!'));
       console.log(`├── ${colors.gray('Project config:')} rover.json`);
       console.log(
