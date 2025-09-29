@@ -354,24 +354,24 @@ export class Runner {
     // Try to parse JSON from the response content if it looks like JSON
     let jsonData: any = null;
 
-    // Look for JSON block in the response
-    const jsonMatch = responseContent.match(/```json\s*([\s\S]*?)\s*```/);
-    if (jsonMatch) {
-      try {
-        jsonData = JSON.parse(jsonMatch[1]);
-      } catch (error) {
-        console.log(
-          colors.yellow('⚠️  Found JSON block but failed to parse it')
-        );
-      }
+    // First, try to parse the entire response as JSON
+    try {
+      jsonData = JSON.parse(responseContent);
+    } catch (error) {
+      // Not JSON, will need to extract manually
     }
 
-    // If no JSON block found, try parsing the entire response as JSON
-    if (!jsonData) {
-      try {
-        jsonData = JSON.parse(responseContent);
-      } catch (error) {
-        // Not JSON, will need to extract manually
+    // If the response is invalid, look for JSON block in the response
+    if (jsonData == null) {
+      const jsonMatch = responseContent.match(/```json\s*([\s\S]*?)\s*```/);
+      if (jsonMatch) {
+        try {
+          jsonData = JSON.parse(jsonMatch[1]);
+        } catch (error) {
+          console.log(
+            colors.yellow('⚠️  Found JSON block but failed to parse it')
+          );
+        }
       }
     }
 
