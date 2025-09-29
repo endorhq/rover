@@ -242,7 +242,7 @@ export const mergeCommand = async (
 
   // Load config
   try {
-    projectConfig = ProjectConfig.load();
+    projectConfig = await ProjectConfig.load();
   } catch (err) {
     if (!options.json) {
       console.log(colors.yellow('⚠ Could not load project settings'));
@@ -251,8 +251,8 @@ export const mergeCommand = async (
 
   // Load user preferences
   try {
-    if (UserSettings.exists()) {
-      const userSettings = UserSettings.load();
+    if (await UserSettings.exists()) {
+      const userSettings = await UserSettings.load();
       selectedAiAgent = userSettings.defaultAiAgent || AI_AGENT.Claude;
     } else {
       if (!options.json) {
@@ -278,7 +278,7 @@ export const mergeCommand = async (
 
   try {
     // Load task using TaskDescription
-    const task = TaskDescription.load(numericTaskId);
+    const task = await TaskDescription.load(numericTaskId);
 
     jsonOutput.taskTitle = task.title;
     jsonOutput.branchName = task.branchName;

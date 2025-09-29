@@ -109,14 +109,14 @@ const validations = (
 /**
  * Update task metadata with execution information
  */
-const updateTaskMetadata = (
+const updateTaskMetadata = async (
   taskId: number,
   updates: any,
   jsonMode?: boolean
 ) => {
   try {
-    if (TaskDescription.exists(taskId)) {
-      const task = TaskDescription.load(taskId);
+    if (await TaskDescription.exists(taskId)) {
+      const task = await TaskDescription.load(taskId);
 
       // Apply updates to the task object based on the updates parameter
       if (updates.status) {
@@ -270,7 +270,7 @@ export const startDockerExecution = async (
       if (spinner) spinner.success('Container started in background');
 
       // Update task metadata with container ID
-      updateTaskMetadata(
+      await updateTaskMetadata(
         taskId,
         {
           containerId: containerId,
@@ -289,7 +289,7 @@ export const startDockerExecution = async (
       }
 
       // Reset task to NEW status when container fails to start
-      updateTaskMetadata(
+      await updateTaskMetadata(
         taskId,
         {
           status: 'NEW',
@@ -322,7 +322,7 @@ export const startDockerExecution = async (
     }
 
     // Reset task to NEW status when Docker startup fails
-    updateTaskMetadata(
+    await updateTaskMetadata(
       taskId,
       {
         status: 'NEW',
@@ -417,7 +417,7 @@ export const taskCommand = async (
   } else {
     // Fall back to user settings if no agent specified
     try {
-      selectedAiAgent = getUserAIAgent();
+      selectedAiAgent = await getUserAIAgent();
     } catch (_err) {
       if (!json) {
         console.log(
@@ -725,7 +725,7 @@ export const taskCommand = async (
 
   if (taskData) {
     // Generate auto-increment ID for the task
-    const taskId = getNextTaskId();
+    const taskId = await getNextTaskId();
 
     // Create .rover/tasks directory structure
     const endorPath = join(await findProjectRoot(), '.rover');
@@ -742,7 +742,7 @@ export const taskCommand = async (
     mkdirSync(taskPath, { recursive: true });
 
     // Create task using TaskDescription class
-    const task = TaskDescription.create({
+    const task = await TaskDescription.create({
       id: taskId,
       title: taskData.title,
       description: taskData.description,

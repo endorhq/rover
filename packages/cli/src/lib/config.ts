@@ -120,6 +120,14 @@ export class ProjectConfig {
   }
 
   /**
+   * Check if a project configuration exists (synchronous version using current directory)
+   */
+  static existsSync(): boolean {
+    const filePath = join(process.cwd(), PROJECT_CONFIG_FILE);
+    return existsSync(filePath);
+  }
+
+  /**
    * Migrate old configuration to current schema version
    */
   private static migrate(data: any): ProjectConfigSchema {
@@ -322,6 +330,14 @@ export class UserSettings {
    */
   static async exists(): Promise<boolean> {
     const filePath = await UserSettings.getSettingsPath();
+    return existsSync(filePath);
+  }
+
+  /**
+   * Check if user settings exist (synchronous version using current directory)
+   */
+  static existsSync(): boolean {
+    const filePath = join(process.cwd(), '.rover', 'settings.json');
     return existsSync(filePath);
   }
 

@@ -293,7 +293,9 @@ export class IterationConfig {
 /**
  * Load all the iterations for a given task
  */
-export const getTaskIterations = async (task: TaskDescription): Promise<IterationConfig[]> => {
+export const getTaskIterations = async (
+  task: TaskDescription
+): Promise<IterationConfig[]> => {
   const iterations: IterationConfig[] = [];
   const iterationsPath = await task.iterationsPath();
 

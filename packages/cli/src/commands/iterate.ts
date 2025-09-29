@@ -238,7 +238,7 @@ export const iterateCommand = async (
 
   try {
     // Load task using TaskDescription first to get agent preference
-    const task = TaskDescription.load(numericTaskId);
+    const task = await TaskDescription.load(numericTaskId);
 
     // Load AI agent selection - prefer task's agent, fall back to user settings
     let selectedAiAgent = task.agent || AI_AGENT.Claude; // Use task agent if available
@@ -246,7 +246,7 @@ export const iterateCommand = async (
     if (!task.agent) {
       // No agent stored in task, try user settings
       try {
-        selectedAiAgent = getUserAIAgent();
+        selectedAiAgent = await getUserAIAgent();
       } catch (_err) {
         if (!json) {
           console.log(

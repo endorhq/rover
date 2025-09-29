@@ -74,7 +74,7 @@ export const listCommand = async (
   const telemetry = getTelemetry();
 
   try {
-    const tasks = getDescriptions();
+    const tasks = await getDescriptions();
 
     if (!options.watching) {
       telemetry?.eventListTasks();
@@ -118,10 +118,10 @@ export const listCommand = async (
         TaskDescriptionSchema & { iterationsData: IterationConfig[] }
       > = [];
 
-      tasks.forEach(task => {
+      for (const task of tasks) {
         let iterationsData: IterationConfig[] = [];
         try {
-          iterationsData = getTaskIterations(task);
+          iterationsData = await getTaskIterations(task);
         } catch (err) {
           if (VERBOSE) {
             console.error(
@@ -137,7 +137,7 @@ export const listCommand = async (
           ...task.rawData,
           iterationsData,
         });
-      });
+      }
 
       console.log(JSON.stringify(jsonOutput, null, 2));
       return;
@@ -173,7 +173,7 @@ export const listCommand = async (
 
     // Print rows
     for (const task of tasks) {
-      const lastIteration = getLastTaskIteration(task);
+      const lastIteration = await getLastTaskIteration(task);
       const title = task.title || 'Unknown Task';
       const taskStatus = task.status;
       const startedAt = task.startedAt;

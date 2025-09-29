@@ -64,7 +64,7 @@ export const logsCommand = async (
 
   try {
     // Load task using TaskDescription
-    const task = TaskDescription.load(numericTaskId);
+    const task = await TaskDescription.load(numericTaskId);
 
     // Parse iteration number if provided
     let targetIteration: number | undefined;

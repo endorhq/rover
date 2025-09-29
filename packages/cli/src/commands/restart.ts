@@ -49,7 +49,7 @@ export const restartCommand = async (
 
   try {
     // Load task using TaskDescription
-    const task = TaskDescription.load(numericTaskId);
+    const task = await TaskDescription.load(numericTaskId);
 
     // Check if task is in NEW or FAILED status
     if (!task.isNew() && !task.isFailed()) {
@@ -73,8 +73,8 @@ export const restartCommand = async (
     let selectedAiAgent = AI_AGENT.Claude; // default
 
     try {
-      if (UserSettings.exists()) {
-        const userSettings = UserSettings.load();
+      if (await UserSettings.exists()) {
+        const userSettings = await UserSettings.load();
         selectedAiAgent = userSettings.defaultAiAgent || AI_AGENT.Claude;
       }
     } catch (error) {

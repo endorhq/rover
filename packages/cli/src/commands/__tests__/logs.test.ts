@@ -93,7 +93,7 @@ describe('logs command', () => {
     title: string = 'Test Task',
     containerId?: string
   ) => {
-    const task = TaskDescription.create({
+    const task = await TaskDescription.create({
       id,
       title,
       description: 'Test task description',

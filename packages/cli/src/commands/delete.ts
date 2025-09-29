@@ -56,7 +56,7 @@ export const deleteCommand = async (
 
   for (const numericTaskId of numericTaskIds) {
     try {
-      const task = TaskDescription.load(numericTaskId);
+      const task = await TaskDescription.load(numericTaskId);
       tasksToDelete.push(task);
     } catch (error) {
       if (error instanceof TaskNotFoundError) {

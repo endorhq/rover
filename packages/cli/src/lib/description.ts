@@ -350,8 +350,8 @@ export class TaskDescription {
   /**
    * Update the current status based on the latest iteration
    */
-  updateStatus(): void {
-    const iteration = getLastTaskIteration(this);
+  async updateStatus(): Promise<void> {
+    const iteration = await getLastTaskIteration(this);
 
     if (iteration != null) {
       const status = iteration.status();
@@ -388,7 +388,7 @@ export class TaskDescription {
       }
 
       const metadata = { timestamp, error };
-      this.setStatus(statusName, metadata);
+      await this.setStatus(statusName, metadata);
     }
   }
 
@@ -411,7 +411,10 @@ export class TaskDescription {
   /**
    * Set task status with optional metadata
    */
-  async setStatus(status: TaskStatus, metadata?: StatusMetadata): Promise<void> {
+  async setStatus(
+    status: TaskStatus,
+    metadata?: StatusMetadata
+  ): Promise<void> {
     this.data.status = status;
 
     const timestamp = metadata?.timestamp || new Date().toISOString();
@@ -450,56 +453,56 @@ export class TaskDescription {
   /**
    * Mark task as completed
    */
-  markCompleted(completedAt?: string): void {
-    this.setStatus('COMPLETED', { timestamp: completedAt });
+  async markCompleted(completedAt?: string): Promise<void> {
+    await this.setStatus('COMPLETED', { timestamp: completedAt });
   }
 
   /**
    * Mark task as failed with error message
    */
-  markFailed(error: string, failedAt?: string): void {
-    this.setStatus('FAILED', { timestamp: failedAt, error });
+  async markFailed(error: string, failedAt?: string): Promise<void> {
+    await this.setStatus('FAILED', { timestamp: failedAt, error });
   }
 
   /**
    * Mark task as in progress
    */
-  markInProgress(startedAt?: string): void {
-    this.setStatus('IN_PROGRESS', { timestamp: startedAt });
+  async markInProgress(startedAt?: string): Promise<void> {
+    await this.setStatus('IN_PROGRESS', { timestamp: startedAt });
   }
 
   /**
    * Mark task as iterating
    */
-  markIterating(timestamp?: string): void {
-    this.setStatus('ITERATING', { timestamp });
+  async markIterating(timestamp?: string): Promise<void> {
+    await this.setStatus('ITERATING', { timestamp });
   }
 
   /**
    * Mark task as merged
    */
-  markMerged(timestamp?: string): void {
-    this.setStatus('MERGED', { timestamp });
+  async markMerged(timestamp?: string): Promise<void> {
+    await this.setStatus('MERGED', { timestamp });
   }
 
   /**
    * Mark task as pushed
    */
-  markPushed(timestamp?: string): void {
-    this.setStatus('PUSHED', { timestamp });
+  async markPushed(timestamp?: string): Promise<void> {
+    await this.setStatus('PUSHED', { timestamp });
   }
 
   /**
    * Reset task back to NEW status (for container start failures or user reset)
    */
-  resetToNew(timestamp?: string): void {
-    this.setStatus('NEW', { timestamp });
+  async resetToNew(timestamp?: string): Promise<void> {
+    await this.setStatus('NEW', { timestamp });
   }
 
   /**
    * Restart a failed task by resetting to IN_PROGRESS  status and tracking restart attempt
    */
-  restart(timestamp?: string): void {
+  async restart(timestamp?: string): Promise<void> {
     const restartTimestamp = timestamp || new Date().toISOString();
 
     // Increment restart count
@@ -507,7 +510,7 @@ export class TaskDescription {
     this.data.lastRestartAt = restartTimestamp;
 
     // Reset to IN_PROGRESS status
-    this.setStatus('IN_PROGRESS', { timestamp: restartTimestamp });
+    await this.setStatus('IN_PROGRESS', { timestamp: restartTimestamp });
   }
 
   // Iteration Management
@@ -657,7 +660,10 @@ export class TaskDescription {
   /**
    * Set container execution information
    */
-  async setContainerInfo(containerId: string, executionStatus: string): Promise<void> {
+  async setContainerInfo(
+    containerId: string,
+    executionStatus: string
+  ): Promise<void> {
     this.data.containerId = containerId;
     this.data.executionStatus = executionStatus;
     if (executionStatus === 'running') {

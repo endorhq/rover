@@ -149,12 +149,12 @@ export const initCommand = async (
   }
 
   // Check if already initialized
-  if (ProjectConfig.exists() && UserSettings.exists()) {
+  if (ProjectConfig.existsSync() && UserSettings.existsSync()) {
     console.log(
       colors.cyan('\n✓ Rover is already initialized in this directory')
     );
     return;
-  } else if (!UserSettings.exists()) {
+  } else if (!UserSettings.existsSync()) {
     console.log(
       colors.green(
         '\n✓ Rover is initialized in this directory. User settings will be initialized now.'
@@ -271,8 +271,8 @@ export const initCommand = async (
       // Save Project Configuration (rover.json)
       let projectConfig: ProjectConfig;
 
-      if (ProjectConfig.exists()) {
-        projectConfig = ProjectConfig.load();
+      if (ProjectConfig.existsSync()) {
+        projectConfig = await ProjectConfig.load();
         // Update with detected values
         environment.languages.forEach(lang => projectConfig.addLanguage(lang));
         environment.packageManagers.forEach(pm =>
@@ -297,8 +297,8 @@ export const initCommand = async (
 
       // Save User Settings (.rover/settings.json)
       let userSettings: UserSettings;
-      if (UserSettings.exists()) {
-        userSettings = UserSettings.load();
+      if (UserSettings.existsSync()) {
+        userSettings = await UserSettings.load();
         // Update AI agents
         availableAgents.forEach(agent => userSettings.addAiAgent(agent));
         userSettings.setDefaultAiAgent(defaultAIAgent);

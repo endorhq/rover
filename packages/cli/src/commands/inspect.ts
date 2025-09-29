@@ -176,7 +176,7 @@ export const inspectCommand = async (
 
   try {
     // Load task using TaskDescription
-    const task = TaskDescription.load(numericTaskId);
+    const task = await TaskDescription.load(numericTaskId);
 
     if (iterationNumber === undefined) {
       iterationNumber = task.iterations;

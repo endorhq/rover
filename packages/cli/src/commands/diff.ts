@@ -20,7 +20,7 @@ export const diffCommand = async (
 
   try {
     // Load task using TaskDescription
-    const task = TaskDescription.load(numericTaskId);
+    const task = await TaskDescription.load(numericTaskId);
 
     // Check if worktree exists
     if (!task.worktreePath || !existsSync(task.worktreePath)) {

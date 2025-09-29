@@ -68,8 +68,8 @@ describe('diff command', () => {
   });
 
   // Helper to create a test task with a worktree
-  const createTestTask = (id: number, title: string = 'Test Task') => {
-    const task = TaskDescription.create({
+  const createTestTask = async (id: number, title: string = 'Test Task') => {
+    const task = await TaskDescription.create({
       id,
       title,
       description: 'Test task description',
@@ -106,7 +106,7 @@ describe('diff command', () => {
 
     it('should handle task without workspace', async () => {
       // Create task without workspace
-      const task = TaskDescription.create({
+      const task = await TaskDescription.create({
         id: 1,
         title: 'No Workspace Task',
         description: 'Test',
@@ -122,7 +122,7 @@ describe('diff command', () => {
 
   describe('Basic diff functionality', () => {
     it('should show no changes when workspace is clean', async () => {
-      createTestTask(1, 'Clean Task');
+      await createTestTask(1, 'Clean Task');
 
       await diffCommand('1');
 
@@ -132,7 +132,7 @@ describe('diff command', () => {
     });
 
     it('should show unstaged changes', async () => {
-      const { worktreePath } = createTestTask(2, 'Unstaged Changes Task');
+      const { worktreePath } = await createTestTask(2, 'Unstaged Changes Task');
 
       // Modify an existing file
       const readmePath = join(worktreePath, 'README.md');
@@ -150,7 +150,7 @@ describe('diff command', () => {
     });
 
     it('should show staged changes', async () => {
-      const { worktreePath } = createTestTask(3, 'Staged Changes Task');
+      const { worktreePath } = await createTestTask(3, 'Staged Changes Task');
 
       // Create and stage a new file
       const newFilePath = join(worktreePath, 'new-file.js');
@@ -172,7 +172,7 @@ describe('diff command', () => {
     });
 
     it('should show both staged and unstaged changes', async () => {
-      const { worktreePath } = createTestTask(4, 'Mixed Changes Task');
+      const { worktreePath } = await createTestTask(4, 'Mixed Changes Task');
 
       // Stage a new file
       const stagedFile = join(worktreePath, 'staged.txt');
@@ -199,7 +199,7 @@ describe('diff command', () => {
 
   describe('Untracked files handling', () => {
     it('should include untracked files in diff', async () => {
-      const { worktreePath } = createTestTask(5, 'Untracked Files Task');
+      const { worktreePath } = await createTestTask(5, 'Untracked Files Task');
 
       // Create untracked files
       writeFileSync(
@@ -227,7 +227,7 @@ describe('diff command', () => {
     });
 
     it('should respect .gitignore for untracked files', async () => {
-      const { worktreePath } = createTestTask(6, 'Gitignore Task');
+      const { worktreePath } = await createTestTask(6, 'Gitignore Task');
 
       // Create files, some matching .gitignore patterns
       writeFileSync(join(worktreePath, 'important.txt'), 'This should show\n');
@@ -256,7 +256,7 @@ describe('diff command', () => {
     });
 
     it('should handle mix of tracked, untracked, and modified files', async () => {
-      const { worktreePath } = createTestTask(7, 'Mixed Files Task');
+      const { worktreePath } = await createTestTask(7, 'Mixed Files Task');
 
       // Modified tracked file
       const readmePath = join(worktreePath, 'README.md');
@@ -294,7 +294,7 @@ describe('diff command', () => {
 
   describe('File-specific diff', () => {
     it('should show diff for specific file only', async () => {
-      const { worktreePath } = createTestTask(8, 'Specific File Task');
+      const { worktreePath } = await createTestTask(8, 'Specific File Task');
 
       // Create multiple changes
       appendFileSync(join(worktreePath, 'README.md'), 'README change\n');
@@ -316,7 +316,7 @@ describe('diff command', () => {
     });
 
     it('should handle non-existent file path', async () => {
-      createTestTask(9, 'Non-existent File Task');
+      await createTestTask(9, 'Non-existent File Task');
 
       await diffCommand('9', 'non-existent.txt');
 
@@ -326,7 +326,10 @@ describe('diff command', () => {
     });
 
     it('should show diff for untracked file when specified', async () => {
-      const { worktreePath } = createTestTask(10, 'Untracked Specific Task');
+      const { worktreePath } = await createTestTask(
+        10,
+        'Untracked Specific Task'
+      );
 
       // Create untracked file
       writeFileSync(
@@ -347,7 +350,7 @@ describe('diff command', () => {
 
   describe('--only-files flag', () => {
     it('should list only file names when flag is set', async () => {
-      const { worktreePath } = createTestTask(11, 'Files Only Task');
+      const { worktreePath } = await createTestTask(11, 'Files Only Task');
 
       // Create various changes
       appendFileSync(join(worktreePath, 'README.md'), 'Change\n');
@@ -378,7 +381,7 @@ describe('diff command', () => {
     });
 
     it('should show no files message when no changes', async () => {
-      createTestTask(12, 'No Files Task');
+      await createTestTask(12, 'No Files Task');
 
       await diffCommand('12', undefined, { onlyFiles: true });
 
@@ -392,7 +395,7 @@ describe('diff command', () => {
     // TODO: Review this specific test as it's failing on the CI.
     //       It works locally only. I tried it with CI=1 and still works.
     it.skip('should compare with specified branch', async () => {
-      const { worktreePath } = createTestTask(13, 'Branch Compare Task');
+      const { worktreePath } = await createTestTask(13, 'Branch Compare Task');
 
       // Make changes in the worktree and commit them
       appendFileSync(
@@ -429,7 +432,7 @@ describe('diff command', () => {
     });
 
     it('should handle invalid branch name', async () => {
-      createTestTask(14, 'Invalid Branch Task');
+      await createTestTask(14, 'Invalid Branch Task');
 
       await diffCommand('14', undefined, { branch: 'non-existent-branch' });
 
@@ -443,7 +446,7 @@ describe('diff command', () => {
 
   describe('Complex scenarios', () => {
     it('should handle renamed files', async () => {
-      const { worktreePath } = createTestTask(15, 'Rename Task');
+      const { worktreePath } = await createTestTask(15, 'Rename Task');
 
       // Create and commit a file first
       writeFileSync(join(worktreePath, 'old-name.txt'), 'File content\n');
@@ -469,7 +472,7 @@ describe('diff command', () => {
     });
 
     it('should handle deleted files', async () => {
-      const { worktreePath } = createTestTask(16, 'Delete Task');
+      const { worktreePath } = await createTestTask(16, 'Delete Task');
 
       // Create and commit a file
       writeFileSync(join(worktreePath, 'to-delete.txt'), 'Will be deleted\n');
@@ -493,7 +496,7 @@ describe('diff command', () => {
     });
 
     it('should handle binary files', async () => {
-      const { worktreePath } = createTestTask(17, 'Binary Task');
+      const { worktreePath } = await createTestTask(17, 'Binary Task');
 
       // Create a binary file (small image simulation)
       const binaryContent = Buffer.from([
@@ -512,7 +515,7 @@ describe('diff command', () => {
     });
 
     it('should handle large number of changes', async () => {
-      const { worktreePath } = createTestTask(18, 'Many Changes Task');
+      const { worktreePath } = await createTestTask(18, 'Many Changes Task');
 
       // Create many files
       for (let i = 1; i <= 10; i++) {
@@ -536,7 +539,7 @@ describe('diff command', () => {
 
   describe('Output formatting', () => {
     it('should use correct colors for diff output', async () => {
-      const { worktreePath } = createTestTask(19, 'Color Test Task');
+      const { worktreePath } = await createTestTask(19, 'Color Test Task');
 
       // Create changes
       appendFileSync(join(worktreePath, 'README.md'), 'Added line\n');
@@ -552,7 +555,7 @@ describe('diff command', () => {
 
     it('should show tips when appropriate', async () => {
       const { showTips } = await import('../../utils/display.js');
-      createTestTask(20, 'Tips Task');
+      await createTestTask(20, 'Tips Task');
 
       await diffCommand('20');
 
@@ -571,7 +574,7 @@ describe('diff command', () => {
       launchSync('git', ['config', 'user.name', 'Test User']);
       mkdirSync('.rover/tasks', { recursive: true });
 
-      const task = TaskDescription.create({
+      const task = await TaskDescription.create({
         id: 1,
         title: 'Empty Repo Task',
         description: 'Test',
@@ -608,7 +611,7 @@ describe('diff command', () => {
     });
 
     it('should handle very long file paths', async () => {
-      const { worktreePath } = createTestTask(21, 'Long Path Task');
+      const { worktreePath } = await createTestTask(21, 'Long Path Task');
 
       // Create deeply nested directory
       const deepPath = join(
@@ -635,7 +638,7 @@ describe('diff command', () => {
     });
 
     it('should handle files with special characters in names', async () => {
-      const { worktreePath } = createTestTask(22, 'Special Chars Task');
+      const { worktreePath } = await createTestTask(22, 'Special Chars Task');
 
       // Create files with special characters
       writeFileSync(join(worktreePath, 'file with spaces.txt'), 'Content\n');
@@ -661,7 +664,7 @@ describe('diff command', () => {
       const { getTelemetry } = await import('../../lib/telemetry.js');
       const mockTelemetry = getTelemetry();
 
-      createTestTask(23, 'Telemetry Task');
+      await createTestTask(23, 'Telemetry Task');
 
       await diffCommand('23');
 

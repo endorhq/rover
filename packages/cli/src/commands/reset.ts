@@ -23,7 +23,7 @@ export const resetCommand = async (
 
   try {
     // Load task using TaskDescription
-    const task = TaskDescription.load(numericTaskId);
+    const task = await TaskDescription.load(numericTaskId);
     const taskPath = join(
       await findProjectRoot(),
       '.rover',

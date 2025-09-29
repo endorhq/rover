@@ -83,7 +83,7 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
 
   // Load config
   try {
-    projectConfig = ProjectConfig.load();
+    projectConfig = await ProjectConfig.load();
   } catch (err) {
     if (!options.json) {
       console.log(colors.yellow('⚠ Could not load project settings'));
@@ -92,7 +92,7 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
 
   try {
     // Load task using TaskDescription
-    const task = TaskDescription.load(numericTaskId);
+    const task = await TaskDescription.load(numericTaskId);
 
     result.taskTitle = task.title;
     result.branchName = task.branchName;
