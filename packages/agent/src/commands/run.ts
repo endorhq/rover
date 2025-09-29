@@ -133,10 +133,10 @@ export const runCommand = async (
             colors.gray('├── Tokens: ') + colors.cyan(result.tokens.toString())
           );
         }
-        if (result.price) {
+        if (result.cost) {
           console.log(
-            colors.gray('├── Price: ') +
-              colors.cyan(`$${result.price.toFixed(4)}`)
+            colors.gray('├── Cost: ') +
+              colors.cyan(`$${result.cost.toFixed(4)}`)
           );
         }
         if (result.error) {

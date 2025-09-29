@@ -31,7 +31,7 @@ steps:
     type: agent
     name: 'Analyze Project'
     prompt: |
-      Analyze the current project to identify the language and main framwork.
+      Analyze the current project to identify the language and main framework.
 
       Do not apply any change, just identify it.
     outputs:
@@ -44,17 +44,17 @@ steps:
 
   - id: suggest_library
     type: agent
-    name: 'Generate Final Report and suggest the library'
+    name: 'Generate the Final Report and suggest the library'
     prompt: |
       Analyze the task description from the user:
 
       {{inputs.description}}
 
       Based on this description and the current project language and main framework,
-      find the best library for it. Write the library name in a file too.
+      find the best library for it. Write the library name to a file too.
 
       Main language: {{steps.analyze_project.outputs.language}}
-      Main framwork: {{steps.analyze_project.outputs.framework}}
+      Main framework: {{steps.analyze_project.outputs.framework}}
     outputs:
       - name: library_name
         description: 'The library name you suggest to complete the given description'

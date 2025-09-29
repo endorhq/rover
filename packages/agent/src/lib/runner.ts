@@ -28,8 +28,8 @@ export interface RunnerStepResult {
   duration: number;
   // Consumed tokens
   tokens?: number;
-  // Price
-  price?: number;
+  // Cost
+  cost?: number;
   // Parsed output
   outputs: Map<string, string>;
 }
@@ -278,16 +278,14 @@ export class Runner {
         try {
           parsedResponse = JSON.parse(rawOutput);
 
-          // TODO: Different agents might structure JSON differently
-          // Need to determine the correct key for the actual content
           if (this.tool === 'claude') {
-            // TODO: Verify the correct key for Claude's JSON response
+            // Currently, claude uses "result"
             responseContent =
               parsedResponse.result ||
               parsedResponse.content ||
               parsedResponse.message;
           } else if (this.tool === 'gemini') {
-            // TODO: Verify the correct key for Gemini's JSON response
+            // Currently, gemini uses "response"
             responseContent =
               parsedResponse.response ||
               parsedResponse.content ||
