@@ -96,11 +96,6 @@ configure-mcp-servers() {
 # Task ID: ${this.taskId}
 # Task description is mounted at /task/description.json
 
-# Download and install the MCP server
-export PACKAGE_MANAGER_MCP_SERVER_VERSION=v0.1.3
-wget -O /usr/local/bin/package-manager-mcp-server https://github.com/endorhq/package-manager-mcp/releases/download/\${PACKAGE_MANAGER_MCP_SERVER_VERSION}/package-manager-mcp-$(uname -m)-unknown-linux-musl
-chmod +x /usr/local/bin/package-manager-mcp-server
-
 echo "======================================="
 echo "📦 Starting the package manager MCP server"
 echo "======================================="
