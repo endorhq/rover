@@ -252,6 +252,7 @@ export const startDockerExecution = async (
     if (!isDockerRootless) {
       const userInfo_ = userInfo();
       dockerArgs.push('--user', `${userInfo_.uid}:${userInfo_.gid}`);
+      dockerArgs.push('--group-add', 'wheel');
     }
 
     dockerArgs.push(

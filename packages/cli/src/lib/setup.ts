@@ -25,25 +25,25 @@ export class SetupBuilder {
         return `# Function to configure MCP servers for claude
 configure-mcp-servers() {
   # Ensure configuration file exists
-  if [ ! -f /home/agent/.claude.json ]; then
-    echo '{}' > /home/agent/.claude.json
+  if [ ! -f $HOME/.claude.json ]; then
+    echo '{}' > $HOME/.claude.json
   fi
 
-  jq '.mcpServers //= {}' /home/agent/.claude.json | \
+  jq '.mcpServers //= {}' $HOME/.claude.json | \
     jq '.mcpServers += { "package-manager": { "type": "http", "url": "http://127.0.0.1:8090/mcp" } }' \
     > /tmp/agent-settings.json
-  mv /tmp/agent-settings.json /home/agent/.claude.json
+  mv /tmp/agent-settings.json $HOME/.claude.json
 }
 `;
       case 'codex':
         return `# Function to configure MCP servers for codex
 configure-mcp-servers() {
   # Ensure configuration file exists
-  if [ ! -f /home/agent/.codex/config.toml ]; then
-    echo '' > /home/agent/.codex/config.toml
+  if [ ! -f $HOME/.codex/config.toml ]; then
+    echo '' > $HOME/.codex/config.toml
   fi
 
-  cat <<'EOF' >> /home/agent/.codex/config.toml
+  cat <<'EOF' >> $HOME/.codex/config.toml
 [mcp_servers.package-manager]
 command = "mcp-remote"
 args = ["http://127.0.0.1:8090/mcp"]
@@ -54,30 +54,30 @@ EOF
         return `# Function to configure MCP servers for gemini
 configure-mcp-servers() {
   # Ensure configuration file exists
-  if [ ! -f /home/agent/.gemini/settings.json ]; then
-    mkdir -p /home/agent/.gemini
-    echo '{}' > /home/agent/.gemini/settings.json
+  if [ ! -f $HOME/.gemini/settings.json ]; then
+    mkdir -p $HOME/.gemini
+    echo '{}' > $HOME/.gemini/settings.json
   fi
 
-  jq '.mcpServers //= {}' /home/agent/.gemini/settings.json | \
+  jq '.mcpServers //= {}' $HOME/.gemini/settings.json | \
     jq '.mcpServers += { "package-manager": { "httpUrl": "http://127.0.0.1:8090/mcp", "oauth": { "enabled": false } } }' \
     > /tmp/agent-settings.json
-  mv /tmp/agent-settings.json /home/agent/.gemini/settings.json
+  mv /tmp/agent-settings.json $HOME/.gemini/settings.json
 }
 `;
       case 'qwen':
         return `# Function to configure MCP servers for qwen
 configure-mcp-servers() {
   # Ensure configuration file exists
-  if [ ! -f /home/agent/.qwen/settings.json ]; then
-    mkdir -p /home/agent/.qwen
-    echo '{}' > /home/agent/.qwen/settings.json
+  if [ ! -f $HOME/.qwen/settings.json ]; then
+    mkdir -p $HOME/.qwen
+    echo '{}' > $HOME/.qwen/settings.json
   fi
 
-  jq '.mcpServers //= {}' /home/agent/.qwen/settings.json | \
+  jq '.mcpServers //= {}' $HOME/.qwen/settings.json | \
     jq '.mcpServers += { "package-manager": { "httpUrl": "http://127.0.0.1:8090/mcp", "oauth": { "enabled": false } } }' \
     > /tmp/agent-settings.json
-  mv /tmp/agent-settings.json /home/agent/.qwen/settings.json
+  mv /tmp/agent-settings.json $HOME/.qwen/settings.json
 }
 `;
       default:
@@ -349,14 +349,14 @@ echo "======================================="`;
     if (this.agent == 'claude') {
       return `npm install -g @anthropic-ai/claude-code
 
-mkdir -p /home/agent/.claude
+mkdir -p $HOME/.claude
 
 # Process and copy Claude credentials
 if [ -f "/.claude.json" ]; then
     echo "📝 Processing Claude configuration..."
     write_status "installing" "Claude configuration" 20
     # Copy .claude.json but clear the projects object
-    jq '.projects = {}' /.claude.json > /home/agent/.claude.json
+    jq '.projects = {}' /.claude.json > $HOME/.claude.json
     echo "✅ Claude configuration processed and copied to claude user"
 else
     echo "⚠️  No Claude config found at /.claude.json, continuing..."
@@ -365,7 +365,7 @@ fi
 if [ -f "/.credentials.json" ]; then
     echo "📝 Processing Claude credentials..."
     write_status "installing" "Claude credentials" 20
-    cp /.credentials.json /home/agent/.claude/
+    cp /.credentials.json $HOME/.claude/
     echo "✅ Claude credentials processed and copied to claude user"
 else
     echo "⚠️  No Claude credentials found, continuing..."
@@ -384,9 +384,9 @@ if [ -d "/.codex" ]; then
     echo "📝 Processing Codex credentials..."
     write_status "installing" "Process Codex credentials" 20
 
-    mkdir -p /home/agent/.codex
-    cp /.codex/auth.json /home/agent/.codex/
-    cp /.codex/config.json /home/agent/.codex/
+    mkdir -p $HOME/.codex
+    cp /.codex/auth.json $HOME/.codex/
+    cp /.codex/config.json $HOME/.codex/
 
     echo "✅ Codex credentials processed and copied to agent user"
 else
@@ -403,10 +403,10 @@ if [ -d "/.gemini" ]; then
     echo "📝 Processing Gemini credentials..."
     write_status "installing" "Process Gemini credentials" 20
 
-    mkdir -p /home/agent/.gemini
-    cp /.gemini/oauth_creds.json /home/agent/.gemini/
-    cp /.gemini/settings.json /home/agent/.gemini/
-cp /.gemini/user_id /home/agent/.gemini/
+    mkdir -p $HOME/.gemini
+    cp /.gemini/oauth_creds.json $HOME/.gemini/
+    cp /.gemini/settings.json $HOME/.gemini/
+cp /.gemini/user_id $HOME/.gemini/
 
     echo "✅ Gemini credentials processed and copied to agent user"
 else
@@ -423,10 +423,10 @@ if [ -d "/.qwen" ]; then
     echo "📝 Processing Qwen credentials..."
     write_status "installing" "Process Qwen credentials" 20
 
-    mkdir -p /home/agent/.qwen
-    cp /.qwen/installation_id /home/agent/.qwen/
-    cp /.qwen/oauth_creds.json /home/agent/.qwen/
-    cp /.qwen/settings.json /home/agent/.qwen/
+    mkdir -p $HOME/.qwen
+    cp /.qwen/installation_id $HOME/.qwen/
+    cp /.qwen/oauth_creds.json $HOME/.qwen/
+    cp /.qwen/settings.json $HOME/.qwen/
 
     echo "✅ Qwen credentials processed and copied to agent user"
 else
@@ -497,6 +497,11 @@ validate_task_file() {
 # depending on the chosen agent and requirements, make this directory
 # available in the $PATH
 export PATH=/root/local/.bin:$PATH
+export HOME=/home/agent
+sudo mkdir -p $HOME
+
+echo "sleeping..."
+sleep infinity
 
 ${this.generateCommonFunctions()}
 
