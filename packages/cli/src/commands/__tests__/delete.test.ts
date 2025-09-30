@@ -71,8 +71,8 @@ describe('delete command', () => {
   });
 
   // Helper to create a test task
-  const createTestTask = (id: number, title: string = 'Test Task') => {
-    const task = TaskDescription.create({
+  const createTestTask = async (id: number, title: string = 'Test Task') => {
+    const task = await TaskDescription.create({
       id,
       title,
       description: 'Test task description',
@@ -167,12 +167,12 @@ describe('delete command', () => {
 
   describe('Successful task deletion', () => {
     it('should delete task with --yes flag', async () => {
-      const task = createTestTask(1, 'Task to Delete');
+      const task = await createTestTask(1, 'Task to Delete');
       const taskPath = join('.rover', 'tasks', '1');
 
       // Verify task exists before deletion
       expect(existsSync(taskPath)).toBe(true);
-      expect(TaskDescription.exists(1)).toBe(true);
+      expect(await TaskDescription.exists(1)).toBe(true);
 
       const { exitWithSuccess } = await import('../../utils/exit.js');
 
@@ -191,7 +191,7 @@ describe('delete command', () => {
     });
 
     it('should delete task with JSON output', async () => {
-      createTestTask(2, 'JSON Delete Task');
+      await createTestTask(2, 'JSON Delete Task');
 
       const { exitWithSuccess } = await import('../../utils/exit.js');
 
@@ -209,7 +209,7 @@ describe('delete command', () => {
     });
 
     it('should prune Git worktrees after deletion', async () => {
-      createTestTask(3, 'Worktree Test Task');
+      await createTestTask(3, 'Worktree Test Task');
 
       // Verify worktree exists
       const worktreeList = launchSync('git', ['worktree', 'list']).stdout;
@@ -222,7 +222,7 @@ describe('delete command', () => {
     });
 
     it('should delete task with complex title and description', async () => {
-      createTestTask(4, 'Complex Task with "quotes" & special chars!');
+      await createTestTask(4, 'Complex Task with "quotes" & special chars!');
 
       const { exitWithSuccess } = await import('../../utils/exit.js');
 
@@ -242,7 +242,7 @@ describe('delete command', () => {
 
   describe('User confirmation flow', () => {
     it('should prompt for confirmation when no --yes flag', async () => {
-      createTestTask(5, 'Confirmation Task');
+      await createTestTask(5, 'Confirmation Task');
 
       // Mock enquirer to return false (cancel)
       const enquirer = await import('enquirer');
@@ -265,7 +265,7 @@ describe('delete command', () => {
     });
 
     it('should treat Ctrl-C as cancellation', async () => {
-      createTestTask(26, 'Ctrl-C Task');
+      await createTestTask(26, 'Ctrl-C Task');
 
       // Mock enquirer to throw an error simulating Ctrl-C
       const enquirer = await import('enquirer');
@@ -290,7 +290,7 @@ describe('delete command', () => {
     });
 
     it('should proceed when user confirms deletion', async () => {
-      createTestTask(6, 'Confirmed Task');
+      await createTestTask(6, 'Confirmed Task');
 
       // Mock enquirer to return true (confirm)
       const enquirer = await import('enquirer');
@@ -314,7 +314,7 @@ describe('delete command', () => {
     });
 
     it('should skip confirmation in JSON mode', async () => {
-      createTestTask(7, 'JSON Mode Task');
+      await createTestTask(7, 'JSON Mode Task');
 
       const { exitWithSuccess } = await import('../../utils/exit.js');
 
@@ -336,10 +336,10 @@ describe('delete command', () => {
   describe('Task status handling', () => {
     it('should delete tasks with different statuses', async () => {
       // Create tasks with various statuses
-      const _taskNew = createTestTask(8, 'New Task');
-      const taskInProgress = createTestTask(9, 'In Progress Task');
-      const taskCompleted = createTestTask(10, 'Completed Task');
-      const taskFailed = createTestTask(11, 'Failed Task');
+      const _taskNew = await createTestTask(8, 'New Task');
+      const taskInProgress = await createTestTask(9, 'In Progress Task');
+      const taskCompleted = await createTestTask(10, 'Completed Task');
+      const taskFailed = await createTestTask(11, 'Failed Task');
 
       taskInProgress.markInProgress();
       taskCompleted.markCompleted();
@@ -359,7 +359,7 @@ describe('delete command', () => {
     });
 
     it('should delete tasks in ITERATING status', async () => {
-      const taskIterating = createTestTask(12, 'Iterating Task');
+      const taskIterating = await createTestTask(12, 'Iterating Task');
       taskIterating.updateIteration({ timestamp: new Date().toISOString() });
 
       await deleteCommand(['12'], { yes: true });
@@ -371,9 +371,9 @@ describe('delete command', () => {
   describe('Multiple tasks and workspace cleanup', () => {
     it('should handle deletion of multiple tasks', async () => {
       // Create multiple tasks
-      createTestTask(13, 'Task A');
-      createTestTask(14, 'Task B');
-      createTestTask(15, 'Task C');
+      await createTestTask(13, 'Task A');
+      await createTestTask(14, 'Task B');
+      await createTestTask(15, 'Task C');
 
       // Verify worktrees exist
       const initialWorktrees = launchSync('git', ['worktree', 'list']).stdout;
@@ -398,7 +398,7 @@ describe('delete command', () => {
     });
 
     it('should handle tasks with iterations directory', async () => {
-      const task = createTestTask(16, 'Task with Iterations');
+      const task = await createTestTask(16, 'Task with Iterations');
 
       // Create iterations directory structure
       const iterationsDir = join('.rover', 'tasks', '16', 'iterations', '1');
@@ -415,7 +415,7 @@ describe('delete command', () => {
 
   describe('Edge cases and error scenarios', () => {
     it('should handle task with missing worktree gracefully', async () => {
-      const task = createTestTask(17, 'Missing Worktree Task');
+      const task = await createTestTask(17, 'Missing Worktree Task');
 
       // Remove the worktree manually to simulate corruption
       const worktreePath = join('.rover', 'tasks', '17', 'workspace');
@@ -468,7 +468,7 @@ describe('delete command', () => {
 
   describe('Combined flag scenarios', () => {
     it('should handle --yes and --json flags together', async () => {
-      createTestTask(18, 'Combined Flags Task');
+      await createTestTask(18, 'Combined Flags Task');
 
       const { exitWithSuccess } = await import('../../utils/exit.js');
 
@@ -488,9 +488,9 @@ describe('delete command', () => {
 
   describe('Multiple task deletion', () => {
     it('should delete multiple tasks with single confirmation', async () => {
-      createTestTask(20, 'Task A');
-      createTestTask(21, 'Task B');
-      createTestTask(22, 'Task C');
+      await createTestTask(20, 'Task A');
+      await createTestTask(21, 'Task B');
+      await createTestTask(22, 'Task C');
 
       // Mock enquirer to return true (confirm)
       const enquirer = await import('enquirer');
@@ -516,7 +516,7 @@ describe('delete command', () => {
     });
 
     it('should handle mixed valid/invalid task IDs', async () => {
-      createTestTask(23, 'Valid Task');
+      await createTestTask(23, 'Valid Task');
 
       const { exitWithSuccess } = await import('../../utils/exit.js');
 
@@ -536,8 +536,8 @@ describe('delete command', () => {
     });
 
     it('should cancel all deletions when user declines', async () => {
-      createTestTask(24, 'Task A');
-      createTestTask(25, 'Task B');
+      await createTestTask(24, 'Task A');
+      await createTestTask(25, 'Task B');
 
       // Mock enquirer to return false (cancel)
       const enquirer = await import('enquirer');
@@ -563,7 +563,7 @@ describe('delete command', () => {
 
   describe('Telemetry integration', () => {
     it('should call telemetry on successful deletion', async () => {
-      createTestTask(19, 'Telemetry Task');
+      await createTestTask(19, 'Telemetry Task');
 
       const { getTelemetry } = await import('../../lib/telemetry.js');
       const mockTelemetry = getTelemetry();

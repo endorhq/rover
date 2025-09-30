@@ -19,7 +19,7 @@ import { checkGitHubCLI } from '../utils/system.js';
 import { showRoverBanner, showRoverChat, showTips } from '../utils/display.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { NewTaskProvider } from 'rover-telemetry';
-import { Git } from 'rover-common';
+import { git } from 'rover-common';
 import { readFromStdin, stdinIsAvailable } from '../utils/stdin.js';
 import { CLIJsonOutput } from '../types.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
@@ -109,14 +109,14 @@ const validations = (
 /**
  * Update task metadata with execution information
  */
-const updateTaskMetadata = (
+const updateTaskMetadata = async (
   taskId: number,
   updates: any,
   jsonMode?: boolean
 ) => {
   try {
-    if (TaskDescription.exists(taskId)) {
-      const task = TaskDescription.load(taskId);
+    if (await TaskDescription.exists(taskId)) {
+      const task = await TaskDescription.load(taskId);
 
       // Apply updates to the task object based on the updates parameter
       if (updates.status) {
@@ -183,12 +183,12 @@ export const startDockerExecution = async (
 
   // Generate setup script using SetupBuilder
   const setupBuilder = new SetupBuilder(task, selectedAiAgent);
-  const setupScriptPath = setupBuilder.generateSetupScript();
-  const setupMcpScriptPath = setupBuilder.generateSetupMcpScript();
+  const setupScriptPath = await setupBuilder.generateSetupScript();
+  const setupMcpScriptPath = await setupBuilder.generateSetupMcpScript();
 
   // Generate prompts using PromptBuilder
   const promptsDir = join(
-    findProjectRoot(),
+    await findProjectRoot(),
     '.rover',
     'tasks',
     taskId.toString(),
@@ -270,7 +270,7 @@ export const startDockerExecution = async (
       if (spinner) spinner.success('Container started in background');
 
       // Update task metadata with container ID
-      updateTaskMetadata(
+      await updateTaskMetadata(
         taskId,
         {
           containerId: containerId,
@@ -289,7 +289,7 @@ export const startDockerExecution = async (
       }
 
       // Reset task to NEW status when container fails to start
-      updateTaskMetadata(
+      await updateTaskMetadata(
         taskId,
         {
           status: 'NEW',
@@ -322,7 +322,7 @@ export const startDockerExecution = async (
     }
 
     // Reset task to NEW status when Docker startup fails
-    updateTaskMetadata(
+    await updateTaskMetadata(
       taskId,
       {
         status: 'NEW',
@@ -387,7 +387,7 @@ export const taskCommand = async (
   };
 
   // Check if rover is initialized
-  const roverPath = join(findProjectRoot(), '.rover');
+  const roverPath = join(await findProjectRoot(), '.rover');
   if (!existsSync(roverPath)) {
     jsonOutput.error = 'Rover is not initialized in this directory';
     exitWithError(jsonOutput, json, {
@@ -417,7 +417,7 @@ export const taskCommand = async (
   } else {
     // Fall back to user settings if no agent specified
     try {
-      selectedAiAgent = getUserAIAgent();
+      selectedAiAgent = await getUserAIAgent();
     } catch (_err) {
       if (!json) {
         console.log(
@@ -449,13 +449,14 @@ export const taskCommand = async (
   let skipExpansion = false;
   let taskData: IPromptTask | null = null;
 
-  const git = new Git();
-
   // Handle --from-github option
   if (fromGithub) {
     const github = new GitHub(false);
     try {
-      const issueData = await github.fetchIssue(fromGithub, git.remoteUrl());
+      const issueData = await github.fetchIssue(
+        fromGithub,
+        await git.remoteUrl()
+      );
       if (issueData) {
         description = `${issueData.title}\n\n${issueData.body}`;
         skipExpansion = true;
@@ -507,17 +508,17 @@ export const taskCommand = async (
 
   if (sourceBranch) {
     // Validate specified branch exists
-    if (!git.branchExists(sourceBranch)) {
+    if (!(await git.branchExists(sourceBranch))) {
       jsonOutput.error = `Branch '${sourceBranch}' does not exist`;
       exitWithError(jsonOutput, json);
       return;
     }
   } else {
     // No branch specified, use current branch
-    baseBranch = git.getCurrentBranch();
+    baseBranch = await git.getCurrentBranch();
 
     // Check for uncommitted changes and warn
-    if (git.hasUncommittedChanges()) {
+    if (await git.hasUncommittedChanges()) {
       if (!json) {
         console.log(
           colors.yellow(
@@ -618,7 +619,7 @@ export const taskCommand = async (
       const aiAgent = getAIAgentTool(selectedAiAgent);
       const expanded = await aiAgent.expandTask(
         taskData ? `${taskData.title}: ${taskData.description}` : description,
-        findProjectRoot()
+        await findProjectRoot()
       );
 
       if (expanded) {
@@ -724,10 +725,10 @@ export const taskCommand = async (
 
   if (taskData) {
     // Generate auto-increment ID for the task
-    const taskId = getNextTaskId();
+    const taskId = await getNextTaskId();
 
     // Create .rover/tasks directory structure
-    const endorPath = join(findProjectRoot(), '.rover');
+    const endorPath = join(await findProjectRoot(), '.rover');
     const tasksPath = join(endorPath, 'tasks');
     const taskPath = join(tasksPath, taskId.toString());
 
@@ -741,7 +742,7 @@ export const taskCommand = async (
     mkdirSync(taskPath, { recursive: true });
 
     // Create task using TaskDescription class
-    const task = TaskDescription.create({
+    const task = await TaskDescription.create({
       id: taskId,
       title: taskData.title,
       description: taskData.description,
@@ -754,10 +755,10 @@ export const taskCommand = async (
     const branchName = targetBranch || generateBranchName(taskId);
 
     try {
-      git.createWorktree(worktreePath, branchName, baseBranch);
+      await git.createWorktree(worktreePath, branchName, baseBranch);
 
       // Copy user .env development files
-      copyEnvironmentFiles(findProjectRoot(), worktreePath);
+      copyEnvironmentFiles(await findProjectRoot(), worktreePath);
     } catch (error) {
       jsonOutput.error = 'Error creating git workspace: ' + error;
       exitWithError(jsonOutput, json);

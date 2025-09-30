@@ -6,7 +6,7 @@ import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
 import { exitWithError, exitWithSuccess } from '../utils/exit.js';
 import { startDockerExecution } from './task.js';
 import { UserSettings, AI_AGENT } from '../lib/config.js';
-import { Git } from 'rover-common';
+import { git } from 'rover-common';
 import { CLIJsonOutput } from '../types.js';
 import { IterationConfig } from '../lib/iteration.js';
 import { getTelemetry } from '../lib/telemetry.js';
@@ -49,7 +49,7 @@ export const restartCommand = async (
 
   try {
     // Load task using TaskDescription
-    const task = TaskDescription.load(numericTaskId);
+    const task = await TaskDescription.load(numericTaskId);
 
     // Check if task is in NEW or FAILED status
     if (!task.isNew() && !task.isFailed()) {
@@ -73,8 +73,8 @@ export const restartCommand = async (
     let selectedAiAgent = AI_AGENT.Claude; // default
 
     try {
-      if (UserSettings.exists()) {
-        const userSettings = UserSettings.load();
+      if (await UserSettings.exists()) {
+        const userSettings = await UserSettings.load();
         selectedAiAgent = userSettings.defaultAiAgent || AI_AGENT.Claude;
       }
     } catch (error) {
@@ -87,7 +87,7 @@ export const restartCommand = async (
     }
 
     const taskPath = join(
-      findProjectRoot(),
+      await findProjectRoot(),
       '.rover',
       'tasks',
       numericTaskId.toString()
@@ -106,11 +106,10 @@ export const restartCommand = async (
         : null;
 
       try {
-        const git = new Git();
-        git.createWorktree(worktreePath, branchName);
+        await git.createWorktree(worktreePath, branchName);
 
         // Copy user .env development files
-        copyEnvironmentFiles(findProjectRoot(), worktreePath);
+        copyEnvironmentFiles(await findProjectRoot(), worktreePath);
 
         // Update task with workspace information
         task.setWorkspace(worktreePath, branchName);

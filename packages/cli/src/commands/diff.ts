@@ -2,7 +2,7 @@ import colors from 'ansi-colors';
 import { existsSync } from 'node:fs';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
 import { getTelemetry } from '../lib/telemetry.js';
-import { Git } from 'rover-common';
+import { git } from 'rover-common';
 import { showTips } from '../utils/display.js';
 
 export const diffCommand = async (
@@ -19,10 +19,8 @@ export const diffCommand = async (
   }
 
   try {
-    const git = new Git();
-
     // Load task using TaskDescription
-    const task = TaskDescription.load(numericTaskId);
+    const task = await TaskDescription.load(numericTaskId);
 
     // Check if worktree exists
     if (!task.worktreePath || !existsSync(task.worktreePath)) {
@@ -38,7 +36,7 @@ export const diffCommand = async (
     }
 
     // Check if we're in a git repository
-    if (!git.isGitRepo()) {
+    if (!(await git.isGitRepo())) {
       console.log(colors.red('✗ Not in a git repository'));
       return;
     }
@@ -67,7 +65,7 @@ export const diffCommand = async (
     try {
       // Execute git diff command
       try {
-        const diffResult = git.diff({
+        const diffResult = await git.diff({
           worktreePath: task.worktreePath,
           filePath: filePath,
           onlyFiles: options.onlyFiles,

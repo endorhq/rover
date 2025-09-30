@@ -34,7 +34,7 @@ export const shellCommand = async (
 
   try {
     // Load task using TaskDescription
-    const task = TaskDescription.load(numericTaskId);
+    const task = await TaskDescription.load(numericTaskId);
 
     const colorFunc = statusColor(task.status);
 

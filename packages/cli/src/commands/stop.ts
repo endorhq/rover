@@ -50,7 +50,7 @@ export const stopCommand = async (
 
   try {
     // Load task using TaskDescription
-    const task = TaskDescription.load(numericTaskId);
+    const task = await TaskDescription.load(numericTaskId);
 
     if (!json) {
       console.log(colors.bold.white('Stopping Task'));
@@ -161,7 +161,7 @@ export const stopCommand = async (
 
     // Delete the iterations
     const taskPath = join(
-      findProjectRoot(),
+      await findProjectRoot(),
       '.rover',
       'tasks',
       numericTaskId.toString()

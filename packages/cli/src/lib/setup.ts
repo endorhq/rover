@@ -124,10 +124,10 @@ configure-mcp-servers
 `;
   }
 
-  generateSetupMcpScript(): string {
+  async generateSetupMcpScript(): Promise<string> {
     // Ensure task directory exists
     const taskDir = join(
-      findProjectRoot(),
+      await findProjectRoot(),
       '.rover',
       'tasks',
       this.taskId.toString()
@@ -668,10 +668,10 @@ exit 0
   /**
    * Generate and save the setup script to the appropriate task directory
    */
-  generateSetupScript(): string {
+  async generateSetupScript(): Promise<string> {
     // Ensure task directory exists
     const taskDir = join(
-      findProjectRoot(),
+      await findProjectRoot(),
       '.rover',
       'tasks',
       this.taskId.toString()
@@ -694,9 +694,9 @@ exit 0
   /**
    * Get the path where the setup script will be saved
    */
-  getScriptPath(script: string): string {
+  async getScriptPath(script: string): Promise<string> {
     return join(
-      findProjectRoot(),
+      await findProjectRoot(),
       '.rover',
       'tasks',
       this.taskId.toString(),
@@ -707,11 +707,11 @@ exit 0
   /**
    * Static factory method to create and generate setup script
    */
-  static generate(
+  static async generate(
     taskDescription: TaskDescription,
     agent: string = 'claude'
-  ): string {
+  ): Promise<string> {
     const builder = new SetupBuilder(taskDescription, agent);
-    return builder.generateSetupScript();
+    return await builder.generateSetupScript();
   }
 }

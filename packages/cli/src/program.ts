@@ -32,7 +32,10 @@ export function createProgram(
       })
       .hook('preAction', (thisCommand, actionCommand) => {
         const commandName = actionCommand.name();
-        if (!['init', 'mcp'].includes(commandName) && !ProjectConfig.exists()) {
+        if (
+          !['init', 'mcp'].includes(commandName) &&
+          !ProjectConfig.existsSync()
+        ) {
           console.log(
             colors.white(
               `Rover is not initialized in this directory. The command you requested (\`${commandName}\`) was not executed.`
@@ -106,8 +109,8 @@ export function createProgram(
         const commandName = actionCommand.name();
         if (
           !['init', 'mcp'].includes(commandName) &&
-          ProjectConfig.exists() &&
-          !UserSettings.exists()
+          ProjectConfig.existsSync() &&
+          !UserSettings.existsSync()
         ) {
           console.log(
             colors.white(

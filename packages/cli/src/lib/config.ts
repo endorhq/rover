@@ -65,8 +65,8 @@ export class ProjectConfig {
   /**
    * Load an existing configuration from disk
    */
-  static load(): ProjectConfig {
-    const projectRoot = findProjectRoot();
+  static async load(): Promise<ProjectConfig> {
+    const projectRoot = await findProjectRoot();
     const filePath = join(projectRoot, PROJECT_CONFIG_FILE);
 
     try {
@@ -113,9 +113,17 @@ export class ProjectConfig {
   /**
    * Check if a project configuration exists
    */
-  static exists(): boolean {
-    const projectRoot = findProjectRoot();
+  static async exists(): Promise<boolean> {
+    const projectRoot = await findProjectRoot();
     const filePath = join(projectRoot, PROJECT_CONFIG_FILE);
+    return existsSync(filePath);
+  }
+
+  /**
+   * Check if a project configuration exists (synchronous version using current directory)
+   */
+  static existsSync(): boolean {
+    const filePath = join(process.cwd(), PROJECT_CONFIG_FILE);
     return existsSync(filePath);
   }
 
@@ -143,8 +151,8 @@ export class ProjectConfig {
   /**
    * Save current configuration to disk
    */
-  save(): void {
-    const projectRoot = findProjectRoot();
+  async save(): Promise<void> {
+    const projectRoot = await findProjectRoot();
     const filePath = join(projectRoot, PROJECT_CONFIG_FILE);
     try {
       const json = JSON.stringify(this.data, null, 2);
@@ -157,8 +165,8 @@ export class ProjectConfig {
   /**
    * Reload configuration from disk
    */
-  reload(): void {
-    const reloaded = ProjectConfig.load();
+  async reload(): Promise<void> {
+    const reloaded = await ProjectConfig.load();
     this.data = reloaded.data;
   }
 
@@ -180,54 +188,54 @@ export class ProjectConfig {
   }
 
   // Data Modification (Setters)
-  addLanguage(language: LANGUAGE): void {
+  async addLanguage(language: LANGUAGE): Promise<void> {
     if (!this.data.languages.includes(language)) {
       this.data.languages.push(language);
-      this.save();
+      await this.save();
     }
   }
 
-  removeLanguage(language: LANGUAGE): void {
+  async removeLanguage(language: LANGUAGE): Promise<void> {
     const index = this.data.languages.indexOf(language);
     if (index > -1) {
       this.data.languages.splice(index, 1);
-      this.save();
+      await this.save();
     }
   }
 
-  addPackageManager(packageManager: PACKAGE_MANAGER): void {
+  async addPackageManager(packageManager: PACKAGE_MANAGER): Promise<void> {
     if (!this.data.packageManagers.includes(packageManager)) {
       this.data.packageManagers.push(packageManager);
-      this.save();
+      await this.save();
     }
   }
 
-  removePackageManager(packageManager: PACKAGE_MANAGER): void {
+  async removePackageManager(packageManager: PACKAGE_MANAGER): Promise<void> {
     const index = this.data.packageManagers.indexOf(packageManager);
     if (index > -1) {
       this.data.packageManagers.splice(index, 1);
-      this.save();
+      await this.save();
     }
   }
 
-  addTaskManager(taskManager: TASK_MANAGER): void {
+  async addTaskManager(taskManager: TASK_MANAGER): Promise<void> {
     if (!this.data.taskManagers.includes(taskManager)) {
       this.data.taskManagers.push(taskManager);
-      this.save();
+      await this.save();
     }
   }
 
-  removeTaskManager(taskManager: TASK_MANAGER): void {
+  async removeTaskManager(taskManager: TASK_MANAGER): Promise<void> {
     const index = this.data.taskManagers.indexOf(taskManager);
     if (index > -1) {
       this.data.taskManagers.splice(index, 1);
-      this.save();
+      await this.save();
     }
   }
 
-  setAttribution(value: boolean): void {
+  async setAttribution(value: boolean): Promise<void> {
     this.data.attribution = value;
-    this.save();
+    await this.save();
   }
 
   /**
@@ -270,8 +278,8 @@ export class UserSettings {
   /**
    * Load user settings from disk
    */
-  static load(): UserSettings {
-    const filePath = UserSettings.getSettingsPath();
+  static async load(): Promise<UserSettings> {
+    const filePath = await UserSettings.getSettingsPath();
 
     if (!existsSync(filePath)) {
       // Return default settings if file doesn't exist
@@ -320,16 +328,24 @@ export class UserSettings {
   /**
    * Check if user settings exist
    */
-  static exists(): boolean {
-    const filePath = UserSettings.getSettingsPath();
+  static async exists(): Promise<boolean> {
+    const filePath = await UserSettings.getSettingsPath();
+    return existsSync(filePath);
+  }
+
+  /**
+   * Check if user settings exist (synchronous version using current directory)
+   */
+  static existsSync(): boolean {
+    const filePath = join(process.cwd(), '.rover', 'settings.json');
     return existsSync(filePath);
   }
 
   /**
    * Get the path to the settings file
    */
-  private static getSettingsPath(): string {
-    const projectRoot = findProjectRoot();
+  private static async getSettingsPath(): Promise<string> {
+    const projectRoot = await findProjectRoot();
     return join(projectRoot, '.rover', 'settings.json');
   }
 
@@ -357,9 +373,9 @@ export class UserSettings {
   /**
    * Save current settings to disk
    */
-  save(): void {
-    const filePath = UserSettings.getSettingsPath();
-    const projectRoot = findProjectRoot();
+  async save(): Promise<void> {
+    const filePath = await UserSettings.getSettingsPath();
+    const projectRoot = await findProjectRoot();
     const dirPath = join(projectRoot, '.rover');
 
     try {
@@ -378,8 +394,8 @@ export class UserSettings {
   /**
    * Reload settings from disk
    */
-  reload(): void {
-    const reloaded = UserSettings.load();
+  async reload(): Promise<void> {
+    const reloaded = await UserSettings.load();
     this.data = reloaded.data;
   }
 
@@ -395,23 +411,23 @@ export class UserSettings {
   }
 
   // Data Modification (Setters)
-  setDefaultAiAgent(agent: AI_AGENT): void {
+  async setDefaultAiAgent(agent: AI_AGENT): Promise<void> {
     this.data.defaults.aiAgent = agent;
     // Ensure the agent is in the available agents list
     if (!this.data.aiAgents.includes(agent)) {
       this.data.aiAgents.push(agent);
     }
-    this.save();
+    await this.save();
   }
 
-  addAiAgent(agent: AI_AGENT): void {
+  async addAiAgent(agent: AI_AGENT): Promise<void> {
     if (!this.data.aiAgents.includes(agent)) {
       this.data.aiAgents.push(agent);
-      this.save();
+      await this.save();
     }
   }
 
-  removeAiAgent(agent: AI_AGENT): void {
+  async removeAiAgent(agent: AI_AGENT): Promise<void> {
     const index = this.data.aiAgents.indexOf(agent);
     if (index > -1) {
       this.data.aiAgents.splice(index, 1);
@@ -422,7 +438,7 @@ export class UserSettings {
       ) {
         this.data.defaults.aiAgent = this.data.aiAgents[0];
       }
-      this.save();
+      await this.save();
     }
   }
 

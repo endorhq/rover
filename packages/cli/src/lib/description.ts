@@ -126,12 +126,11 @@ export class TaskFileError extends Error {
 export class TaskDescription {
   private data: TaskDescriptionSchema;
   private taskId: number;
-  private filePath: string;
+  private filePath?: string;
 
   constructor(data: TaskDescriptionSchema, taskId: number) {
     this.data = data;
     this.taskId = taskId;
-    this.filePath = this.getTaskDescriptionPath(taskId);
     this.validate();
   }
 
@@ -140,7 +139,7 @@ export class TaskDescription {
   /**
    * Create a new task with initial metadata
    */
-  static create(taskData: CreateTaskData): TaskDescription {
+  static async create(taskData: CreateTaskData): Promise<TaskDescription> {
     const now = new Date().toISOString();
     const uuid = taskData.uuid || randomUUID();
 
@@ -165,7 +164,7 @@ export class TaskDescription {
 
     // Ensure task directory exists
     const taskDir = join(
-      findProjectRoot(),
+      await findProjectRoot(),
       '.rover',
       'tasks',
       taskData.id.toString()
@@ -173,15 +172,15 @@ export class TaskDescription {
     mkdirSync(taskDir, { recursive: true });
 
     // Save the initial task
-    instance.save();
+    await instance.save();
     return instance;
   }
 
   /**
    * Load an existing task from disk
    */
-  static load(taskId: number): TaskDescription {
-    const filePath = TaskDescription.getTaskDescriptionPath(taskId);
+  static async load(taskId: number): Promise<TaskDescription> {
+    const filePath = await TaskDescription.getTaskDescriptionPath(taskId);
 
     if (!existsSync(filePath)) {
       throw new TaskNotFoundError(taskId);
@@ -199,7 +198,7 @@ export class TaskDescription {
       // If migration occurred, save the updated data
       if (migratedData.version !== parsedData.version) {
         TaskDescription.createBackup(filePath);
-        instance.save();
+        await instance.save();
       }
 
       return instance;
@@ -216,16 +215,16 @@ export class TaskDescription {
   /**
    * Check if a task exists
    */
-  static exists(taskId: number): boolean {
-    const filePath = TaskDescription.getTaskDescriptionPath(taskId);
+  static async exists(taskId: number): Promise<boolean> {
+    const filePath = await TaskDescription.getTaskDescriptionPath(taskId);
     return existsSync(filePath);
   }
 
   // Private static helper methods
 
-  private static getTaskDescriptionPath(taskId: number): string {
+  private static async getTaskDescriptionPath(taskId: number): Promise<string> {
     return join(
-      findProjectRoot(),
+      await findProjectRoot(),
       '.rover',
       'tasks',
       taskId.toString(),
@@ -317,8 +316,11 @@ export class TaskDescription {
     }
   }
 
-  private getTaskDescriptionPath(taskId: number): string {
-    return TaskDescription.getTaskDescriptionPath(taskId);
+  private async getTaskDescriptionPath(taskId: number): Promise<string> {
+    if (!this.filePath) {
+      this.filePath = await TaskDescription.getTaskDescriptionPath(taskId);
+    }
+    return this.filePath;
   }
 
   // CRUD Operations
@@ -326,11 +328,12 @@ export class TaskDescription {
   /**
    * Save current data to disk
    */
-  save(): void {
+  async save(): Promise<void> {
     try {
       this.validate();
       const json = JSON.stringify(this.data, null, 2);
-      writeFileSync(this.filePath, json, 'utf8');
+      const filePath = await this.getTaskDescriptionPath(this.taskId);
+      writeFileSync(filePath, json, 'utf8');
     } catch (error) {
       throw new TaskFileError(`Failed to save task ${this.taskId}: ${error}`);
     }
@@ -339,16 +342,16 @@ export class TaskDescription {
   /**
    * Reload data from disk
    */
-  reload(): void {
-    const reloaded = TaskDescription.load(this.taskId);
+  async reload(): Promise<void> {
+    const reloaded = await TaskDescription.load(this.taskId);
     this.data = reloaded.data;
   }
 
   /**
    * Update the current status based on the latest iteration
    */
-  updateStatus(): void {
-    const iteration = getLastTaskIteration(this);
+  async updateStatus(): Promise<void> {
+    const iteration = await getLastTaskIteration(this);
 
     if (iteration != null) {
       const status = iteration.status();
@@ -385,17 +388,18 @@ export class TaskDescription {
       }
 
       const metadata = { timestamp, error };
-      this.setStatus(statusName, metadata);
+      await this.setStatus(statusName, metadata);
     }
   }
 
   /**
    * Delete the task file
    */
-  delete(): void {
+  async delete(): Promise<void> {
     try {
-      if (existsSync(this.filePath)) {
-        rmSync(this.filePath);
+      const filePath = await this.getTaskDescriptionPath(this.taskId);
+      if (existsSync(filePath)) {
+        rmSync(filePath);
       }
     } catch (error) {
       throw new TaskFileError(`Failed to delete task ${this.taskId}: ${error}`);
@@ -407,7 +411,10 @@ export class TaskDescription {
   /**
    * Set task status with optional metadata
    */
-  setStatus(status: TaskStatus, metadata?: StatusMetadata): void {
+  async setStatus(
+    status: TaskStatus,
+    metadata?: StatusMetadata
+  ): Promise<void> {
     this.data.status = status;
 
     const timestamp = metadata?.timestamp || new Date().toISOString();
@@ -440,62 +447,62 @@ export class TaskDescription {
     }
 
     this.data.lastStatusCheck = timestamp;
-    this.save();
+    await this.save();
   }
 
   /**
    * Mark task as completed
    */
-  markCompleted(completedAt?: string): void {
-    this.setStatus('COMPLETED', { timestamp: completedAt });
+  async markCompleted(completedAt?: string): Promise<void> {
+    await this.setStatus('COMPLETED', { timestamp: completedAt });
   }
 
   /**
    * Mark task as failed with error message
    */
-  markFailed(error: string, failedAt?: string): void {
-    this.setStatus('FAILED', { timestamp: failedAt, error });
+  async markFailed(error: string, failedAt?: string): Promise<void> {
+    await this.setStatus('FAILED', { timestamp: failedAt, error });
   }
 
   /**
    * Mark task as in progress
    */
-  markInProgress(startedAt?: string): void {
-    this.setStatus('IN_PROGRESS', { timestamp: startedAt });
+  async markInProgress(startedAt?: string): Promise<void> {
+    await this.setStatus('IN_PROGRESS', { timestamp: startedAt });
   }
 
   /**
    * Mark task as iterating
    */
-  markIterating(timestamp?: string): void {
-    this.setStatus('ITERATING', { timestamp });
+  async markIterating(timestamp?: string): Promise<void> {
+    await this.setStatus('ITERATING', { timestamp });
   }
 
   /**
    * Mark task as merged
    */
-  markMerged(timestamp?: string): void {
-    this.setStatus('MERGED', { timestamp });
+  async markMerged(timestamp?: string): Promise<void> {
+    await this.setStatus('MERGED', { timestamp });
   }
 
   /**
    * Mark task as pushed
    */
-  markPushed(timestamp?: string): void {
-    this.setStatus('PUSHED', { timestamp });
+  async markPushed(timestamp?: string): Promise<void> {
+    await this.setStatus('PUSHED', { timestamp });
   }
 
   /**
    * Reset task back to NEW status (for container start failures or user reset)
    */
-  resetToNew(timestamp?: string): void {
-    this.setStatus('NEW', { timestamp });
+  async resetToNew(timestamp?: string): Promise<void> {
+    await this.setStatus('NEW', { timestamp });
   }
 
   /**
    * Restart a failed task by resetting to IN_PROGRESS  status and tracking restart attempt
    */
-  restart(timestamp?: string): void {
+  async restart(timestamp?: string): Promise<void> {
     const restartTimestamp = timestamp || new Date().toISOString();
 
     // Increment restart count
@@ -503,7 +510,7 @@ export class TaskDescription {
     this.data.lastRestartAt = restartTimestamp;
 
     // Reset to IN_PROGRESS status
-    this.setStatus('IN_PROGRESS', { timestamp: restartTimestamp });
+    await this.setStatus('IN_PROGRESS', { timestamp: restartTimestamp });
   }
 
   // Iteration Management
@@ -511,20 +518,20 @@ export class TaskDescription {
   /**
    * Increment iteration counter
    */
-  incrementIteration(): void {
+  async incrementIteration(): Promise<void> {
     this.data.iterations += 1;
     this.data.lastIterationAt = new Date().toISOString();
-    this.save();
+    await this.save();
   }
 
   /**
    * Update iteration metadata
    */
-  updateIteration(metadata: IterationMetadata): void {
+  async updateIteration(metadata: IterationMetadata): Promise<void> {
     if (metadata.timestamp) {
       this.data.lastIterationAt = metadata.timestamp;
     }
-    this.save();
+    await this.save();
   }
 
   // Workspace Management
@@ -532,16 +539,16 @@ export class TaskDescription {
   /**
    * Set workspace information
    */
-  setWorkspace(worktreePath: string, branchName: string): void {
+  async setWorkspace(worktreePath: string, branchName: string): Promise<void> {
     this.data.worktreePath = worktreePath;
     this.data.branchName = branchName;
-    this.save();
+    await this.save();
   }
 
   // Other helpers
-  iterationsPath(): string {
+  async iterationsPath(): Promise<string> {
     return join(
-      findProjectRoot(),
+      await findProjectRoot(),
       '.rover',
       'tasks',
       this.taskId.toString(),
@@ -635,17 +642,17 @@ export class TaskDescription {
   /**
    * Update task title
    */
-  updateTitle(title: string): void {
+  async updateTitle(title: string): Promise<void> {
     this.data.title = title;
-    this.save();
+    await this.save();
   }
 
   /**
    * Update task description
    */
-  updateDescription(description: string): void {
+  async updateDescription(description: string): Promise<void> {
     this.data.description = description;
-    this.save();
+    await this.save();
   }
 
   // Docker Execution Management
@@ -653,22 +660,25 @@ export class TaskDescription {
   /**
    * Set container execution information
    */
-  setContainerInfo(containerId: string, executionStatus: string): void {
+  async setContainerInfo(
+    containerId: string,
+    executionStatus: string
+  ): Promise<void> {
     this.data.containerId = containerId;
     this.data.executionStatus = executionStatus;
     if (executionStatus === 'running') {
       this.data.runningAt = new Date().toISOString();
     }
-    this.save();
+    await this.save();
   }
 
   /**
    * Update execution status
    */
-  updateExecutionStatus(
+  async updateExecutionStatus(
     status: string,
     metadata?: { exitCode?: number; error?: string }
-  ): void {
+  ): Promise<void> {
     this.data.executionStatus = status;
 
     if (metadata?.exitCode !== undefined) {
@@ -686,7 +696,7 @@ export class TaskDescription {
       this.data.failedAt = new Date().toISOString();
     }
 
-    this.save();
+    await this.save();
   }
 
   // Utility Methods
@@ -820,11 +830,11 @@ export class TaskDescription {
 /**
  * Retrieves all tasks description from the given folder.
  */
-export const getDescriptions = (): TaskDescription[] => {
+export const getDescriptions = async (): Promise<TaskDescription[]> => {
   const tasks: TaskDescription[] = [];
 
   try {
-    const roverPath = join(findProjectRoot(), '.rover');
+    const roverPath = join(await findProjectRoot(), '.rover');
     const tasksPath = join(roverPath, 'tasks');
 
     if (existsSync(tasksPath)) {
@@ -834,15 +844,15 @@ export const getDescriptions = (): TaskDescription[] => {
         .filter(name => !isNaN(name)) // Only numeric task IDs
         .sort((a, b) => b - a); // Sort descending
 
-      taskIds.forEach(id => {
+      for (const id of taskIds) {
         try {
-          tasks.push(TaskDescription.load(id));
+          tasks.push(await TaskDescription.load(id));
         } catch (err) {
           if (VERBOSE) {
             console.error(colors.gray(`Error loading task ${id}: ` + err));
           }
         }
-      });
+      }
     }
   } catch (err) {
     if (VERBOSE) {

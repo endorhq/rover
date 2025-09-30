@@ -1012,7 +1012,7 @@ export function activate(context: vscode.ExtensionContext) {
             try {
               const workspaceRoot =
                 vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ||
-                findProjectRoot();
+                (await findProjectRoot());
               const { stdout: remoteUrl } = launchSync(
                 'git',
                 ['remote', 'get-url', 'origin'],
@@ -1064,7 +1064,7 @@ export function activate(context: vscode.ExtensionContext) {
             try {
               const workspaceRoot =
                 vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ||
-                findProjectRoot();
+                (await findProjectRoot());
               const { stdout } = launchSync(
                 'gh',
                 [
@@ -1159,7 +1159,7 @@ export function activate(context: vscode.ExtensionContext) {
                   .get<string>('cliPath') || 'rover';
               const workspaceRoot =
                 vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ||
-                findProjectRoot();
+                (await findProjectRoot());
 
               telemetry?.eventNewTask(NewTaskProvider.GITHUB);
 
