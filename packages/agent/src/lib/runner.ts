@@ -4,7 +4,7 @@
  * by building the prompt and passing it.
  */
 
-import { launch, launchSync, VERBOSE } from 'rover-common';
+import { launch, launchSync, VERBOSE, IterationStatus } from 'rover-common';
 import colors from 'ansi-colors';
 import { existsSync, readFileSync } from 'node:fs';
 import { AgentStep } from '../schema.js';
@@ -47,7 +47,10 @@ export class Runner {
     private inputs: Map<string, string>,
     private stepsOutput: Map<string, Map<string, string>>,
     private defaultTool: string | undefined,
-    private defaultModel: string | undefined
+    private defaultModel: string | undefined,
+    private statusManager?: IterationStatus,
+    private totalSteps: number = 0,
+    private currentStepIndex: number = 0
   ) {
     // Get the step from the workflow
     this.step = this.workflow.getStep(stepId);
@@ -96,7 +99,14 @@ export class Runner {
     const outputs = new Map<string, string>();
     let agentError: AgentError | undefined;
 
+    // Calculate current progress
+    const currentProgress = this.calculateProgress(this.currentStepIndex);
+    const nextProgress = this.calculateProgress(this.currentStepIndex + 1);
+
     try {
+      // Update status before executing step
+      this.statusManager?.update('running', this.step.name, currentProgress);
+
       // Get the processed prompt
       const finalPrompt = this.prompt();
 
@@ -181,6 +191,9 @@ export class Runner {
       console.log(
         colors.green(`✓ Step '${this.step.name}' completed successfully`)
       );
+
+      // Update status after successful completion
+      this.statusManager?.update('running', this.step.name, nextProgress);
     } catch (error) {
       // Handle different error types
       if (error instanceof AgentError) {
@@ -713,5 +726,13 @@ export class Runner {
     }
 
     return finalPrompt;
+  }
+
+  /**
+   * Calculate progress percentage based on current step index
+   */
+  private calculateProgress(stepIndex: number): number {
+    if (this.totalSteps === 0) return 0;
+    return Math.floor((stepIndex / this.totalSteps) * 100);
   }
 }

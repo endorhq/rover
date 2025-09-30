@@ -6,7 +6,7 @@ import colors from 'ansi-colors';
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { TaskDescription } from './description.js';
-import { VERBOSE } from 'rover-common';
+import { VERBOSE, type IterationStatusSchema } from 'rover-common';
 
 const CURRENT_ITERATION_SCHEMA_VERSION = '1.0';
 export const ITERATION_FILENAME = 'iteration.json';
@@ -37,26 +37,6 @@ export interface IterationConfigSchema {
   };
 }
 
-export interface IterationStatus {
-  // Original Task ID
-  taskId: string;
-
-  // Status name
-  status: string;
-
-  // Current step name and progress
-  currentStep: string;
-  progress: number;
-
-  // Timstamps
-  startedAt: string;
-  updatedAt: string;
-  completedAt: string;
-
-  // Other
-  error?: string;
-}
-
 /**
  * Iteration configuration. It provides the agent with enough information to iterate over
  * the given task.
@@ -65,7 +45,7 @@ export class IterationConfig {
   private data: IterationConfigSchema;
   private filePath: string;
   private iterationPath: string;
-  private statusCache: IterationStatus | undefined;
+  private statusCache: IterationStatusSchema | undefined;
 
   constructor(
     data: IterationConfigSchema,
@@ -195,7 +175,7 @@ export class IterationConfig {
   /**
    * Load the iteration status
    */
-  status(): IterationStatus {
+  status(): IterationStatusSchema {
     if (this.statusCache) return this.statusCache;
 
     const statusPath = join(this.iterationPath, ITERATION_STATUS_FILENAME);
@@ -203,7 +183,7 @@ export class IterationConfig {
     if (existsSync(statusPath)) {
       try {
         const content = readFileSync(statusPath, 'utf8');
-        const status = JSON.parse(content) as IterationStatus;
+        const status = JSON.parse(content) as IterationStatusSchema;
         this.statusCache = status;
 
         return status;

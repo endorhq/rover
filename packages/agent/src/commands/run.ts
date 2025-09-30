@@ -3,6 +3,7 @@ import colors from 'ansi-colors';
 import { AgentWorkflow } from '../workflow.js';
 import { parseCollectOptions } from '../lib/options.js';
 import { Runner } from '../lib/runner.js';
+import { IterationStatus } from 'rover-common';
 
 interface RunCommandOptions {
   // Inputs. Take precedence over files
@@ -15,6 +16,10 @@ interface RunCommandOptions {
   agentTool?: string;
   // Model to use instead of workflow defaults
   agentModel?: string;
+  // Task ID for status tracking
+  taskId?: string;
+  // Path to status.json file
+  statusFile?: string;
 }
 
 interface RunCommandOutput extends CommandOutput {}
@@ -31,7 +36,38 @@ export const runCommand = async (
     success: false,
   };
 
+  // Declare status manager outside try block so it's accessible in catch
+  let statusManager: IterationStatus | undefined;
+
   try {
+    // Validate status tracking options
+    if (options.statusFile && !options.taskId) {
+      console.log(
+        colors.red('\n✗ --task-id is required when --status-file is provided')
+      );
+      output.error = '--task-id is required when --status-file is provided';
+      return;
+    }
+
+    // Create status manager if status file is provided
+    if (options.statusFile && options.taskId) {
+      try {
+        statusManager = IterationStatus.createInitial(
+          options.statusFile,
+          options.taskId,
+          'Starting workflow'
+        );
+      } catch (error) {
+        console.log(
+          colors.red(
+            `\n✗ Failed to initialize status file: ${error instanceof Error ? error.message : String(error)}`
+          )
+        );
+        output.error = `Failed to initialize status file: ${error}`;
+        return;
+      }
+    }
+
     // Load the agent workflow
     const agentWorkflow = AgentWorkflow.load(workflowPath);
     const providedInputs = parseCollectOptions(options.input);
@@ -98,15 +134,24 @@ export const runCommand = async (
       });
 
       let runSteps = 0;
+      const totalSteps = agentWorkflow.steps.length;
 
-      for (const step of agentWorkflow.steps) {
+      for (
+        let stepIndex = 0;
+        stepIndex < agentWorkflow.steps.length;
+        stepIndex++
+      ) {
+        const step = agentWorkflow.steps[stepIndex];
         const runner = new Runner(
           agentWorkflow,
           step.id,
           inputs,
           stepsOutput,
           options.agentTool,
-          options.agentModel
+          options.agentModel,
+          statusManager,
+          totalSteps,
+          stepIndex
         );
 
         runSteps++;
@@ -231,7 +276,9 @@ export const runCommand = async (
 
       console.log(colors.gray('└── Status: ') + status);
 
+      // Mark workflow as completed in status file
       output.success = true;
+      statusManager?.complete('Workflow completed successfully');
     }
   } catch (err) {
     output.success = false;
@@ -239,6 +286,8 @@ export const runCommand = async (
   }
 
   if (!output.success) {
+    statusManager?.fail('Workflow execution', output.error || 'Unknown error');
+
     console.log(colors.red(`\n✗ ${output.error}`));
   }
 };

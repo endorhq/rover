@@ -56,6 +56,14 @@ program
     '--agent-model <agent>',
     'Agent model to use. It overrides defaults, but prioritize step tools if available.'
   )
+  .option(
+    '--task-id <id>',
+    'Task ID for status tracking (required if --status-file is provided)'
+  )
+  .option(
+    '--status-file <path>',
+    'Path to status.json file for tracking workflow progress'
+  )
   .action(runCommand);
 
 // Install workflow dependencies
