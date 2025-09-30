@@ -4,7 +4,7 @@ import { Command, Argument } from 'commander';
 import { setVerbose, getVersion } from 'rover-common';
 import { runCommand } from './commands/run.js';
 import {
-  DEFAUTL_INSTALL_DIRECTORY,
+  DEFAULT_INSTALL_DIRECTORY,
   DEFAULT_INSTALL_VERSION,
   installCommand,
 } from './commands/install.js';
@@ -78,7 +78,7 @@ program
   .option(
     '--user-dir <directory>',
     'User directory to copy credentials',
-    DEFAUTL_INSTALL_DIRECTORY
+    DEFAULT_INSTALL_DIRECTORY
   )
   .action(installCommand);
 

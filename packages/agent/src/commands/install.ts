@@ -13,16 +13,16 @@ interface InstallCommandOutput extends CommandOutput {}
 
 // Default agent version to install
 export const DEFAULT_INSTALL_VERSION = 'latest';
-export const DEFAUTL_INSTALL_DIRECTORY = '/home/agent';
+export const DEFAULT_INSTALL_DIRECTORY = '/home/agent';
 
 /**
- * Install an AI Coding Tool and configure the required credendtials to run it
+ * Install an AI Coding Tool and configure the required credentials to run it
  */
 export const installCommand = async (
   agentName: string,
   options: InstallCommandOptions = {
     version: DEFAULT_INSTALL_VERSION,
-    userDir: DEFAUTL_INSTALL_DIRECTORY,
+    userDir: DEFAULT_INSTALL_DIRECTORY,
   }
 ) => {
   const output: InstallCommandOutput = {
