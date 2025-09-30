@@ -34,6 +34,7 @@
     "test:extension": "npm run test --workspace=./packages/extension",
     "test:cli": "npm run test --workspace=./packages/cli",
     "test:agent": "npm run test --workspace=./packages/agent",
+    "test:common": "npm run test --workspace=./packages/common",
     "format": "prettier --write .",
     "postinstall": "run-s -l build:common build:telemetry"
   },
