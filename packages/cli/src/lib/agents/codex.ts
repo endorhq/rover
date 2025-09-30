@@ -11,6 +11,25 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { fileSync } from 'tmp';
 
+// Environment variables reference:
+// - https://raw.githubusercontent.com/openai/codex/refs/heads/main/docs/config.md
+const CODEX_ENV_VARS = [
+  // Azure OpenAI configuration
+  'AZURE_OPENAI_API_KEY',
+
+  // OpenTelemetry configuration
+  'OTLP_TOKEN',
+
+  // System environment variables
+  'TMPDIR',
+  'PATH',
+  'HOME',
+  'USER',
+
+  // CI/CD configuration
+  'CI',
+];
+
 class CodexAI implements AIAgentTool {
   // constants
   public AGENT_BIN = 'codex';
@@ -144,6 +163,26 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
     }
 
     return dockerMounts;
+  }
+
+  getEnvironmentVariables(): string[] {
+    const envVars: string[] = [];
+
+    // Look for any CODEX_* and OPENAI_* env vars
+    for (const key in process.env) {
+      if (key.startsWith('CODEX_') || key.startsWith('OPENAI_')) {
+        envVars.push('-e', key);
+      }
+    }
+
+    // Add other specific environment variables from CODEX_ENV_VARS
+    for (const key of CODEX_ENV_VARS) {
+      if (process.env[key] !== undefined) {
+        envVars.push('-e', key);
+      }
+    }
+
+    return envVars;
   }
 }
 

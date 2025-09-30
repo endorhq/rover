@@ -202,6 +202,7 @@ export const startDockerExecution = async (
   // Get agent-specific Docker mounts
   const agent = getAIAgentTool(selectedAiAgent);
   const dockerMounts: string[] = agent.getContainerMounts();
+  const envVariables: string[] = agent.getEnvironmentVariables();
 
   if (!jsonMode) {
     console.log(colors.white.bold('\n🐳 Starting Docker container:'));
@@ -252,6 +253,7 @@ export const startDockerExecution = async (
       `${iterationJsonPath}:/task/description.json:Z,ro`,
       '-v',
       `${promptsDir}:/prompts:Z,ro`,
+      ...envVariables,
       '-w',
       '/workspace',
       'node:24-alpine',
