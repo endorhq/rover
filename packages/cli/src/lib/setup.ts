@@ -179,7 +179,7 @@ write_status() {
    * Generate cleanup functions
    */
   private generateCleanupFunctions(): string {
-    let isDockerRootless = true;
+    let isDockerRootless = false;
 
     const dockerInfo = launchSync('docker', ['info', '-f', 'json']).stdout;
     if (dockerInfo) {
@@ -278,38 +278,6 @@ check_generated_file() {
     fi
 
     echo "✅ Generated file found: $file_path"
-}`;
-  }
-
-  /**
-   * Generate user creation and setup functions
-   */
-  private generateUserSetupFunctions(): string {
-    return `# Function to create agent user
-create_agent_user() {
-    echo "👤 Creating agent user..."
-    write_status "installing" "Creating agent user" 10
-
-    adduser -D -s /bin/sh agent
-    if [ $? -ne 0 ]; then
-        echo "❌ Failed to create user 'agent'"
-        safe_exit 1 "adduser command failed"
-    fi
-
-    echo "✅ User 'agent' created successfully"
-    write_status "installing" "Agent user created" 10
-}
-
-# Function to setup agent user environment
-setup_agent_environment() {
-    echo "🏠 Setting up agent user environment..."
-    write_status "installing" "Setting up agent user environment" 10
-
-    # Create agent home directory
-    mkdir -p /home/agent
-
-    echo "✅ Agent user environment configured"
-    write_status "installing" "Agent environment setup" 15
 }`;
   }
 
@@ -505,28 +473,13 @@ ensure_mcp_remote() {
   fi
 }
 
-# Function to install jq if not available
-ensure_jq() {
-    if ! check_command jq; then
-        echo "📦 Installing jq for JSON parsing..."
-        if apk add --no-cache jq; then
-            write_status "initializing" "Installed jq for JSON parsing" 5
-        else
-            echo "❌ Failed to install jq"
-            safe_exit 1 "apk add jq failed"
-        fi
-    fi
-}
-
 # Function to validate task description file
 validate_task_file() {
     if [ ! -f "/task/description.json" ]; then
         echo "❌ Task description file not found at /task/description.json"
         safe_exit 1 "Task description file not found at /task/description.json"
     fi
-}
-
-${this.generateUserSetupFunctions()}`;
+}`;
   }
 
   /**
@@ -550,9 +503,6 @@ ${this.generateCommonFunctions()}
 # Set start time
 START_TIME=$(date -u +%Y-%m-%dT%H:%M:%S%z)
 
-# Install jq for JSON parsing
-ensure_jq
-
 # Validate task description file
 validate_task_file
 
@@ -574,12 +524,6 @@ echo "Task Iteration: $TASK_ITERATION"
 echo "======================================="
 
 write_status "initializing" "Load metadata" 5
-
-# Create agent user
-create_agent_user
-
-# Setup agent user environment
-setup_agent_environment
 
 # Agent-specific CLI installation and credential setup
 echo "📦 Installing ${this.agent} CLI and setting up credentials..."

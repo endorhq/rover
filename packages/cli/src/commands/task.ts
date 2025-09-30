@@ -226,6 +226,16 @@ export const startDockerExecution = async (
     : null;
 
   try {
+    let isDockerRootless = false;
+
+    const dockerInfo = launchSync('docker', ['info', '-f', 'json']).stdout;
+    if (dockerInfo) {
+      const info = JSON.parse(dockerInfo.toString());
+      isDockerRootless = (info?.SecurityOptions || []).some((value: string) =>
+        value.includes('rootless')
+      );
+    }
+
     // Build Docker run command with mounts
     const dockerArgs = [
       'run',
@@ -235,6 +245,14 @@ export const startDockerExecution = async (
       // '--rm'
       '-d',
     ];
+
+    // If Docker is in rootless mode, user mappings are correct and
+    // don't need any tweaking. On rootful mode, map current user id
+    // and group so that filesystem permissions are correct.
+    if (!isDockerRootless) {
+      const userInfo_ = userInfo();
+      dockerArgs.push('--user', `${userInfo_.uid}:${userInfo_.gid}`);
+    }
 
     dockerArgs.push(
       '-v',
@@ -252,7 +270,7 @@ export const startDockerExecution = async (
       `${promptsDir}:/prompts:Z,ro`,
       '-w',
       '/workspace',
-      'node:24-alpine',
+      'registry.ereslibre.net/node:24-alpine',
       '/bin/sh',
       '/setup.sh'
     );
