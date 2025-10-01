@@ -378,7 +378,6 @@ echo "======================================="`;
 
 sudo mkdir -p $HOME/.claude
 
-
 # Process and copy Claude credentials
 if [ -f "/.claude.json" ]; then
     echo "📝 Processing Claude configuration..."
