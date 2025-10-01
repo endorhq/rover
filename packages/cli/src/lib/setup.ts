@@ -244,18 +244,15 @@ execute_prompt_phase() {
         safe_exit 1 "Prompt file /prompts/$phase_name.txt not found"
     fi
 
-    # Switch to agent user and execute the prompt
-    su agent << EOF
-# Change to workspace directory
-cd /workspace
+    # Change to workspace directory
+    cd /workspace
 
-# Execute the AI agent with the prompt
-if cat /prompts/$phase_name.txt | ${this.getAgentCommand()}; then
-    exit 0
-else
-    exit 1
-fi
-EOF
+    # Execute the AI agent with the prompt
+    if cat /prompts/$phase_name.txt | ${this.getAgentCommand()}; then
+        exit 0
+    else
+        exit 1
+    fi
 
     # Check execution result
     if [ $? -eq 0 ]; then
@@ -347,7 +344,7 @@ echo "======================================="`;
    */
   private generateInstallAgent(): string {
     if (this.agent == 'claude') {
-      return `npm install -g @anthropic-ai/claude-code
+      return `sudo npm install -g @anthropic-ai/claude-code
 
 mkdir -p $HOME/.claude
 
@@ -372,7 +369,7 @@ else
 fi
 `;
     } else if (this.agent == 'codex') {
-      return `npm install -g @openai/codex
+      return `sudo npm install -g @openai/codex
 
 # Codex does not support Streamable HTTP server yet, only stdio; use
 # mcp-remote for proxying.
@@ -395,7 +392,7 @@ else
 fi
 `;
     } else if (this.agent == 'gemini') {
-      return `npm install -g @google/gemini-cli
+      return `sudo npm install -g @google/gemini-cli
 
 # Configure the CLI
 # Process and copy Gemini credentials
@@ -415,7 +412,7 @@ else
 fi
 `;
     } else if (this.agent == 'qwen') {
-      return `npm install -g @qwen-code/qwen-code@latest
+      return `sudo npm install -g @qwen-code/qwen-code@latest
 
 # Configure the CLI
 # Process and copy Qwen credentials
@@ -463,7 +460,7 @@ check_command() {
 # Function to install mcp-remote if not available
 ensure_mcp_remote() {
   if ! check_command mcp-remote; then
-    COMMAND="npm install -g mcp-remote@0.1.29"
+    COMMAND="sudo npm install -g mcp-remote@0.1.29"
     if $COMMAND; then
       write_status "initializing" "Installed mcp-remote for MCP proxying" 5
     else
@@ -499,10 +496,8 @@ validate_task_file() {
 export PATH=/root/local/.bin:$PATH
 export HOME=/home/agent
 
+sudo mkdir -p $HOME
 sudo chown -R $(id -u):$(id -g) $HOME
-
-echo "sleeping..."
-sleep infinity
 
 ${this.generateCommonFunctions()}
 
