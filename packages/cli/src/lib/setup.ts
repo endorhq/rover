@@ -279,6 +279,8 @@ execute_prompt_phase() {
     fi
 
     sudo chown -R $(id -u):$(id -g) $HOME
+    sudo chown -R $(id -u):$(id -g) /workspace
+    sudo chown -R $(id -u):$(id -g) /output
 
     # Execute the AI agent with the prompt
     cd /workspace
