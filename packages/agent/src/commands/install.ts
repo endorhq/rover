@@ -30,14 +30,14 @@ export const installCommand = async (
   };
 
   try {
-    console.log(colors.white.bold('Agent Installation'));
+    console.log(colors.bold('Agent Installation'));
     console.log(colors.gray('├── Agent: ') + colors.cyan(agentName));
     console.log(colors.gray('└── Version: ') + colors.cyan(options.version));
 
     // Create agent instance
     const agent = createAgent(agentName, options.version);
 
-    console.log(colors.white.bold('\nValidating Credentials'));
+    console.log(colors.bold('\nValidating Credentials'));
 
     // Validate agent credentials
     const validation = agent.validateCredentials();

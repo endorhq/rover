@@ -28,7 +28,7 @@ export class CodexAgent extends BaseAgent {
   }
 
   async copyCredentials(targetDir: string): Promise<void> {
-    console.log(colors.white.bold(`\nCopying ${this.name} credentials`));
+    console.log(colors.bold(`\nCopying ${this.name} credentials`));
 
     const targetCodexDir = join(targetDir, '.codex');
     // Ensure .codex directory exists

@@ -33,7 +33,7 @@ export const resetCommand = async (
 
     console.log(colors.bold('\n🔄 Reset Task\n'));
     console.log(colors.gray('ID: ') + colors.cyan(taskId));
-    console.log(colors.gray('Title: ') + colors.white(task.title));
+    console.log(colors.gray('Title: ') + task.title);
     console.log(colors.gray('Status: ') + colors.yellow(task.status));
 
     if (existsSync(task.worktreePath)) {

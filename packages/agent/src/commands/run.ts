@@ -84,21 +84,17 @@ export const runCommand = async (
       }
     }
 
-    console.log(colors.white.bold('Agent Workflow'));
+    console.log(colors.bold('Agent Workflow'));
     console.log(colors.gray('├── Name: ') + colors.cyan(agentWorkflow.name));
-    console.log(
-      colors.gray('└── Description: ') + colors.white(agentWorkflow.description)
-    );
+    console.log(colors.gray('└── Description: ') + agentWorkflow.description);
 
-    console.log(colors.white.bold('\nUser inputs'));
+    console.log(colors.bold('\nUser inputs'));
     const inputEntries = Array.from(inputs.entries());
     inputEntries.forEach(([key, value], idx) => {
       const prefix = idx == inputEntries.length - 1 ? '└──' : '├──';
       const isDefault = defaultInputs.includes(key);
       const suffix = isDefault ? colors.gray(' (default)') : '';
-      console.log(
-        colors.white(`${prefix} ${key}=`) + colors.cyan(`${value}`) + suffix
-      );
+      console.log(`${prefix} ${key}=` + colors.cyan(`${value}`) + suffix);
     });
 
     // Validate inputs against workflow requirements
@@ -125,12 +121,10 @@ export const runCommand = async (
       const stepsOutput: Map<string, Map<string, string>> = new Map();
 
       // Print Steps
-      console.log(colors.white.bold('\nSteps'));
+      console.log(colors.bold('\nSteps'));
       agentWorkflow.steps.forEach((step, idx) => {
         const prefix = idx == agentWorkflow.steps.length - 1 ? '└──' : '├──';
-        console.log(
-          colors.white(`${prefix} ${idx}. `) + colors.white(`${step.name}`)
-        );
+        console.log(`${prefix} ${idx}. ` + `${step.name}`);
       });
 
       let runSteps = 0;
@@ -160,7 +154,7 @@ export const runCommand = async (
         const result = await runner.run();
 
         // Display step results
-        console.log(colors.white.bold(`\n📊 Step Results: ${step.name}`));
+        console.log(colors.bold(`\n📊 Step Results: ${step.name}`));
         console.log(colors.gray('├── ID: ') + colors.cyan(result.id));
         console.log(
           colors.gray('├── Status: ') +
@@ -241,7 +235,7 @@ export const runCommand = async (
       }
 
       // Display workflow completion summary
-      console.log(colors.white.bold('\n🎉 Workflow Execution Summary'));
+      console.log(colors.bold('\n🎉 Workflow Execution Summary'));
       console.log(
         colors.gray('├── Total Steps: ') +
           colors.cyan(agentWorkflow.steps.length.toString())

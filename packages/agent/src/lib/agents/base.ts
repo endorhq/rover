@@ -45,7 +45,7 @@ export abstract class BaseAgent implements Agent {
   async install(): Promise<void> {
     const command = this.getInstallCommand();
 
-    console.log(colors.white.bold(`\nInstalling ${this.name} CLI`));
+    console.log(colors.bold(`\nInstalling ${this.name} CLI`));
     console.log(colors.gray('├── Version: ') + colors.cyan(this.version));
     console.log(colors.gray('└── Command: ') + colors.cyan(command));
 

@@ -157,9 +157,7 @@ export const listCommand = async (
     // Print header
     let headerRow = '';
     headers.forEach((header, index) => {
-      headerRow += colors.bold(
-        colors.white(header.padEnd(columnWidths[index]))
-      );
+      headerRow += colors.bold(header.padEnd(columnWidths[index]));
     });
     console.log(headerRow);
 
@@ -202,9 +200,7 @@ export const listCommand = async (
 
       let row = '';
       row += colors.cyan(task.id.toString().padEnd(columnWidths[0]));
-      row += colors.white(
-        truncateText(title, columnWidths[1] - 1).padEnd(columnWidths[1])
-      );
+      row += truncateText(title, columnWidths[1] - 1).padEnd(columnWidths[1]);
       row += colors.gray(agent.padEnd(columnWidths[2]));
       row += colorFunc(formatTaskStatus(taskStatus).padEnd(columnWidths[3])); // +10 for ANSI codes
       row += formatProgress(

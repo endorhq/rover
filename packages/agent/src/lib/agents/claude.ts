@@ -28,7 +28,7 @@ export class ClaudeAgent extends BaseAgent {
   }
 
   async copyCredentials(targetDir: string): Promise<void> {
-    console.log(colors.white.bold(`\nCopying ${this.name} credentials`));
+    console.log(colors.bold(`\nCopying ${this.name} credentials`));
 
     const targetClaudeDir = join(targetDir, '.claude');
     // Ensure .claude directory exists

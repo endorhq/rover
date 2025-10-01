@@ -122,7 +122,7 @@ export const initCommand = async (
     reqSpinner.fail('Your system misses some required tools');
   }
 
-  console.log(colors.white.bold('\nRequired Tools'));
+  console.log(colors.bold('\nRequired Tools'));
   console.log(
     `├── Git: ${gitInstalled ? colors.green('✓ Installed') : colors.red('✗ Missing')}`
   );
@@ -130,7 +130,7 @@ export const initCommand = async (
     `└── Docker: ${dockerInstalled ? colors.green('✓ Installed') : colors.red('✗ Missing')}`
   );
 
-  console.log(colors.white.bold('\nAI Agents (at least one)'));
+  console.log(colors.bold('\nAI Agents (at least one)'));
   console.log(
     `├── Claude: ${claudeInstalled ? colors.green('✓ Installed') : colors.red('✗ Missing')}`
   );
@@ -166,7 +166,7 @@ export const initCommand = async (
   try {
     await ensureGitignore(path);
   } catch (error) {
-    console.log(colors.white.bold('\n.gitignore'));
+    console.log(colors.bold('\n.gitignore'));
     console.log(
       `└── ${colors.yellow('⚠ Could not update .gitignore:')}`,
       error
@@ -229,7 +229,7 @@ export const initCommand = async (
     let attribution = true;
 
     if (!options.yes) {
-      console.log(colors.white.bold('\nAttribution'));
+      console.log(colors.bold('\nAttribution'));
       // Confirm attribution
       console.log(
         colors.gray(

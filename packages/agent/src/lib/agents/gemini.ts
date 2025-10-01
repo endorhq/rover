@@ -33,7 +33,7 @@ export class GeminiAgent extends BaseAgent {
   }
 
   async copyCredentials(targetDir: string): Promise<void> {
-    console.log(colors.white.bold(`\nCopying ${this.name} credentials`));
+    console.log(colors.bold(`\nCopying ${this.name} credentials`));
 
     const targetGeminiDir = join(targetDir, '.gemini');
     // Ensure .gemini directory exists

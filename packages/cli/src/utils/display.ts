@@ -28,7 +28,7 @@ export const showTips = (tips: string[], config: TipsConfig = {}) => {
 
   if (buildConfig.breakline) console.log('');
 
-  console.log(colors.white(`${buildConfig.emoji} ${buildConfig.title}:`));
+  console.log(`${buildConfig.emoji} ${buildConfig.title}:`);
 
   for (const tip of tips) {
     console.log(colors.gray(`   ${tip}`));

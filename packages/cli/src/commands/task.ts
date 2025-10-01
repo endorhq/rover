@@ -205,10 +205,8 @@ export const startDockerExecution = async (
   const envVariables: string[] = agent.getEnvironmentVariables();
 
   if (!jsonMode) {
-    console.log(colors.white.bold('\n🐳 Starting Docker container:'));
-    console.log(
-      colors.gray('└── Container Name: ') + colors.white(containerName)
-    );
+    console.log(colors.bold('\n🐳 Starting Docker container:'));
+    console.log(colors.gray('└── Container Name: ') + containerName);
   }
 
   // Clean up any existing container with same name
@@ -481,10 +479,8 @@ export const taskCommand = async (
           );
           console.log(
             colors.gray('└── Body: ') +
-              colors.white(
-                issueData.body.substring(0, 100) +
-                  (issueData.body.length > 100 ? '...' : '')
-              )
+              issueData.body.substring(0, 100) +
+              (issueData.body.length > 100 ? '...' : '')
           );
         }
       } else {
@@ -633,13 +629,12 @@ export const taskCommand = async (
         } else {
           // Display the expanded task
           if (!json) {
-            console.log('\n' + colors.white.bold('Task Details:'));
+            console.log('\n' + colors.bold('Task Details:'));
             console.log(
               colors.gray('├── Title: ') + colors.cyan(taskData.title)
             );
             console.log(
-              colors.gray('└── Description: ') +
-                colors.white(taskData.description)
+              colors.gray('└── Description: ') + taskData.description
             );
           }
 
@@ -786,9 +781,9 @@ export const taskCommand = async (
     task.markInProgress();
 
     if (!json) {
-      console.log(colors.bold.white('\n🚀 Task Created'));
+      console.log(colors.bold('\n🚀 Task Created'));
       console.log(colors.gray('├── ID: ') + colors.cyan(task.id.toString()));
-      console.log(colors.gray('├── Title: ') + colors.white(task.title));
+      console.log(colors.gray('├── Title: ') + task.title);
       console.log(
         colors.gray('├── Workspace: ') + colors.cyan(task.worktreePath)
       );

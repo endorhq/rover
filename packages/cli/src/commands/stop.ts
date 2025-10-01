@@ -53,9 +53,9 @@ export const stopCommand = async (
     const task = TaskDescription.load(numericTaskId);
 
     if (!json) {
-      console.log(colors.bold.white('Stopping Task'));
+      console.log(colors.bold('Stopping Task'));
       console.log(colors.gray('├── ID: ') + colors.cyan(task.id.toString()));
-      console.log(colors.gray('├── Title: ') + colors.white(task.title));
+      console.log(colors.gray('├── Title: ') + task.title);
       console.log(colors.gray('└── Status: ') + colors.yellow(task.status));
     }
 

@@ -34,9 +34,7 @@ export function createProgram(
         const commandName = actionCommand.name();
         if (!['init', 'mcp'].includes(commandName) && !ProjectConfig.exists()) {
           console.log(
-            colors.white(
-              `Rover is not initialized in this directory. The command you requested (\`${commandName}\`) was not executed.`
-            )
+            `Rover is not initialized in this directory. The command you requested (\`${commandName}\`) was not executed.`
           );
           console.log(
             `└── ${colors.gray('Project config (does not exist):')} rover.json`
@@ -110,9 +108,7 @@ export function createProgram(
           !UserSettings.exists()
         ) {
           console.log(
-            colors.white(
-              `Rover is not fully initialized in this directory. The command you requested (\`${commandName}\`) was not executed.`
-            )
+            `Rover is not fully initialized in this directory. The command you requested (\`${commandName}\`) was not executed.`
           );
           console.log(
             `├── ${colors.gray('Project config (exists):')} rover.json`
