@@ -1,10 +1,10 @@
 import enquirer from 'enquirer';
 import colors from 'ansi-colors';
 import yoctoSpinner from 'yocto-spinner';
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { getNextTaskId } from '../utils/task-id.js';
-import { homedir, userInfo } from 'node:os';
+import { homedir, tmpdir, userInfo } from 'node:os';
 import { getAIAgentTool, getUserAIAgent } from '../lib/agents/index.js';
 import type { IPromptTask } from '../lib/prompts/index.js';
 import { TaskDescription } from '../lib/description.js';
@@ -151,29 +151,109 @@ const updateTaskMetadata = (
 };
 
 function catFile(image: string, file: string): string {
-    return launchSync('docker', 'run', '--entrypoint', '/bin/sh', '--rm', image, '-c', `/bin/cat ${file}`)
+  try {
+    return (
+      launchSync('docker', [
+        'run',
+        '--entrypoint',
+        '/bin/sh',
+        '--rm',
+        image,
+        '-c',
+        `/bin/cat ${file}`,
+      ])
         .stdout?.toString()
-        .trim()
+        .trim() || ''
+    );
+  } catch (error) {
+    return '';
+  }
 }
 
 function imageUids(image: string): Map<number, string> {
-    // Use `catFile` to read /etc/passwd and process entries.
-    // Entries are as:
-    // root:x:0:0:root:/root:/bin/sh
-    // We are interested in the third column (columns split by ':')
+  const passwdContent = catFile(image, '/etc/passwd');
+  const uidMap = new Map<number, string>();
+
+  if (!passwdContent) {
+    return uidMap;
+  }
+
+  const lines = passwdContent.split('\n').filter(line => line.trim());
+
+  for (const line of lines) {
+    const fields = line.split(':');
+    if (fields.length >= 3) {
+      const username = fields[0];
+      const uid = parseInt(fields[2], 10);
+      if (!isNaN(uid)) {
+        uidMap.set(uid, username);
+      }
+    }
+  }
+
+  return uidMap;
 }
 
-function imageGids(image: string): Map<number, string {
-    // Use `catFile` to read /etc/group and process entries.
-    // Entries are as:
-    // root:x:0:0:root:/root:/bin/sh
-    // We are interested in the third column (columns split by ':')
+function imageGids(image: string): Map<number, string> {
+  const groupContent = catFile(image, '/etc/group');
+  const gidMap = new Map<number, string>();
+
+  if (!groupContent) {
+    return gidMap;
+  }
+
+  const lines = groupContent.split('\n').filter(line => line.trim());
+
+  for (const line of lines) {
+    const fields = line.split(':');
+    if (fields.length >= 3) {
+      const groupname = fields[0];
+      const gid = parseInt(fields[2], 10);
+      if (!isNaN(gid)) {
+        gidMap.set(gid, groupname);
+      }
+    }
+  }
+
+  return gidMap;
 }
 
-export function etcPasswdWithCurrentUser(image: string): string {
+type CurrentUser = string;
+
+export function etcPasswdWithCurrentUser(image: string): [string, CurrentUser] {
+  const originalPasswd = catFile(image, '/etc/passwd');
+  const existingUids = imageUids(image);
+  const userInfo_ = userInfo();
+
+  // Check if current user already exists in the image
+  if (existingUids.has(userInfo_.uid)) {
+    return [originalPasswd, existingUids.get(userInfo_.uid)!];
+  }
+
+  // Create entry for current user
+  const userEntry = `agent:x:${userInfo_.uid}:${userInfo_.gid}:agent:/home/agent:/bin/sh`;
+
+  return [originalPasswd + '\n' + userEntry + '\n', 'agent'];
 }
 
-export function etcGroupWithCurrentGroup(image: string): string {
+type CurrentGroup = string;
+
+export function etcGroupWithCurrentGroup(
+  image: string
+): [string, CurrentGroup] {
+  const originalGroup = catFile(image, '/etc/group');
+  const existingGids = imageGids(image);
+  const userInfo_ = userInfo();
+
+  // Check if current group already exists in the image
+  if (existingGids.has(userInfo_.gid)) {
+    return [originalGroup, existingGids.get(userInfo_.gid)!];
+  }
+
+  // Create entry for current group
+  const groupEntry = `agent:x:${userInfo_.gid}:agent`;
+
+  return [originalGroup + '\n' + groupEntry + '\n', 'agent'];
 }
 
 /**
@@ -262,7 +342,21 @@ export const startDockerExecution = async (
       );
     }
 
-    const containerImage = "node:24-alpine";
+    const containerImage = 'registry.ereslibre.net/node:24-alpine';
+
+    const userCredentialsTempPath = mkdtempSync(join(tmpdir(), 'rover-'));
+    const etcPasswd = join(userCredentialsTempPath, 'passwd');
+    const [etcPasswdContents, username] =
+      etcPasswdWithCurrentUser(containerImage);
+    writeFileSync(etcPasswd, etcPasswdContents);
+
+    const etcGroup = join(userCredentialsTempPath, 'group');
+    const [etcGroupContents, group] = etcGroupWithCurrentGroup(containerImage);
+    writeFileSync(etcGroup, etcGroupContents);
+
+    const sudoers = join(userCredentialsTempPath, 'sudoers');
+    const sudoersContent = `${username} ALL=(ALL:ALL) NOPASSWD: ALL`;
+    writeFileSync(sudoers, sudoersContent);
 
     // Build Docker run command with mounts
     const dockerArgs = [
@@ -272,15 +366,16 @@ export const startDockerExecution = async (
       // For now, do not remove for logs
       // '--rm'
       '-d',
+      '-v',
+      `${etcPasswd}:/etc/passwd`,
+      '-v',
+      `${etcGroup}:/etc/group`,
+      '-v',
+      `${sudoers}:/etc/sudoers.d/rover`,
     ];
 
-    // If Docker is in rootless mode, user mappings are correct and
-    // don't need any tweaking. On rootful mode, map current user id
-    // and group so that filesystem permissions are correct.
-    if (!isDockerRootless) {
-      const userInfo_ = userInfo();
-      dockerArgs.push('--user', `${userInfo_.uid}:${userInfo_.gid}`);
-    }
+    const userInfo_ = userInfo();
+    dockerArgs.push('--user', `${userInfo_.uid}:${userInfo_.gid}`);
 
     dockerArgs.push(
       '-v',

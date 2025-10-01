@@ -498,7 +498,8 @@ validate_task_file() {
 # available in the $PATH
 export PATH=/root/local/.bin:$PATH
 export HOME=/home/agent
-sudo mkdir -p $HOME
+
+sudo chown -R $(id -u):$(id -g) $HOME
 
 echo "sleeping..."
 sleep infinity
