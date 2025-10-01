@@ -299,9 +299,8 @@ export const startDockerExecution = async (
 
   // Generate setup script using SetupBuilder
   const setupBuilder = new SetupBuilder(task, selectedAiAgent);
-  const setupScriptPath = setupBuilder.generateSetupScript(isDockerRootless);
-  const setupMcpScriptPath =
-    setupBuilder.generateSetupMcpScript(isDockerRootless);
+  const setupScriptPath = setupBuilder.generateSetupScript();
+  const setupMcpScriptPath = setupBuilder.generateSetupMcpScript();
 
   // Generate prompts using PromptBuilder
   const promptsDir = join(
