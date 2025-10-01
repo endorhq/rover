@@ -44,7 +44,7 @@ configure-mcp-servers() {
     echo '' | sudo tee $HOME/.codex/config.toml
   fi
 
-  cat <<'EOF' | sudo tee $HOME/.codex/config.toml
+  cat <<'EOF' | sudo tee -a $HOME/.codex/config.toml
 [mcp_servers.package-manager]
 command = "mcp-remote"
 args = ["http://127.0.0.1:8090/mcp"]
