@@ -11,4 +11,6 @@ RUN apk update && \
     wget -O /usr/local/bin/package-manager-mcp-server \
       https://github.com/endorhq/package-manager-mcp/releases/download/${PACKAGE_MANAGER_MCP_SERVER_VERSION}/package-manager-mcp-${ARCH_SUFFIX} && \
     chmod +s+x /usr/local/bin/package-manager-mcp-server
-COPY ./assets/sudoers /etc/sudoers.d/rover
+# COPY ./assets/sudoers /etc/sudoers.d/rover
+# COPY ./assets/group /etc/group
+# COPY ./assets/passwd /etc/passwd

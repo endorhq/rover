@@ -150,6 +150,32 @@ const updateTaskMetadata = (
   }
 };
 
+function catFile(image: string, file: string): string {
+    return launchSync('docker', 'run', '--entrypoint', '/bin/sh', '--rm', image, '-c', `/bin/cat ${file}`)
+        .stdout?.toString()
+        .trim()
+}
+
+function imageUids(image: string): Map<number, string> {
+    // Use `catFile` to read /etc/passwd and process entries.
+    // Entries are as:
+    // root:x:0:0:root:/root:/bin/sh
+    // We are interested in the third column (columns split by ':')
+}
+
+function imageGids(image: string): Map<number, string {
+    // Use `catFile` to read /etc/group and process entries.
+    // Entries are as:
+    // root:x:0:0:root:/root:/bin/sh
+    // We are interested in the third column (columns split by ':')
+}
+
+export function etcPasswdWithCurrentUser(image: string): string {
+}
+
+export function etcGroupWithCurrentGroup(image: string): string {
+}
+
 /**
  * Start environment using containers
  */
@@ -236,6 +262,8 @@ export const startDockerExecution = async (
       );
     }
 
+    const containerImage = "node:24-alpine";
+
     // Build Docker run command with mounts
     const dockerArgs = [
       'run',
@@ -252,7 +280,6 @@ export const startDockerExecution = async (
     if (!isDockerRootless) {
       const userInfo_ = userInfo();
       dockerArgs.push('--user', `${userInfo_.uid}:${userInfo_.gid}`);
-      dockerArgs.push('--group-add', 'wheel');
     }
 
     dockerArgs.push(
@@ -271,7 +298,7 @@ export const startDockerExecution = async (
       `${promptsDir}:/prompts:Z,ro`,
       '-w',
       '/workspace',
-      'registry.ereslibre.net/node:24-alpine',
+      containerImage,
       '/bin/sh',
       '/setup.sh'
     );
