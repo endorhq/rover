@@ -19,20 +19,20 @@ export class SetupBuilder {
     this.taskId = taskDescription.id;
   }
 
-  private configureMcpServersFunction(): string {
+  private configureMcpServersFunction(isDockerRootless: boolean): string {
     switch (this.agent) {
       case 'claude':
         return `# Function to configure MCP servers for claude
 configure-mcp-servers() {
   # Ensure configuration file exists
   if [ ! -f $HOME/.claude.json ]; then
-    echo '{}' | sudo tee $HOME/.claude.json
+    echo '{}' | ${isDockerRootless ? 'sudo' : ''} tee $HOME/.claude.json
   fi
 
   jq '.mcpServers //= {}' $HOME/.claude.json | \
     jq '.mcpServers += { "package-manager": { "type": "http", "url": "http://127.0.0.1:8090/mcp" } }' \
-    | sudo tee /tmp/agent-settings.json
-  sudo mv /tmp/agent-settings.json $HOME/.claude.json
+      | sudo tee /tmp/agent-settings.json
+  ${isDockerRootless ? 'sudo' : ''} mv /tmp/agent-settings.json $HOME/.claude.json
 }
 `;
       case 'codex':
@@ -40,10 +40,10 @@ configure-mcp-servers() {
 configure-mcp-servers() {
   # Ensure configuration file exists
   if [ ! -f $HOME/.codex/config.toml ]; then
-    echo '' | sudo tee $HOME/.codex/config.toml
+    echo '' | ${isDockerRootless ? 'sudo' : ''} tee $HOME/.codex/config.toml
   fi
 
-  cat <<'EOF' | sudo tee $HOME/.codex/config.toml
+  cat <<'EOF' | ${isDockerRootless ? 'sudo' : ''} tee $HOME/.codex/config.toml
 [mcp_servers.package-manager]
 command = "mcp-remote"
 args = ["http://127.0.0.1:8090/mcp"]
@@ -55,14 +55,14 @@ EOF
 configure-mcp-servers() {
   # Ensure configuration file exists
   if [ ! -f $HOME/.gemini/settings.json ]; then
-    sudo mkdir -p $HOME/.gemini
-    echo '{}' | sudo tee $HOME/.gemini/settings.json
+    ${isDockerRootless ? 'sudo' : ''} mkdir -p $HOME/.gemini
+    echo '{}' | ${isDockerRootless ? 'sudo' : ''} tee $HOME/.gemini/settings.json
   fi
 
   jq '.mcpServers //= {}' $HOME/.gemini/settings.json | \
     jq '.mcpServers += { "package-manager": { "httpUrl": "http://127.0.0.1:8090/mcp", "oauth": { "enabled": false } } }' \
-    | sudo tee /tmp/agent-settings.json
-  sudo mv /tmp/agent-settings.json $HOME/.gemini/settings.json
+    | ${isDockerRootless ? 'sudo' : ''} tee /tmp/agent-settings.json
+  ${isDockerRootless ? 'sudo' : ''} mv /tmp/agent-settings.json $HOME/.gemini/settings.json
 }
 `;
       case 'qwen':
@@ -70,14 +70,14 @@ configure-mcp-servers() {
 configure-mcp-servers() {
   # Ensure configuration file exists
   if [ ! -f $HOME/.qwen/settings.json ]; then
-    sudo mkdir -p $HOME/.qwen
+    ${isDockerRootless ? 'sudo' : ''} mkdir -p $HOME/.qwen
     echo '{}' | sudo tee $HOME/.qwen/settings.json
   fi
 
   jq '.mcpServers //= {}' $HOME/.qwen/settings.json | \
     jq '.mcpServers += { "package-manager": { "httpUrl": "http://127.0.0.1:8090/mcp", "oauth": { "enabled": false } } }' \
     | sudo tee /tmp/agent-settings.json
-  sudo mv /tmp/agent-settings.json $HOME/.qwen/settings.json
+  ${isDockerRootless ? 'sudo' : ''} mv /tmp/agent-settings.json $HOME/.qwen/settings.json
 }
 `;
       default:
@@ -88,7 +88,7 @@ configure-mcp-servers() {
     }
   }
 
-  private buildSetupMcpScript(): string {
+  private buildSetupMcpScript(isDockerRootless: boolean): string {
     return `#!/bin/sh
 
 # Docker container setup script for Rover MCP servers integration
@@ -109,13 +109,13 @@ done
 
 echo "Package manager MCP is ready"
 
-${this.configureMcpServersFunction()}
+${this.configureMcpServersFunction(isDockerRootless)}
 
 configure-mcp-servers
 `;
   }
 
-  generateSetupMcpScript(): string {
+  generateSetupMcpScript(isDockerRootless: boolean): string {
     // Ensure task directory exists
     const taskDir = join(
       findProjectRoot(),
@@ -126,7 +126,7 @@ configure-mcp-servers
     mkdirSync(taskDir, { recursive: true });
 
     // Generate script content
-    const scriptContent = this.buildSetupMcpScript();
+    const scriptContent = this.buildSetupMcpScript(isDockerRootless);
 
     // Write script to file
     const scriptPath = join(taskDir, 'setup-mcp.sh');
@@ -178,17 +178,7 @@ write_status() {
   /**
    * Generate cleanup functions
    */
-  private generateCleanupFunctions(): string {
-    let isDockerRootless = false;
-
-    const dockerInfo = launchSync('docker', ['info', '-f', 'json']).stdout;
-    if (dockerInfo) {
-      const info = JSON.parse(dockerInfo.toString());
-      isDockerRootless = (info?.SecurityOptions || []).some((value: string) =>
-        value.includes('rootless')
-      );
-    }
-
+  private generateCleanupFunctions(isDockerRootless: boolean): string {
     let recoverPermissions = '';
     if (isDockerRootless) {
       recoverPermissions = `
@@ -382,18 +372,18 @@ echo "======================================="`;
   /**
    * Generate the task execution workflow
    */
-  private generateInstallAgent(): string {
+  private generateInstallAgent(isDockerRootless: boolean): string {
     if (this.agent == 'claude') {
       return `sudo npm install -g @anthropic-ai/claude-code
 
-sudo mkdir -p $HOME/.claude
+${isDockerRootless ? 'sudo' : ''} mkdir -p $HOME/.claude
 
 # Process and copy Claude credentials
 if [ -f "/.claude.json" ]; then
     echo "📝 Processing Claude configuration..."
     write_status "installing" "Claude configuration" 20
     # Copy .claude.json but clear the projects object
-    jq '.projects = {}' /.claude.json | sudo tee $HOME/.claude.json
+    jq '.projects = {}' /.claude.json | ${isDockerRootless ? 'sudo' : ''} tee $HOME/.claude.json
     echo "✅ Claude configuration processed and copied to claude user"
 else
     echo "⚠️  No Claude config found at /.claude.json, continuing..."
@@ -402,7 +392,7 @@ fi
 if [ -f "/.credentials.json" ]; then
     echo "📝 Processing Claude credentials..."
     write_status "installing" "Claude credentials" 20
-    sudo cp /.credentials.json $HOME/.claude/
+    ${isDockerRootless ? 'sudo' : ''} cp /.credentials.json $HOME/.claude/
     echo "✅ Claude credentials processed and copied to claude user"
 else
     echo "⚠️  No Claude credentials found, continuing..."
@@ -421,9 +411,9 @@ if [ -d "/.codex" ]; then
     echo "📝 Processing Codex credentials..."
     write_status "installing" "Process Codex credentials" 20
 
-    sudo mkdir -p $HOME/.codex
-    sudo cp /.codex/auth.json $HOME/.codex/
-    sudo cp /.codex/config.json $HOME/.codex/
+    ${isDockerRootless ? 'sudo' : ''} mkdir -p $HOME/.codex
+    ${isDockerRootless ? 'sudo' : ''} cp /.codex/auth.json $HOME/.codex/
+    ${isDockerRootless ? 'sudo' : ''} cp /.codex/config.json $HOME/.codex/
 
     echo "✅ Codex credentials processed and copied to agent user"
 else
@@ -440,10 +430,10 @@ if [ -d "/.gemini" ]; then
     echo "📝 Processing Gemini credentials..."
     write_status "installing" "Process Gemini credentials" 20
 
-    sudo mkdir -p $HOME/.gemini
-    sudo cp /.gemini/oauth_creds.json $HOME/.gemini/
-    sudo cp /.gemini/settings.json $HOME/.gemini/
-    sudo cp /.gemini/user_id $HOME/.gemini/
+    ${isDockerRootless ? 'sudo' : ''} mkdir -p $HOME/.gemini
+    ${isDockerRootless ? 'sudo' : ''} cp /.gemini/oauth_creds.json $HOME/.gemini/
+    ${isDockerRootless ? 'sudo' : ''} cp /.gemini/settings.json $HOME/.gemini/
+    ${isDockerRootless ? 'sudo' : ''} cp /.gemini/user_id $HOME/.gemini/
 
     echo "✅ Gemini credentials processed and copied to agent user"
 else
@@ -460,10 +450,10 @@ if [ -d "/.qwen" ]; then
     echo "📝 Processing Qwen credentials..."
     write_status "installing" "Process Qwen credentials" 20
 
-    sudo mkdir -p $HOME/.qwen
-    sudo cp /.qwen/installation_id $HOME/.qwen/
-    sudo cp /.qwen/oauth_creds.json $HOME/.qwen/
-    sudo cp /.qwen/settings.json $HOME/.qwen/
+    ${isDockerRootless ? 'sudo' : ''} mkdir -p $HOME/.qwen
+    ${isDockerRootless ? 'sudo' : ''} cp /.qwen/installation_id $HOME/.qwen/
+    ${isDockerRootless ? 'sudo' : ''} cp /.qwen/oauth_creds.json $HOME/.qwen/
+    ${isDockerRootless ? 'sudo' : ''} cp /.qwen/settings.json $HOME/.qwen/
 
     echo "✅ Qwen credentials processed and copied to agent user"
 else
@@ -480,10 +470,10 @@ fi
   /**
    * Generate common setup functions
    */
-  private generateCommonFunctions(): string {
+  private generateCommonFunctions(isDockerRootless: boolean): string {
     return `${this.generateWriteStatusFunction()}
 
-${this.generateCleanupFunctions()}
+${this.generateCleanupFunctions(isDockerRootless)}
 
 ${this.generatePromptExecutionFunctions()}
 
@@ -522,7 +512,7 @@ validate_task_file() {
   /**
    * Build the complete setup script content
    */
-  buildScript(): string {
+  buildScript(isDockerRootless: boolean): string {
     return `#!/bin/sh
 
 # Docker container setup script for Rover task execution
@@ -548,7 +538,7 @@ sudo chown -R $(id -u):$(id -g) /.codex
 sudo chown -R $(id -u):$(id -g) /.gemini
 sudo chown -R $(id -u):$(id -g) /.qwen
 
-${this.generateCommonFunctions()}
+${this.generateCommonFunctions(isDockerRootless)}
 
 # Set start time
 START_TIME=$(date -u +%Y-%m-%dT%H:%M:%S%z)
@@ -579,7 +569,7 @@ write_status "initializing" "Load metadata" 5
 echo "📦 Installing ${this.agent} CLI and setting up credentials..."
 write_status "installing" "Installing ${this.agent} CLI" 15
 
-${this.generateInstallAgent()}
+${this.generateInstallAgent(isDockerRootless)}
 
 write_status "installing" "Installing ${this.agent} CLI" 20
 
@@ -613,7 +603,7 @@ exit 0
   /**
    * Generate and save the setup script to the appropriate task directory
    */
-  generateSetupScript(): string {
+  generateSetupScript(isDockerRootless: boolean): string {
     // Ensure task directory exists
     const taskDir = join(
       findProjectRoot(),
@@ -624,7 +614,7 @@ exit 0
     mkdirSync(taskDir, { recursive: true });
 
     // Generate script content
-    const scriptContent = this.buildScript();
+    const scriptContent = this.buildScript(isDockerRootless);
 
     // Write script to file
     const scriptPath = join(taskDir, 'setup.sh');
@@ -656,7 +646,17 @@ exit 0
     taskDescription: TaskDescription,
     agent: string = 'claude'
   ): string {
+    let isDockerRootless = false;
+
+    const dockerInfo = launchSync('docker', ['info', '-f', 'json']).stdout;
+    if (dockerInfo) {
+      const info = JSON.parse(dockerInfo.toString());
+      isDockerRootless = (info?.SecurityOptions || []).some((value: string) =>
+        value.includes('rootless')
+      );
+    }
+
     const builder = new SetupBuilder(taskDescription, agent);
-    return builder.generateSetupScript();
+    return builder.generateSetupScript(isDockerRootless);
   }
 }

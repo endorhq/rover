@@ -283,14 +283,25 @@ export const startDockerExecution = async (
     return;
   }
 
+  let isDockerRootless = false;
+
+  const dockerInfo = launchSync('docker', ['info', '-f', 'json']).stdout;
+  if (dockerInfo) {
+    const info = JSON.parse(dockerInfo.toString());
+    isDockerRootless = (info?.SecurityOptions || []).some((value: string) =>
+      value.includes('rootless')
+    );
+  }
+
   // Load task description
   const iterationJsonPath = join(iterationPath, 'iteration.json');
   const iteration = IterationConfig.load(iterationPath);
 
   // Generate setup script using SetupBuilder
   const setupBuilder = new SetupBuilder(task, selectedAiAgent);
-  const setupScriptPath = setupBuilder.generateSetupScript();
-  const setupMcpScriptPath = setupBuilder.generateSetupMcpScript();
+  const setupScriptPath = setupBuilder.generateSetupScript(isDockerRootless);
+  const setupMcpScriptPath =
+    setupBuilder.generateSetupMcpScript(isDockerRootless);
 
   // Generate prompts using PromptBuilder
   const promptsDir = join(
