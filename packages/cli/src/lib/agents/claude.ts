@@ -21,9 +21,9 @@ const findKeychainCredentials = (key: string): string => {
 
 // Environment variables reference:
 // - https://docs.claude.com/en/docs/claude-code/settings.md
-// - https://docs.claude.com/es/docs/claude-code/google-vertex-ai.md
-// - https://docs.claude.com/es/docs/claude-code/amazon-bedrock.md
-// - https://docs.claude.com/es/docs/claude-code/llm-gateway.md
+// - https://docs.claude.com/en/docs/claude-code/google-vertex-ai.md
+// - https://docs.claude.com/en/docs/claude-code/amazon-bedrock.md
+// - https://docs.claude.com/en/docs/claude-code/llm-gateway.md
 const CLAUDE_CODE_ENV_VARS = [
   // AWS/Bedrock configuration
   'AWS_REGION',
