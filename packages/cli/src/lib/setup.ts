@@ -248,11 +248,7 @@ execute_prompt_phase() {
     cd /workspace
 
     # Execute the AI agent with the prompt
-    if cat /prompts/$phase_name.txt | ${this.getAgentCommand()}; then
-        exit 0
-    else
-        exit 1
-    fi
+    cat /prompts/$phase_name.txt | ${this.getAgentCommand()}
 
     # Check execution result
     if [ $? -eq 0 ]; then
