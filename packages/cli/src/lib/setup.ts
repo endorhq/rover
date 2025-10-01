@@ -26,13 +26,13 @@ export class SetupBuilder {
 configure-mcp-servers() {
   # Ensure configuration file exists
   if [ ! -f $HOME/.claude.json ]; then
-    echo '{}' > $HOME/.claude.json
+    echo '{}' | sudo tee $HOME/.claude.json
   fi
 
   jq '.mcpServers //= {}' $HOME/.claude.json | \
     jq '.mcpServers += { "package-manager": { "type": "http", "url": "http://127.0.0.1:8090/mcp" } }' \
-    > /tmp/agent-settings.json
-  mv /tmp/agent-settings.json $HOME/.claude.json
+    | sudo tee /tmp/agent-settings.json
+  sudo mv /tmp/agent-settings.json $HOME/.claude.json
 }
 `;
       case 'codex':
@@ -40,10 +40,10 @@ configure-mcp-servers() {
 configure-mcp-servers() {
   # Ensure configuration file exists
   if [ ! -f $HOME/.codex/config.toml ]; then
-    echo '' > $HOME/.codex/config.toml
+    echo '' | sudo tee $HOME/.codex/config.toml
   fi
 
-  cat <<'EOF' >> $HOME/.codex/config.toml
+  cat <<'EOF' | sudo tee $HOME/.codex/config.toml
 [mcp_servers.package-manager]
 command = "mcp-remote"
 args = ["http://127.0.0.1:8090/mcp"]
@@ -55,14 +55,14 @@ EOF
 configure-mcp-servers() {
   # Ensure configuration file exists
   if [ ! -f $HOME/.gemini/settings.json ]; then
-    mkdir -p $HOME/.gemini
-    echo '{}' > $HOME/.gemini/settings.json
+    sudo mkdir -p $HOME/.gemini
+    echo '{}' | sudo tee $HOME/.gemini/settings.json
   fi
 
   jq '.mcpServers //= {}' $HOME/.gemini/settings.json | \
     jq '.mcpServers += { "package-manager": { "httpUrl": "http://127.0.0.1:8090/mcp", "oauth": { "enabled": false } } }' \
-    > /tmp/agent-settings.json
-  mv /tmp/agent-settings.json $HOME/.gemini/settings.json
+    | sudo tee /tmp/agent-settings.json
+  sudo mv /tmp/agent-settings.json $HOME/.gemini/settings.json
 }
 `;
       case 'qwen':
@@ -70,14 +70,14 @@ configure-mcp-servers() {
 configure-mcp-servers() {
   # Ensure configuration file exists
   if [ ! -f $HOME/.qwen/settings.json ]; then
-    mkdir -p $HOME/.qwen
-    echo '{}' > $HOME/.qwen/settings.json
+    sudo mkdir -p $HOME/.qwen
+    echo '{}' | sudo tee $HOME/.qwen/settings.json
   fi
 
   jq '.mcpServers //= {}' $HOME/.qwen/settings.json | \
     jq '.mcpServers += { "package-manager": { "httpUrl": "http://127.0.0.1:8090/mcp", "oauth": { "enabled": false } } }' \
-    > /tmp/agent-settings.json
-  mv /tmp/agent-settings.json $HOME/.qwen/settings.json
+    | sudo tee /tmp/agent-settings.json
+  sudo mv /tmp/agent-settings.json $HOME/.qwen/settings.json
 }
 `;
       default:
@@ -171,7 +171,7 @@ write_status() {
         }
         | if ($error != "") then . + {error: $error} else . end
         | if ($status == "completed" or $status == "failed") then . + {completedAt: $completedAt} else . end' \\
-        > /output/status.json
+        | sudo tee /output/status.json
 }`;
   }
 
@@ -189,6 +189,14 @@ write_status() {
       );
     }
 
+    let recoverPermissions = '';
+    if (isDockerRootless) {
+      recoverPermissions = `
+sudo chown -R root:root /workspace || true
+sudo chown -R root:root /output || true
+`;
+    }
+
     return `
 # Function to shred secrets before exit
 shred_secrets() {
@@ -201,18 +209,28 @@ shred_secrets() {
     shred -u /.credentials.json &> /dev/null
 }
 
+# Function to recover permissions before exit
+recover_permissions() {
+    echo "🔧 Recovering permissions..."
+
+    ${recoverPermissions}
+
+    echo "✅ Permissions recovered"
+}
+
 # Function to handle script exit
 safe_exit() {
     local exit_code="$1"
     local error_message="$2"
 
-    mv /workspace/context.md /output
-    mv /workspace/plan.md /output
-    mv /workspace/changes.md /output
-    mv /workspace/summary.md /output
-    mv /workspace/review.md /output
+    sudo mv /workspace/context.md /output
+    sudo mv /workspace/plan.md /output
+    sudo mv /workspace/changes.md /output
+    sudo mv /workspace/summary.md /output
+    sudo mv /workspace/review.md /output
 
     shred_secrets
+    recover_permissions
 
     if [ -n "$error_message" ]; then
         write_status "failed" "Script failed" 100 "$error_message"
@@ -227,7 +245,26 @@ safe_exit() {
    * Generate prompt execution functions
    */
   private generatePromptExecutionFunctions(): string {
-    return `# Function to execute a prompt phase
+    let isDockerRootless = false;
+
+    const dockerInfo = launchSync('docker', ['info', '-f', 'json']).stdout;
+    if (dockerInfo) {
+      const info = JSON.parse(dockerInfo.toString());
+      isDockerRootless = (info?.SecurityOptions || []).some((value: string) =>
+        value.includes('rootless')
+      );
+    }
+
+    let prepareSourcePermissions = '';
+    if (isDockerRootless) {
+      prepareSourcePermissions = `
+sudo chown -R $(id -u):$(id -g) $HOME
+sudo chown -R $(id -u):$(id -g) /output
+sudo chown -R $(id -u):$(id -g) /workspace
+`;
+    }
+
+    return `# Function to prepare source permissions on rootless mode
 execute_prompt_phase() {
     local phase_name="$1"
     local progress="$2"
@@ -244,11 +281,18 @@ execute_prompt_phase() {
         safe_exit 1 "Prompt file /prompts/$phase_name.txt not found"
     fi
 
-    # Change to workspace directory
-    cd /workspace
-
     # Execute the AI agent with the prompt
-    cat /prompts/$phase_name.txt | ${this.getAgentCommand()}
+    sudo /bin/sh <<EOF
+      ${prepareSourcePermissions}
+
+      # Change to workspace directory
+      cd /workspace
+      if cat /prompts/$phase_name.txt | sudo -u $(getent passwd $(id -u) | cut -d: -f1) ${this.getAgentCommand()}; then
+          exit 0
+      else
+          exit 1
+      fi
+EOF
 
     # Check execution result
     if [ $? -eq 0 ]; then
@@ -342,14 +386,14 @@ echo "======================================="`;
     if (this.agent == 'claude') {
       return `sudo npm install -g @anthropic-ai/claude-code
 
-mkdir -p $HOME/.claude
+sudo mkdir -p $HOME/.claude
 
 # Process and copy Claude credentials
 if [ -f "/.claude.json" ]; then
     echo "📝 Processing Claude configuration..."
     write_status "installing" "Claude configuration" 20
     # Copy .claude.json but clear the projects object
-    jq '.projects = {}' /.claude.json > $HOME/.claude.json
+    jq '.projects = {}' /.claude.json | sudo tee $HOME/.claude.json
     echo "✅ Claude configuration processed and copied to claude user"
 else
     echo "⚠️  No Claude config found at /.claude.json, continuing..."
@@ -358,7 +402,7 @@ fi
 if [ -f "/.credentials.json" ]; then
     echo "📝 Processing Claude credentials..."
     write_status "installing" "Claude credentials" 20
-    cp /.credentials.json $HOME/.claude/
+    sudo cp /.credentials.json $HOME/.claude/
     echo "✅ Claude credentials processed and copied to claude user"
 else
     echo "⚠️  No Claude credentials found, continuing..."
@@ -377,9 +421,9 @@ if [ -d "/.codex" ]; then
     echo "📝 Processing Codex credentials..."
     write_status "installing" "Process Codex credentials" 20
 
-    mkdir -p $HOME/.codex
-    cp /.codex/auth.json $HOME/.codex/
-    cp /.codex/config.json $HOME/.codex/
+    sudo mkdir -p $HOME/.codex
+    sudo cp /.codex/auth.json $HOME/.codex/
+    sudo cp /.codex/config.json $HOME/.codex/
 
     echo "✅ Codex credentials processed and copied to agent user"
 else
@@ -396,10 +440,10 @@ if [ -d "/.gemini" ]; then
     echo "📝 Processing Gemini credentials..."
     write_status "installing" "Process Gemini credentials" 20
 
-    mkdir -p $HOME/.gemini
-    cp /.gemini/oauth_creds.json $HOME/.gemini/
-    cp /.gemini/settings.json $HOME/.gemini/
-cp /.gemini/user_id $HOME/.gemini/
+    sudo mkdir -p $HOME/.gemini
+    sudo cp /.gemini/oauth_creds.json $HOME/.gemini/
+    sudo cp /.gemini/settings.json $HOME/.gemini/
+    sudo cp /.gemini/user_id $HOME/.gemini/
 
     echo "✅ Gemini credentials processed and copied to agent user"
 else
@@ -416,10 +460,10 @@ if [ -d "/.qwen" ]; then
     echo "📝 Processing Qwen credentials..."
     write_status "installing" "Process Qwen credentials" 20
 
-    mkdir -p $HOME/.qwen
-    cp /.qwen/installation_id $HOME/.qwen/
-    cp /.qwen/oauth_creds.json $HOME/.qwen/
-    cp /.qwen/settings.json $HOME/.qwen/
+    sudo mkdir -p $HOME/.qwen
+    sudo cp /.qwen/installation_id $HOME/.qwen/
+    sudo cp /.qwen/oauth_creds.json $HOME/.qwen/
+    sudo cp /.qwen/settings.json $HOME/.qwen/
 
     echo "✅ Qwen credentials processed and copied to agent user"
 else
@@ -486,14 +530,23 @@ validate_task_file() {
 # Task ID: ${this.taskId}
 # Task description is mounted at /task/description.json
 
+if [[ -z "\${HOME}" ]]; then
+  export HOME=/home/agent
+fi
+
 # Some tools might be installed under /root/local/.bin conditionally
 # depending on the chosen agent and requirements, make this directory
 # available in the $PATH
 export PATH=/root/local/.bin:$PATH
-export HOME=/home/agent
 
 sudo mkdir -p $HOME
 sudo chown -R $(id -u):$(id -g) $HOME
+
+sudo chown -R $(id -u):$(id -g) /.claude
+sudo chown -R $(id -u):$(id -g) /.claude.json
+sudo chown -R $(id -u):$(id -g) /.codex
+sudo chown -R $(id -u):$(id -g) /.gemini
+sudo chown -R $(id -u):$(id -g) /.qwen
 
 ${this.generateCommonFunctions()}
 
@@ -539,14 +592,15 @@ export TASK_ID TASK_TITLE TASK_DESCRIPTION
 ${this.generateTaskExecutionWorkflow()}
 
 # Move all outputs to the right location
-mv /workspace/context.md /output
-mv /workspace/plan.md /output
-mv /workspace/changes.md /output
-mv /workspace/summary.md /output
-mv /workspace/review.md /output
+sudo mv /workspace/context.md /output
+sudo mv /workspace/plan.md /output
+sudo mv /workspace/changes.md /output
+sudo mv /workspace/summary.md /output
+sudo mv /workspace/review.md /output
 
 # Shred secrets after task completion
 shred_secrets
+recover_permissions
 
 write_status "completed" "Task completed" 100
 echo "======================================="

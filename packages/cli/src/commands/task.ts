@@ -363,9 +363,9 @@ export const startDockerExecution = async (
       // '--rm'
       '-d',
       '-v',
-      `${etcPasswd}:/etc/passwd`,
+      `${etcPasswd}:/etc/passwd:Z,ro`,
       '-v',
-      `${etcGroup}:/etc/group`,
+      `${etcGroup}:/etc/group,Z:ro`,
     ];
 
     const userInfo_ = userInfo();
