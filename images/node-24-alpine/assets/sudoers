@@ -1,5 +1,5 @@
-# Rover agent group; if there is no matching group within the
-# container with the user host, the `agent` group will be used.
+# Rover agent group; if there is no matching gid within the container
+# with the host gid, the `agent` group will be used.
 %agent ALL=(ALL) NOPASSWD: ALL
 
 # Original image group list at /etc/group. If the host user gid
