@@ -354,10 +354,6 @@ export const startDockerExecution = async (
     const [etcGroupContents, group] = etcGroupWithCurrentGroup(containerImage);
     writeFileSync(etcGroup, etcGroupContents);
 
-    const sudoers = join(userCredentialsTempPath, 'sudoers');
-    const sudoersContent = `${username} ALL=(ALL:ALL) NOPASSWD: ALL`;
-    writeFileSync(sudoers, sudoersContent);
-
     // Build Docker run command with mounts
     const dockerArgs = [
       'run',
@@ -370,8 +366,6 @@ export const startDockerExecution = async (
       `${etcPasswd}:/etc/passwd`,
       '-v',
       `${etcGroup}:/etc/group`,
-      '-v',
-      `${sudoers}:/etc/sudoers.d/rover`,
     ];
 
     const userInfo_ = userInfo();
