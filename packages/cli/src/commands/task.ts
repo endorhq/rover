@@ -27,6 +27,7 @@ import { GitHub, GitHubError } from '../lib/github.js';
 import { copyEnvironmentFiles } from '../utils/env-files.js';
 
 const { prompt } = enquirer;
+const AGENT_IMAGE = 'ghcr.io/endorhq/rover/node:latest';
 
 type validationResult = {
   error: string;
@@ -352,16 +353,14 @@ export const startDockerExecution = async (
       );
     }
 
-    const containerImage = 'registry.ereslibre.net/node:24-alpine';
-
     const userCredentialsTempPath = mkdtempSync(join(tmpdir(), 'rover-'));
     const etcPasswd = join(userCredentialsTempPath, 'passwd');
     const [etcPasswdContents, username] =
-      etcPasswdWithCurrentUser(containerImage);
+      etcPasswdWithCurrentUser(AGENT_IMAGE);
     writeFileSync(etcPasswd, etcPasswdContents);
 
     const etcGroup = join(userCredentialsTempPath, 'group');
-    const [etcGroupContents, group] = etcGroupWithCurrentGroup(containerImage);
+    const [etcGroupContents, group] = etcGroupWithCurrentGroup(AGENT_IMAGE);
     writeFileSync(etcGroup, etcGroupContents);
 
     // Build Docker run command with mounts
@@ -397,7 +396,7 @@ export const startDockerExecution = async (
       `${promptsDir}:/prompts:Z,ro`,
       '-w',
       '/workspace',
-      containerImage,
+      AGENT_IMAGE,
       '/bin/sh',
       '/setup.sh'
     );
