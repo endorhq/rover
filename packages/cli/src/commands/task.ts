@@ -27,7 +27,7 @@ import { GitHub, GitHubError } from '../lib/github.js';
 import { copyEnvironmentFiles } from '../utils/env-files.js';
 
 const { prompt } = enquirer;
-const AGENT_IMAGE = 'registry.ereslibre.net/node:24-alpine';
+const AGENT_IMAGE = 'ghcr.io/endorhq/rover/node:latest';
 
 type validationResult = {
   error: string;

@@ -534,7 +534,8 @@ fi
 # available in the $PATH
 export PATH=/root/local/.bin:$PATH
 
-mkdir -p $HOME
+sudo mkdir -p $HOME
+sudo chown $(id -u):$(id -g) $HOME
 
 ${this.generateCommonFunctions()}
 
