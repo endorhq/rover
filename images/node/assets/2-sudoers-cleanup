@@ -1,0 +1,38 @@
+# Rover agent group; if there is no matching gid within the container
+# with the host gid, the `agent` group will be used.
+%agent ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+
+# Original image group list at /etc/group. If the host user gid
+# matches with any of them, it will be able to use `sudo` normally
+# within the container.
+%adm ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%tty ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%disk ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%lp ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%kmem ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%wheel ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%floppy ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%mail ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%news ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%uucp ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%cron ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%audio ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%cdrom ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%dialout ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%ftp ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%sshd ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%input ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%tape ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%video ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%netdev ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%kvm ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%games ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%shadow ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%www-data ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%users ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%ntp ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%abuild ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%utmp ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%ping ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%nogroup ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%nobody ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee

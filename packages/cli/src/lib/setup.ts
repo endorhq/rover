@@ -578,6 +578,9 @@ export TASK_ID TASK_TITLE TASK_DESCRIPTION
 # Run setup MCP script
 /setup-mcp.sh
 
+# Remove ourselves from sudoers
+sudo rm /etc/sudoers.d/1-agent-setup
+
 ${this.generateTaskExecutionWorkflow()}
 
 # Move all outputs to the right location
