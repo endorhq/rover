@@ -534,8 +534,8 @@ fi
 # available in the $PATH
 export PATH=/root/local/.bin:$PATH
 
-sudo mkdir -p $HOME
-sudo chown -R $(id -u):$(id -g) $HOME
+mkdir -p $HOME
+chown -R $(id -u):$(id -g) $HOME
 
 sudo chown -R $(id -u):$(id -g) /.claude
 sudo chown -R $(id -u):$(id -g) /.claude.json
