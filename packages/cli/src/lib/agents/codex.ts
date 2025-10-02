@@ -20,12 +20,6 @@ const CODEX_ENV_VARS = [
   // OpenTelemetry configuration
   'OTLP_TOKEN',
 
-  // System environment variables
-  'TMPDIR',
-  'PATH',
-  'HOME',
-  'USER',
-
   // CI/CD configuration
   'CI',
 ];

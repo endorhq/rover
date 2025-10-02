@@ -231,14 +231,13 @@ safe_exit() {
     sudo mv /workspace/summary.md /output
     sudo mv /workspace/review.md /output
 
-    shred_secrets
-    recover_permissions
-
     if [ -n "$error_message" ]; then
         write_status "failed" "Script failed" 100 "$error_message"
         echo "❌ $error_message"
-        sleep infinity
     fi
+
+    shred_secrets
+    recover_permissions
 
     exit $exit_code
 }`;

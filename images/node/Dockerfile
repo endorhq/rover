@@ -2,7 +2,7 @@ FROM node:24-alpine
 ARG TARGETARCH
 ARG PACKAGE_MANAGER_MCP_SERVER_VERSION="v0.1.3"
 RUN apk update && \
-    apk add jq sudo && \
+    apk add bash file jq sudo && \
     case ${TARGETARCH} in \
       amd64) ARCH_SUFFIX="x86_64-unknown-linux-musl" ;; \
       arm64) ARCH_SUFFIX="aarch64-unknown-linux-musl" ;; \
