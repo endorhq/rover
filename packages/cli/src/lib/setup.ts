@@ -398,9 +398,9 @@ if [ -d "/.codex" ]; then
     write_status "installing" "Process Codex credentials" 20
 
     mkdir -p $HOME/.codex
-    cp /.codex/auth.json $HOME/.codex/
-    cp /.codex/config.json $HOME/.codex/
-    sudo chown $(id -u):$(id -g) $HOME/.codex
+    sudo cp /.codex/auth.json $HOME/.codex/
+    sudo cp /.codex/config.json $HOME/.codex/
+    sudo chown -R $(id -u):$(id -g) $HOME/.codex
 
     echo "✅ Codex credentials processed and copied to agent user"
 else
@@ -418,10 +418,10 @@ if [ -d "/.gemini" ]; then
     write_status "installing" "Process Gemini credentials" 20
 
     mkdir -p $HOME/.gemini
-    cp /.gemini/oauth_creds.json $HOME/.gemini/
-    cp /.gemini/settings.json $HOME/.gemini/
-    cp /.gemini/user_id $HOME/.gemini/
-    sudo chown $(id -u):$(id -g) $HOME/.gemini
+    sudo cp /.gemini/oauth_creds.json $HOME/.gemini/
+    sudo cp /.gemini/settings.json $HOME/.gemini/
+    sudo cp /.gemini/user_id $HOME/.gemini/
+    sudo chown -R $(id -u):$(id -g) $HOME/.gemini
 
     echo "✅ Gemini credentials processed and copied to agent user"
 else
@@ -439,10 +439,10 @@ if [ -d "/.qwen" ]; then
     write_status "installing" "Process Qwen credentials" 20
 
     mkdir -p $HOME/.qwen
-    cp /.qwen/installation_id $HOME/.qwen/
-    cp /.qwen/oauth_creds.json $HOME/.qwen/
-    cp /.qwen/settings.json $HOME/.qwen/
-    sudo chown $(id -u):$(id -g) $HOME/.qwen
+    sudo cp /.qwen/installation_id $HOME/.qwen/
+    sudo cp /.qwen/oauth_creds.json $HOME/.qwen/
+    sudo cp /.qwen/settings.json $HOME/.qwen/
+    sudo chown -R $(id -u):$(id -g) $HOME/.qwen
 
     echo "✅ Qwen credentials processed and copied to agent user"
 else
