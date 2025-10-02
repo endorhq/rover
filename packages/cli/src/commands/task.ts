@@ -27,7 +27,7 @@ import { GitHub, GitHubError } from '../lib/github.js';
 import { copyEnvironmentFiles } from '../utils/env-files.js';
 
 const { prompt } = enquirer;
-const AGENT_IMAGE = 'ghcr.io/endorhq/rover/node:latest';
+const AGENT_IMAGE = 'registry.ereslibre.net/node:24-alpine';
 
 type validationResult = {
   error: string;
@@ -355,8 +355,7 @@ export const startDockerExecution = async (
 
     const userCredentialsTempPath = mkdtempSync(join(tmpdir(), 'rover-'));
     const etcPasswd = join(userCredentialsTempPath, 'passwd');
-    const [etcPasswdContents, username] =
-      etcPasswdWithCurrentUser(AGENT_IMAGE);
+    const [etcPasswdContents, username] = etcPasswdWithCurrentUser(AGENT_IMAGE);
     writeFileSync(etcPasswd, etcPasswdContents);
 
     const etcGroup = join(userCredentialsTempPath, 'group');

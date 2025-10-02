@@ -26,14 +26,13 @@ export class SetupBuilder {
 configure-mcp-servers() {
   # Ensure configuration file exists
   if [ ! -f $HOME/.claude.json ]; then
-    echo '{}' | sudo tee $HOME/.claude.json
+    echo '{}' | tee $HOME/.claude.json
   fi
 
   jq '.mcpServers //= {}' $HOME/.claude.json | \
     jq '.mcpServers += { "package-manager": { "type": "http", "url": "http://127.0.0.1:8090/mcp" } }' \
-      | sudo tee /tmp/agent-settings.json
-  sudo mv /tmp/agent-settings.json $HOME/.claude.json
-  sudo chown $(id -u):$(id -g) $HOME/.claude.json
+      | tee /tmp/agent-settings.json
+  mv /tmp/agent-settings.json $HOME/.claude.json
 }
 `;
       case 'codex':
@@ -41,31 +40,29 @@ configure-mcp-servers() {
 configure-mcp-servers() {
   # Ensure configuration file exists
   if [ ! -f $HOME/.codex/config.toml ]; then
-    echo '' | sudo tee $HOME/.codex/config.toml
+    echo '' | tee $HOME/.codex/config.toml
   fi
 
-  cat <<'EOF' | sudo tee -a $HOME/.codex/config.toml
+  cat <<'EOF' | tee -a $HOME/.codex/config.toml
 [mcp_servers.package-manager]
 command = "mcp-remote"
 args = ["http://127.0.0.1:8090/mcp"]
 EOF
 }
-  sudo chown $(id -u):$(id -g) $HOME/.codex/config.toml
 `;
       case 'gemini':
         return `# Function to configure MCP servers for gemini
 configure-mcp-servers() {
   # Ensure configuration file exists
   if [ ! -f $HOME/.gemini/settings.json ]; then
-    sudo mkdir -p $HOME/.gemini
-    echo '{}' | sudo tee $HOME/.gemini/settings.json
+    mkdir -p $HOME/.gemini
+    echo '{}' | tee $HOME/.gemini/settings.json
   fi
 
   jq '.mcpServers //= {}' $HOME/.gemini/settings.json | \
     jq '.mcpServers += { "package-manager": { "httpUrl": "http://127.0.0.1:8090/mcp", "oauth": { "enabled": false } } }' \
-    | sudo tee /tmp/agent-settings.json
-  sudo mv /tmp/agent-settings.json $HOME/.gemini/settings.json
-  sudo chown $(id -u):$(id -g) $HOME/.gemini/settings.json
+    | tee /tmp/agent-settings.json
+  mv /tmp/agent-settings.json $HOME/.gemini/settings.json
 }
 `;
       case 'qwen':
@@ -73,15 +70,14 @@ configure-mcp-servers() {
 configure-mcp-servers() {
   # Ensure configuration file exists
   if [ ! -f $HOME/.qwen/settings.json ]; then
-    sudo mkdir -p $HOME/.qwen
-    echo '{}' | sudo tee $HOME/.qwen/settings.json
+    mkdir -p $HOME/.qwen
+    echo '{}' | tee $HOME/.qwen/settings.json
   fi
 
   jq '.mcpServers //= {}' $HOME/.qwen/settings.json | \
     jq '.mcpServers += { "package-manager": { "httpUrl": "http://127.0.0.1:8090/mcp", "oauth": { "enabled": false } } }' \
-    | sudo tee /tmp/agent-settings.json
-  sudo mv /tmp/agent-settings.json $HOME/.qwen/settings.json
-  sudo chown $(id -u):$(id -g) $HOME/.qwen/settings.json
+    | tee /tmp/agent-settings.json
+  mv /tmp/agent-settings.json $HOME/.qwen/settings.json
 }
 `;
       default:
@@ -241,6 +237,7 @@ safe_exit() {
     if [ -n "$error_message" ]; then
         write_status "failed" "Script failed" 100 "$error_message"
         echo "❌ $error_message"
+        sleep infinity
     fi
 
     exit $exit_code
@@ -278,9 +275,9 @@ execute_prompt_phase() {
         safe_exit 1 "Prompt file /prompts/$phase_name.txt not found"
     fi
 
-    sudo chown -R $(id -u):$(id -g) $HOME
-    sudo chown -R $(id -u):$(id -g) /workspace
-    sudo chown -R $(id -u):$(id -g) /output
+    ${isDockerRootless ? 'sudo chown -R $(id -u):$(id -g) $HOME' : ''}
+    ${isDockerRootless ? 'sudo chown -R $(id -u):$(id -g) /workspace' : ''}
+    ${isDockerRootless ? 'sudo chown -R $(id -u):$(id -g) /output' : ''}
 
     # Execute the AI agent with the prompt
     cd /workspace
@@ -378,7 +375,7 @@ echo "======================================="`;
     if (this.agent == 'claude') {
       return `sudo npm install -g @anthropic-ai/claude-code
 
-sudo mkdir -p $HOME/.claude
+mkdir -p $HOME/.claude
 
 # Process and copy Claude credentials
 if [ -f "/.claude.json" ]; then
@@ -386,7 +383,6 @@ if [ -f "/.claude.json" ]; then
     write_status "installing" "Claude configuration" 20
     # Copy .claude.json but clear the projects object
     jq '.projects = {}' /.claude.json | sudo tee $HOME/.claude.json
-    sudo chown $(id -u):$(id -g) $HOME/.claude.json
     echo "✅ Claude configuration processed and copied to claude user"
 else
     echo "⚠️  No Claude config found at /.claude.json, continuing..."
@@ -396,6 +392,7 @@ if [ -f "/.credentials.json" ]; then
     echo "📝 Processing Claude credentials..."
     write_status "installing" "Claude credentials" 20
     sudo cp /.credentials.json $HOME/.claude/
+    sudo chown $(id -u):$(id -g) $HOME/.claude/.credentials.json
     echo "✅ Claude credentials processed and copied to claude user"
 else
     echo "⚠️  No Claude credentials found, continuing..."
@@ -414,9 +411,10 @@ if [ -d "/.codex" ]; then
     echo "📝 Processing Codex credentials..."
     write_status "installing" "Process Codex credentials" 20
 
-    sudo mkdir -p $HOME/.codex
-    sudo cp /.codex/auth.json $HOME/.codex/
-    sudo cp /.codex/config.json $HOME/.codex/
+    mkdir -p $HOME/.codex
+    cp /.codex/auth.json $HOME/.codex/
+    cp /.codex/config.json $HOME/.codex/
+    sudo chown $(id -u):$(id -g) $HOME/.codex
 
     echo "✅ Codex credentials processed and copied to agent user"
 else
@@ -433,10 +431,11 @@ if [ -d "/.gemini" ]; then
     echo "📝 Processing Gemini credentials..."
     write_status "installing" "Process Gemini credentials" 20
 
-    sudo mkdir -p $HOME/.gemini
-    sudo cp /.gemini/oauth_creds.json $HOME/.gemini/
-    sudo cp /.gemini/settings.json $HOME/.gemini/
-    sudo cp /.gemini/user_id $HOME/.gemini/
+    mkdir -p $HOME/.gemini
+    cp /.gemini/oauth_creds.json $HOME/.gemini/
+    cp /.gemini/settings.json $HOME/.gemini/
+    cp /.gemini/user_id $HOME/.gemini/
+    sudo chown $(id -u):$(id -g) $HOME/.gemini
 
     echo "✅ Gemini credentials processed and copied to agent user"
 else
@@ -453,10 +452,11 @@ if [ -d "/.qwen" ]; then
     echo "📝 Processing Qwen credentials..."
     write_status "installing" "Process Qwen credentials" 20
 
-    sudo mkdir -p $HOME/.qwen
-    sudo cp /.qwen/installation_id $HOME/.qwen/
-    sudo cp /.qwen/oauth_creds.json $HOME/.qwen/
-    sudo cp /.qwen/settings.json $HOME/.qwen/
+    mkdir -p $HOME/.qwen
+    cp /.qwen/installation_id $HOME/.qwen/
+    cp /.qwen/oauth_creds.json $HOME/.qwen/
+    cp /.qwen/settings.json $HOME/.qwen/
+    sudo chown $(id -u):$(id -g) $HOME/.qwen
 
     echo "✅ Qwen credentials processed and copied to agent user"
 else
@@ -535,13 +535,6 @@ fi
 export PATH=/root/local/.bin:$PATH
 
 mkdir -p $HOME
-chown -R $(id -u):$(id -g) $HOME
-
-sudo chown -R $(id -u):$(id -g) /.claude
-sudo chown -R $(id -u):$(id -g) /.claude.json
-sudo chown -R $(id -u):$(id -g) /.codex
-sudo chown -R $(id -u):$(id -g) /.gemini
-sudo chown -R $(id -u):$(id -g) /.qwen
 
 ${this.generateCommonFunctions()}
 
