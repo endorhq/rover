@@ -382,7 +382,7 @@ if [ -f "/.claude.json" ]; then
     echo "📝 Processing Claude configuration..."
     write_status "installing" "Claude configuration" 20
     # Copy .claude.json but clear the projects object
-    jq '.projects = {}' /.claude.json | sudo tee $HOME/.claude.json
+    jq '.projects = {} | .bypassPermissionsModeAccepted = true' /.claude.json | sudo tee $HOME/.claude.json
     echo "✅ Claude configuration processed and copied to claude user"
 else
     echo "⚠️  No Claude config found at /.claude.json, continuing..."
@@ -522,8 +522,6 @@ validate_task_file() {
 # Generated for agent: ${this.agent}
 # Task ID: ${this.taskId}
 # Task description is mounted at /task/description.json
-
-set -x
 
 if [[ -z "\${HOME}" ]]; then
   export HOME=/home/agent
