@@ -17,7 +17,7 @@ export class CodexAgent extends BaseAgent {
       {
         path: '/.codex/auth.json',
         description: 'Codex authentication',
-        required: true,
+        required: false,
       },
       {
         path: '/.codex/config.json',

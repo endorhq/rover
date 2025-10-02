@@ -22,7 +22,7 @@ export class ClaudeAgent extends BaseAgent {
       {
         path: '/.credentials.json',
         description: 'Claude credentials',
-        required: true,
+        required: false, // It's not required when using env variables
       },
     ];
   }
