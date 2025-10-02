@@ -1,4 +1,3 @@
-import colors from 'ansi-colors';
 import { writeFileSync, chmodSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { TaskDescription } from './description.js';
@@ -12,11 +11,24 @@ export class SetupBuilder {
   private taskDescription: TaskDescription;
   private agent: string;
   private taskId: number;
+  private isDockerRootless: boolean;
 
   constructor(taskDescription: TaskDescription, agent: string = 'claude') {
     this.taskDescription = taskDescription;
     this.agent = agent;
     this.taskId = taskDescription.id;
+
+    let isDockerRootless = false;
+
+    const dockerInfo = launchSync('docker', ['info', '-f', 'json']).stdout;
+    if (dockerInfo) {
+      const info = JSON.parse(dockerInfo.toString());
+      isDockerRootless = (info?.SecurityOptions || []).some((value: string) =>
+        value.includes('rootless')
+      );
+    }
+
+    this.isDockerRootless = isDockerRootless;
   }
 
   private configureMcpServersFunction(): string {
@@ -171,9 +183,7 @@ write_status() {
         }
         | if ($error != "") then . + {error: $error} else . end
         | if ($status == "completed" or $status == "failed") then . + {completedAt: $completedAt} else . end' \\
-      | sudo tee /output/status.json
-
-    sudo chown $(id -u):$(id -g) /output/status.json
+      | tee /output/status.json
 }`;
   }
 
@@ -181,18 +191,8 @@ write_status() {
    * Generate cleanup functions
    */
   private generateCleanupFunctions(): string {
-    let isDockerRootless = false;
-
-    const dockerInfo = launchSync('docker', ['info', '-f', 'json']).stdout;
-    if (dockerInfo) {
-      const info = JSON.parse(dockerInfo.toString());
-      isDockerRootless = (info?.SecurityOptions || []).some((value: string) =>
-        value.includes('rootless')
-      );
-    }
-
     let recoverPermissions = '';
-    if (isDockerRootless) {
+    if (this.isDockerRootless) {
       recoverPermissions = `
 sudo chown -R root:root /workspace || true
 sudo chown -R root:root /output || true
@@ -248,16 +248,6 @@ safe_exit() {
    * Generate prompt execution functions
    */
   private generatePromptExecutionFunctions(): string {
-    let isDockerRootless = false;
-
-    const dockerInfo = launchSync('docker', ['info', '-f', 'json']).stdout;
-    if (dockerInfo) {
-      const info = JSON.parse(dockerInfo.toString());
-      isDockerRootless = (info?.SecurityOptions || []).some((value: string) =>
-        value.includes('rootless')
-      );
-    }
-
     return `# Function to prepare source permissions on rootless mode
 execute_prompt_phase() {
     local phase_name="$1"
@@ -275,13 +265,9 @@ execute_prompt_phase() {
         safe_exit 1 "Prompt file /prompts/$phase_name.txt not found"
     fi
 
-    ${isDockerRootless ? 'sudo chown -R $(id -u):$(id -g) $HOME' : ''}
-    ${isDockerRootless ? 'sudo chown -R $(id -u):$(id -g) /workspace' : ''}
-    ${isDockerRootless ? 'sudo chown -R $(id -u):$(id -g) /output' : ''}
-
     # Execute the AI agent with the prompt
     cd /workspace
-    cat /prompts/$phase_name.txt | ${isDockerRootless ? 'sudo -u $(getent passwd $(id -u) | cut -d: -f1)' : ''} ${this.getAgentCommand()}
+    cat /prompts/$phase_name.txt | ${this.getAgentCommand()}
 
     # Check execution result
     if [ $? -eq 0 ]; then
@@ -535,6 +521,10 @@ export PATH=/root/local/.bin:$PATH
 sudo mkdir -p $HOME
 sudo chown $(id -u):$(id -g) $HOME
 
+${this.isDockerRootless ? 'sudo chown -R $(id -u):$(id -g) $HOME' : ''}
+${this.isDockerRootless ? 'sudo chown -R $(id -u):$(id -g) /workspace' : ''}
+${this.isDockerRootless ? 'sudo chown -R $(id -u):$(id -g) /output' : ''}
+
 ${this.generateCommonFunctions()}
 
 # Set start time
@@ -588,11 +578,13 @@ sudo mv /workspace/changes.md /output
 sudo mv /workspace/summary.md /output
 sudo mv /workspace/review.md /output
 
+# Mark as done!
+write_status "completed" "Task completed" 100
+
 # Shred secrets after task completion
 shred_secrets
 recover_permissions
 
-write_status "completed" "Task completed" 100
 echo "======================================="
 echo "✅ Task execution completed successfully"
 echo "======================================="
