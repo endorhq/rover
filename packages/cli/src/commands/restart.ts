@@ -139,9 +139,9 @@ export const restartCommand = async (
     }
 
     if (!json) {
-      console.log(colors.bold.white('Restarting Task'));
+      console.log(colors.bold('Restarting Task'));
       console.log(colors.gray('├── ID: ') + colors.cyan(task.id.toString()));
-      console.log(colors.gray('├── Title: ') + colors.white(task.title));
+      console.log(colors.gray('├── Title: ') + task.title);
       console.log(colors.gray('├── Status: ') + colors.red(task.status));
       console.log(colors.gray('├── Workspace: ') + colors.cyan(worktreePath));
       console.log(colors.gray('├── Branch: ') + colors.cyan(branchName));

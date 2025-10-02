@@ -19,6 +19,48 @@ const findKeychainCredentials = (key: string): string => {
   return result.stdout?.toString() || '';
 };
 
+// Environment variables reference:
+// - https://docs.claude.com/en/docs/claude-code/settings.md
+// - https://docs.claude.com/en/docs/claude-code/google-vertex-ai.md
+// - https://docs.claude.com/en/docs/claude-code/amazon-bedrock.md
+// - https://docs.claude.com/en/docs/claude-code/llm-gateway.md
+const CLAUDE_CODE_ENV_VARS = [
+  // AWS/Bedrock configuration
+  'AWS_REGION',
+  'AWS_ACCESS_KEY_ID',
+  'AWS_SECRET_ACCESS_KEY',
+  'AWS_SESSION_TOKEN',
+  'AWS_PROFILE',
+  'AWS_BEARER_TOKEN_BEDROCK',
+
+  // Google Vertex AI configuration
+  'CLOUD_ML_REGION',
+  'ANTHROPIC_VERTEX_PROJECT_ID',
+  'VERTEX_REGION_CLAUDE_3_5_HAIKU',
+  'VERTEX_REGION_CLAUDE_3_5_SONNET',
+  'VERTEX_REGION_CLAUDE_3_7_SONNET',
+  'VERTEX_REGION_CLAUDE_4_0_OPUS',
+  'VERTEX_REGION_CLAUDE_4_0_SONNET',
+  'VERTEX_REGION_CLAUDE_4_1_OPUS',
+
+  // General configuration
+  'BASH_DEFAULT_TIMEOUT_MS',
+  'BASH_MAX_OUTPUT_LENGTH',
+  'BASH_MAX_TIMEOUT_MS',
+  'CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR',
+  'DISABLE_AUTOUPDATER',
+  'DISABLE_BUG_COMMAND',
+  'DISABLE_COST_WARNINGS',
+  'DISABLE_ERROR_REPORTING',
+  'DISABLE_NON_ESSENTIAL_MODEL_CALLS',
+  'DISABLE_PROMPT_CACHING',
+  'DISABLE_TELEMETRY',
+  'HTTP_PROXY',
+  'HTTPS_PROXY',
+  'MAX_MCP_OUTPUT_TOKENS',
+  'MAX_THINKING_TOKENS',
+];
+
 class ClaudeAI implements AIAgentTool {
   // constants
   public AGENT_BIN = 'claude';
@@ -184,6 +226,26 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
     }
 
     return dockerMounts;
+  }
+
+  getEnvironmentVariables(): string[] {
+    const envVars: string[] = [];
+
+    // Look for any ANTHROPIC_* and CLAUDE_CODE_* env vars
+    for (const key in process.env) {
+      if (key.startsWith('ANTHROPIC_') || key.startsWith('CLAUDE_CODE_')) {
+        envVars.push('-e', key);
+      }
+    }
+
+    // Add other specific environment variables from CLAUDE_CODE_ENV_VARS
+    for (const key of CLAUDE_CODE_ENV_VARS) {
+      if (process.env[key] !== undefined) {
+        envVars.push('-e', key);
+      }
+    }
+
+    return envVars;
   }
 }
 

@@ -1,0 +1,65 @@
+# library-expert.yml
+version: '1.0'
+name: 'library-expert'
+description: 'Suggest you the best library for your project'
+
+inputs:
+  - name: description
+    description: 'A description about the library you are looking for'
+    type: string
+    required: true
+
+outputs:
+  - name: library_name
+    description: 'The library name to use'
+    type: string
+  - name: library_file
+    description: 'Markdown file that contains the library name'
+    filename: library.md
+    type: file
+
+defaults:
+  tool: claude
+  model: sonnet
+
+config:
+  timeout: 3600
+  continueOnError: false
+
+steps:
+  - id: analyze_project
+    type: agent
+    name: 'Analyze Project'
+    prompt: |
+      Analyze the current project to identify the language and main framework.
+
+      Do not apply any change, just identify it.
+    outputs:
+      - name: language
+        description: 'The main language for the current project'
+        type: string
+      - name: framework
+        description: 'The main framework for the current project. "none" if you could not identify any'
+        type: string
+
+  - id: suggest_library
+    type: agent
+    name: 'Generate the Final Report and suggest the library'
+    prompt: |
+      Analyze the task description from the user:
+
+      {{inputs.description}}
+
+      Based on this description and the current project language and main framework,
+      find the best library for it. Write the library name to a file too.
+
+      Main language: {{steps.analyze_project.outputs.language}}
+      Main framework: {{steps.analyze_project.outputs.framework}}
+    outputs:
+      - name: library_name
+        description: 'The library name you suggest to complete the given description'
+        type: string
+      - name: library_file
+        description: 'Markdown file that contains the library name'
+        filename: library.md
+        type: file

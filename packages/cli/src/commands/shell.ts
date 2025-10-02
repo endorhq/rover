@@ -38,9 +38,9 @@ export const shellCommand = async (
 
     const colorFunc = statusColor(task.status);
 
-    console.log(colors.white.bold('Task details'));
+    console.log(colors.bold('Task details'));
     console.log(colors.gray('├── ID: ') + colors.cyan(task.id.toString()));
-    console.log(colors.gray('├── Title: ') + colors.white(task.title));
+    console.log(colors.gray('├── Title: ') + task.title);
     console.log(colors.gray('└── Status: ') + colorFunc(task.status) + '\n');
 
     // Check if worktree exists

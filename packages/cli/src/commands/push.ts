@@ -109,10 +109,10 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
 
       const colorFunc = statusColor(task.status);
 
-      console.log(colors.white.bold('Push task changes'));
+      console.log(colors.bold('Push task changes'));
       console.log(colors.gray('├── ID: ') + colors.cyan(task.id.toString()));
-      console.log(colors.gray('├── Title: ') + colors.white(task.title));
-      console.log(colors.gray('├── Branch: ') + colors.white(task.branchName));
+      console.log(colors.gray('├── Title: ') + task.title);
+      console.log(colors.gray('├── Branch: ') + task.branchName);
       console.log(colors.gray('└── Status: ') + colorFunc(task.status) + '\n');
     }
 

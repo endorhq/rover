@@ -96,7 +96,7 @@ export const deleteCommand = async (
     showRoverChat(["It's time to cleanup some tasks!"]);
 
     console.log(
-      colors.white.bold(`Task${tasksToDelete.length > 1 ? 's' : ''} to delete`)
+      colors.bold(`Task${tasksToDelete.length > 1 ? 's' : ''} to delete`)
     );
 
     tasksToDelete.forEach((task, index) => {
@@ -108,7 +108,7 @@ export const deleteCommand = async (
         colors.gray(`${prefix} ID: `) +
           colors.cyan(task.id.toString()) +
           colors.gray(' | Title: ') +
-          colors.white(task.title) +
+          task.title +
           colors.gray(' | Status: ') +
           colorFunc(task.status)
       );
@@ -116,9 +116,7 @@ export const deleteCommand = async (
 
     console.log(
       '\n' +
-        colors.white(
-          `This action will delete the task${tasksToDelete.length > 1 ? 's' : ''} metadata and workspace${tasksToDelete.length > 1 ? 's' : ''} (git worktree${tasksToDelete.length > 1 ? 's' : ''})`
-        )
+        `This action will delete the task${tasksToDelete.length > 1 ? 's' : ''} metadata and workspace${tasksToDelete.length > 1 ? 's' : ''} (git worktree${tasksToDelete.length > 1 ? 's' : ''})`
     );
   }
 

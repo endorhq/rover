@@ -273,12 +273,10 @@ export const iterateCommand = async (
     result.taskTitle = task.title;
 
     if (!options.json) {
-      console.log(colors.white.bold('Task Details'));
+      console.log(colors.bold('Task Details'));
       console.log(colors.gray('├── ID: ') + colors.cyan(task.id.toString()));
-      console.log(colors.gray('├── Task Title: ') + colors.white(task.title));
-      console.log(
-        colors.gray('├── Current Status: ') + colors.white(task.status)
-      );
+      console.log(colors.gray('├── Task Title: ') + task.title);
+      console.log(colors.gray('├── Current Status: ') + task.status);
       console.log(
         colors.gray('└── Instructions: ') + colors.green(finalInstructions)
       );
@@ -362,13 +360,11 @@ export const iterateCommand = async (
     // Skip confirmation and refinement instructions if --json flag is passed
     if (!options.json) {
       // Display the expanded iteration
-      console.log(colors.white.bold('Iteration:'));
+      console.log(colors.bold('Iteration:'));
       console.log(
         colors.gray('├── Instructions: ') + colors.cyan(expandedTask.title)
       );
-      console.log(
-        colors.gray('└── Details: ') + colors.white(expandedTask.description)
-      );
+      console.log(colors.gray('└── Details: ') + expandedTask.description);
     }
 
     // Check if we're in a git repository and setup worktree

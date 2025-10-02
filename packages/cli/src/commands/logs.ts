@@ -116,8 +116,8 @@ export const logsCommand = async (
 
     // Display header
     if (!json) {
-      console.log(colors.white.bold(`Task ${numericTaskId} Logs`));
-      console.log(colors.gray('├── Title: ') + colors.white(task.title));
+      console.log(colors.bold(`Task ${numericTaskId} Logs`));
+      console.log(colors.gray('├── Title: ') + task.title);
       console.log(
         colors.gray('└── Iteration: ') + colors.cyan(`#${actualIteration}`)
       );
@@ -127,7 +127,7 @@ export const logsCommand = async (
 
     if (!json) {
       console.log('');
-      console.log(colors.white.bold('Execution Log\n'));
+      console.log(colors.bold('Execution Log\n'));
     }
 
     if (options.follow && !json) {

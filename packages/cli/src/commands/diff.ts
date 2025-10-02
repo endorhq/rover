@@ -44,22 +44,16 @@ export const diffCommand = async (
     }
 
     console.log(colors.bold(`Task ${numericTaskId} Changes`));
-    console.log(colors.gray('├── Title: ') + colors.white(task.title));
-    console.log(
-      colors.gray('├── Workspace: ') + colors.white(task.worktreePath)
-    );
+    console.log(colors.gray('├── Title: ') + task.title);
+    console.log(colors.gray('├── Workspace: ') + task.worktreePath);
 
     if (options.branch) {
-      console.log(
-        colors.gray('├── Task Branch: ') + colors.white(task.branchName)
-      );
+      console.log(colors.gray('├── Task Branch: ') + task.branchName);
       console.log(
         colors.gray('└── Comparing with: ') + colors.cyan(options.branch)
       );
     } else {
-      console.log(
-        colors.gray('└── Task Branch: ') + colors.white(task.branchName)
-      );
+      console.log(colors.gray('└── Task Branch: ') + task.branchName);
     }
 
     telemetry?.eventDiff();
@@ -87,7 +81,7 @@ export const diffCommand = async (
           }
         } else {
           if (options.onlyFiles) {
-            console.log(colors.bold.white('\nChanged Files'));
+            console.log(colors.bold('\nChanged Files'));
             // Display file list with colors
             const files = diffOutput?.trim().split('\n') || [];
 
@@ -107,7 +101,7 @@ export const diffCommand = async (
               } else if (line.startsWith('-') && !line.startsWith('---')) {
                 console.log(colors.red(line));
               } else if (line.startsWith('diff --git')) {
-                console.log(colors.bold(colors.white(line)));
+                console.log(colors.bold(line));
               } else if (
                 line.startsWith('index ') ||
                 line.startsWith('+++') ||

@@ -4,7 +4,7 @@ const isProd = process.env.TSUP_DEV !== 'true';
 
 export default defineConfig({
   format: ['esm'],
-  entry: ['./src/index.ts'],
+  entry: ['./src/index.ts', './src/cli.ts'],
   outDir: './dist',
   dts: true,
   shims: true,

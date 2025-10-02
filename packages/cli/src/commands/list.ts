@@ -3,12 +3,11 @@ import { formatTaskStatus, statusColor } from '../utils/task-status.js';
 import { showTips } from '../utils/display.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { getDescriptions, TaskDescriptionSchema } from '../lib/description.js';
-import { VERBOSE } from 'rover-common';
+import { VERBOSE, type IterationStatusSchema } from 'rover-common';
 import {
   getLastTaskIteration,
   getTaskIterations,
   IterationConfig,
-  IterationStatus,
 } from '../lib/iteration.js';
 
 /**
@@ -158,9 +157,7 @@ export const listCommand = async (
     // Print header
     let headerRow = '';
     headers.forEach((header, index) => {
-      headerRow += colors.bold(
-        colors.white(header.padEnd(columnWidths[index]))
-      );
+      headerRow += colors.bold(header.padEnd(columnWidths[index]));
     });
     console.log(headerRow);
 
@@ -193,7 +190,7 @@ export const listCommand = async (
 
       const maybeIterationStatus: (
         iteration?: IterationConfig
-      ) => IterationStatus | undefined = iteration => {
+      ) => IterationStatusSchema | undefined = iteration => {
         try {
           return iteration?.status();
         } catch (e) {
@@ -203,9 +200,7 @@ export const listCommand = async (
 
       let row = '';
       row += colors.cyan(task.id.toString().padEnd(columnWidths[0]));
-      row += colors.white(
-        truncateText(title, columnWidths[1] - 1).padEnd(columnWidths[1])
-      );
+      row += truncateText(title, columnWidths[1] - 1).padEnd(columnWidths[1]);
       row += colors.gray(agent.padEnd(columnWidths[2]));
       row += colorFunc(formatTaskStatus(taskStatus).padEnd(columnWidths[3])); // +10 for ANSI codes
       row += formatProgress(

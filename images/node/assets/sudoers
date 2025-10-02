@@ -1,0 +1,38 @@
+# Rover agent group; if there is no matching gid within the container
+# with the host gid, the `agent` group will be used.
+%agent ALL=(ALL) NOPASSWD: ALL
+
+# Original image group list at /etc/group. If the host user gid
+# matches with any of them, it will be able to use `sudo` normally
+# within the container.
+%adm ALL=(ALL) NOPASSWD: ALL
+%tty ALL=(ALL) NOPASSWD: ALL
+%disk ALL=(ALL) NOPASSWD: ALL
+%lp ALL=(ALL) NOPASSWD: ALL
+%kmem ALL=(ALL) NOPASSWD: ALL
+%wheel ALL=(ALL) NOPASSWD: ALL
+%floppy ALL=(ALL) NOPASSWD: ALL
+%mail ALL=(ALL) NOPASSWD: ALL
+%news ALL=(ALL) NOPASSWD: ALL
+%uucp ALL=(ALL) NOPASSWD: ALL
+%cron ALL=(ALL) NOPASSWD: ALL
+%audio ALL=(ALL) NOPASSWD: ALL
+%cdrom ALL=(ALL) NOPASSWD: ALL
+%dialout ALL=(ALL) NOPASSWD: ALL
+%ftp ALL=(ALL) NOPASSWD: ALL
+%sshd ALL=(ALL) NOPASSWD: ALL
+%input ALL=(ALL) NOPASSWD: ALL
+%tape ALL=(ALL) NOPASSWD: ALL
+%video ALL=(ALL) NOPASSWD: ALL
+%netdev ALL=(ALL) NOPASSWD: ALL
+%kvm ALL=(ALL) NOPASSWD: ALL
+%games ALL=(ALL) NOPASSWD: ALL
+%shadow ALL=(ALL) NOPASSWD: ALL
+%www-data ALL=(ALL) NOPASSWD: ALL
+%users ALL=(ALL) NOPASSWD: ALL
+%ntp ALL=(ALL) NOPASSWD: ALL
+%abuild ALL=(ALL) NOPASSWD: ALL
+%utmp ALL=(ALL) NOPASSWD: ALL
+%ping ALL=(ALL) NOPASSWD: ALL
+%nogroup ALL=(ALL) NOPASSWD: ALL
+%nobody ALL=(ALL) NOPASSWD: ALL

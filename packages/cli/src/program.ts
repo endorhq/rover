@@ -2,7 +2,6 @@ import { Command } from 'commander';
 import { ProjectConfig, UserSettings } from './lib/config.js';
 import { initCommand } from './commands/init.js';
 import { listCommand } from './commands/list.js';
-import { getVersion } from './utils/version.js';
 import { exitWithError } from './utils/exit.js';
 import { taskCommand } from './commands/task.js';
 import { diffCommand } from './commands/diff.js';
@@ -19,7 +18,7 @@ import { pushCommand } from './commands/push.js';
 import { stopCommand } from './commands/stop.js';
 import { mcpCommand } from './commands/mcp.js';
 import { showTips, TIP_TITLES } from './utils/display.js';
-import { Git, setVerbose } from 'rover-common';
+import { Git, setVerbose, getVersion } from 'rover-common';
 
 export function createProgram(
   options: { excludeRuntimeHooks?: boolean } = {}
@@ -35,9 +34,7 @@ export function createProgram(
         const commandName = actionCommand.name();
         if (!['init', 'mcp'].includes(commandName) && !ProjectConfig.exists()) {
           console.log(
-            colors.white(
-              `Rover is not initialized in this directory. The command you requested (\`${commandName}\`) was not executed.`
-            )
+            `Rover is not initialized in this directory. The command you requested (\`${commandName}\`) was not executed.`
           );
           console.log(
             `└── ${colors.gray('Project config (does not exist):')} rover.json`
@@ -111,9 +108,7 @@ export function createProgram(
           !UserSettings.exists()
         ) {
           console.log(
-            colors.white(
-              `Rover is not fully initialized in this directory. The command you requested (\`${commandName}\`) was not executed.`
-            )
+            `Rover is not fully initialized in this directory. The command you requested (\`${commandName}\`) was not executed.`
           );
           console.log(
             `├── ${colors.gray('Project config (exists):')} rover.json`

@@ -46,8 +46,8 @@ describe('AgentWorkflow', () => {
       expect(workflow.name).toBe('test-workflow');
       expect(workflow.description).toBe('Test workflow description');
       expect(workflow.version).toBe('1.0');
-      expect(workflow.defaults.tool).toBe('claude');
-      expect(workflow.defaults.model).toBe('claude-3-sonnet');
+      expect(workflow.defaults?.tool).toBe('claude');
+      expect(workflow.defaults?.model).toBe('claude-3-sonnet');
       expect(workflow.config?.timeout).toBe(3600);
       expect(workflow.config?.continueOnError).toBe(false);
       expect(existsSync(workflowPath)).toBe(true);
@@ -278,8 +278,8 @@ steps: []
       const workflow = AgentWorkflow.load(workflowPath);
 
       expect(workflow.version).toBe('1.0');
-      expect(workflow.defaults.tool).toBe('claude');
-      expect(workflow.defaults.model).toBe('claude-3-sonnet');
+      expect(workflow.defaults?.tool).toBe('claude');
+      expect(workflow.defaults?.model).toBe('claude-3-sonnet');
       expect(workflow.config?.timeout).toBe(3600);
 
       // Verify migration was saved
@@ -302,8 +302,8 @@ steps: []
       writeFileSync(workflowPath, oldYaml, 'utf8');
       const workflow = AgentWorkflow.load(workflowPath);
 
-      expect(workflow.defaults.tool).toBe('claude');
-      expect(workflow.defaults.model).toBe('claude-3-sonnet');
+      expect(workflow.defaults?.tool).toBe('claude');
+      expect(workflow.defaults?.model).toBe('claude-3-sonnet');
     });
 
     it('should migrate workflow without config', () => {
@@ -349,8 +349,8 @@ steps: []
       const workflow = AgentWorkflow.load(workflowPath);
 
       // Should preserve custom values
-      expect(workflow.defaults.tool).toBe('custom-tool');
-      expect(workflow.defaults.model).toBe('custom-model');
+      expect(workflow.defaults?.tool).toBe('custom-tool');
+      expect(workflow.defaults?.model).toBe('custom-model');
       expect(workflow.config?.timeout).toBe(7200);
       expect(workflow.config?.continueOnError).toBe(true);
 
@@ -855,8 +855,204 @@ steps: []
       expect(workflow.inputs).toHaveLength(1);
       expect(workflow.outputs).toHaveLength(1);
       expect(workflow.steps).toHaveLength(1);
-      expect(workflow.defaults.tool).toBe('claude');
+      expect(workflow.defaults?.tool).toBe('claude');
       expect(workflow.config?.timeout).toBe(3600);
+    });
+  });
+
+  describe('validateInputs()', () => {
+    let workflow: AgentWorkflow;
+
+    beforeEach(() => {
+      const inputs: WorkflowInput[] = [
+        {
+          name: 'required_input',
+          description: 'A required input',
+          type: 'string',
+          required: true,
+        },
+        {
+          name: 'optional_input',
+          description: 'An optional input',
+          type: 'string',
+          required: false,
+        },
+        {
+          name: 'required_with_default',
+          description: 'A required input with default value',
+          type: 'string',
+          required: true,
+          default: 'default_value',
+        },
+      ];
+
+      workflow = AgentWorkflow.create(
+        workflowPath,
+        'validation-test-workflow',
+        'Workflow for testing input validation',
+        inputs,
+        [],
+        []
+      );
+    });
+
+    it('should validate successfully when all required inputs are provided', () => {
+      const providedInputs = new Map([
+        ['required_input', 'value1'],
+        ['optional_input', 'value2'],
+        ['required_with_default', 'custom_value'],
+      ]);
+
+      const validation = workflow.validateInputs(providedInputs);
+
+      expect(validation.valid).toBe(true);
+      expect(validation.errors).toHaveLength(0);
+      expect(validation.warnings).toHaveLength(0);
+    });
+
+    it('should validate successfully when only required inputs are provided', () => {
+      const providedInputs = new Map([['required_input', 'value1']]);
+
+      const validation = workflow.validateInputs(providedInputs);
+
+      expect(validation.valid).toBe(true);
+      expect(validation.errors).toHaveLength(0);
+      expect(validation.warnings).toHaveLength(0);
+    });
+
+    it('should fail validation when required input without default is missing', () => {
+      const providedInputs = new Map([['optional_input', 'value2']]);
+
+      const validation = workflow.validateInputs(providedInputs);
+
+      expect(validation.valid).toBe(false);
+      expect(validation.errors).toHaveLength(1);
+      expect(validation.errors[0]).toBe(
+        'Required input "required_input" is missing'
+      );
+    });
+
+    it('should warn about unknown inputs not defined in workflow', () => {
+      const providedInputs = new Map([
+        ['required_input', 'value1'],
+        ['unknown_input', 'unknown_value'],
+        ['another_unknown', 'another_value'],
+      ]);
+
+      const validation = workflow.validateInputs(providedInputs);
+
+      expect(validation.valid).toBe(true);
+      expect(validation.errors).toHaveLength(0);
+      expect(validation.warnings).toHaveLength(2);
+      expect(validation.warnings).toContain(
+        'Unknown input "unknown_input" provided (not defined in workflow)'
+      );
+      expect(validation.warnings).toContain(
+        'Unknown input "another_unknown" provided (not defined in workflow)'
+      );
+    });
+
+    it('should handle empty input map', () => {
+      const providedInputs = new Map<string, string>();
+
+      const validation = workflow.validateInputs(providedInputs);
+
+      expect(validation.valid).toBe(false);
+      expect(validation.errors).toHaveLength(1);
+      expect(validation.errors[0]).toBe(
+        'Required input "required_input" is missing'
+      );
+      expect(validation.warnings).toHaveLength(0);
+    });
+
+    it('should detect duplicate input definitions in workflow schema', () => {
+      // Create a workflow with duplicate input names (this would be a schema issue)
+      const duplicateInputs: WorkflowInput[] = [
+        {
+          name: 'duplicate_name',
+          description: 'First input with duplicate name',
+          type: 'string',
+          required: true,
+        },
+        {
+          name: 'duplicate_name',
+          description: 'Second input with duplicate name',
+          type: 'string',
+          required: false,
+        },
+      ];
+
+      const duplicateWorkflow = AgentWorkflow.create(
+        join(testDir, 'duplicate-workflow.yaml'),
+        'duplicate-workflow',
+        'Workflow with duplicate input names',
+        duplicateInputs,
+        [],
+        []
+      );
+
+      const providedInputs = new Map([['duplicate_name', 'some_value']]);
+
+      const validation = duplicateWorkflow.validateInputs(providedInputs);
+
+      expect(validation.valid).toBe(false);
+      expect(validation.errors).toContain(
+        'Input "duplicate_name" is defined 2 times in workflow (should be unique)'
+      );
+    });
+
+    it('should handle workflow with no inputs defined', () => {
+      const noInputWorkflow = AgentWorkflow.create(
+        join(testDir, 'no-input-workflow.yaml'),
+        'no-input-workflow',
+        'Workflow with no inputs',
+        [], // No inputs
+        [],
+        []
+      );
+
+      const providedInputs = new Map([['unexpected_input', 'value']]);
+
+      const validation = noInputWorkflow.validateInputs(providedInputs);
+
+      expect(validation.valid).toBe(true);
+      expect(validation.errors).toHaveLength(0);
+      expect(validation.warnings).toHaveLength(1);
+      expect(validation.warnings[0]).toBe(
+        'Unknown input "unexpected_input" provided (not defined in workflow)'
+      );
+    });
+
+    it('should validate successfully with empty inputs for workflow with no required inputs', () => {
+      const optionalOnlyWorkflow = AgentWorkflow.create(
+        join(testDir, 'optional-only-workflow.yaml'),
+        'optional-only-workflow',
+        'Workflow with only optional inputs',
+        [
+          {
+            name: 'optional1',
+            description: 'Optional input 1',
+            type: 'string',
+            required: false,
+          },
+          {
+            name: 'optional2',
+            description: 'Optional input 2',
+            type: 'file',
+            required: false,
+          },
+        ],
+        [],
+        []
+      );
+
+      const providedInputs = new Map<string, string>();
+
+      const validation = optionalOnlyWorkflow.validateInputs(providedInputs);
+
+      expect(validation.valid).toBe(true);
+      expect(validation.errors).toHaveLength(0);
+      expect(validation.warnings).toHaveLength(0);
     });
   });
 

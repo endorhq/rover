@@ -284,14 +284,12 @@ export const mergeCommand = async (
     jsonOutput.branchName = task.branchName;
 
     if (!options.json) {
-      console.log(colors.white.bold('Merge Task'));
+      console.log(colors.bold('Merge Task'));
       console.log(colors.gray('├── ID: ') + colors.cyan(task.id.toString()));
-      console.log(colors.gray('├── Title: ') + colors.white(task.title));
-      console.log(
-        colors.gray('├── Worktree: ') + colors.white(task.worktreePath)
-      );
-      console.log(colors.gray('├── Branch: ') + colors.white(task.branchName));
-      console.log(colors.gray('└── Status: ') + colors.white(task.status));
+      console.log(colors.gray('├── Title: ') + task.title);
+      console.log(colors.gray('├── Worktree: ') + task.worktreePath);
+      console.log(colors.gray('├── Branch: ') + task.branchName);
+      console.log(colors.gray('└── Status: ') + task.status);
     }
 
     if (task.isPushed()) {
@@ -496,7 +494,7 @@ export const mergeCommand = async (
             mergeConflicts.forEach((file, index) => {
               const isLast = index === mergeConflicts.length - 1;
               const connector = isLast ? '└──' : '├──';
-              console.log(colors.gray(connector), colors.white(file));
+              console.log(colors.gray(connector), file);
             });
           }
 
@@ -593,7 +591,7 @@ export const mergeCommand = async (
                 colors.gray('3. Run: git merge --continue')
               );
 
-              console.log(colors.white('\nIf you prefer to stop the process:'));
+              console.log('\nIf you prefer to stop the process:');
               console.log(colors.cyan(`└── 1. Run: git merge --abort`));
             }
             exitWithError(jsonOutput, options.json);

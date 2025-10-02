@@ -213,34 +213,28 @@ export const inspectCommand = async (
       // Status color
       const statusColorFunc = statusColor(task.status);
 
-      console.log(colors.bold.white('\nTask Details'));
+      console.log(colors.bold('\nTask Details'));
       console.log(
         `├── ${colors.gray('ID: ')} ${colors.cyan(task.id.toString())} (${colors.gray(task.uuid)})`
       );
-      console.log('├── ' + colors.gray('Title: ') + colors.white(task.title));
+      console.log('├── ' + colors.gray('Title: ') + task.title);
       console.log(
         '├── ' + colors.gray('Status: ') + statusColorFunc(formattedStatus)
       );
       console.log(
-        '├── ' +
-          colors.gray('Directory: ') +
-          colors.white(`.rover/tasks/${numericTaskId}/`)
+        '├── ' + colors.gray('Directory: ') + `.rover/tasks/${numericTaskId}/`
       );
-      console.log(
-        '├── ' + colors.gray('Workspace: ') + colors.white(task.worktreePath)
-      );
-      console.log(
-        '└── ' + colors.gray('Branch: ') + colors.white(task.branchName)
-      );
+      console.log('├── ' + colors.gray('Workspace: ') + task.worktreePath);
+      console.log('└── ' + colors.gray('Branch: ') + task.branchName);
 
-      console.log(colors.bold.white('\nDescription:'));
+      console.log(colors.bold('\nDescription:'));
       console.log(colors.gray(task.description));
 
-      console.log(colors.bold.white('\nTimestamps'));
+      console.log(colors.bold('\nTimestamps'));
       console.log(
         '├── ' +
           colors.gray('Created: ') +
-          colors.white(new Date(task.createdAt).toLocaleString())
+          new Date(task.createdAt).toLocaleString()
       );
 
       // Show completion time if completed
@@ -267,7 +261,7 @@ export const inspectCommand = async (
       // Show error if failed
       if (task.error) {
         console.log(colors.red('\nError: '));
-        console.log(colors.white(task.error));
+        console.log(task.error);
       }
 
       const discoveredFiles = discoverIterationFiles(
@@ -277,13 +271,13 @@ export const inspectCommand = async (
 
       if (discoveredFiles.length > 0) {
         console.log(
-          colors.bold.white('\nIteration Details ') +
+          colors.bold('\nIteration Details ') +
             colors.gray(`${iterationNumber}/${task.iterations}`)
         );
 
-        console.log('└── ' + colors.white('Files:'));
+        console.log('└── ' + 'Files:');
         for (const file of discoveredFiles) {
-          console.log(colors.white(`     └── ${colors.cyan(file)}`));
+          console.log(`     └── ${colors.cyan(file)}`);
         }
 
         const fileFilter = options.file || ['summary.md'];
@@ -300,7 +294,7 @@ export const inspectCommand = async (
             )
           );
         } else {
-          console.log(colors.white.bold('\nOutput content:'));
+          console.log(colors.bold('\nOutput content:'));
           iterationFileContents.forEach((contents, file) => {
             console.log(`└── ${colors.cyan(file)}:`);
             contents.split('\n').forEach(line => {
@@ -313,9 +307,7 @@ export const inspectCommand = async (
                 );
               }
 
-              chunks.forEach(chunk =>
-                console.log(colors.white('    | ' + chunk))
-              );
+              chunks.forEach(chunk => console.log('    | ' + chunk));
             });
             console.log();
           });

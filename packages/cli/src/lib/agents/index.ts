@@ -39,6 +39,9 @@ export interface AIAgentTool {
 
   // Get Docker mount strings for agent-specific credential files
   getContainerMounts(): string[];
+
+  // Get Container environment variables for this tool
+  getEnvironmentVariables(): string[];
 }
 
 export class MissingAIAgentError extends Error {
