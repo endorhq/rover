@@ -521,7 +521,6 @@ export PATH=/root/local/.bin:$PATH
 sudo mkdir -p $HOME
 sudo chown $(id -u):$(id -g) $HOME
 
-${this.isDockerRootless ? 'sudo chown -R $(id -u):$(id -g) $HOME' : ''}
 ${this.isDockerRootless ? 'sudo chown -R $(id -u):$(id -g) /workspace' : ''}
 ${this.isDockerRootless ? 'sudo chown -R $(id -u):$(id -g) /output' : ''}
 
