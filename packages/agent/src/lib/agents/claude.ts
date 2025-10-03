@@ -78,6 +78,11 @@ export class ClaudeAgent extends BaseAgent {
   ): Promise<void> {
     const args = ['mcp', 'add', '--transport', transport];
 
+    // Prepend this to other options to avoid issues with the command.
+    // Since execa add quotes to '--env=A=B', if we add the name after,
+    // the Claude CLI ignores it.
+    args.push(name);
+
     envs.forEach(env => {
       if (/\w+=\w+/.test(env)) {
         args.push(`--env=${env}`);
@@ -99,8 +104,6 @@ export class ClaudeAgent extends BaseAgent {
         );
       }
     });
-
-    args.push(name);
 
     // @see https://docs.claude.com/en/docs/claude-code/mcp#installing-mcp-servers
     if (transport === 'stdio') {

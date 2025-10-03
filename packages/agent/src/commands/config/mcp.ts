@@ -69,7 +69,6 @@ export const mcpInstallCommand = async (
       output.success = true;
     }
   } catch (err) {
-    console.log(err);
     spinner.fail('The MCP server was not installed');
     output.success = false;
     output.error = err instanceof Error ? err.message : `${err}`;
