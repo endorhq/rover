@@ -1,18 +1,12 @@
-import { execa, execaSync } from 'execa';
+import { execa, execaSync, parseCommandString } from 'execa';
 
-import type {
-  Options,
-  Result,
-  SyncOptions,
-  SyncResult,
-  StdoutStderrOption,
-} from 'execa';
+import type { Options, Result, SyncOptions, SyncResult } from 'execa';
 export type { Options, Result, SyncOptions, SyncResult };
 
 import colors from 'ansi-colors';
 import { Git } from './git.js';
 
-import { PROJECT_CONFIG_FILE, VERBOSE } from './index.js';
+import { VERBOSE } from './index.js';
 
 export type LaunchOptions = Options & {
   mightLogSensitiveInformation?: boolean;
@@ -88,11 +82,44 @@ const shouldAddLogging = (stream: string, options?: Options | SyncOptions) => {
   return !(streamArrayInherit || streamInherit);
 };
 
+/**
+ * Run a specific command with the arguments and return an object with the result.
+ * The command and args get converted in the a template string for proper escaping.
+ *
+ * Initially, we were passing a command + args[] to the execa method, but it was
+ * causing some escaping error. For example, if you pass:
+ *
+ * npx binary -- another-command test
+ *
+ * Using execa('npx', ['binary', '--', 'another-command', 'test']), the argument after
+ * -- gets incorrectly quoted: npx binary -- 'another-command test'.
+ *
+ * To avoid this issue, we use the parseCommandString + template strings.
+ *
+ * We found another corner case related to environment variables options like
+ * `-e ENV=VALUE`. Execa escapes the 'ENV=VALUE' string regardless you use options
+ * like { shell: true }. For those, you must use the long syntax: `--env=ENV=VALUE`.
+ *
+ * @see https://github.com/sindresorhus/execa/blob/main/docs/escaping.md
+ * @see https://github.com/sindresorhus/execa/blob/main/docs/shell.md
+ *
+ * @param command the command to run
+ * @param args arguments to pass to the command
+ * @param options Execa options to modify the behavior of the spawn
+ * @returns An Execa object with the result
+ */
 export function launch(
   command: string,
   args?: ReadonlyArray<string>,
   options?: LaunchOptions
 ): ReturnType<typeof execa> {
+  const argsWithSpacing = (args || [])
+    .map(arg => {
+      return arg.replaceAll(' ', '\\ ');
+    })
+    .join(' ');
+  const parsedCommand = parseCommandString(`${command} ${argsWithSpacing}`);
+
   if (VERBOSE) {
     const now = new Date();
     console.error(
@@ -150,17 +177,56 @@ export function launch(
       } as Options;
     }
 
-    return execa(command, args, newOpts);
+    // Use template string as array format quotes arguments even when using shell
+    return execa(newOpts)`${parsedCommand}`;
   }
 
-  return execa(command, args, options);
+  if (options) {
+    return execa(options)`${parsedCommand}`;
+  } else {
+    return execa`${parsedCommand}`;
+  }
 }
 
+/**
+ * Run a specific command with the arguments and return an object with the result.
+ * The command and args get converted in the a template string for proper escaping.
+ * All this process run synchronously.
+ *
+ * Initially, we were passing a command + args[] to the execa method, but it was
+ * causing some escaping error. For example, if you pass:
+ *
+ * npx binary -- another-command test
+ *
+ * Using execa('npx', ['binary', '--', 'another-command', 'test']), the argument after
+ * -- gets incorrectly quoted: npx binary -- 'another-command test'.
+ *
+ * To avoid this issue, we use the parseCommandString + template strings.
+ *
+ * We found another corner case related to environment variables options like
+ * `-e ENV=VALUE`. Execa escapes the 'ENV=VALUE' string regardless you use options
+ * like { shell: true }. For those, you must use the long syntax: `--env=ENV=VALUE`.
+ *
+ * @see https://github.com/sindresorhus/execa/blob/main/docs/escaping.md
+ * @see https://github.com/sindresorhus/execa/blob/main/docs/shell.md
+ *
+ * @param command the command to run
+ * @param args arguments to pass to the command
+ * @param options Execa options to modify the behavior of the spawn
+ * @returns An Execa object with the result
+ */
 export function launchSync(
   command: string,
   args?: ReadonlyArray<string>,
   options?: LaunchSyncOptions
 ): ReturnType<typeof execaSync> {
+  const argsWithSpacing = (args || [])
+    .map(arg => {
+      return arg.replaceAll(' ', '\\ ');
+    })
+    .join(' ');
+  const parsedCommand = parseCommandString(`${command} ${argsWithSpacing}`);
+
   if (VERBOSE) {
     const now = new Date();
     console.error(
@@ -218,7 +284,13 @@ export function launchSync(
       } as SyncOptions;
     }
 
-    return execaSync(command, args, newOpts);
+    // Use template string as array format quotes arguments even when using shell
+    return execaSync(newOpts)`${parsedCommand}`;
   }
-  return execaSync(command, args, options);
+
+  if (options) {
+    return execaSync(options)`${parsedCommand}`;
+  } else {
+    return execaSync`${parsedCommand}`;
+  }
 }
