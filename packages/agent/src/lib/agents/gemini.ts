@@ -82,7 +82,7 @@ export class GeminiAgent extends BaseAgent {
 
     envs.forEach(env => {
       if (/\w+=\w+/.test(env)) {
-        args.push(`--env = ${env}`);
+        args.push(`--env=${env}`);
       } else {
         console.log(
           colors.yellow(
@@ -94,10 +94,10 @@ export class GeminiAgent extends BaseAgent {
 
     headers.forEach(header => {
       if (/[\w\-]+\s*:\s*\w+/.test(header)) {
-        args.push('-H', `${header.replaceAll(' ', '\\ ')}`);
+        args.push('-H', header);
       } else {
         console.log(
-          colors.yellow(` Invalid ${header} header.Use "KEY: VALUE" format`)
+          colors.yellow(` Invalid ${header} header. Use "KEY: VALUE" format`)
         );
       }
     });

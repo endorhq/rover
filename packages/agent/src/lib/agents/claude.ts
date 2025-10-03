@@ -97,7 +97,7 @@ export class ClaudeAgent extends BaseAgent {
 
     headers.forEach(header => {
       if (/[\w\-]+\s*:\s*\w+/.test(header)) {
-        args.push('-H', `${header.replaceAll(' ', '\\ ')}`);
+        args.push('-H', header);
       } else {
         console.log(
           colors.yellow(` Invalid ${header} header. Use "KEY: VALUE" format`)

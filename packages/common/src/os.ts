@@ -113,9 +113,12 @@ export function launch(
   args?: ReadonlyArray<string>,
   options?: LaunchOptions
 ): ReturnType<typeof execa> {
-  const parsedCommand = parseCommandString(
-    `${command} ${(args || []).join(' ')}`
-  );
+  const argsWithSpacing = (args || [])
+    .map(arg => {
+      return arg.replaceAll(' ', '\\ ');
+    })
+    .join(' ');
+  const parsedCommand = parseCommandString(`${command} ${argsWithSpacing}`);
 
   if (VERBOSE) {
     const now = new Date();
@@ -217,9 +220,12 @@ export function launchSync(
   args?: ReadonlyArray<string>,
   options?: LaunchSyncOptions
 ): ReturnType<typeof execaSync> {
-  const parsedCommand = parseCommandString(
-    `${command} ${(args || []).join(' ')}`
-  );
+  const argsWithSpacing = (args || [])
+    .map(arg => {
+      return arg.replaceAll(' ', '\\ ');
+    })
+    .join(' ');
+  const parsedCommand = parseCommandString(`${command} ${argsWithSpacing}`);
 
   if (VERBOSE) {
     const now = new Date();
