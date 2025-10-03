@@ -1,10 +1,11 @@
 import { existsSync, mkdirSync } from 'node:fs';
 import colors from 'ansi-colors';
-import { launchSync } from 'rover-common';
+import { launch, launchSync } from 'rover-common';
 import { Agent, AgentCredentialFile, ValidationResult } from './types.js';
 
 export abstract class BaseAgent implements Agent {
   abstract name: string;
+  abstract binary: string;
   version: string;
 
   constructor(version: string = 'latest') {
@@ -84,5 +85,11 @@ export abstract class BaseAgent implements Agent {
         );
       }
     }
+  }
+
+  async isInstalled(): Promise<boolean> {
+    const result = await launch(this.binary, ['--version']);
+
+    return result.exitCode === 0;
   }
 }

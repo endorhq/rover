@@ -8,6 +8,7 @@ import {
   DEFAULT_INSTALL_VERSION,
   installCommand,
 } from './commands/install.js';
+import { addConfigCommands } from './commands/config/index.js';
 
 // Common types
 export interface CommandOutput {
@@ -53,7 +54,7 @@ program
     'Agent tool to use. It overrides defaults, but prioritize step tools if available.'
   )
   .option(
-    '--agent-model <agent>',
+    '--agent-model <model>',
     'Agent model to use. It overrides defaults, but prioritize step tools if available.'
   )
   .option(
@@ -89,6 +90,9 @@ program
     DEFAULT_INSTALL_DIRECTORY
   )
   .action(installCommand);
+
+// Add the config commands
+addConfigCommands(program);
 
 program.parse(process.argv);
 

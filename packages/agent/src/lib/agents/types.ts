@@ -17,5 +17,13 @@ export interface Agent {
   validateCredentials(): ValidationResult;
   getInstallCommand(): string;
   install(): Promise<void>;
+  configureMCP(
+    name: string,
+    commandOrUrl: string,
+    transport: string,
+    envs: string[],
+    headers: string[]
+  ): Promise<void>;
   copyCredentials(targetDir: string): Promise<void>;
+  isInstalled(): Promise<boolean>;
 }
