@@ -15,6 +15,13 @@ export abstract class BaseAgent implements Agent {
   abstract getRequiredCredentials(): AgentCredentialFile[];
   abstract getInstallCommand(): string;
   abstract copyCredentials(targetDir: string): Promise<void>;
+  abstract configureMCP(
+    name: string,
+    commandOrUrl: string,
+    transport: string,
+    envs: string[],
+    headers: string[]
+  ): Promise<void>;
 
   protected ensureDirectory(dirPath: string): void {
     try {
