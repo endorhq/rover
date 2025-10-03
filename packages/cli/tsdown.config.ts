@@ -24,5 +24,6 @@ export default defineConfig({
   splitting: false,
   loader: {
     '.md': 'text',
+    '.json': 'text',
   },
 });

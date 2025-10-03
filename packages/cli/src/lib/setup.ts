@@ -2,6 +2,18 @@ import { writeFileSync, chmodSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { TaskDescription } from './description.js';
 import { findProjectRoot, launchSync, VERBOSE } from 'rover-common';
+import clisJson from '../clis.json' with { type: 'json' };
+
+function packageWithVersion(packageName: string): string | undefined {
+  const clis = clisJson as Record<string, string>;
+  const packageVersion_ = clis[packageName];
+
+  if (packageVersion_ == undefined) {
+    return packageName;
+  }
+
+  return `${packageName}@${packageVersion_}`;
+}
 
 /**
  * SetupBuilder class - Consolidates Docker setup script generation
@@ -358,7 +370,7 @@ echo "======================================="`;
    */
   private generateInstallAgent(): string {
     if (this.agent == 'claude') {
-      return `sudo npm install -g @anthropic-ai/claude-code
+      return `sudo npm install -g ${packageWithVersion('@anthropic-ai/claude-code')}
 
 mkdir -p $HOME/.claude
 
@@ -384,7 +396,7 @@ else
 fi
 `;
     } else if (this.agent == 'codex') {
-      return `sudo npm install -g @openai/codex
+      return `sudo npm install -g ${packageWithVersion('@openai/codex')}
 
 # Codex does not support Streamable HTTP server yet, only stdio; use
 # mcp-remote for proxying.
@@ -408,7 +420,7 @@ else
 fi
 `;
     } else if (this.agent == 'gemini') {
-      return `sudo npm install -g @google/gemini-cli
+      return `sudo npm install -g ${packageWithVersion('@google/gemini-cli')}
 
 # Configure the CLI
 # Process and copy Gemini credentials
@@ -429,7 +441,7 @@ else
 fi
 `;
     } else if (this.agent == 'qwen') {
-      return `sudo npm install -g @qwen-code/qwen-code@latest
+      return `sudo npm install -g ${packageWithVersion('@qwen-code/qwen-code')}
 
 # Configure the CLI
 # Process and copy Qwen credentials
