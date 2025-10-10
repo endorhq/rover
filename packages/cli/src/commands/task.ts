@@ -366,8 +366,6 @@ export const startDockerExecution = async (
       'run',
       '--name',
       containerName,
-      // For now, do not remove for logs
-      // '--rm'
       '-d',
       '-v',
       `${etcPasswd}:/etc/passwd:Z,ro`,

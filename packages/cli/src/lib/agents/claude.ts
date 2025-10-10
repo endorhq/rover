@@ -1,4 +1,10 @@
-import { launch, launchSync } from 'rover-common';
+import {
+  launch,
+  launchSync,
+  requiredClaudeCredentials,
+  requiredBedrockCredentials,
+  requiredVertexAiCredentials,
+} from 'rover-common';
 import {
   AIAgentTool,
   InvokeAIAgentError,
@@ -33,7 +39,17 @@ const CLAUDE_CODE_ENV_VARS = [
   'AWS_PROFILE',
   'AWS_BEARER_TOKEN_BEDROCK',
 
+  // Amazon Bedrock configuration
+  'CLAUDE_CODE_USE_BEDROCK',
+  'AWS_BEARER_TOKEN_BEDROCK',
+  'ANTHROPIC_SMALL_FAST_MODEL_AWS_REGION',
+  'CLAUDE_CODE_USE_BEDROCK',
+  'CLAUDE_CODE_SKIP_BEDROCK_AUTH',
+  'awsAuthRefresh',
+  'awsCredentialExport',
+
   // Google Vertex AI configuration
+  'CLAUDE_CODE_USE_VERTEX',
   'CLOUD_ML_REGION',
   'ANTHROPIC_VERTEX_PROJECT_ID',
   'VERTEX_REGION_CLAUDE_3_5_HAIKU',
@@ -44,6 +60,7 @@ const CLAUDE_CODE_ENV_VARS = [
   'VERTEX_REGION_CLAUDE_4_1_OPUS',
 
   // General configuration
+  'ANTHROPIC_SMALL_FAST_MODEL',
   'BASH_DEFAULT_TIMEOUT_MS',
   'BASH_MAX_OUTPUT_LENGTH',
   'BASH_MAX_TIMEOUT_MS',
@@ -205,24 +222,37 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
     const dockerMounts: string[] = [];
     const claudeFile = join(homedir(), '.claude.json');
     const claudeCreds = join(homedir(), '.claude', '.credentials.json');
+    const gcloudConfig = join(homedir(), '.config', 'gcloud');
 
     dockerMounts.push(`-v`, `${claudeFile}:/.claude.json:Z,ro`);
 
-    if (existsSync(claudeCreds)) {
-      dockerMounts.push(`-v`, `${claudeCreds}:/.credentials.json:Z,ro`);
-    } else if (platform() === 'darwin') {
-      const claudeCredsData = findKeychainCredentials(
-        'Claude Code-credentials'
-      );
-      const userCredentialsTempPath = mkdtempSync(join(tmpdir(), 'rover-'));
-      const claudeCredsFile = join(
-        userCredentialsTempPath,
-        '.credentials.json'
-      );
-      writeFileSync(claudeCredsFile, claudeCredsData);
-      // Do not mount credentials as RO, as they will be
-      // shredded by the setup script when it finishes
-      dockerMounts.push(`-v`, `${claudeCredsFile}:/.credentials.json:Z`);
+    if (requiredClaudeCredentials()) {
+      if (existsSync(claudeCreds)) {
+        dockerMounts.push(`-v`, `${claudeCreds}:/.credentials.json:Z,ro`);
+      } else if (platform() === 'darwin') {
+        const claudeCredsData = findKeychainCredentials(
+          'Claude Code-credentials'
+        );
+        const userCredentialsTempPath = mkdtempSync(join(tmpdir(), 'rover-'));
+        const claudeCredsFile = join(
+          userCredentialsTempPath,
+          '.credentials.json'
+        );
+        writeFileSync(claudeCredsFile, claudeCredsData);
+        // Do not mount credentials as RO, as they will be
+        // shredded by the setup script when it finishes
+        dockerMounts.push(`-v`, `${claudeCredsFile}:/.credentials.json:Z`);
+      }
+    }
+
+    if (requiredVertexAiCredentials()) {
+      if (existsSync(gcloudConfig)) {
+        dockerMounts.push(`-v`, `${gcloudConfig}:/.config/gcloud:Z,ro`);
+      }
+    }
+
+    if (requiredBedrockCredentials()) {
+      // TODO: mount bedrock credentials
     }
 
     return dockerMounts;

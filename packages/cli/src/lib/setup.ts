@@ -360,7 +360,7 @@ echo "======================================="`;
     if (this.agent == 'claude') {
       return `sudo npm install -g @anthropic-ai/claude-code
 
-mkdir -p $HOME/.claude
+mkdir -p $HOME/.claude $HOME/.config
 
 # Process and copy Claude credentials
 if [ -f "/.claude.json" ]; then
@@ -381,6 +381,15 @@ if [ -f "/.credentials.json" ]; then
     echo "✅ Claude credentials processed and copied to claude user"
 else
     echo "⚠️  No Claude credentials found, continuing..."
+fi
+
+# Copy gcloud credentials, if any
+if [ -d /.config/gcloud ]; then
+    echo "📝 Processing Google Cloud credentials..."
+    write_status "installing" "Google Cloud credentials" 20
+    sudo cp -r /.config/gcloud $HOME/.config/
+    sudo chown -R $(id -u):$(id -g) $HOME/.config/gcloud
+    echo "✅ Google Cloud credentials processed and copied to claude user"
 fi
 `;
     } else if (this.agent == 'codex') {

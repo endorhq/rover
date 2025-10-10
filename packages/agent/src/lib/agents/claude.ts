@@ -3,7 +3,12 @@ import { join } from 'node:path';
 import colors from 'ansi-colors';
 import { AgentCredentialFile } from './types.js';
 import { BaseAgent } from './base.js';
-import { launch } from 'rover-common';
+import {
+  launch,
+  requiredClaudeCredentials,
+  requiredBedrockCredentials,
+  requiredVertexAiCredentials,
+} from 'rover-common';
 
 export class ClaudeAgent extends BaseAgent {
   name = 'Claude';
@@ -15,18 +20,31 @@ export class ClaudeAgent extends BaseAgent {
   }
 
   getRequiredCredentials(): AgentCredentialFile[] {
-    return [
+    let requiredCredentials: AgentCredentialFile[] = [
       {
         path: '/.claude.json',
         description: 'Claude configuration',
         required: true,
       },
-      {
+    ];
+    if (requiredBedrockCredentials()) {
+      // TODO: mount bedrock credentials
+    }
+    if (requiredClaudeCredentials()) {
+      requiredCredentials.push({
         path: '/.credentials.json',
         description: 'Claude credentials',
-        required: true, // It's not required when using env variables
-      },
-    ];
+        required: true,
+      });
+    }
+    if (requiredVertexAiCredentials()) {
+      requiredCredentials.push({
+        path: '/.config/gcloud',
+        description: 'Google Cloud credentials',
+        required: true,
+      });
+    }
+    return requiredCredentials;
   }
 
   async copyCredentials(targetDir: string): Promise<void> {
@@ -36,34 +54,13 @@ export class ClaudeAgent extends BaseAgent {
     // Ensure .claude directory exists
     this.ensureDirectory(targetClaudeDir);
 
-    // Process and copy Claude configuration
-    if (existsSync('/.claude.json')) {
-      console.log(colors.gray('├── Processing .claude.json'));
-
-      // Read the config and clear the projects object
-      const config = JSON.parse(readFileSync('/.claude.json', 'utf-8'));
-      config.projects = {};
-
-      // Write to target
-      writeFileSync(
-        join(targetDir, '.claude.json'),
-        JSON.stringify(config, null, 2)
-      );
-      console.log(
-        colors.gray('├── Copied: ') +
-          colors.cyan('.claude.json (projects cleared)')
-      );
-    }
-
-    // Copy credentials
-    if (existsSync('/.credentials.json')) {
-      copyFileSync(
-        '/.credentials.json',
-        join(targetClaudeDir, '.credentials.json')
-      );
-      console.log(
-        colors.gray('├── Copied: ') + colors.cyan('.credentials.json')
-      );
+    const credentials = this.getRequiredCredentials();
+    for (const cred of credentials) {
+      if (existsSync(cred.path)) {
+        const filename = cred.path.split('/').pop()!;
+        copyFileSync(cred.path, join(targetClaudeDir, filename));
+        console.log(colors.gray('├── Copied: ') + colors.cyan(cred.path));
+      }
     }
 
     console.log(colors.green(`✓ ${this.name} credentials copied successfully`));
