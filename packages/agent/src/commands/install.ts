@@ -13,7 +13,7 @@ interface InstallCommandOutput extends CommandOutput {}
 
 // Default agent version to install
 export const DEFAULT_INSTALL_VERSION = 'latest';
-export const DEFAULT_INSTALL_DIRECTORY = '/home/agent';
+export const DEFAULT_INSTALL_DIRECTORY = process.env.HOME || '/home/agent';
 
 /**
  * Install an AI Coding Tool and configure the required credentials to run it

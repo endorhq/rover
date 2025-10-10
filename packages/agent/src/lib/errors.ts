@@ -240,9 +240,14 @@ export function parseAgentError(
   }
 
   // Try to parse JSON errors first
-  const jsonError = extractJsonError(combinedOutput);
-  if (jsonError) {
-    return classifyJsonError(jsonError, tool);
+  const jsonStderrError = extractJsonError(stderr);
+  if (jsonStderrError) {
+    return classifyJsonError(jsonStderrError, tool);
+  }
+
+  const jsonStdoutError = extractJsonError(stdout);
+  if (jsonStdoutError) {
+    return classifyJsonError(jsonStdoutError, tool);
   }
 
   // Match against known patterns
@@ -270,7 +275,7 @@ export function parseAgentError(
 /**
  * Check if the process is waiting for authentication input
  */
-export function isWaitingForAuthentication(stderr: string): boolean {
+export function isWaitingForAuthentication(output: string): boolean {
   const authPatterns = [
     /Please visit the following URL to authorize/i,
     /Enter the authorization code:/i,
@@ -278,7 +283,7 @@ export function isWaitingForAuthentication(stderr: string): boolean {
     /Failed to authenticate.*Retrying/i,
   ];
 
-  return authPatterns.some(pattern => pattern.test(stderr));
+  return authPatterns.some(pattern => pattern.test(output));
 }
 
 /**
@@ -286,7 +291,7 @@ export function isWaitingForAuthentication(stderr: string): boolean {
  */
 function extractJsonError(output: string): any {
   // Try to find JSON objects in the output
-  const jsonMatches = output.match(/\{[\s\S]*?\}/g);
+  const jsonMatches = output.match(/\{[\s\S]*\}/g);
   if (!jsonMatches) return null;
 
   for (const jsonStr of jsonMatches) {
@@ -314,7 +319,11 @@ function classifyJsonError(jsonError: any, tool?: string): AgentError {
   const errorCode = errorInfo.code?.toLowerCase() || '';
   const message = errorInfo.message || jsonError.result || 'Unknown error';
 
-  if (errorType.includes('authentication') || errorCode.includes('auth')) {
+  if (
+    errorType.includes('authentication') ||
+    errorCode.includes('auth') ||
+    message.toLowerCase().includes('invalid api key')
+  ) {
     return new AuthenticationError(message, tool);
   }
 

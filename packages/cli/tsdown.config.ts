@@ -2,7 +2,8 @@ import { defineConfig } from 'tsdown';
 
 const isProd = process.env.TSUP_DEV !== 'true';
 
-let entryPoints = { index: './src/index.ts' };
+let entryPoints: Record<string, string> = { index: './src/index.ts' };
+
 if (!isProd) {
   entryPoints = {
     ...entryPoints,
@@ -21,8 +22,10 @@ export default defineConfig({
   platform: 'node',
   minify: isProd,
   sourcemap: !isProd,
-  splitting: false,
   loader: {
     '.md': 'text',
+    '.yml': 'asset',
+    '.yaml': 'asset',
+    '.sh': 'text',
   },
 });

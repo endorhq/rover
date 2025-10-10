@@ -33,6 +33,7 @@ export class ClaudeAgent extends BaseAgent {
     console.log(colors.bold(`\nCopying ${this.name} credentials`));
 
     const targetClaudeDir = join(targetDir, '.claude');
+    console.log(colors.gray(`├── Target directory: ${targetClaudeDir}`));
     // Ensure .claude directory exists
     this.ensureDirectory(targetClaudeDir);
 
@@ -62,7 +63,7 @@ export class ClaudeAgent extends BaseAgent {
         join(targetClaudeDir, '.credentials.json')
       );
       console.log(
-        colors.gray('├── Copied: ') + colors.cyan('.credentials.json')
+        colors.gray('└── Copied: ') + colors.cyan('.credentials.json')
       );
     }
 

@@ -8,14 +8,11 @@ import { homedir, tmpdir, userInfo } from 'node:os';
 import { getAIAgentTool, getUserAIAgent } from '../lib/agents/index.js';
 import type { IPromptTask } from '../lib/prompts/index.js';
 import { TaskDescription } from '../lib/description.js';
-import { PromptBuilder } from '../lib/prompts/index.js';
 import { SetupBuilder } from '../lib/setup.js';
 import { AI_AGENT } from '../lib/config.js';
 import { IterationConfig } from '../lib/iteration.js';
 import { generateBranchName } from '../utils/branch-name.js';
-import { request } from 'node:https';
 import { findProjectRoot, launch, launchSync } from 'rover-common';
-import { checkGitHubCLI } from '../utils/system.js';
 import { showRoverBanner, showRoverChat, showTips } from '../utils/display.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { NewTaskProvider } from 'rover-telemetry';
@@ -284,37 +281,13 @@ export const startDockerExecution = async (
     return;
   }
 
-  let isDockerRootless = false;
-
-  const dockerInfo = launchSync('docker', ['info', '-f', 'json']).stdout;
-  if (dockerInfo) {
-    const info = JSON.parse(dockerInfo.toString());
-    isDockerRootless = (info?.SecurityOptions || []).some((value: string) =>
-      value.includes('rootless')
-    );
-  }
-
   // Load task description
   const iterationJsonPath = join(iterationPath, 'iteration.json');
-  const iteration = IterationConfig.load(iterationPath);
 
   // Generate setup script using SetupBuilder
   const setupBuilder = new SetupBuilder(task, selectedAiAgent);
-  const setupScriptPath = setupBuilder.generateSetupScript();
-  const setupMcpScriptPath = setupBuilder.generateSetupMcpScript();
-
-  // Generate prompts using PromptBuilder
-  const promptsDir = join(
-    findProjectRoot(),
-    '.rover',
-    'tasks',
-    taskId.toString(),
-    'iterations',
-    task.iterations.toString(),
-    'prompts'
-  );
-  const promptBuilder = new PromptBuilder(selectedAiAgent);
-  promptBuilder.generatePromptFiles(iteration, promptsDir);
+  const entrypointScriptPath = setupBuilder.generateEntrypoint();
+  const workflowPath = setupBuilder.saveWorkflow();
 
   // Get agent-specific Docker mounts
   const agent = getAIAgentTool(selectedAiAgent);
@@ -385,19 +358,31 @@ export const startDockerExecution = async (
       `${iterationPath}:/output:Z,rw`,
       ...dockerMounts,
       '-v',
-      `${setupScriptPath}:/setup.sh:Z,ro`,
+      `${entrypointScriptPath}:/entrypoint.sh:Z,ro`,
       '-v',
-      `${setupMcpScriptPath}:/setup-mcp.sh:Z,ro`,
+      `${workflowPath}:/workflow.yml:Z,ro`,
       '-v',
       `${iterationJsonPath}:/task/description.json:Z,ro`,
-      '-v',
-      `${promptsDir}:/prompts:Z,ro`,
       ...envVariables,
       '-w',
       '/workspace',
+      '--entrypoint',
+      '/entrypoint.sh',
       AGENT_IMAGE,
-      '/bin/sh',
-      '/setup.sh'
+      'rover-agent',
+      'run',
+      '/workflow.yml',
+      '--agent-tool',
+      selectedAiAgent,
+      '--task-id',
+      taskId.toString(),
+      '--status-file',
+      '/output/status.json',
+      // TODO: use JSON / YAML files instead.
+      '-i',
+      `title='${task.title}'`,
+      '-i',
+      `description='${task.description}'`
     );
 
     // Background mode execution

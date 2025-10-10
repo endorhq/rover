@@ -38,6 +38,7 @@ export const runCommand = async (
 
   // Declare status manager outside try block so it's accessible in catch
   let statusManager: IterationStatus | undefined;
+  let totalDuration = 0;
 
   try {
     // Validate status tracking options
@@ -166,6 +167,7 @@ export const runCommand = async (
           colors.gray('├── Duration: ') +
             colors.yellow(`${result.duration.toFixed(2)}s`)
         );
+        totalDuration += result.duration;
 
         if (result.tokens) {
           console.log(
@@ -236,6 +238,10 @@ export const runCommand = async (
 
       // Display workflow completion summary
       console.log(colors.bold('\n🎉 Workflow Execution Summary'));
+      console.log(
+        colors.gray('├── Duration: ') +
+          colors.cyan(totalDuration.toFixed(2) + 's')
+      );
       console.log(
         colors.gray('├── Total Steps: ') +
           colors.cyan(agentWorkflow.steps.length.toString())
