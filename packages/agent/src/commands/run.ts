@@ -4,6 +4,7 @@ import { AgentWorkflow } from '../workflow.js';
 import { parseCollectOptions } from '../lib/options.js';
 import { Runner } from '../lib/runner.js';
 import { IterationStatus } from 'rover-common';
+import { existsSync } from 'node:fs';
 
 interface RunCommandOptions {
   // Inputs. Take precedence over files
@@ -20,6 +21,8 @@ interface RunCommandOptions {
   taskId?: string;
   // Path to status.json file
   statusFile?: string;
+  // Optional output directory
+  output?: string;
 }
 
 interface RunCommandOutput extends CommandOutput {}
@@ -46,7 +49,16 @@ export const runCommand = async (
       console.log(
         colors.red('\n✗ --task-id is required when --status-file is provided')
       );
-      output.error = '--task-id is required when --status-file is provided';
+      return;
+    }
+
+    // Check if the output folder exists.
+    if (options.output && !existsSync(options.output)) {
+      console.log(
+        colors.red(
+          `\n✗ The "${options.output}" directory does not exist or current user does not have permissions.`
+        )
+      );
       return;
     }
 
@@ -152,7 +164,7 @@ export const runCommand = async (
         runSteps++;
 
         // Run it
-        const result = await runner.run();
+        const result = await runner.run(options.output);
 
         // Display step results
         console.log(colors.bold(`\n📊 Step Results: ${step.name}`));
@@ -198,8 +210,13 @@ export const runCommand = async (
             const prefix =
               idx === outputEntries.length - 1 ? '    └──' : '    ├──';
             // Truncate long values for display
-            const displayValue =
+            let displayValue =
               value.length > 100 ? value.substring(0, 100) + '...' : value;
+
+            if (displayValue.includes('\n')) {
+              displayValue = displayValue.split('\n')[0] + '...';
+            }
+
             console.log(
               colors.gray(`${prefix} ${key}: `) + colors.cyan(displayValue)
             );

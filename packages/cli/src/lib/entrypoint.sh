@@ -37,7 +37,10 @@ shred_secrets() {
 
 # Function to recover permissions before exit
 recover_permissions() {
+    echo -e "\n======================================="
     echo "🔧 Recovering permissions..."
+    echo "======================================="
+
     {recoverPermissions}
     echo "✅ Permissions recovered"
 }
@@ -107,10 +110,10 @@ echo "Task Iteration: $TASK_ITERATION"
 echo "======================================="
 
 # Agent-specific CLI installation and credential setup
-echo "📦 Installing Agent CLI and setting up credentials"
+echo -e "\n📦 Installing Agent CLI and setting up credentials"
 sudo rover-agent install $AGENT --user-dir $HOME
 # Set the right permissions
-sudo -R chown $(id -u):$(id -g) $HOME
+sudo chown -R $(id -u):$(id -g) $HOME
 
 if [ $? -eq 0 ]; then
     echo "✅ $AGENT was installed successfully."
@@ -119,19 +122,23 @@ else
     safe_exit 1
 fi
 
-echo "📦 Installing MCP servers"
+echo -e "\n📦 Done installing agent"
+
+echo -e "\n📦 Installing MCP servers"
 # For now, we only configure the package manager!
 rover-agent config mcp $AGENT package-manager --transport "http" http://127.0.0.1:8090/mcp
+
+echo -e "\n📦 Done installing MCP servers"
 
 # Export variables for agent execution
 export TASK_ID TASK_TITLE TASK_DESCRIPTION
 
 # Remove ourselves from sudoers
-echo "👤 Removing privileges after completing the setup!"
+echo -e "\n👤 Removing privileges after completing the setup!"
 sudo rm /etc/sudoers.d/1-agent-setup
 
 # Execute the complete task workflow
-echo "======================================="
+echo -e "\n======================================="
 echo "🚀 Running Workflow"
 echo "======================================="
 

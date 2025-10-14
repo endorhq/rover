@@ -65,6 +65,10 @@ program
     '--status-file <path>',
     'Path to status.json file for tracking workflow progress'
   )
+  .option(
+    '--output <directory>',
+    'Directory to move the output files and values from the workflow. If none, it will save them in the current folder.'
+  )
   .action(runCommand);
 
 // Install workflow dependencies

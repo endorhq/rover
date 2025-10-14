@@ -198,8 +198,16 @@ steps:
       Title: {{inputs.title}}
       Description:
       {{inputs.description}}
-      Context: {{steps.context.outputs.context_file}}
 
+      Context: 
+      ```
+      {{steps.context.outputs.context_file}}
+      ```
+
+      Plan: 
+      ```
+      {{steps.plan.outputs.plan_file}}
+      ```
       ---
 
       ### Phase 1: Triage task complexity
@@ -274,9 +282,17 @@ steps:
       Title: {{inputs.title}}
       Description:
       {{inputs.description}}
-      Context: {{steps.context.outputs.context_file}}
       Task Complexity: {{steps.context.outputs.complexity}}
 
+      Plan: 
+      ```
+      {{steps.plan.outputs.plan_file}}
+      ```
+
+      Changes: 
+      ```
+      {{steps.implement.outputs.changes_file}}
+      ```
       ---
 
       ### Phase 1: Confirm if review is required
@@ -288,7 +304,7 @@ steps:
 
       ### Phase 2: For complex tasks, perform the review
 
-      1. Compare the implementation in `changes.md` against `plan.md`
+      1. Compare the implementation in "Changes" against "Plan"
       2. Review code changes for quality, and adherence to existing patterns
       3. Verify task requirements are satisfied
       4. Check security concerns
@@ -352,8 +368,17 @@ steps:
       Title: {{inputs.title}}
       Description:
       {{inputs.description}}
-      Context: {{steps.context.outputs.context_file}}
       Issues Found: {{steps.review.outputs.issues_found}}
+
+      Context: 
+      ```
+      {{steps.context.outputs.context_file}}
+      ```
+
+      Review:
+      ```
+      {{steps.review.outputs.review_file}}
+      ```
 
       ---
 
@@ -366,15 +391,15 @@ steps:
 
       ### Phase 2: Apply fixes
 
-      1. Read all issues in `review.md`
+      1. Read all issues in Review
       2. Fix issues systematically by priority: Must Fix → Nice to have
       3. Follow review recommendations exactly — do not invent alternative solutions
       4. Ensure fixes preserve existing functionality and do not introduce regressions
-      5. Reference `plan.md` and `context.md` for consistency
+      5. Reference Context for consistency
 
       ### Phase 3: Output
 
-      Read the existing `changes.md` file and APPEND (do NOT overwrite) a new section following this template. This is mandatory.
+      Write `review_fixes.md` following this template only if you fixed any issue. This is mandatory.
 
       <template>
       ## Review Fixes Applied
@@ -385,16 +410,14 @@ steps:
         - Files modified: [file paths]
         - Changes made: [concise description]
       </template>
-
-      After appending to changes.md, output: {"fixes_applied": "true"}
     outputs:
       - name: fixes_applied
         description: 'Whether fixes were applied (true/false)'
         type: string
-      - name: changes_updated
+      - name: review_fixes_file
         description: 'Updated changes file with review fixes appended'
         type: file
-        filename: changes.md
+        filename: review_fixes.md
 
   - id: summary
     type: agent
@@ -407,9 +430,17 @@ steps:
       Title: {{inputs.title}}
       Description:
       {{inputs.description}}
-      Context: {{steps.context.outputs.context_file}}
       Task Complexity: {{steps.context.outputs.complexity}}
 
+      Context: 
+      ```
+      {{steps.context.outputs.context_file}}
+      ```
+
+      Changes: 
+      ```
+      {{steps.implement.outputs.changes_file}}
+      ```
       ---
 
       ### Phase 1: Triage task complexity
@@ -421,7 +452,7 @@ steps:
 
       ### Phase 2: For complex tasks
 
-      - Use only information from `context.md` and `changes.md`
+      - Use only information from Context and Changes
       - Do not fabricate content; if a section has nothing to report, write `None`
       - Keep all required sections concise: 1-2 sentences or one-line bullets only
 

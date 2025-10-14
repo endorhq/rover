@@ -1,3 +1,10 @@
+FROM node:24-alpine AS agent-builder
+COPY . /app
+WORKDIR /app
+# Build the agent
+RUN npm install && npm run build:agent
+RUN cd ./packages/agent && npm pack && mv *.tgz /rover-agent.tgz
+
 FROM node:24-alpine
 ARG TARGETARCH
 ARG PACKAGE_MANAGER_MCP_SERVER_VERSION="v0.1.3"
@@ -13,7 +20,9 @@ RUN apk update && \
     chmod +s+x /usr/local/bin/package-manager-mcp-server
 
 # Install Node dependencies
+COPY --from=agent-builder /rover-agent.tgz /rover-agent.tgz
 RUN npm install -g mcp-remote@0.1.29
+RUN npm install -g /rover-agent.tgz
 
-COPY ./assets/1-sudoers-setup /etc/sudoers.d/1-agent-setup
-COPY ./assets/2-sudoers-cleanup /etc/sudoers.d/2-agent-cleanup
+COPY ./images/node/assets/1-sudoers-setup /etc/sudoers.d/1-agent-setup
+COPY ./images/node/assets/2-sudoers-cleanup /etc/sudoers.d/2-agent-cleanup

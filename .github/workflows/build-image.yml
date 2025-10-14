@@ -58,7 +58,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
-          context: ./images/node
+          context: .
           file: ./images/node/Dockerfile
           platforms: ${{ inputs.platforms }}
           push: true
