@@ -1,15 +1,5 @@
-import { IterationConfig } from '../iteration.js';
-import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-
-// Import templates to include them in the dist.
-import contextPrompt from './context.md';
-import planPrompt from './plan.md';
-import implementPrompt from './implement.md';
-import reviewPrompt from './review.md';
-import applyReviewPrompt from './apply-review.md';
-import summaryPrompt from './summary.md';
 
 // Other templates
 import expandIterationPrompt from './expand-iteration-instructions.md';
@@ -18,12 +8,6 @@ import generateCommitPrompt from './generate-commit-message.md';
 import resolveMergePrompt from './resolve-merge-conflicts.md';
 
 enum PROMPT_ID {
-  Context = 'Context',
-  Plan = 'Plan',
-  Implement = 'Implement',
-  Review = 'Review',
-  ApplyReview = 'ApplyReview',
-  Summary = 'Summary',
   // Others
   ExpandIteration = 'ExpandIteration',
   ExpandTask = 'ExpandTask',
@@ -32,12 +16,6 @@ enum PROMPT_ID {
 }
 
 const PROMPT_CONTENT: Record<PROMPT_ID, string> = {
-  [PROMPT_ID.Context]: contextPrompt,
-  [PROMPT_ID.Plan]: planPrompt,
-  [PROMPT_ID.Implement]: implementPrompt,
-  [PROMPT_ID.Review]: reviewPrompt,
-  [PROMPT_ID.ApplyReview]: applyReviewPrompt,
-  [PROMPT_ID.Summary]: summaryPrompt,
   [PROMPT_ID.ExpandIteration]: expandIterationPrompt,
   [PROMPT_ID.ExpandTask]: expandTaskPrompt,
   [PROMPT_ID.GenerateCommit]: generateCommitPrompt,
@@ -108,103 +86,6 @@ export class PromptBuilder {
     }
 
     return '\n' + template.trim() + '\n';
-  }
-
-  /**
-   * Generate and save all iteration workflow prompt files to the specified directory.
-   * This method creates structured prompts for the complete task iteration lifecycle:
-   * context analysis, planning, implementation, review, and summary.
-   *
-   * @param iteration - Configuration object containing task details and iteration info
-   * @param promptsDir - Directory path where prompt files will be saved
-   *
-   * @example
-   * ```typescript
-   * const config = new IterationConfig(...);
-   * const builder = new PromptBuilder();
-   * builder.generatePromptFiles(config, '/workspace/prompts');
-   * // Creates: context.txt, plan.txt, implement.txt, review.txt, apply_review.txt, summary.txt
-   * ```
-   */
-  generatePromptFiles(iteration: IterationConfig, promptsDir: string): void {
-    // Ensure prompts directory exists
-    mkdirSync(promptsDir, { recursive: true });
-
-    // Generate each prompt and save to file
-    const prompts = {
-      'context.txt': this.context(iteration),
-      'plan.txt': this.plan(iteration),
-      'implement.txt': this.implement(iteration),
-      'review.txt': this.review(iteration),
-      'apply_review.txt': this.apply_review(iteration),
-      'summary.txt': this.summary(iteration),
-    };
-
-    // Write each prompt to its respective file
-    for (const [filename, content] of Object.entries(prompts)) {
-      const filePath = join(promptsDir, filename);
-      writeFileSync(filePath, content.trim(), 'utf8');
-    }
-  }
-
-  /**
-   * Provides a prompt that fetches the context to build a task.
-   */
-  context(iteration: IterationConfig): string {
-    return this.loadTemplate(PROMPT_ID.Context, {
-      title: iteration.title,
-      description: iteration.description,
-    });
-  }
-
-  /**
-   * Provides a prompt to define a plan for a task
-   */
-  plan(iteration: IterationConfig): string {
-    return this.loadTemplate(PROMPT_ID.Plan, {
-      title: iteration.title,
-      description: iteration.description,
-    });
-  }
-
-  /**
-   * Provides a prompt to implement the plan
-   */
-  implement(iteration: IterationConfig): string {
-    return this.loadTemplate(PROMPT_ID.Implement, {
-      title: iteration.title,
-      description: iteration.description,
-    });
-  }
-
-  /**
-   * Provides a prompt to review task changes
-   */
-  review(iteration: IterationConfig): string {
-    return this.loadTemplate(PROMPT_ID.Review, {
-      title: iteration.title,
-      description: iteration.description,
-    });
-  }
-
-  /**
-   * Provides a prompt to apply review feedback and fix identified issues
-   */
-  apply_review(iteration: IterationConfig): string {
-    return this.loadTemplate(PROMPT_ID.ApplyReview, {
-      title: iteration.title,
-      description: iteration.description,
-    });
-  }
-
-  /**
-   * Provides a prompt to elaborate a summary
-   */
-  summary(iteration: IterationConfig): string {
-    return this.loadTemplate(PROMPT_ID.Summary, {
-      title: iteration.title,
-      description: iteration.description,
-    });
   }
 
   /**

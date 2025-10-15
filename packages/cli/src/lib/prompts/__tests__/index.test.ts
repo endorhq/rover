@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { PromptBuilder } from '../index.js';
 import { IterationConfig } from '../../iteration.js';
-import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -37,78 +37,6 @@ describe('PromptBuilder', () => {
     it('should create instance with specified agent', () => {
       const geminiBuilder = new PromptBuilder('gemini');
       expect(geminiBuilder.agent).toBe('gemini');
-    });
-  });
-
-  describe('template loading', () => {
-    it('should load and process context template', () => {
-      const result = builder.context(testIteration);
-
-      // Check that placeholders are replaced
-      expect(result).toContain('Task title: Test Task Title');
-      expect(result).toContain(
-        'Task description: Test task description with multiple lines'
-      );
-      expect(result).not.toContain('%title%');
-      expect(result).not.toContain('%description%');
-
-      // Check that key sections are present
-      expect(result).toContain('# Context');
-      expect(result).toContain('## Task complexity');
-      expect(result).toContain('## Relevant code');
-      expect(result).toContain('## Extra OS packages');
-    });
-
-    it('should load and process plan template', () => {
-      const result = builder.plan(testIteration);
-
-      expect(result).toContain('Title: Test Task Title');
-      expect(result).toContain('Test task description with multiple lines');
-      expect(result).not.toContain('%title%');
-      expect(result).not.toContain('%description%');
-
-      expect(result).toContain('# Implementation Plan');
-      expect(result).toContain('## Implementation Steps');
-      expect(result).toContain('## Risks & Edge Cases');
-    });
-
-    it('should load and process implement template', () => {
-      const result = builder.implement(testIteration);
-
-      expect(result).toContain('Title: Test Task Title');
-      expect(result).toContain('Test task description with multiple lines');
-      expect(result).toContain('# Implementation Changes');
-      expect(result).toContain('## Files Modified');
-      expect(result).toContain('## Technical Details');
-    });
-
-    it('should load and process review template', () => {
-      const result = builder.review(testIteration);
-
-      expect(result).toContain('Title: Test Task Title');
-      expect(result).toContain('Test task description with multiple lines');
-      expect(result).toContain('# Code Review');
-      expect(result).toContain('## Overall Assessment');
-      expect(result).toContain('## Plan Adherence Issues');
-    });
-
-    it('should load and process apply_review template', () => {
-      const result = builder.apply_review(testIteration);
-
-      expect(result).toContain('Title: Test Task Title');
-      expect(result).toContain('Test task description with multiple lines');
-      expect(result).toContain('## Review Fixes Applied');
-      expect(result).toContain('### Issues Addressed');
-    });
-
-    it('should load and process summary template', () => {
-      const result = builder.summary(testIteration);
-
-      expect(result).toContain('Title: Test Task Title');
-      expect(result).toContain('Test task description with multiple lines');
-      expect(result).toContain('# Implementation Summary');
-      expect(result).toContain('## What was implemented');
-      expect(result).toContain('## Files modified');
     });
   });
 
@@ -307,116 +235,6 @@ describe('PromptBuilder', () => {
 
       expect(result).toContain('File: test.js');
       expect(result).toContain(conflictedContent);
-    });
-  });
-
-  describe('generatePromptFiles', () => {
-    it('should generate all prompt files in specified directory', () => {
-      const promptsDir = join(tempDir, 'prompts');
-      builder.generatePromptFiles(testIteration, promptsDir);
-
-      // Check directory was created
-      expect(existsSync(promptsDir)).toBe(true);
-
-      // Check all expected files were created
-      const expectedFiles = [
-        'context.txt',
-        'plan.txt',
-        'implement.txt',
-        'review.txt',
-        'apply_review.txt',
-        'summary.txt',
-      ];
-
-      for (const file of expectedFiles) {
-        const filePath = join(promptsDir, file);
-        expect(existsSync(filePath)).toBe(true);
-
-        // Check file content has placeholders replaced
-        const content = readFileSync(filePath, 'utf8');
-        expect(content).toContain('Test Task Title');
-        expect(content).not.toContain('%title%');
-        expect(content).not.toContain('%description%');
-      }
-    });
-
-    it('should create nested directories if they do not exist', () => {
-      const nestedDir = join(tempDir, 'deeply', 'nested', 'prompts');
-      builder.generatePromptFiles(testIteration, nestedDir);
-
-      expect(existsSync(nestedDir)).toBe(true);
-      expect(existsSync(join(nestedDir, 'context.txt'))).toBe(true);
-    });
-
-    it('should overwrite existing files', () => {
-      const promptsDir = join(tempDir, 'prompts');
-      mkdirSync(promptsDir, { recursive: true });
-
-      // Create a file with initial content
-      const contextFile = join(promptsDir, 'context.txt');
-      writeFileSync(contextFile, 'old content');
-
-      // Generate prompt files
-      builder.generatePromptFiles(testIteration, promptsDir);
-
-      // Check file was overwritten
-      const newContent = readFileSync(contextFile, 'utf8');
-      expect(newContent).not.toContain('old content');
-      expect(newContent).toContain('Test Task Title');
-    });
-  });
-
-  describe('edge cases', () => {
-    it('should handle minimal title and description', () => {
-      // IterationConfig requires non-empty title and description
-      const minimalIteration = IterationConfig.createInitial(
-        tempDir,
-        1,
-        ' ',
-        ' '
-      );
-      const result = builder.context(minimalIteration);
-
-      expect(result).toContain('Task title:  '); // Single space title
-      expect(result).toContain('Task description:  '); // Single space description
-    });
-
-    it('should handle special characters in templates', () => {
-      const specialIteration = IterationConfig.createInitial(
-        tempDir,
-        1,
-        'Task with $special% characters',
-        'Description with %placeholders% and $vars'
-      );
-
-      const result = builder.plan(specialIteration);
-      expect(result).toContain('Task with $special% characters');
-      expect(result).toContain('Description with %placeholders% and $vars');
-    });
-
-    it('should handle very long descriptions', () => {
-      const longDescription = 'A'.repeat(10000);
-      const longIteration = IterationConfig.createInitial(
-        tempDir,
-        1,
-        'Long Task',
-        longDescription
-      );
-
-      const result = builder.implement(longIteration);
-      expect(result).toContain(longDescription);
-    });
-
-    it('should handle multiline descriptions correctly', () => {
-      const multilineIteration = IterationConfig.createInitial(
-        tempDir,
-        1,
-        'Multiline Task',
-        'Line 1\nLine 2\n\nLine 4 with\ttabs'
-      );
-
-      const result = builder.summary(multilineIteration);
-      expect(result).toContain('Line 1\nLine 2\n\nLine 4 with\ttabs');
     });
   });
 
