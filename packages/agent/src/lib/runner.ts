@@ -646,7 +646,7 @@ export class Runner {
         instructions += `  - Create this file in the current working directory\n`;
 
         if (this.tool == 'gemini' || this.tool == 'qwen') {
-          // Gemini has difficulties to call its own tools
+          // Gemini has difficulties calling its own tools
           instructions += `  - When creating the file, call the write_file tool using an absolute path based on current directory. THIS IS MANDATORY\n`;
         }
 
