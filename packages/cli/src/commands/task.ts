@@ -56,10 +56,10 @@ const validations = (
         error: 'Codex credentials not found',
         tips: [
           'Run ' +
-            colors.cyan('codex') +
-            ' first to set up credentials, using the' +
-            colors.cyan('/auth') +
-            ' command',
+          colors.cyan('codex') +
+          ' first to set up credentials, using the' +
+          colors.cyan('/auth') +
+          ' command',
         ],
       };
     }
@@ -383,7 +383,6 @@ export const startDockerExecution = async (
       '/output/status.json',
       '--output',
       '/output',
-      // TODO: use JSON / YAML files instead.
       '--inputs-json',
       '/inputs.json'
     );
@@ -434,8 +433,8 @@ export const startDockerExecution = async (
         console.log(colors.gray('  Resetting the task status to "New"'));
         console.log(
           colors.gray('  Use ') +
-            colors.cyan(`rover restart ${taskId}`) +
-            colors.gray(' to retry execution')
+          colors.cyan(`rover restart ${taskId}`) +
+          colors.gray(' to retry execution')
         );
       }
 
@@ -464,8 +463,8 @@ export const startDockerExecution = async (
       console.log(colors.yellow('⚠ Task reset to NEW status'));
       console.log(
         colors.gray('  Use ') +
-          colors.cyan(`rover restart ${taskId}`) +
-          colors.gray(' to retry execution')
+        colors.cyan(`rover restart ${taskId}`) +
+        colors.gray(' to retry execution')
       );
     }
 
@@ -606,8 +605,8 @@ export const taskCommand = async (
           );
           console.log(
             colors.gray('└── Body: ') +
-              issueData.body.substring(0, 100) +
-              (issueData.body.length > 100 ? '...' : '')
+            issueData.body.substring(0, 100) +
+            (issueData.body.length > 100 ? '...' : '')
           );
         }
       } else {
@@ -659,13 +658,13 @@ export const taskCommand = async (
         if (initialPrompt.length > 0) {
           console.log(
             colors.gray(`  Example: `) +
-              colors.cyan(`rover task --source-branch main "${initialPrompt}"
+            colors.cyan(`rover task --source-branch main "${initialPrompt}"
 `)
           );
         } else {
           console.log(
             colors.gray(`  Example: `) +
-              colors.cyan(`rover task --source-branch main
+            colors.cyan(`rover task --source-branch main
 `)
           );
         }
@@ -704,7 +703,7 @@ export const taskCommand = async (
         exitWithError(jsonOutput, json, {
           tips: [
             'Provide a description as an argument using' +
-              colors.cyan(' rover task "your task description" --yes'),
+            colors.cyan(' rover task "your task description" --yes'),
           ],
         });
         return;
@@ -735,8 +734,8 @@ export const taskCommand = async (
     // Expand task with selected AI provider
     const spinner = !json
       ? yoctoSpinner({
-          text: `Expanding task description with ${selectedAiAgent.charAt(0).toUpperCase() + selectedAiAgent.slice(1)}...`,
-        }).start()
+        text: `Expanding task description with ${selectedAiAgent.charAt(0).toUpperCase() + selectedAiAgent.slice(1)}...`,
+      }).start()
       : null;
 
     try {
@@ -968,11 +967,11 @@ export const taskCommand = async (
       tips: [
         'Use ' + colors.cyan('rover list') + ' to check the list of tasks',
         'Use ' +
-          colors.cyan(`rover logs -f ${task.id}`) +
-          ' to watch the task logs',
+        colors.cyan(`rover logs -f ${task.id}`) +
+        ' to watch the task logs',
         'Use ' +
-          colors.cyan(`rover inspect ${task.id}`) +
-          ' to check the task status',
+        colors.cyan(`rover inspect ${task.id}`) +
+        ' to check the task status',
       ],
     });
   } else {
