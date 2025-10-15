@@ -48,7 +48,6 @@ program
     []
   )
   .option('--inputs-json <jsonPath>', 'Load the input values from a JSON file')
-  .option('--inputs-yaml <yamlPath>', 'Load the input values from a YAML file')
   .option(
     '--agent-tool <agent>',
     'Agent tool to use. It overrides defaults, but prioritize step tools if available.'

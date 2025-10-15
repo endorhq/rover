@@ -166,6 +166,9 @@ export class Runner {
           );
           abortController.abort();
         }
+
+        // Always return the chunk. If not, the stderr will be empty.
+        yield chunk;
       };
 
       // Launch the process with proper timeout and abort signal
@@ -502,9 +505,10 @@ export class Runner {
         ];
 
         // Add model if specified
-        if (model) {
-          args.push('--model', model);
-        }
+        // TODO: Enable selecting the model
+        // if (model) {
+        //   args.push('--model', model);
+        // }
 
         args.push('-p');
 
@@ -518,9 +522,10 @@ export class Runner {
         ];
 
         // Add model if specified
-        if (model) {
-          args.push('--model', model);
-        }
+        // TODO: Enable selecting the model
+        // if (model) {
+        //   args.push('--model', model);
+        // }
 
         // Read the input from stdin
         args.push('-');
@@ -531,9 +536,10 @@ export class Runner {
         const args = ['--yolo', '--output-format', 'json'];
 
         // Add model if specified
-        if (model) {
-          args.push('--model', model);
-        }
+        // TODO: Enable selecting the model
+        // if (model) {
+        //   args.push('--model', model);
+        // }
 
         // Do not add -p as it's deprecated
 
@@ -544,9 +550,10 @@ export class Runner {
         const args = ['--yolo'];
 
         // Add model if specified
-        if (model) {
-          args.push('--model', model);
-        }
+        // TODO: Enable selecting the model
+        // if (model) {
+        //   args.push('--model', model);
+        // }
 
         // For now, this is not deprecated in Qwen
         args.push('-p');
@@ -637,6 +644,12 @@ export class Runner {
       fileOutputs.forEach(output => {
         instructions += `- **${output.name}**: ${output.description}\n`;
         instructions += `  - Create this file in the current working directory\n`;
+
+        if (this.tool == 'gemini' || this.tool == 'qwen') {
+          // Gemini has difficulties to call its own tools
+          instructions += `  - When creating the file, call the write_file tool using an absolute path based on current directory. THIS IS MANDATORY\n`;
+        }
+
         instructions += `  - Filename: \`${output.filename}\`\n\n`;
       });
 

@@ -4,8 +4,11 @@
  *
  * @throws Error when the option does not follow the key=value format
  */
-export const parseCollectOptions = (options: string[]): Map<string, string> => {
-  const kv = new Map();
+export const parseCollectOptions = (
+  options: string[],
+  current: Map<string, string>
+): Map<string, string> => {
+  const kv = new Map(current);
 
   options.forEach(val => {
     if (!val.includes('=')) {

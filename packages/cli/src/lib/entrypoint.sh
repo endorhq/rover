@@ -95,13 +95,26 @@ validate_task_file
 # Setup the agent
 AGENT={agent}
 
+echo -e "\n======================================="
+echo "📦 Starting the package manager MCP server"
+echo "======================================="
+export PACKAGE_MANAGER_MCP_PORT=8090
+package-manager-mcp-server $PACKAGE_MANAGER_MCP_PORT &
+
+while ! nc -w 0 127.0.0.1 "$PACKAGE_MANAGER_MCP_PORT" < /dev/null; do
+  echo "Waiting for package manager MCP to be ready at $PACKAGE_MANAGER_MCP_PORT..."
+  sleep 1
+done
+
+echo "✅ Package manager MCP is ready"
+
 # Read task data from mounted JSON file
 TASK_ID=$(jq -r '.id' /task/description.json)
 TASK_ITERATION=$(jq -r '.iteration' /task/description.json)
 TASK_TITLE=$(jq -r '.title' /task/description.json)
 TASK_DESCRIPTION=$(jq -r '.description' /task/description.json)
 
-echo "======================================="
+echo -e "\n======================================="
 echo "🚀 Rover Task Execution Setup"
 echo "======================================="
 echo "Task Title: $TASK_TITLE"

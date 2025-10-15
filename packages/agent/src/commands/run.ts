@@ -4,15 +4,13 @@ import { AgentWorkflow } from '../workflow.js';
 import { parseCollectOptions } from '../lib/options.js';
 import { Runner } from '../lib/runner.js';
 import { IterationStatus } from 'rover-common';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 interface RunCommandOptions {
   // Inputs. Take precedence over files
   input: string[];
-  // Load the inputs from a YAML file
-  inputYaml?: string;
   // Load the inputs from a JSON file
-  inputJson?: string;
+  inputsJson?: string;
   // Tool to use instead of workflow defaults
   agentTool?: string;
   // Model to use instead of workflow defaults
@@ -83,7 +81,37 @@ export const runCommand = async (
 
     // Load the agent workflow
     const agentWorkflow = AgentWorkflow.load(workflowPath);
-    const providedInputs = parseCollectOptions(options.input);
+    let providedInputs = new Map();
+
+    if (options.inputsJson != null) {
+      console.log(colors.gray(`Loading inputs from ${options.inputsJson}\n`));
+      if (!existsSync(options.inputsJson)) {
+        console.log(
+          colors.yellow(
+            `The provided JSON input file (${options.inputsJson}) does not exist. Skipping it.`
+          )
+        );
+      } else {
+        try {
+          const jsonData = readFileSync(options.inputsJson, 'utf-8');
+          const data = JSON.parse(jsonData);
+
+          for (const key in data) {
+            providedInputs.set(key, data[key]);
+          }
+        } catch (err) {
+          console.log(
+            colors.yellow(
+              `The provided JSON input file (${options.inputsJson}) is not a valid JSON. Skipping it.`
+            )
+          );
+        }
+      }
+    }
+
+    // Users might override the --inputs-json values with --input.
+    // The --input always have preference
+    providedInputs = parseCollectOptions(options.input, providedInputs);
 
     // Merge provided inputs with defaults
     const inputs = new Map(providedInputs);

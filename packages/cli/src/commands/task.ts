@@ -287,6 +287,7 @@ export const startDockerExecution = async (
   // Generate setup script using SetupBuilder
   const setupBuilder = new SetupBuilder(task, selectedAiAgent);
   const entrypointScriptPath = setupBuilder.generateEntrypoint();
+  const inputsPath = setupBuilder.generateInputs();
   const workflowPath = setupBuilder.saveWorkflow();
 
   // Get agent-specific Docker mounts
@@ -362,6 +363,8 @@ export const startDockerExecution = async (
       '-v',
       `${workflowPath}:/workflow.yml:Z,ro`,
       '-v',
+      `${inputsPath}:/inputs.json:Z,ro`,
+      '-v',
       `${iterationJsonPath}:/task/description.json:Z,ro`,
       ...envVariables,
       '-w',
@@ -381,10 +384,8 @@ export const startDockerExecution = async (
       '--output',
       '/output',
       // TODO: use JSON / YAML files instead.
-      '-i',
-      `title='${task.title}'`,
-      '-i',
-      `description='${task.description}'`
+      '--inputs-json',
+      '/inputs.json'
     );
 
     // Background mode execution

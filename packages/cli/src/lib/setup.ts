@@ -13,12 +13,13 @@ import { fileURLToPath } from 'node:url';
  */
 export class SetupBuilder {
   private agent: string;
-  private taskId: number;
+  private task: TaskDescription;
+  private taskDir: string;
   private isDockerRootless: boolean;
 
   constructor(taskDescription: TaskDescription, agent: string) {
     this.agent = agent;
-    this.taskId = taskDescription.id;
+    this.task = taskDescription;
 
     let isDockerRootless = false;
 
@@ -31,21 +32,23 @@ export class SetupBuilder {
     }
 
     this.isDockerRootless = isDockerRootless;
+
+    // Ensures the task directory exists
+    const taskDir = join(
+      findProjectRoot(),
+      '.rover',
+      'tasks',
+      this.task.id.toString()
+    );
+    mkdirSync(taskDir, { recursive: true });
+
+    this.taskDir = taskDir;
   }
 
   /**
    * Generate and save the setup script to the appropriate task directory
    */
   generateEntrypoint(): string {
-    // Ensure task directory exists
-    const taskDir = join(
-      findProjectRoot(),
-      '.rover',
-      'tasks',
-      this.taskId.toString()
-    );
-    mkdirSync(taskDir, { recursive: true });
-
     let recoverPermissions = '';
 
     // For Docker rootless, force it to return the permissions to the right users.
@@ -61,7 +64,7 @@ export class SetupBuilder {
     });
 
     // Write script to file
-    const scriptPath = join(taskDir, 'entrypoint.sh');
+    const scriptPath = join(this.taskDir, 'entrypoint.sh');
     writeFileSync(scriptPath, scriptContent, 'utf8');
 
     // Make script executable
@@ -71,21 +74,28 @@ export class SetupBuilder {
   }
 
   /**
+   * Generate the inputs file to store task inputs and simplify loading them.
+   */
+  generateInputs(): string {
+    // For now, we only pass the task title and description as inputs
+    const inputs = {
+      title: this.task.title,
+      description: this.task.description,
+    };
+
+    const inputsPath = join(this.taskDir, 'inputs.json');
+    writeFileSync(inputsPath, JSON.stringify(inputs, null, 2), 'utf-8');
+
+    return inputsPath;
+  }
+
+  /**
    * Save the workflow file into the target task.
    * TODO: Support multiple workflows
    */
   saveWorkflow(): string {
-    // Ensure task directory exists
-    const taskDir = join(
-      findProjectRoot(),
-      '.rover',
-      'tasks',
-      this.taskId.toString()
-    );
-    mkdirSync(taskDir, { recursive: true });
-
     // Write script to file
-    const workflowTaskPath = join(taskDir, 'workflow.yml');
+    const workflowTaskPath = join(this.taskDir, 'workflow.yml');
     const distDir = dirname(fileURLToPath(import.meta.url));
     const workflowPath = join(distDir, workflowDistPath);
     cpSync(workflowPath, workflowTaskPath);
@@ -101,7 +111,7 @@ export class SetupBuilder {
       findProjectRoot(),
       '.rover',
       'tasks',
-      this.taskId.toString(),
+      this.task.id.toString(),
       script
     );
   }
