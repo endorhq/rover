@@ -23,8 +23,13 @@ export class CodexAgent extends BaseAgent {
       },
       {
         path: '/.codex/config.json',
-        description: 'Codex configuration',
-        required: true,
+        description: 'Codex configuration (old)',
+        required: false,
+      },
+      {
+        path: '/.codex/config.toml',
+        description: 'Codex configuration (new)',
+        required: false,
       },
     ];
   }
