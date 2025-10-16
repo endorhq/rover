@@ -10,6 +10,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { launchSync } from 'rover-common';
 import { initCommand } from '../init.js';
+import { CURRENT_PROJECT_SCHEMA_VERSION } from '../../lib/config.js';
 
 // Mock only the external tool checks (except Git which should be available)
 vi.mock('../../utils/system.js', async () => {
@@ -97,7 +98,7 @@ describe('init command', () => {
 
     // Verify content - should detect TypeScript, JavaScript, and NPM
     const roverConfig = JSON.parse(readFileSync('rover.json', 'utf8'));
-    expect(roverConfig.version).toBe('1.0');
+    expect(roverConfig.version).toBe(CURRENT_PROJECT_SCHEMA_VERSION);
     expect(roverConfig.languages).toContain('typescript');
     expect(roverConfig.languages).toContain('javascript');
     expect(roverConfig.packageManagers).toContain('npm');

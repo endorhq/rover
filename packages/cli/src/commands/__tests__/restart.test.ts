@@ -48,6 +48,7 @@ describe('restart command', async () => {
     execSync('git init', { stdio: 'pipe' });
     execSync('git config user.email "test@example.com"', { stdio: 'pipe' });
     execSync('git config user.name "Test User"', { stdio: 'pipe' });
+    execSync('git config commit.gpgsign false');
 
     // Create main branch and initial commit
     writeFileSync(join(testDir, 'README.md'), '# Test Project');

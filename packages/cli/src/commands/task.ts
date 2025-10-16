@@ -1,15 +1,21 @@
 import enquirer from 'enquirer';
 import colors from 'ansi-colors';
 import yoctoSpinner from 'yocto-spinner';
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  writeFileSync,
+  readFileSync,
+} from 'node:fs';
+import { join, resolve } from 'node:path';
 import { getNextTaskId } from '../utils/task-id.js';
 import { homedir, tmpdir, userInfo } from 'node:os';
 import { getAIAgentTool, getUserAIAgent } from '../lib/agents/index.js';
 import type { IPromptTask } from '../lib/prompts/index.js';
 import { TaskDescription } from '../lib/description.js';
 import { SetupBuilder } from '../lib/setup.js';
-import { AI_AGENT } from '../lib/config.js';
+import { AI_AGENT, ProjectConfig } from '../lib/config.js';
 import { IterationConfig } from '../lib/iteration.js';
 import { generateBranchName } from '../utils/branch-name.js';
 import { findProjectRoot, launch, launchSync } from 'rover-common';
@@ -22,6 +28,10 @@ import { CLIJsonOutput } from '../types.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
 import { GitHub, GitHubError } from '../lib/github.js';
 import { copyEnvironmentFiles } from '../utils/env-files.js';
+import {
+  parseCustomEnvironmentVariables,
+  loadEnvsFile,
+} from '../utils/env-variables.js';
 
 const { prompt } = enquirer;
 const AGENT_IMAGE = 'ghcr.io/endorhq/rover/node:v1.1.0';
@@ -295,6 +305,41 @@ export const startDockerExecution = async (
   const dockerMounts: string[] = agent.getContainerMounts();
   const envVariables: string[] = agent.getEnvironmentVariables();
 
+  // Load project config and merge custom environment variables
+  const projectRoot = findProjectRoot();
+  let customEnvVariables: string[] = [];
+
+  if (ProjectConfig.exists()) {
+    try {
+      const projectConfig = ProjectConfig.load();
+
+      // Parse custom envs array
+      if (projectConfig.envs && projectConfig.envs.length > 0) {
+        customEnvVariables = parseCustomEnvironmentVariables(
+          projectConfig.envs
+        );
+      }
+
+      // Load envs from file
+      if (projectConfig.envsFile) {
+        const fileEnvVariables = loadEnvsFile(
+          projectConfig.envsFile,
+          projectRoot
+        );
+        customEnvVariables = [...customEnvVariables, ...fileEnvVariables];
+      }
+    } catch (error) {
+      // Silently skip if there's an error loading project config
+    }
+  }
+
+  // Merge agent environment variables with custom environment variables
+  // IMPORTANT: Custom environment variables are appended after agent defaults.
+  // In Docker, when the same environment variable appears multiple times, the last
+  // occurrence takes precedence. This means custom environment variables will
+  // override agent defaults if there are conflicts, which is the desired behavior.
+  const allEnvVariables = [...envVariables, ...customEnvVariables];
+
   if (!jsonMode) {
     console.log(colors.bold('\n🐳 Starting Docker container:'));
     console.log(colors.gray('└── Container Name: ') + containerName);
@@ -364,7 +409,7 @@ export const startDockerExecution = async (
       `${inputsPath}:/inputs.json:Z,ro`,
       '-v',
       `${iterationJsonPath}:/task/description.json:Z,ro`,
-      ...envVariables,
+      ...allEnvVariables,
       '-w',
       '/workspace',
       '--entrypoint',

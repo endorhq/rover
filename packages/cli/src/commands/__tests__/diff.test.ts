@@ -569,6 +569,7 @@ describe('diff command', () => {
       launchSync('git', ['init']);
       launchSync('git', ['config', 'user.email', 'test@test.com']);
       launchSync('git', ['config', 'user.name', 'Test User']);
+      launchSync('git', ['config', 'commit.gpgsign', 'false']);
       mkdirSync('.rover/tasks', { recursive: true });
 
       const task = TaskDescription.create({

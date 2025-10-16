@@ -38,7 +38,7 @@ export enum TASK_MANAGER {
 }
 
 // Schema version for migrations
-const CURRENT_PROJECT_SCHEMA_VERSION = '1.0';
+export const CURRENT_PROJECT_SCHEMA_VERSION = '1.1';
 
 export interface ProjectConfigSchema {
   // Common values
@@ -51,6 +51,10 @@ export interface ProjectConfigSchema {
 
   // Attribution
   attribution: boolean;
+
+  // Custom environment variables
+  envs?: string[];
+  envsFile?: string;
 }
 
 const PROJECT_CONFIG_FILE = 'rover.json';
@@ -134,7 +138,9 @@ export class ProjectConfig {
       languages: data.languages || [],
       packageManagers: data.packageManagers || [],
       taskManagers: data.taskManagers || [],
-      attribution: data.attribution || true,
+      attribution: data.attribution !== undefined ? data.attribution : true,
+      ...(data.envs !== undefined ? { envs: data.envs } : {}),
+      ...(data.envsFile !== undefined ? { envsFile: data.envsFile } : {}),
     };
 
     return migrated;
@@ -177,6 +183,12 @@ export class ProjectConfig {
   }
   get attribution(): boolean {
     return this.data.attribution;
+  }
+  get envs(): string[] | undefined {
+    return this.data.envs;
+  }
+  get envsFile(): string | undefined {
+    return this.data.envsFile;
   }
 
   // Data Modification (Setters)
