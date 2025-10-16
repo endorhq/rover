@@ -20,6 +20,7 @@ export PATH=/root/local/.bin:$PATH
 # create this. Once we finish the setup, we will reduce the sudo
 # permissions to the minimal.
 sudo mkdir -p $HOME
+sudo mkdir -p $HOME/.config
 sudo chown -R $(id -u):$(id -g) $HOME
 sudo chown -R $(id -u):$(id -g) /workspace
 sudo chown -R $(id -u):$(id -g) /output
@@ -125,7 +126,7 @@ echo "======================================="
 # Agent-specific CLI installation and credential setup
 echo -e "\n📦 Installing Agent CLI and setting up credentials"
 sudo rover-agent install $AGENT --user-dir $HOME
-# Set the right permissions
+# Set the right permissions after installing and moving credentials
 sudo chown -R $(id -u):$(id -g) $HOME
 
 if [ $? -eq 0 ]; then
