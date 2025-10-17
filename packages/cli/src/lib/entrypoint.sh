@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Template file for the entrypoint to run the agents and the workflow.
-# The purpose of this file is to install all required elements and 
+# The purpose of this file is to install all required elements and
 # prepare the agent to run.
 #
 # @see https://github.com/sindresorhus/pupa

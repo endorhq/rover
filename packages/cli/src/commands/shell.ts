@@ -111,10 +111,63 @@ export const shellCommand = async (
         return;
       }
     } else {
-      const shell = process.env.SHELL || '/bin/sh';
+      // Detect the appropriate shell based on the platform
+      let shell: string;
+      let shellArgs: string[] = [];
+
+      if (process.platform === 'win32') {
+        // On Windows, prioritize WSL, then fall back to PowerShell or cmd.exe
+        shell = process.env.COMSPEC || 'cmd.exe';
+
+        try {
+          // Try WSL first (assume it exists)
+          launchSync('wsl.exe', ['--version']);
+          shell = 'wsl.exe';
+          shellArgs = ['--cd', task.worktreePath];
+        } catch {
+          // WSL not available, try PowerShell if available
+          if (process.env.PSModulePath) {
+            // PowerShell is available
+            const pwshPath = 'pwsh.exe'; // PowerShell Core
+            const powershellPath = 'powershell.exe'; // Windows PowerShell
+
+            try {
+              // Try PowerShell Core first
+              launchSync(pwshPath, ['-v']);
+              shell = pwshPath;
+              shellArgs = [
+                '-NoExit',
+                '-Command',
+                `Set-Location '${task.worktreePath}'`,
+              ];
+            } catch {
+              try {
+                // Fall back to Windows PowerShell
+                launchSync(powershellPath, ['-v']);
+                shell = powershellPath;
+                shellArgs = [
+                  '-NoExit',
+                  '-Command',
+                  `Set-Location '${task.worktreePath}'`,
+                ];
+              } catch {
+                // Fall back to cmd.exe - don't pass cd command, rely on cwd option instead
+                shellArgs = ['/K'];
+              }
+            }
+          } else {
+            // Use cmd.exe - don't pass cd command, rely on cwd option instead
+            shellArgs = ['/K'];
+          }
+        }
+      } else {
+        // Unix-like systems (Linux, macOS)
+        shell = process.env.SHELL || '/bin/sh';
+        shellArgs = [];
+      }
 
       try {
-        const shellInit = launch(shell, [], {
+        const shellInit = launch(shell, shellArgs, {
           stdio: 'inherit',
           cwd: task.worktreePath,
         });

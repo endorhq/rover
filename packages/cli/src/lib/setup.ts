@@ -65,7 +65,7 @@ export class SetupBuilder {
 
     // Write script to file
     const scriptPath = join(this.taskDir, 'entrypoint.sh');
-    writeFileSync(scriptPath, scriptContent, 'utf8');
+    writeFileSync(scriptPath, scriptContent.replace(/\r\n/g, '\n'), 'utf8');
 
     // Make script executable
     chmodSync(scriptPath, 0o755);

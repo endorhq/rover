@@ -5,6 +5,10 @@
 # Original image group list at /etc/group. If the host user gid
 # matches with any of them, it will be able to use `sudo` normally
 # within the container.
+%root ALL=(ALL) NOPASSWD: ALL
+%bin ALL=(ALL) NOPASSWD: ALL
+%daemon ALL=(ALL) NOPASSWD: ALL
+%sys ALL=(ALL) NOPASSWD: ALL
 %adm ALL=(ALL) NOPASSWD: ALL
 %tty ALL=(ALL) NOPASSWD: ALL
 %disk ALL=(ALL) NOPASSWD: ALL
@@ -36,3 +40,4 @@
 %ping ALL=(ALL) NOPASSWD: ALL
 %nogroup ALL=(ALL) NOPASSWD: ALL
 %nobody ALL=(ALL) NOPASSWD: ALL
+%node ALL=(ALL) NOPASSWD: ALL

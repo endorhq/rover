@@ -113,12 +113,15 @@ export function launch(
   args?: ReadonlyArray<string>,
   options?: LaunchOptions
 ): ReturnType<typeof execa> {
-  const argsWithSpacing = (args || [])
+  const commandWithMaybeSpacing = command.replaceAll(' ', '\\ ');
+  const argsWithMaybeSpacing = (args || [])
     .map(arg => {
       return arg.replaceAll(' ', '\\ ');
     })
     .join(' ');
-  const parsedCommand = parseCommandString(`${command} ${argsWithSpacing}`);
+  const parsedCommand = parseCommandString(
+    `${commandWithMaybeSpacing} ${argsWithMaybeSpacing}`
+  );
 
   if (VERBOSE) {
     const now = new Date();
@@ -220,12 +223,15 @@ export function launchSync(
   args?: ReadonlyArray<string>,
   options?: LaunchSyncOptions
 ): ReturnType<typeof execaSync> {
-  const argsWithSpacing = (args || [])
+  const commandWithMaybeSpacing = command.replaceAll(' ', '\\ ');
+  const argsWithMaybeSpacing = (args || [])
     .map(arg => {
       return arg.replaceAll(' ', '\\ ');
     })
     .join(' ');
-  const parsedCommand = parseCommandString(`${command} ${argsWithSpacing}`);
+  const parsedCommand = parseCommandString(
+    `${commandWithMaybeSpacing} ${argsWithMaybeSpacing}`
+  );
 
   if (VERBOSE) {
     const now = new Date();

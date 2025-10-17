@@ -34,7 +34,7 @@ import {
 } from '../utils/env-variables.js';
 
 const { prompt } = enquirer;
-const AGENT_IMAGE = 'ghcr.io/endorhq/rover/node:v1.1.0';
+const AGENT_IMAGE = 'ghcr.io/endorhq/rover/node:v1.3.0';
 
 type validationResult = {
   error: string;
@@ -228,38 +228,40 @@ function imageGids(image: string): Map<number, string> {
 
 type CurrentUser = string;
 
-export function etcPasswdWithCurrentUser(image: string): [string, CurrentUser] {
+export function etcPasswdWithUserInfo(
+  image: string,
+  userInfo: { uid: number; gid: number }
+): [string, CurrentUser] {
   const originalPasswd = catFile(image, '/etc/passwd');
   const existingUids = imageUids(image);
-  const userInfo_ = userInfo();
 
   // Check if current user already exists in the image
-  if (existingUids.has(userInfo_.uid)) {
-    return [originalPasswd, existingUids.get(userInfo_.uid)!];
+  if (existingUids.has(userInfo.uid)) {
+    return [originalPasswd, existingUids.get(userInfo.uid)!];
   }
 
   // Create entry for current user
-  const userEntry = `agent:x:${userInfo_.uid}:${userInfo_.gid}:agent:/home/agent:/bin/sh`;
+  const userEntry = `agent:x:${userInfo.uid}:${userInfo.gid}:agent:/home/agent:/bin/sh`;
 
   return [originalPasswd + '\n' + userEntry + '\n', 'agent'];
 }
 
 type CurrentGroup = string;
 
-export function etcGroupWithCurrentGroup(
-  image: string
+export function etcGroupWithUserInfo(
+  image: string,
+  userInfo: { uid: number; gid: number }
 ): [string, CurrentGroup] {
   const originalGroup = catFile(image, '/etc/group');
   const existingGids = imageGids(image);
-  const userInfo_ = userInfo();
 
   // Check if current group already exists in the image
-  if (existingGids.has(userInfo_.gid)) {
-    return [originalGroup, existingGids.get(userInfo_.gid)!];
+  if (existingGids.has(userInfo.gid)) {
+    return [originalGroup, existingGids.get(userInfo.gid)!];
   }
 
   // Create entry for current group
-  const groupEntry = `agent:x:${userInfo_.gid}:agent`;
+  const groupEntry = `agent:x:${userInfo.gid}:agent`;
 
   return [originalGroup + '\n' + groupEntry + '\n', 'agent'];
 }
@@ -371,31 +373,49 @@ export const startDockerExecution = async (
       );
     }
 
+    // Build Docker run command with mounts
+    const dockerArgs = ['run', '--name', containerName, '-d'];
+
+    const userInfo_ = userInfo();
+
+    // If we cannot retrieve the UID in the current environment,
+    // set it to 1000, so that the Rover agent container will be
+    // using this unprivileged UID. This happens typically on
+    // environments such as Windows.
+    if (userInfo_.uid === -1) {
+      userInfo_.uid = 1000;
+    }
+
+    // If we cannot retrieve the GID in the current environment,
+    // set it to 1000, so that the Rover agent container will be
+    // using this unprivileged GID. This happens typically on
+    // environments such as Windows.
+    if (userInfo_.gid === -1) {
+      userInfo_.gid = 1000;
+    }
+
     const userCredentialsTempPath = mkdtempSync(join(tmpdir(), 'rover-'));
     const etcPasswd = join(userCredentialsTempPath, 'passwd');
-    const [etcPasswdContents, username] = etcPasswdWithCurrentUser(AGENT_IMAGE);
+    const [etcPasswdContents, username] = etcPasswdWithUserInfo(
+      AGENT_IMAGE,
+      userInfo_
+    );
     writeFileSync(etcPasswd, etcPasswdContents);
 
     const etcGroup = join(userCredentialsTempPath, 'group');
-    const [etcGroupContents, group] = etcGroupWithCurrentGroup(AGENT_IMAGE);
+    const [etcGroupContents, group] = etcGroupWithUserInfo(
+      AGENT_IMAGE,
+      userInfo_
+    );
     writeFileSync(etcGroup, etcGroupContents);
 
-    // Build Docker run command with mounts
-    const dockerArgs = [
-      'run',
-      '--name',
-      containerName,
-      '-d',
+    dockerArgs.push(
       '-v',
       `${etcPasswd}:/etc/passwd:Z,ro`,
       '-v',
-      `${etcGroup}:/etc/group,Z:ro`,
-    ];
-
-    const userInfo_ = userInfo();
-    dockerArgs.push('--user', `${userInfo_.uid}:${userInfo_.gid}`);
-
-    dockerArgs.push(
+      `${etcGroup}:/etc/group:Z,ro`,
+      '--user',
+      `${userInfo_.uid}:${userInfo_.gid}`,
       '-v',
       `${worktreePath}:/workspace:Z,rw`,
       '-v',
