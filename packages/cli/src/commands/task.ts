@@ -371,29 +371,31 @@ export const startDockerExecution = async (
       );
     }
 
-    const userCredentialsTempPath = mkdtempSync(join(tmpdir(), 'rover-'));
-    const etcPasswd = join(userCredentialsTempPath, 'passwd');
-    const [etcPasswdContents, username] = etcPasswdWithCurrentUser(AGENT_IMAGE);
-    writeFileSync(etcPasswd, etcPasswdContents);
-
-    const etcGroup = join(userCredentialsTempPath, 'group');
-    const [etcGroupContents, group] = etcGroupWithCurrentGroup(AGENT_IMAGE);
-    writeFileSync(etcGroup, etcGroupContents);
-
     // Build Docker run command with mounts
-    const dockerArgs = [
-      'run',
-      '--name',
-      containerName,
-      '-d',
-      '-v',
-      `${etcPasswd}:/etc/passwd:Z,ro`,
-      '-v',
-      `${etcGroup}:/etc/group,Z:ro`,
-    ];
+    const dockerArgs = ['run', '--name', containerName, '-d'];
 
     const userInfo_ = userInfo();
-    dockerArgs.push('--user', `${userInfo_.uid}:${userInfo_.gid}`);
+
+    if (userInfo_.uid !== -1 && userInfo_.gid !== -1) {
+      const userCredentialsTempPath = mkdtempSync(join(tmpdir(), 'rover-'));
+      const etcPasswd = join(userCredentialsTempPath, 'passwd');
+      const [etcPasswdContents, username] =
+        etcPasswdWithCurrentUser(AGENT_IMAGE);
+      writeFileSync(etcPasswd, etcPasswdContents);
+
+      const etcGroup = join(userCredentialsTempPath, 'group');
+      const [etcGroupContents, group] = etcGroupWithCurrentGroup(AGENT_IMAGE);
+      writeFileSync(etcGroup, etcGroupContents);
+
+      dockerArgs.push(
+        '-v',
+        `${etcPasswd}:/etc/passwd:Z,ro`,
+        '-v',
+        `${etcGroup}:/etc/group,Z:ro`,
+        '--user',
+        `${userInfo_.uid}:${userInfo_.gid}`
+      );
+    }
 
     dockerArgs.push(
       '-v',
