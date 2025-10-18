@@ -2,6 +2,7 @@ import ClaudeAI from './claude.js';
 import CodexAI from './codex.js';
 import GeminiAI from './gemini.js';
 import QwenAI from './qwen.js';
+import CopilotAI from './copilot.js';
 import type { IPromptTask } from '../prompts/index.js';
 import { AI_AGENT, UserSettings } from '../config.js';
 
@@ -80,6 +81,8 @@ export const getAIAgentTool = (agent: string): AIAgentTool => {
       return new GeminiAI();
     case 'qwen':
       return new QwenAI();
+    case 'copilot':
+      return new CopilotAI();
     default:
       throw new Error(`Unknown AI agent: ${agent}`);
   }

@@ -80,6 +80,7 @@ program
       'codex',
       'gemini',
       'qwen',
+      'copilot',
     ])
   )
   .option(

@@ -28,3 +28,5 @@ export const checkQwen = async (): Promise<boolean> =>
   await checkCommand('qwen');
 export const checkGemini = async (): Promise<boolean> =>
   await checkCommand('gemini');
+export const checkCopilot = async (): Promise<boolean> =>
+  await checkCommand('copilot');

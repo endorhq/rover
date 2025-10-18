@@ -255,6 +255,7 @@ export enum AI_AGENT {
   Codex = 'codex',
   Gemini = 'gemini',
   Qwen = 'qwen',
+  Copilot = 'copilot',
 }
 
 const CURRENT_USER_SCHEMA_VERSION = '1.0';
