@@ -62,7 +62,7 @@ Example of correct response format:
         }
 
     // Use standalone copilot with -p flag for non-interactive mode
-    const copilotArgs = ['-p', finalPrompt, '--allow-all-tools'];
+    const copilotArgs = ['-p', finalPrompt, '--allow-all-paths', '--allow-all-tools'];
 
     try {
       const { stdout } = await launch(this.AGENT_BIN, copilotArgs);
