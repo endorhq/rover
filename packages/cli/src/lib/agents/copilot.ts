@@ -55,7 +55,7 @@ class CopilotAI implements AIAgentTool {
           // We need to be very explicit about JSON-only responses
           finalPrompt = `${prompt}
 
-CRITICAL: You MUST respond with ONLY a valid JSON object. No conversational text, no explanations, no markdown, no bullet points, no greetings. Start your response with { and end with }. Nothing else.
+CRITICAL: You MUST respond with ONLY a valid JSON object. No conversational text, no explanations, no markdown, no bullet points, no greetings. Nothing else.
 
 Example of correct response format:
 {"title": "Example title", "description": "Example description"}`;
