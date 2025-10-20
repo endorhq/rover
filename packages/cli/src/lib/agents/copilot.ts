@@ -216,7 +216,7 @@ Example of correct response format:
 
     // Mount GitHub CLI config directory if it exists
     if (existsSync(ghConfigDir)) {
-      dockerMounts.push(`-v`, `${ghConfigDir}:/.config/gh:Z,ro`);
+      dockerMounts.push(`-v`, `${ghConfigDir}:/.copilot-cli:Z,ro`);
     }
 
     return dockerMounts;
