@@ -177,7 +177,7 @@ export function createProgram(
     )
     .option(
       '-a, --agent <agent>',
-      'AI agent to use (claude, codex, gemini, qwen)'
+      'AI agent to use (claude, codex, copilot, gemini, qwen)'
     )
     .option('--json', 'Output the result in JSON format')
     .option('--debug', 'Show debug information like running commands')

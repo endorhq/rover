@@ -29,11 +29,11 @@ export function createAgent(
       return new CopilotAgent(version);
     default:
       throw new Error(
-        `Unknown agent: ${agentName}. Supported agents: claude, codex, gemini, qwen, copilot`
+        `Unknown agent: ${agentName}. Supported agents: claude, codex, copilot, gemini, qwen`
       );
   }
 }
 
 export function getSupportedAgents(): string[] {
-  return ['claude', 'codex', 'gemini', 'qwen', 'copilot'];
+  return ['claude', 'codex', 'copilot', 'gemini', 'qwen'];
 }

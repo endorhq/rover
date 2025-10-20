@@ -581,7 +581,7 @@ export const taskCommand = async (
     } else if (agentLower === 'copilot') {
       selectedAiAgent = AI_AGENT.Copilot;
     } else {
-      jsonOutput.error = `Invalid agent: ${agent}. Valid options are: claude, codex, gemini, qwen, copilot`;
+      jsonOutput.error = `Invalid agent: ${agent}. Valid options are: claude, codex, copilot, gemini, qwen`;
       exitWithError(jsonOutput, json);
       return;
     }
