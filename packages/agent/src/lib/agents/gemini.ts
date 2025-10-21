@@ -30,7 +30,7 @@ export class GeminiAgent extends BaseAgent {
       {
         path: '/.gemini/user_id',
         description: 'Gemini user ID',
-        required: true,
+        required: false,
       },
     ];
   }
