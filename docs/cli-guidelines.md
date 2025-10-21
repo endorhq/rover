@@ -130,7 +130,7 @@ A list enumerates related elements. Here, we should distinguish between three di
   ○ 12:31 | Starting the rover-task-44-1 container
   ```
 
-  The color of the circle depends on the step status. If it's ongoing, use yellow. If it's done, green for success and red for failure.
+  The color of the circle depends on the step status. If it's ongoing, use cyan. If it's done, green for success and red for failure.
 
   Processes will be **located at the end of the command output when possible**.
 
@@ -142,6 +142,24 @@ For file content, we will show the content as a box. The title will be filename.
 ┌ context.md ─────┐
 │ foo bar foo bar │
 └─────────────────┘
+```
+
+### Tips
+
+Tips help users to understand the next steps or related actions in the current context. To be helpful, we need to limit them as a long list will be ignored.
+
+The conventions for tips are:
+
+1. When there's a clear next step, just show one tip
+2. Avoid showing more than two tips
+3. Tip messages must be concise
+4. If the alternative actions are not clearly relevant, skip the tips
+5. Show tips always at the bottom
+6. Use the following format for tips. Use cyan for the "Tip:" text and gray for the rest
+
+```
+
+Tip: run `rover logs 12` to check logs
 ```
 
 ## Avoid always
