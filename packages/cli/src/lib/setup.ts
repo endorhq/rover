@@ -2,7 +2,7 @@ import { writeFileSync, chmodSync, mkdirSync, cpSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { TaskDescription } from './description.js';
 import { findProjectRoot, launchSync, VERBOSE } from 'rover-common';
-import workflowDistPath from './workflows/swe.yml';
+import sweWorkflow from './workflows/swe.yml';
 import entrypointScript from './entrypoint.sh';
 import pupa from 'pupa';
 import { fileURLToPath } from 'node:url';
@@ -132,7 +132,7 @@ export class SetupBuilder {
     // Write script to file
     const workflowTaskPath = join(this.taskDir, 'workflow.yml');
     const distDir = dirname(fileURLToPath(import.meta.url));
-    const workflowPath = join(distDir, workflowDistPath);
+    const workflowPath = join(distDir, sweWorkflow);
     cpSync(workflowPath, workflowTaskPath);
 
     return workflowTaskPath;

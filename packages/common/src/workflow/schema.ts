@@ -5,16 +5,12 @@
 import { z } from 'zod';
 
 // Input schemas
-export const WorkflowInputTypeSchema = z.enum([
-  'string',
-  'number',
-  'boolean',
-  'file',
-]);
+export const WorkflowInputTypeSchema = z.enum(['string', 'number', 'boolean']);
 
 export const WorkflowInputSchema = z.object({
   name: z.string(),
   description: z.string(),
+  label: z.string().optional(),
   type: WorkflowInputTypeSchema,
   required: z.boolean(),
 });

@@ -166,6 +166,11 @@ export function createProgram(
       '--from-github <issue>',
       'Fetch task description from a GitHub issue number'
     )
+    .option(
+      '--workflow, -w <name>',
+      'Use a specific workflow to complete this task. The options are: swe, bug-finder.',
+      'swe'
+    )
     .option('-y, --yes', 'Skip all confirmations and run non-interactively')
     .option(
       '-s, --source-branch <branch>',

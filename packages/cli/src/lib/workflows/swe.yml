@@ -6,12 +6,9 @@ name: 'swe'
 description: 'Complete software engineering workflow with adaptive complexity handling'
 
 inputs:
-  - name: title
-    description: 'Task title'
-    type: string
-    required: true
   - name: description
     description: 'Detailed task description'
+    label: 'Describe the task you want to complete'
     type: string
     required: true
 

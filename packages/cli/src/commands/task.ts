@@ -1,14 +1,9 @@
 import enquirer from 'enquirer';
+import type PromptOptions from 'enquirer';
 import colors from 'ansi-colors';
 import yoctoSpinner from 'yocto-spinner';
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  writeFileSync,
-  readFileSync,
-} from 'node:fs';
-import { join, resolve } from 'node:path';
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { getNextTaskId } from '../utils/task-id.js';
 import { homedir, tmpdir, userInfo } from 'node:os';
 import { getAIAgentTool, getUserAIAgent } from '../lib/agents/index.js';
@@ -18,7 +13,7 @@ import { SetupBuilder } from '../lib/setup.js';
 import { AI_AGENT, ProjectConfig } from '../lib/config.js';
 import { IterationConfig } from '../lib/iteration.js';
 import { generateBranchName } from '../utils/branch-name.js';
-import { findProjectRoot, launch, launchSync } from 'rover-common';
+import { findProjectRoot, launchSync } from 'rover-common';
 import { showRoverBanner, showRoverChat, showTips } from '../utils/display.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { NewTaskProvider } from 'rover-telemetry';
@@ -32,9 +27,13 @@ import {
   parseCustomEnvironmentVariables,
   loadEnvsFile,
 } from '../utils/env-variables.js';
+import { loadWorkflowByName } from '../lib/workflow.js';
 
 const { prompt } = enquirer;
+
+// Default values
 const AGENT_IMAGE = 'ghcr.io/endorhq/rover/node:v1.3.0';
+const DEFAULT_WORKFLOW = 'swe';
 
 type validationResult = {
   error: string;
@@ -44,10 +43,7 @@ type validationResult = {
 /**
  * Command validations.
  */
-const validations = (
-  selectedAiAgent?: string,
-  isJsonMode?: boolean
-): validationResult => {
+const validations = (selectedAiAgent?: string): validationResult => {
   // Check AI agent credentials based on selected agent
   if (selectedAiAgent === 'claude') {
     const claudeFile = join(homedir(), '.claude.json');
@@ -66,10 +62,10 @@ const validations = (
         error: 'Codex credentials not found',
         tips: [
           'Run ' +
-            colors.cyan('codex') +
-            ' first to set up credentials, using the' +
-            colors.cyan('/auth') +
-            ' command',
+          colors.cyan('codex') +
+          ' first to set up credentials, using the' +
+          colors.cyan('/auth') +
+          ' command',
         ],
       };
     }
@@ -496,8 +492,8 @@ export const startDockerExecution = async (
         console.log(colors.gray('  Resetting the task status to "New"'));
         console.log(
           colors.gray('  Use ') +
-            colors.cyan(`rover restart ${taskId}`) +
-            colors.gray(' to retry execution')
+          colors.cyan(`rover restart ${taskId}`) +
+          colors.gray(' to retry execution')
         );
       }
 
@@ -526,8 +522,8 @@ export const startDockerExecution = async (
       console.log(colors.yellow('⚠ Task reset to NEW status'));
       console.log(
         colors.gray('  Use ') +
-          colors.cyan(`rover restart ${taskId}`) +
-          colors.gray(' to retry execution')
+        colors.cyan(`rover restart ${taskId}`) +
+        colors.gray(' to retry execution')
       );
     }
 
@@ -552,19 +548,25 @@ interface TaskTaskOutput extends CLIJsonOutput {
 }
 
 /**
+ * Command options
+ */
+interface TaskOptions {
+  workflow?: string;
+  fromGithub?: string;
+  yes?: boolean;
+  sourceBranch?: string;
+  targetBranch?: string;
+  agent?: string;
+  json?: boolean;
+  debug?: boolean;
+}
+
+/**
  * Task commands
  */
 export const taskCommand = async (
   initPrompt?: string,
-  options: {
-    fromGithub?: string;
-    yes?: boolean;
-    sourceBranch?: string;
-    targetBranch?: string;
-    agent?: string;
-    json?: boolean;
-    debug?: boolean;
-  } = {}
+  options: TaskOptions = {}
 ) => {
   const telemetry = getTelemetry();
   // Extract options
@@ -616,7 +618,7 @@ export const taskCommand = async (
     }
   }
 
-  const valid = validations(selectedAiAgent, json);
+  const valid = validations(selectedAiAgent);
 
   if (valid != null) {
     jsonOutput.error = valid.error;
@@ -634,9 +636,31 @@ export const taskCommand = async (
     ]);
   }
 
+  // Initial values
   let description = initPrompt?.trim() || '';
-  let skipExpansion = false;
   let taskData: IPromptTask | null = null;
+
+  const workflowName = options.workflow || DEFAULT_WORKFLOW;
+  let workflow;
+
+  try {
+    workflow = loadWorkflowByName(workflowName);
+  } catch (err) {
+    jsonOutput.error = `There was an error loading the '${workflowName}' workflow: ${err}`;
+    console.log(err);
+    exitWithError(jsonOutput, json);
+    return;
+  }
+
+  if (workflow == null) {
+    jsonOutput.error = `The workflow ${workflow} does not exist`;
+    exitWithError(jsonOutput, json);
+    return;
+  }
+
+  // Get the required inputs
+  const inputs = workflow.inputs;
+  const inputsData: Map<string, string> = new Map();
 
   const git = new Git();
 
@@ -647,7 +671,6 @@ export const taskCommand = async (
       const issueData = await github.fetchIssue(fromGithub, git.remoteUrl());
       if (issueData) {
         description = `${issueData.title}\n\n${issueData.body}`;
-        skipExpansion = true;
 
         if (!issueData.body || issueData.body.length == 0) {
           jsonOutput.error =
@@ -668,8 +691,8 @@ export const taskCommand = async (
           );
           console.log(
             colors.gray('└── Body: ') +
-              issueData.body.substring(0, 100) +
-              (issueData.body.length > 100 ? '...' : '')
+            issueData.body.substring(0, 100) +
+            (issueData.body.length > 100 ? '...' : '')
           );
         }
       } else {
@@ -721,13 +744,13 @@ export const taskCommand = async (
         if (initialPrompt.length > 0) {
           console.log(
             colors.gray(`  Example: `) +
-              colors.cyan(`rover task --source-branch main "${initialPrompt}"
+            colors.cyan(`rover task --source-branch main "${initialPrompt}"
 `)
           );
         } else {
           console.log(
             colors.gray(`  Example: `) +
-              colors.cyan(`rover task --source-branch main
+            colors.cyan(`rover task --source-branch main
 `)
           );
         }
@@ -735,53 +758,74 @@ export const taskCommand = async (
     }
   }
 
-  // Display source branch
+  // Display extra information
   if (!json) {
+    console.log(colors.gray(`Source branch: `) + colors.cyan(`${baseBranch}`));
     console.log(
-      colors.gray(`Source branch: `) + colors.cyan(`${baseBranch}\n`)
+      colors.cyan.bold(`\n${workflowName}`) + colors.bold(` Workflow: `)
     );
   }
 
-  // Get initial task description - try stdin first if no description provided
-  if (
-    !fromGithub &&
-    (typeof description !== 'string' || description.length == 0)
-  ) {
-    // Try to read from stdin first
+  // We need to process the workflow inputs. We will ask users to provide this
+  // information or load it as a JSON from the stdin.
+  if (inputs && inputs.length > 0) {
     if (stdinIsAvailable()) {
       const stdinInput = await readFromStdin();
       if (stdinInput) {
-        description = stdinInput;
-        if (!json) {
-          console.log(colors.gray('✓ Read task description from stdin'));
+        try {
+          const parsed = JSON.parse(stdinInput);
+
+          for (const key in parsed) {
+            inputsData.set(key, parsed[key]);
+          }
+
+          if (!json) {
+            console.log(colors.gray('✓ Read task description from stdin'));
+          }
+        } catch (err) {
+          jsonOutput.error = 'The stdin input data is not a valid json.';
+          exitWithError(jsonOutput, json);
+          return;
         }
       }
-    }
+    } else if (fromGithub != null) {
+      // TODO: Extract the data from the task to complete the inputs
+    } else {
+      const questions = [];
+      // Build the questions and pass them to enquirer
+      for (const key in inputs) {
+        const input = inputs[key];
 
-    // If still no description
-    if (typeof description !== 'string' || description.length == 0) {
-      if (yes) {
-        jsonOutput.error =
-          'Task description is required in non-interactive mode';
-        exitWithError(jsonOutput, json, {
-          tips: [
-            'Provide a description as an argument using' +
-              colors.cyan(' rover task "your task description" --yes'),
-          ],
-        });
-        return;
+        let enquirerType;
+
+        switch (input.type) {
+          case 'string':
+          case 'number':
+            enquirerType = 'input';
+            break;
+          case 'boolean':
+            enquirerType = 'confirm';
+            break;
+          default:
+            enquirerType = 'input';
+            break;
+        }
+
+        const question = {
+          type: enquirerType,
+          name: input.name,
+          message: input.label || input.description,
+        };
+
+        questions.push(question);
       }
 
       try {
-        const { input } = await prompt<{ input: string }>({
-          type: 'input',
-          name: 'input',
-          message: 'Describe the task you want to assign:',
-          validate: value =>
-            value.trim().length > 0 || 'Please provide a description',
-        });
-
-        description = input;
+        const response: Record<string, string | number> =
+          await prompt(questions);
+        for (const key in response) {
+          inputsData.set(key, String(response[key]));
+        }
       } catch (err) {
         jsonOutput.error = 'Task creation cancelled';
         exitWithWarn('Task creation cancelled', jsonOutput, json, {
@@ -789,122 +833,19 @@ export const taskCommand = async (
         });
       }
     }
-  }
 
-  let satisfied = skipExpansion;
-
-  while (!satisfied) {
-    // Expand task with selected AI provider
-    const spinner = !json
-      ? yoctoSpinner({
-          text: `Expanding task description with ${selectedAiAgent.charAt(0).toUpperCase() + selectedAiAgent.slice(1)}...`,
-        }).start()
-      : null;
-
-    try {
-      const aiAgent = getAIAgentTool(selectedAiAgent);
-      const expanded = await aiAgent.expandTask(
-        taskData ? `${taskData.title}: ${taskData.description}` : description,
-        findProjectRoot()
-      );
-
-      if (expanded) {
-        if (spinner) spinner.success('Done!');
-        taskData = expanded;
-
-        // Skip confirmation if using GitHub issue
-        if (skipExpansion || yes) {
-          satisfied = true;
-        } else {
-          // Display the expanded task
-          if (!json) {
-            console.log('\n' + colors.bold('Task Details:'));
-            console.log(
-              colors.gray('├── Title: ') + colors.cyan(taskData.title)
-            );
-            console.log(
-              colors.gray('└── Description: ') + taskData.description
-            );
-          }
-
-          // Ask for confirmation
-          let confirmValue = 'cancel';
-          try {
-            const { confirm } = await prompt<{ confirm: string }>({
-              type: 'select',
-              name: 'confirm',
-              message: '\nAre you satisfied with this task?',
-              choices: [
-                { name: 'yes', message: 'Yes, looks good!' },
-                { name: 'refine', message: 'No, I want to add more details' },
-                { name: 'cancel', message: 'Cancel task creation' },
-              ],
-            });
-            confirmValue = confirm;
-          } catch (err) {
-            // Just cancel it
-            confirmValue = 'cancel';
-          }
-
-          if (confirmValue === 'yes') {
-            satisfied = true;
-          } else if (confirmValue === 'refine') {
-            // Get additional details
-            try {
-              const { additionalInfo } = await prompt<{
-                additionalInfo: string;
-              }>({
-                type: 'input',
-                name: 'additionalInfo',
-                message: 'Provide additional instructions:',
-                validate: value =>
-                  value.trim().length > 0 ||
-                  'Please provide additional information',
-              });
-
-              // Update the description for next iteration
-              taskData.description = `${taskData.description}. Additional instructions: ${additionalInfo}`;
-            } catch (err) {
-              jsonOutput.error = 'Task creation cancelled';
-              exitWithWarn('Task creation cancelled', jsonOutput, json, {
-                exitCode: 1,
-              });
-              return;
-            }
-          } else {
-            // Cancel
-            jsonOutput.error = 'Task creation cancelled';
-            exitWithWarn('Task creation cancelled', jsonOutput, json, {
-              exitCode: 1,
-            });
-            return;
-          }
-        }
-      } else {
-        if (spinner) spinner.error('Failed to expand task');
-        if (!json) {
-          console.log(
-            colors.yellow(
-              `\n⚠ ${selectedAiAgent.charAt(0).toUpperCase() + selectedAiAgent.slice(1)} AI is not available. Creating task with original description.`
-            )
-          );
-        }
-        taskData = {
-          title: description.split(' ').slice(0, 5).join(' '),
-          description: description,
-        };
-        satisfied = true;
+    // Validate
+    const missing: string[] = [];
+    inputs.forEach(input => {
+      if (input.required && !inputsData.has(input.name)) {
+        missing.push(input.name);
       }
-    } catch (error) {
-      if (spinner)
-        spinner.error('Failed to expand task. Continuing with original values');
+    });
 
-      // Fallback to manual task creation
-      taskData = {
-        title: description.split(' ').slice(0, 5).join(' '),
-        description: description,
-      };
-      satisfied = true;
+    if (missing.length > 0) {
+      jsonOutput.error = `The workflow requires the following missing properties: ${missing.join(', ')}`;
+      exitWithError(jsonOutput, json);
+      return;
     }
   }
 
@@ -1030,11 +971,8 @@ export const taskCommand = async (
       tips: [
         'Use ' + colors.cyan('rover list') + ' to check the list of tasks',
         'Use ' +
-          colors.cyan(`rover logs -f ${task.id}`) +
-          ' to watch the task logs',
-        'Use ' +
-          colors.cyan(`rover inspect ${task.id}`) +
-          ' to check the task status',
+        colors.cyan(`rover logs -f ${task.id}`) +
+        ' to watch the task logs',
       ],
     });
   } else {
