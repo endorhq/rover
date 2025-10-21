@@ -42,10 +42,10 @@ To define commands, we clearly distinguish between two levels:
 The naming conventions for any command are:
 
 - Main commands and subcommands must be short
-- Main commands refer always to the concept of "task", which it's the top resource
-- Subcommands must be nouns that represents the resource (config, workflows, etc.). Distinguish between singular and plural depending on the resource
-- For main commands and subcommands, prefer to use verbs over nouns.
-- Commands must be consistent across resources. If we want to change it, we should deprecate all at once.
+- Main commands refer always to the concept of "task", which is the top resource
+- Subcommands must be nouns that represent resources (config, workflows, etc.). Distinguish between singular and plural depending on the resource
+- For main commands and subcommands, prefer to use verbs over nouns
+- Commands must be consistent across resources. If we want to rename or delete a command, we should deprecate all at once
   - `new`
   - `list`
   - `inspect`
@@ -65,7 +65,7 @@ Arguments and options expand the configuration for each command. They should be 
 - Use arguments for the main command input (`<task id>`)
 - Use arguments always for mandatory fields (`<task id>`)
 - Use optional arguments at the end for information that might be asked later or it's not required to run a certain command (`[task description]`)
-- Use options for any input that change the default command behavior (`--yes`)
+- Use options for any input that change the default command behavior (`--yes`). Give a short option as well as a long one when possible (no clashes exist.)
 - Use descriptive names for options and add an alternative shorter version (`--source-branch | -s`)
 - Place global options at the CLI level (`--debug`)
 - Use a consistent option and argument names across all commands (`task id`)
@@ -88,7 +88,7 @@ The header is the section that appears right before any command output. Here, we
 
 ### Title
 
-Titles highlights a separate section in the CLI output. It uses a bold cyan text with a line break just before.
+Titles highlights a separate section in the CLI output. It uses a bold cyan text with a line break right before.
 
 ```
 
@@ -111,7 +111,7 @@ A list enumerates related elements. Here, we should distinguish between three di
     We show it using the | decorator on the property name.
   ```
 
-- Independent elements: a list of elements that represents independent entities. For example, a list of files. Here, we use the listing `├──` and `└──` symbols.
+- Independent elements: a list of elements that represent independent entities. For example, a list of files. Here, we use the listing `├──` and `└──` symbols.
 
   ```
   Iteration Files 1/1
@@ -149,3 +149,4 @@ For file content, we will show the content as a box. The title will be filename.
 These are mandatory rules. Not following them will cause a really bad UX for our users.
 
 - Do not set the color for regular text. Avoid using `color.white` helpers as they will look bad on light terminals.
+- Do not overuse emojis
