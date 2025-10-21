@@ -89,7 +89,7 @@ export const shellCommand = async (
           '--name',
           containerName,
           '-v',
-          `${task.worktreePath}:/workspace:rw`,
+          `${task.worktreePath}:/workspace:Z,rw`,
           '-w',
           '/workspace',
           'node:24-alpine',
