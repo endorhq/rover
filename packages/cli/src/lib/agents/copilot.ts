@@ -66,59 +66,7 @@ Example of correct response format:
 
     try {
       const { stdout } = await launch(this.AGENT_BIN, copilotArgs);
-
-          const result = stdout?.toString().trim() || '';
-
-          if (json) {
-            try {
-              // Clean the response to extract JSON from various formats
-              let cleanedResult = result;
-              
-              // Remove bullet points and other formatting characters from the start
-              cleanedResult = cleanedResult.replace(/^[●•*\-+]\s*/, '');
-              
-              // Remove common conversational prefixes
-              cleanedResult = cleanedResult.replace(/^(I understand|Here's|Here is|The JSON|Response:|Answer:)\s*/i, '');
-              
-              // Find JSON object in markdown code blocks (```json ... ```)
-              const jsonCodeBlockMatch = cleanedResult.match(/```json\s*([\s\S]*?)\s*```/);
-              if (jsonCodeBlockMatch) {
-                cleanedResult = jsonCodeBlockMatch[1].trim();
-              } else {
-                // Look for JSON object directly - find the first { and last }
-                const firstBrace = cleanedResult.indexOf('{');
-                const lastBrace = cleanedResult.lastIndexOf('}');
-                if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-                  cleanedResult = cleanedResult.substring(firstBrace, lastBrace + 1);
-                }
-              }
-              
-              // Clean up whitespace and fix JSON formatting issues
-              cleanedResult = cleanedResult.trim();
-              
-              // Fix common JSON formatting issues from Copilot's multiline responses
-              // First, handle newlines within JSON strings properly
-              // We need to be careful to only escape newlines that are inside string values
-              cleanedResult = cleanedResult.replace(/\n\s*/g, '\\n');
-              
-              // Remove any remaining control characters that could break JSON parsing
-              // Keep only printable ASCII characters and essential JSON characters
-              cleanedResult = cleanedResult.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
-              
-              // Additional cleanup for common formatting issues
-              cleanedResult = cleanedResult.replace(/\s+/g, ' '); // Normalize whitespace
-              
-              const parsed = JSON.parse(cleanedResult);
-              return JSON.stringify(parsed);
-            } catch (jsonErr) {
-              // If JSON parsing fails, log the issue and return the raw result for parseJsonResponse to handle
-              console.error('Copilot JSON parsing failed:', jsonErr.message);
-              console.error('Cleaned result that failed to parse:', JSON.stringify(cleanedResult));
-              return result;
-            }
-          } else {
-            return result;
-          }
+      return stdout?.toString().trim() || '';
     } catch (error) {
       throw new InvokeAIAgentError(this.AGENT_BIN, error);
     }
