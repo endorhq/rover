@@ -93,6 +93,7 @@ Titles highlights a separate section in the CLI output. It uses a bold cyan text
 ```
 
 Title
+-----
 ```
 
 To keep the output clear, we should reduce the number of sections in a single output. Be concise and clear.
