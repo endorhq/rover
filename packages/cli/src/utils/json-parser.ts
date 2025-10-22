@@ -25,13 +25,9 @@ export function parseJsonResponse<T>(response: string): T {
   cleanedResponse = cleanedResponse.replace(/^```json\s*/i, '');
   cleanedResponse = cleanedResponse.replace(/^```\s*/i, '');
   cleanedResponse = cleanedResponse.replace(/\s*```$/i, '');
-
-  // Remove bullet points and other common formatting characters that Copilot adds
-  cleanedResponse = cleanedResponse.replace(/^[●•▪▫‣⁃]\s*/, '');
-  cleanedResponse = cleanedResponse.replace(/^[-*+]\s*/, '');
   
   // Remove any leading/trailing whitespace and newlines
-  cleanedResponse = cleanedResponse.trim();
+   cleanedResponse = cleanedResponse.trim();
   
   // Handle newlines within JSON strings by replacing them with spaces
   cleanedResponse = cleanedResponse.replace(/\n\s*/g, ' ');
