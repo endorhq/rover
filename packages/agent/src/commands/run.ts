@@ -1,6 +1,6 @@
 import { CommandOutput } from '../cli.js';
 import colors from 'ansi-colors';
-import { AgentWorkflow } from '../workflow.js';
+import { AgentWorkflow } from '../lib/workflow.js';
 import { parseCollectOptions } from '../lib/options.js';
 import { Runner } from '../lib/runner.js';
 import { IterationStatus } from 'rover-common';

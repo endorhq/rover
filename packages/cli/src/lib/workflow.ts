@@ -1,5 +1,5 @@
 // Utilities to load and find workflows.
-import { loadWorkflow, type Workflow } from 'rover-common';
+import { loadWorkflow, type Workflow } from '@endorhq/agent';
 import sweWorkflow from './workflows/swe.yml';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';

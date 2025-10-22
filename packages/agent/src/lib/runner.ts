@@ -13,8 +13,8 @@ import {
   renameSync,
   rmSync,
 } from 'node:fs';
-import { AgentStep } from '../schema.js';
-import { AgentWorkflow } from '../workflow.js';
+import type { AgentStep, WorkflowOutputType } from './workflow/types.js';
+import { AgentWorkflow } from './workflow.js';
 import {
   parseAgentError,
   isWaitingForAuthentication,
@@ -334,7 +334,8 @@ export class Runner {
       }
 
       // Extract string outputs from the response
-      const stringOutputs = this.step.outputs.filter(
+      const stepOutputs = this.step.outputs || [];
+      const stringOutputs = stepOutputs.filter(
         output => output.type === 'string'
       );
       if (stringOutputs.length > 0) {
@@ -346,9 +347,7 @@ export class Runner {
       }
 
       // Extract file outputs by reading created files
-      const fileOutputs = this.step.outputs.filter(
-        output => output.type === 'file'
-      );
+      const fileOutputs = stepOutputs.filter(output => output.type === 'file');
       if (fileOutputs.length > 0) {
         await this.extractFileOutputs(fileOutputs, outputs, outputDir);
       }
@@ -572,7 +571,7 @@ export class Runner {
    */
   private loadValueByType(
     value: string,
-    type: 'string' | 'file' | undefined,
+    type: WorkflowOutputType,
     warnings: string[]
   ): string {
     if (type === 'file') {
@@ -600,16 +599,15 @@ export class Runner {
    * Generate output instructions based on the step's expected outputs
    */
   private generateOutputInstructions(): string {
-    if (this.step.outputs.length === 0) {
+    const stepOutputs = this.step.outputs || [];
+    if (stepOutputs.length === 0) {
       return '';
     }
 
-    const stringOutputs = this.step.outputs.filter(
+    const stringOutputs = stepOutputs.filter(
       output => output.type === 'string'
     );
-    const fileOutputs = this.step.outputs.filter(
-      output => output.type === 'file'
-    );
+    const fileOutputs = stepOutputs.filter(output => output.type === 'file');
 
     let instructions = '\n\n## OUTPUT REQUIREMENTS\n\n';
     instructions +=
@@ -706,13 +704,10 @@ export class Runner {
         const inputValue = this.inputs.get(inputName);
 
         if (inputValue !== undefined) {
-          // Find the input definition to check its type
-          const inputDef = this.workflow.inputs.find(i => i.name === inputName);
-          replacementValue = this.loadValueByType(
-            inputValue,
-            inputDef?.type,
-            warnings
-          );
+          // Inputs are always string values (never files)
+          // The input type (string/number/boolean) just indicates validation,
+          // but in the context of template replacement, we use the string value directly
+          replacementValue = inputValue;
         } else {
           warnings.push(`Input '${inputName}' not provided`);
         }
@@ -731,12 +726,19 @@ export class Runner {
 
           // Find the step and output definition to check its type
           const stepDef = this.workflow.steps.find(s => s.id === stepId);
-          const outputDef = stepDef?.outputs.find(o => o.name === outputName);
-          replacementValue = this.loadValueByType(
-            outputValue,
-            outputDef?.type,
-            warnings
-          );
+          const outputDef = stepDef?.outputs?.find(o => o.name === outputName);
+
+          if (!outputDef) {
+            warnings.push(
+              `The output '${outputName}' definition in step '${stepId}' is missing`
+            );
+          } else {
+            replacementValue = this.loadValueByType(
+              outputValue,
+              outputDef.type,
+              warnings
+            );
+          }
         } else if (!stepOutputs) {
           warnings.push(`Step '${stepId}' has not been executed yet`);
         } else {

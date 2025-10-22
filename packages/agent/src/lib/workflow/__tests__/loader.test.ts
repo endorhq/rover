@@ -31,7 +31,7 @@ describe('Workflow loader', () => {
         'Complete software engineering workflow with adaptive complexity handling'
       );
       expect(workflow.inputs).toBeDefined();
-      expect(workflow.inputs?.length).toBe(2);
+      expect(workflow.inputs?.length).toBe(1); // Only 'description' input
       expect(workflow.outputs).toBeDefined();
       expect(workflow.outputs?.length).toBe(4);
       expect(workflow.steps).toBeDefined();

@@ -1,5 +1,4 @@
 import enquirer from 'enquirer';
-import type PromptOptions from 'enquirer';
 import colors from 'ansi-colors';
 import yoctoSpinner from 'yocto-spinner';
 import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
@@ -32,7 +31,7 @@ import { loadWorkflowByName } from '../lib/workflow.js';
 const { prompt } = enquirer;
 
 // Default values
-const AGENT_IMAGE = 'ghcr.io/endorhq/rover/node:v1.3.0';
+const AGENT_IMAGE = 'ghcr.io/endorhq/rover/node:v1.3.0-dev';
 const DEFAULT_WORKFLOW = 'swe';
 
 type validationResult = {
@@ -62,10 +61,10 @@ const validations = (selectedAiAgent?: string): validationResult => {
         error: 'Codex credentials not found',
         tips: [
           'Run ' +
-          colors.cyan('codex') +
-          ' first to set up credentials, using the' +
-          colors.cyan('/auth') +
-          ' command',
+            colors.cyan('codex') +
+            ' first to set up credentials, using the' +
+            colors.cyan('/auth') +
+            ' command',
         ],
       };
     }
@@ -492,8 +491,8 @@ export const startDockerExecution = async (
         console.log(colors.gray('  Resetting the task status to "New"'));
         console.log(
           colors.gray('  Use ') +
-          colors.cyan(`rover restart ${taskId}`) +
-          colors.gray(' to retry execution')
+            colors.cyan(`rover restart ${taskId}`) +
+            colors.gray(' to retry execution')
         );
       }
 
@@ -522,8 +521,8 @@ export const startDockerExecution = async (
       console.log(colors.yellow('⚠ Task reset to NEW status'));
       console.log(
         colors.gray('  Use ') +
-        colors.cyan(`rover restart ${taskId}`) +
-        colors.gray(' to retry execution')
+          colors.cyan(`rover restart ${taskId}`) +
+          colors.gray(' to retry execution')
       );
     }
 
@@ -691,8 +690,8 @@ export const taskCommand = async (
           );
           console.log(
             colors.gray('└── Body: ') +
-            issueData.body.substring(0, 100) +
-            (issueData.body.length > 100 ? '...' : '')
+              issueData.body.substring(0, 100) +
+              (issueData.body.length > 100 ? '...' : '')
           );
         }
       } else {
@@ -744,13 +743,13 @@ export const taskCommand = async (
         if (initialPrompt.length > 0) {
           console.log(
             colors.gray(`  Example: `) +
-            colors.cyan(`rover task --source-branch main "${initialPrompt}"
+              colors.cyan(`rover task --source-branch main "${initialPrompt}"
 `)
           );
         } else {
           console.log(
             colors.gray(`  Example: `) +
-            colors.cyan(`rover task --source-branch main
+              colors.cyan(`rover task --source-branch main
 `)
           );
         }
@@ -971,8 +970,8 @@ export const taskCommand = async (
       tips: [
         'Use ' + colors.cyan('rover list') + ' to check the list of tasks',
         'Use ' +
-        colors.cyan(`rover logs -f ${task.id}`) +
-        ' to watch the task logs',
+          colors.cyan(`rover logs -f ${task.id}`) +
+          ' to watch the task logs',
       ],
     });
   } else {

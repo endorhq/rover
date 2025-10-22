@@ -14,10 +14,6 @@ export {
   type SequentialStep,
   type CommandStep,
   isAgentStep,
-  isConditionalStep,
-  isParallelStep,
-  isSequentialStep,
-  isCommandStep,
 } from './types.js';
 
 export {
@@ -32,7 +28,6 @@ export {
   ParallelStepSchema,
   SequentialStepSchema,
   CommandStepSchema,
-  type WorkflowSchemaType,
 } from './schema.js';
 
 export {

@@ -4,14 +4,26 @@
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
+import { ZodError } from 'zod';
 import {
-  AgentWorkflowSchema,
+  CURRENT_WORKFLOW_SCHEMA_VERSION,
+  WorkflowSchema,
+} from './workflow/schema.js';
+import type {
+  Workflow,
   WorkflowInput,
   WorkflowOutput,
+  WorkflowStep,
   AgentStep,
-} from './schema.js';
-
-const CURRENT_WORKFLOW_SCHEMA_VERSION = '1.0';
+  WorkflowDefaults,
+  WorkflowConfig,
+  AgentTool,
+} from './workflow/types.js';
+import {
+  WorkflowLoadError,
+  WorkflowValidationError,
+} from './workflow/loader.js';
+import { isAgentStep } from './workflow/types.js';
 
 // Default step timeout in seconds
 const DEFAULT_STEP_TIMEOUT = 60 * 30; // 30 minutes
@@ -21,13 +33,26 @@ const DEFAULT_STEP_TIMEOUT = 60 * 30; // 30 minutes
  * Provides validation, loading, and execution preparation for YAML-based workflows.
  */
 export class AgentWorkflow {
-  private data: AgentWorkflowSchema;
+  private data: Workflow;
   filePath: string;
 
-  constructor(data: AgentWorkflowSchema, filePath: string) {
-    this.data = data;
-    this.filePath = filePath;
-    this.validate();
+  constructor(data: unknown, filePath: string) {
+    try {
+      // Validate data with Zod schema
+      this.data = WorkflowSchema.parse(data);
+      this.filePath = filePath;
+    } catch (error) {
+      if (error instanceof ZodError) {
+        const errorMessages = error.issues
+          .map(err => `  - ${err.path.join('.')}: ${err.message}`)
+          .join('\n');
+        throw new WorkflowValidationError(
+          `Workflow validation failed:\n${errorMessages}`,
+          error
+        );
+      }
+      throw error;
+    }
   }
 
   /**
@@ -39,17 +64,17 @@ export class AgentWorkflow {
     description: string,
     inputs: WorkflowInput[] = [],
     outputs: WorkflowOutput[] = [],
-    steps: AgentStep[] = []
+    steps: WorkflowStep[] = []
   ): AgentWorkflow {
-    const schema: AgentWorkflowSchema = {
+    const workflowData = {
       version: CURRENT_WORKFLOW_SCHEMA_VERSION,
       name,
       description,
       inputs,
       outputs,
       defaults: {
-        tool: 'claude',
-        model: 'claude-3-sonnet',
+        tool: 'claude' as AgentTool,
+        model: 'claude-4-sonnet',
       },
       config: {
         timeout: 3600, // 1 hour default
@@ -58,7 +83,7 @@ export class AgentWorkflow {
       steps,
     };
 
-    const instance = new AgentWorkflow(schema, filePath);
+    const instance = new AgentWorkflow(workflowData, filePath);
     instance.save();
     return instance;
   }
@@ -68,64 +93,61 @@ export class AgentWorkflow {
    */
   static load(filePath: string): AgentWorkflow {
     if (!existsSync(filePath)) {
-      throw new Error(`Workflow configuration not found at ${filePath}`);
+      throw new WorkflowLoadError(
+        `Workflow configuration not found at ${filePath}`
+      );
     }
 
     try {
       const rawData = readFileSync(filePath, 'utf8');
-      const parsedData = parseYaml(rawData) as AgentWorkflowSchema;
+      const parsedData = parseYaml(rawData);
+      const originalVersion = (parsedData as { version?: string }).version;
 
-      // Migrate if necessary
+      // Migrate if necessary (returns validated Workflow)
       const migratedData = AgentWorkflow.migrate(parsedData);
 
+      // Constructor validates with Zod (safe even though migrate already validated)
       const instance = new AgentWorkflow(migratedData, filePath);
 
       // If migration occurred, save the updated data
-      if (migratedData.version !== parsedData.version) {
+      if (migratedData.version !== originalVersion) {
         instance.save();
       }
 
       return instance;
     } catch (error) {
-      if (error instanceof Error) {
-        throw new Error(`Failed to load workflow config: ${error.message}`);
+      // Re-throw validation errors as-is
+      if (error instanceof WorkflowValidationError) {
+        throw error;
       }
-      throw new Error(`Failed to load workflow config: ${error}`);
+      if (error instanceof Error) {
+        throw new WorkflowLoadError(
+          `Failed to load workflow config: ${error.message}`,
+          error
+        );
+      }
+      throw new WorkflowLoadError(`Failed to load workflow config: ${error}`);
     }
   }
 
   /**
    * Migrate old workflow schema to current version
+   * Returns validated Workflow after migration
    */
-  private static migrate(data: any): AgentWorkflowSchema {
-    // If already current version, return as-is
+  private static migrate(data: any): Workflow {
+    // If already current version, validate and return
     if (data.version === CURRENT_WORKFLOW_SCHEMA_VERSION) {
-      return data as AgentWorkflowSchema;
+      return WorkflowSchema.parse(data);
     }
 
-    // Add migration logic here as schemas evolve
-    // For now, just ensure required fields exist
+    // Migrate to current version
     const migrated = { ...data };
 
-    if (!migrated.version) {
-      migrated.version = CURRENT_WORKFLOW_SCHEMA_VERSION;
-    }
+    // Always update version to current when migrating
+    migrated.version = CURRENT_WORKFLOW_SCHEMA_VERSION;
 
-    if (!migrated.defaults) {
-      migrated.defaults = {
-        tool: 'claude',
-        model: 'claude-3-sonnet',
-      };
-    }
-
-    if (!migrated.config) {
-      migrated.config = {
-        timeout: 3600,
-        continueOnError: false,
-      };
-    }
-
-    return migrated as AgentWorkflowSchema;
+    // Validate with Zod and return typed result
+    return WorkflowSchema.parse(migrated);
   }
 
   /**
@@ -133,7 +155,7 @@ export class AgentWorkflow {
    */
   save(): void {
     try {
-      this.validate();
+      // Data is already validated in constructor, no need to revalidate
       const yamlContent = stringifyYaml(this.data, {
         indent: 2,
         lineWidth: 80,
@@ -142,149 +164,60 @@ export class AgentWorkflow {
       writeFileSync(this.filePath, yamlContent, 'utf8');
     } catch (error) {
       if (error instanceof Error) {
-        throw new Error(`Failed to save workflow config: ${error.message}`);
+        throw new WorkflowLoadError(
+          `Failed to save workflow config: ${error.message}`,
+          error
+        );
       }
-      throw new Error(`Failed to save workflow config: ${error}`);
-    }
-  }
-
-  /**
-   * Validate the workflow configuration
-   */
-  private validate(): void {
-    const errors: string[] = [];
-
-    // Required fields
-    if (typeof this.data.version !== 'string') {
-      errors.push('version is required');
-    }
-    if (typeof this.data.name !== 'string' || !this.data.name) {
-      errors.push('name is required');
-    }
-    if (typeof this.data.description !== 'string' || !this.data.description) {
-      errors.push('description is required');
-    }
-    if (!Array.isArray(this.data.inputs)) {
-      errors.push('inputs must be an array');
-    }
-    if (!Array.isArray(this.data.outputs)) {
-      errors.push('outputs must be an array');
-    }
-    if (!Array.isArray(this.data.steps)) {
-      errors.push('steps must be an array');
-    }
-
-    // Validate inputs
-    if (Array.isArray(this.data.inputs)) {
-      this.data.inputs.forEach((input, index) => {
-        if (!input.name) {
-          errors.push(`input[${index}].name is required`);
-        }
-        if (!input.type) {
-          errors.push(`input[${index}].type is required`);
-        }
-        if (typeof input.required !== 'boolean') {
-          errors.push(`input[${index}].required must be boolean`);
-        }
-      });
-    }
-
-    // Validate outputs
-    if (Array.isArray(this.data.outputs)) {
-      this.data.outputs.forEach((output, index) => {
-        if (!output.name) {
-          errors.push(`output[${index}].name is required`);
-        }
-        if (!output.type) {
-          errors.push(`output[${index}].type is required`);
-        }
-        // Validate that file outputs have a filename
-        if (output.type === 'file' && !output.filename) {
-          errors.push(
-            `output[${index}].filename is required for file type outputs`
-          );
-        }
-      });
-    }
-
-    // Validate steps
-    if (Array.isArray(this.data.steps)) {
-      this.data.steps.forEach((step, index) => {
-        if (!step.id) {
-          errors.push(`step[${index}].id is required`);
-        }
-        if (!step.name) {
-          errors.push(`step[${index}].name is required`);
-        }
-        if (!step.prompt) {
-          errors.push(`step[${index}].prompt is required`);
-        }
-        if (!Array.isArray(step.outputs)) {
-          errors.push(`step[${index}].outputs must be an array`);
-        } else {
-          // Validate each step output
-          step.outputs.forEach((output, outputIndex) => {
-            if (!output.name) {
-              errors.push(
-                `step[${index}].outputs[${outputIndex}].name is required`
-              );
-            }
-            if (!output.type) {
-              errors.push(
-                `step[${index}].outputs[${outputIndex}].type is required`
-              );
-            }
-            // Validate that file outputs have a filename
-            if (output.type === 'file' && !output.filename) {
-              errors.push(
-                `step[${index}].outputs[${outputIndex}].filename is required for file type outputs`
-              );
-            }
-          });
-        }
-      });
-
-      // Check for duplicate step IDs
-      const stepIds = this.data.steps.map(step => step.id);
-      const duplicateIds = stepIds.filter(
-        (id, index) => stepIds.indexOf(id) !== index
-      );
-      if (duplicateIds.length > 0) {
-        errors.push(`duplicate step IDs found: ${duplicateIds.join(', ')}`);
-      }
-    }
-
-    if (errors.length > 0) {
-      throw new Error(`Workflow validation error: ${errors.join(', ')}`);
+      throw new WorkflowLoadError(`Failed to save workflow config: ${error}`);
     }
   }
 
   /**
    * Get the effective tool for a step (step-specific or default)
+   * Only works with AgentStep - other step types don't have tool property
    */
   getStepTool(stepId: string, defaultTool?: string): string | undefined {
     const step = this.data.steps.find(s => s.id === stepId);
     if (!step) {
       throw new Error(`Step not found: ${stepId}`);
     }
+
+    // Check if this is an agent step (only agent steps have tool/model)
+    if (!isAgentStep(step)) {
+      throw new Error(
+        `Step "${stepId}" is not an agent step (type: ${step.type}). Only agent steps support tool configuration.`
+      );
+    }
+
     return step.tool || defaultTool || this.data.defaults?.tool;
   }
 
   /**
    * Get the effective model for a step (step-specific or default)
+   * Only works with AgentStep - other step types don't have model property
    */
   getStepModel(stepId: string, defaultModel?: string): string | undefined {
     const step = this.data.steps.find(s => s.id === stepId);
     if (!step) {
       throw new Error(`Step not found: ${stepId}`);
     }
+
+    // Check if this is an agent step (only agent steps have tool/model)
+    if (!isAgentStep(step)) {
+      throw new Error(
+        `Step "${stepId}" is not an agent step (type: ${step.type}). Only agent steps support model configuration.`
+      );
+    }
+
     return step.model || defaultModel || this.data.defaults?.model;
   }
 
   /**
    * Get step by ID
+   * Returns the generic WorkflowStep union type
    */
-  getStep(stepId: string): AgentStep {
+  getStep(stepId: string): WorkflowStep {
     const step = this.data.steps.find(s => s.id === stepId);
     if (!step) {
       throw new Error(`Step not found: ${stepId}`);
@@ -293,10 +226,30 @@ export class AgentWorkflow {
   }
 
   /**
+   * Get agent step by ID
+   * Throws if the step is not an agent step
+   */
+  getAgentStep(stepId: string): AgentStep {
+    const step = this.getStep(stepId);
+    if (!isAgentStep(step)) {
+      throw new Error(`Step "${stepId}" is not an agent step`);
+    }
+    return step;
+  }
+
+  /**
    * Get step timeout (step-specific or global default)
+   * Only works with AgentStep - other step types may not have config
    */
   getStepTimeout(stepId: string): number {
     const step = this.getStep(stepId);
+
+    // Only agent steps support config for now
+    if (!isAgentStep(step)) {
+      // For future step types, return global or default timeout
+      return this.data.config?.timeout || DEFAULT_STEP_TIMEOUT;
+    }
+
     return (
       step.config?.timeout || this.data.config?.timeout || DEFAULT_STEP_TIMEOUT
     );
@@ -304,9 +257,16 @@ export class AgentWorkflow {
 
   /**
    * Get step retry count
+   * Only works with AgentStep - other step types may not have retries
    */
   getStepRetries(stepId: string): number {
     const step = this.getStep(stepId);
+
+    // Only agent steps support retries for now
+    if (!isAgentStep(step)) {
+      return 0; // Future step types default to no retries
+    }
+
     return step.config?.retries || 0;
   }
 
@@ -324,22 +284,22 @@ export class AgentWorkflow {
   }
 
   get inputs(): WorkflowInput[] {
-    return this.data.inputs;
+    return this.data.inputs || [];
   }
 
   get outputs(): WorkflowOutput[] {
-    return this.data.outputs;
+    return this.data.outputs || [];
   }
 
-  get steps(): AgentStep[] {
+  get steps(): WorkflowStep[] {
     return this.data.steps;
   }
 
-  get defaults(): { tool?: string; model?: string } | undefined {
+  get defaults(): WorkflowDefaults | undefined {
     return this.data.defaults;
   }
 
-  get config(): { timeout?: number; continueOnError?: boolean } | undefined {
+  get config(): WorkflowConfig | undefined {
     return this.data.config;
   }
 
