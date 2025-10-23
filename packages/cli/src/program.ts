@@ -18,19 +18,26 @@ import { pushCommand } from './commands/push.js';
 import { stopCommand } from './commands/stop.js';
 import { mcpCommand } from './commands/mcp.js';
 import { showTips, TIP_TITLES } from './utils/display.js';
-import { Git, setVerbose, getVersion } from 'rover-common';
+import {
+  Git,
+  setVerbose,
+  getVersion,
+  showSplashHeader,
+  showRegularHeader,
+} from 'rover-common';
 
 export function createProgram(
   options: { excludeRuntimeHooks?: boolean } = {}
 ): Command {
   const program = new Command();
+  const version = getVersion();
 
   if (!options.excludeRuntimeHooks) {
     program
-      .hook('preAction', (thisCommand, actionCommand) => {
+      .hook('preAction', (thisCommand, _actionCommand) => {
         setVerbose(thisCommand.opts().verbose);
       })
-      .hook('preAction', (thisCommand, actionCommand) => {
+      .hook('preAction', (_thisCommand, actionCommand) => {
         const commandName = actionCommand.name();
         if (!['init', 'mcp'].includes(commandName) && !ProjectConfig.exists()) {
           console.log(
@@ -54,7 +61,7 @@ export function createProgram(
           process.exit(1);
         }
       })
-      .hook('preAction', (thisCommand, actionCommand) => {
+      .hook('preAction', (_thisCommand, actionCommand) => {
         const git = new Git();
         try {
           git.version();
@@ -130,6 +137,20 @@ export function createProgram(
 
           process.exit(1);
         }
+      })
+      .hook('preAction', (_thisCommand, actionCommand) => {
+        const commandName = actionCommand.name();
+
+        if (actionCommand.opts().json === true) {
+          // Do not print anything for JSON
+          return;
+        }
+
+        if (['init', 'task'].includes(commandName)) {
+          showSplashHeader();
+        } else if (commandName !== 'mcp') {
+          showRegularHeader(version, process.cwd());
+        }
       });
   }
 
@@ -141,7 +162,7 @@ export function createProgram(
   program
     .name('rover')
     .description('Collaborate with AI agents to complete any task')
-    .version(getVersion());
+    .version(version);
 
   program.optionsGroup(colors.cyan('Options'));
 
@@ -166,11 +187,12 @@ export function createProgram(
       '--from-github <issue>',
       'Fetch task description from a GitHub issue number'
     )
-    .option(
-      '--workflow, -w <name>',
-      'Use a specific workflow to complete this task. The options are: swe, bug-finder.',
-      'swe'
-    )
+    // TODO: Uncomment it once we support multiple workflows by default
+    // .option(
+    //   '--workflow, -w <name>',
+    //   'Use a specific workflow to complete this task. The options are: swe, bug-finder.',
+    //   'swe'
+    // )
     .option('-y, --yes', 'Skip all confirmations and run non-interactively')
     .option(
       '-s, --source-branch <branch>',
@@ -188,7 +210,7 @@ export function createProgram(
     .option('--debug', 'Show debug information like running commands')
     .argument(
       '[description]',
-      'The task description, or provide it later. Mandatory in non-interactive envs'
+      'The task description, or provide it later. Mandatory in non-interactive environments'
     )
     .action(taskCommand);
 

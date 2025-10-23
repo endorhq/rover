@@ -10,6 +10,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { fileSync } from 'tmp';
+import type { WorkflowInput } from '@endorhq/agent';
 
 // Environment variables reference:
 // - https://raw.githubusercontent.com/openai/codex/refs/heads/main/docs/config.md
@@ -29,11 +30,10 @@ class CodexAI implements AIAgentTool {
   public AGENT_BIN = 'codex';
   private promptBuilder = new PromptBuilder('codex');
 
-  constructor() {
-    // Check Codex CLI is available
+  async checkAgent(): Promise<void> {
     try {
-      launchSync(this.AGENT_BIN, ['--version']);
-    } catch (err) {
+      await launch(this.AGENT_BIN, ['--version']);
+    } catch (_err) {
       throw new MissingAIAgentError(this.AGENT_BIN);
     }
   }
@@ -143,6 +143,24 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
 
       return response;
     } catch (err) {
+      return null;
+    }
+  }
+
+  async extractGithubInputs(
+    issueDescription: string,
+    inputs: WorkflowInput[]
+  ): Promise<Record<string, any> | null> {
+    const prompt = this.promptBuilder.extractGithubInputsPrompt(
+      issueDescription,
+      inputs
+    );
+
+    try {
+      const response = await this.invoke(prompt, true);
+      return parseJsonResponse<Record<string, any>>(response);
+    } catch (error) {
+      console.error('Failed to extract GitHub inputs with Codex:', error);
       return null;
     }
   }

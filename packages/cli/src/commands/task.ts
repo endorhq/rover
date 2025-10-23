@@ -1,19 +1,21 @@
 import enquirer from 'enquirer';
 import colors from 'ansi-colors';
-import yoctoSpinner from 'yocto-spinner';
 import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { getNextTaskId } from '../utils/task-id.js';
 import { homedir, tmpdir, userInfo } from 'node:os';
 import { getAIAgentTool, getUserAIAgent } from '../lib/agents/index.js';
-import type { IPromptTask } from '../lib/prompts/index.js';
 import { TaskDescription } from '../lib/description.js';
 import { SetupBuilder } from '../lib/setup.js';
 import { AI_AGENT, ProjectConfig } from '../lib/config.js';
 import { IterationConfig } from '../lib/iteration.js';
 import { generateBranchName } from '../utils/branch-name.js';
-import { findProjectRoot, launchSync } from 'rover-common';
-import { showRoverBanner, showRoverChat, showTips } from '../utils/display.js';
+import {
+  findProjectRoot,
+  launchSync,
+  ProcessManager,
+  showProperties,
+} from 'rover-common';
 import { getTelemetry } from '../lib/telemetry.js';
 import { NewTaskProvider } from 'rover-telemetry';
 import { Git } from 'rover-common';
@@ -271,15 +273,20 @@ export const startDockerExecution = async (
   iterationPath: string,
   selectedAiAgent: string,
   jsonMode?: boolean,
-  debug?: boolean
+  debug?: boolean,
+  processManager?: ProcessManager
 ) => {
   const containerName = `rover-task-${taskId}-${task.iterations}`;
+
+  processManager?.addItem(`Prepare sandbox container | Name: ${containerName}`);
 
   try {
     // Check if Docker is available
     launchSync('docker', ['--version']);
   } catch (error) {
     if (!jsonMode) {
+      processManager?.failLastItem();
+
       console.log(colors.red('\n✗ Docker is not available'));
       console.log(
         colors.gray('  Please install Docker to use automated task execution')
@@ -337,10 +344,8 @@ export const startDockerExecution = async (
   // override agent defaults if there are conflicts, which is the desired behavior.
   const allEnvVariables = [...envVariables, ...customEnvVariables];
 
-  if (!jsonMode) {
-    console.log(colors.bold('\n🐳 Starting Docker container:'));
-    console.log(colors.gray('└── Container Name: ') + containerName);
-  }
+  processManager?.completeLastItem();
+  processManager?.addItem(`Start sandbox container | Name: ${containerName}`);
 
   // Clean up any existing container with same name
   try {
@@ -348,14 +353,6 @@ export const startDockerExecution = async (
   } catch (error) {
     // Container doesn't exist, which is fine
   }
-
-  if (!jsonMode) {
-    console.log('');
-  }
-
-  const spinner = !jsonMode
-    ? yoctoSpinner({ text: 'Starting container...' }).start()
-    : null;
 
   try {
     let isDockerRootless = false;
@@ -451,7 +448,7 @@ export const startDockerExecution = async (
         .stdout?.toString()
         .trim();
 
-      if (spinner) spinner.success('Container started in background');
+      processManager?.completeLastItem();
 
       // Update task metadata with container ID
       updateTaskMetadata(
@@ -464,7 +461,7 @@ export const startDockerExecution = async (
         jsonMode
       );
     } catch (error: any) {
-      if (spinner) spinner.error('Failed to start container in background');
+      processManager?.failLastItem();
       if (!jsonMode) {
         console.error(
           colors.red('Error starting Docker container:'),
@@ -500,7 +497,7 @@ export const startDockerExecution = async (
       process.exit(1);
     }
   } catch (error) {
-    if (spinner) spinner.error('Failed to start container');
+    processManager?.failLastItem();
     if (!jsonMode) {
       console.error(colors.red('Error starting Docker container:'), error);
     }
@@ -572,6 +569,8 @@ export const taskCommand = async (
   const { yes, json, fromGithub, debug, sourceBranch, targetBranch, agent } =
     options;
 
+  const workflowName = options.workflow || DEFAULT_WORKFLOW;
+
   const jsonOutput: TaskTaskOutput = {
     success: false,
   };
@@ -627,19 +626,7 @@ export const taskCommand = async (
     return;
   }
 
-  if (!json) {
-    showRoverBanner();
-    showRoverChat([
-      'hey human! Here you can assign new tasks to an agent.',
-      'Add detailed instructions for a better result.',
-    ]);
-  }
-
-  // Initial values
-  let description = initPrompt?.trim() || '';
-  let taskData: IPromptTask | null = null;
-
-  const workflowName = options.workflow || DEFAULT_WORKFLOW;
+  // Load the workflow
   let workflow;
 
   try {
@@ -657,61 +644,19 @@ export const taskCommand = async (
     return;
   }
 
-  // Get the required inputs
+  // Many workflows require instructions and this is the default input we collect
+  // from the CLI. We might revisit it in the future when we have more workflows.
+  let description = initPrompt?.trim() || '';
+
+  // Workflow inputs' data
   const inputs = workflow.inputs;
+  const requiredInputs = (inputs || [])
+    .filter(el => el.required)
+    .map(el => el.name);
   const inputsData: Map<string, string> = new Map();
 
-  const git = new Git();
-
-  // Handle --from-github option
-  if (fromGithub) {
-    const github = new GitHub(false);
-    try {
-      const issueData = await github.fetchIssue(fromGithub, git.remoteUrl());
-      if (issueData) {
-        description = `${issueData.title}\n\n${issueData.body}`;
-
-        if (!issueData.body || issueData.body.length == 0) {
-          jsonOutput.error =
-            'The GitHub issue description is empty. Add more details to the issue so the Agent can complete it successfully.';
-          exitWithError(jsonOutput, json);
-          return;
-        }
-
-        taskData = {
-          title: issueData.title,
-          description,
-        };
-
-        if (!json) {
-          console.log(colors.green('✓ GitHub issue fetched successfully'));
-          console.log(
-            colors.gray('├── Title: ') + colors.cyan(issueData.title)
-          );
-          console.log(
-            colors.gray('└── Body: ') +
-              issueData.body.substring(0, 100) +
-              (issueData.body.length > 100 ? '...' : '')
-          );
-        }
-      } else {
-        jsonOutput.error = 'Failed to fetch issue from GitHub';
-        exitWithError(jsonOutput, json);
-        return;
-      }
-    } catch (err) {
-      if (err instanceof GitHubError) {
-        jsonOutput.error = `Failed to fetch issue from GitHub: ${err.cause}`;
-      } else {
-        jsonOutput.error = `Failed to fetch issue from GitHub: ${err}`;
-      }
-
-      exitWithError(jsonOutput, json);
-      return;
-    }
-  }
-
   // Validate branch option and check for uncommitted changes
+  const git = new Git();
   let baseBranch = sourceBranch;
 
   if (sourceBranch) {
@@ -738,31 +683,26 @@ export const taskCommand = async (
             '  Consider using --source-branch option to specify a clean base branch or stash your changes'
           )
         );
-        const initialPrompt = description || initPrompt || '';
-
-        if (initialPrompt.length > 0) {
-          console.log(
-            colors.gray(`  Example: `) +
-              colors.cyan(`rover task --source-branch main "${initialPrompt}"
-`)
-          );
-        } else {
-          console.log(
-            colors.gray(`  Example: `) +
-              colors.cyan(`rover task --source-branch main
-`)
-          );
-        }
+        console.log(
+          colors.gray(`  Example: `) +
+            colors.cyan(`rover task --source-branch main\n`)
+        );
       }
     }
   }
 
   // Display extra information
   if (!json) {
-    console.log(colors.gray(`Source branch: `) + colors.cyan(`${baseBranch}`));
-    console.log(
-      colors.cyan.bold(`\n${workflowName}`) + colors.bold(` Workflow: `)
-    );
+    const props: Record<string, string> = {
+      ['Source Branch']: baseBranch!,
+      ['Workflow']: workflowName,
+    };
+
+    if (description.length > 0) {
+      props['Description'] = description!;
+    }
+
+    showProperties(props, { addLineBreak: true });
   }
 
   // We need to process the workflow inputs. We will ask users to provide this
@@ -776,27 +716,123 @@ export const taskCommand = async (
 
           for (const key in parsed) {
             inputsData.set(key, parsed[key]);
+
+            if (key == 'description') {
+              description = parsed[key];
+            }
           }
 
           if (!json) {
             console.log(colors.gray('✓ Read task description from stdin'));
           }
         } catch (err) {
-          jsonOutput.error = 'The stdin input data is not a valid json.';
-          exitWithError(jsonOutput, json);
-          return;
+          // Assume the text is just the description
+          description = stdinInput;
         }
       }
     } else if (fromGithub != null) {
-      // TODO: Extract the data from the task to complete the inputs
+      // Load the inputs from GitHub
+      const github = new GitHub(false);
+
+      try {
+        const issueData = await github.fetchIssue(fromGithub, git.remoteUrl());
+        if (issueData) {
+          description = issueData.body;
+
+          if (!issueData.body || issueData.body.length == 0) {
+            jsonOutput.error =
+              'The GitHub issue description is empty. Add more details to the issue so the Agent can complete it successfully.';
+            exitWithError(jsonOutput, json);
+            return;
+          }
+
+          if (!json) {
+            console.log(colors.green('✓ GitHub issue fetched successfully'));
+            console.log(
+              colors.gray('└── Title: ') + colors.cyan(issueData.title)
+            );
+          }
+
+          // Now, let's ask an agent to extract the required inputs from the issue body.
+          if (inputs && inputs.length > 0) {
+            if (!json) {
+              console.log(
+                colors.gray('\nExtracting workflow inputs from issue...')
+              );
+            }
+
+            const agentTool = getAIAgentTool(selectedAiAgent);
+            const extractedInputs = await agentTool.extractGithubInputs(
+              issueData.body,
+              inputs
+            );
+
+            if (extractedInputs) {
+              for (const key in extractedInputs) {
+                if (extractedInputs[key] !== null) {
+                  inputsData.set(key, String(extractedInputs[key]));
+                }
+              }
+
+              if (!json) {
+                console.log(
+                  colors.green('✓ Workflow inputs extracted successfully')
+                );
+              }
+            } else {
+              if (!json) {
+                console.log(
+                  colors.yellow(
+                    '⚠ Could not extract workflow inputs from issue'
+                  )
+                );
+              }
+
+              jsonOutput.error =
+                'Failed to fetch the workflow inputs from issue';
+              exitWithError(jsonOutput, json);
+              return;
+            }
+          }
+        } else {
+          jsonOutput.error = 'Failed to fetch issue from GitHub';
+          exitWithError(jsonOutput, json);
+          return;
+        }
+      } catch (err) {
+        if (err instanceof GitHubError) {
+          jsonOutput.error = `Failed to fetch issue from GitHub: ${err.cause}`;
+        } else {
+          jsonOutput.error = `Failed to fetch issue from GitHub: ${err}`;
+        }
+
+        exitWithError(jsonOutput, json);
+        return;
+      }
     } else {
       const questions = [];
+
+      // By default, we always ask for a description.
+      if (description == null || description.length == 0) {
+        questions.push({
+          type: 'input',
+          name: 'description',
+          message: 'Describe the task you want to complete',
+        });
+      } else {
+        inputsData.set('description', description);
+      }
+
       // Build the questions and pass them to enquirer
       for (const key in inputs) {
         const input = inputs[key];
 
-        let enquirerType;
+        // We are already asking of providing it.
+        if (input.name == 'description') {
+          continue;
+        }
 
+        let enquirerType;
         switch (input.type) {
           case 'string':
           case 'number':
@@ -819,25 +855,32 @@ export const taskCommand = async (
         questions.push(question);
       }
 
-      try {
-        const response: Record<string, string | number> =
-          await prompt(questions);
-        for (const key in response) {
-          inputsData.set(key, String(response[key]));
+      if (questions.length > 0) {
+        try {
+          console.log();
+          const response: Record<string, string | number> =
+            await prompt(questions);
+          for (const key in response) {
+            inputsData.set(key, String(response[key]));
+
+            if (key == 'description') {
+              description = String(response[key]);
+            }
+          }
+        } catch (err) {
+          jsonOutput.error = 'Task creation cancelled';
+          exitWithWarn('Task creation cancelled', jsonOutput, json, {
+            exitCode: 1,
+          });
         }
-      } catch (err) {
-        jsonOutput.error = 'Task creation cancelled';
-        exitWithWarn('Task creation cancelled', jsonOutput, json, {
-          exitCode: 1,
-        });
       }
     }
 
     // Validate
     const missing: string[] = [];
-    inputs.forEach(input => {
-      if (input.required && !inputsData.has(input.name)) {
-        missing.push(input.name);
+    requiredInputs.forEach(name => {
+      if (!inputsData.has(name)) {
+        missing.push(name);
       }
     });
 
@@ -848,7 +891,29 @@ export const taskCommand = async (
     }
   }
 
-  if (taskData) {
+  if (description.length > 0) {
+    const processManager = json
+      ? undefined
+      : new ProcessManager({ title: 'Create new task in the background' });
+    processManager?.start();
+
+    processManager?.addItem(`Expand task information using ${selectedAiAgent}`);
+
+    // Extract the title and description based on current data.
+    const agentTool = getAIAgentTool(selectedAiAgent);
+    await agentTool.checkAgent();
+    const expandedTask = await agentTool.expandTask(
+      description,
+      findProjectRoot()
+    );
+
+    processManager?.completeLastItem();
+
+    inputsData.set('description', expandedTask!.description);
+    inputsData.set('title', expandedTask!.title);
+
+    processManager?.addItem('Create the task workspace');
+
     // Generate auto-increment ID for the task
     const taskId = getNextTaskId();
 
@@ -869,8 +934,10 @@ export const taskCommand = async (
     // Create task using TaskDescription class
     const task = TaskDescription.create({
       id: taskId,
-      title: taskData.title,
-      description: taskData.description,
+      title: expandedTask!.title,
+      description: expandedTask!.description,
+      inputs: inputsData,
+      workflowName: workflowName,
       agent: selectedAiAgent,
       sourceBranch: sourceBranch,
     });
@@ -889,6 +956,13 @@ export const taskCommand = async (
       exitWithError(jsonOutput, json);
       return;
     }
+
+    processManager?.updateLastItem(
+      `Create the task workspace | Branch: ${branchName}`
+    );
+    processManager?.completeLastItem();
+
+    processManager?.addItem('Complete task creation');
 
     const iterationPath = join(
       taskPath,
@@ -909,16 +983,6 @@ export const taskCommand = async (
     task.setWorkspace(worktreePath, branchName);
     task.markInProgress();
 
-    if (!json) {
-      console.log(colors.bold('\n🚀 Task Created'));
-      console.log(colors.gray('├── ID: ') + colors.cyan(task.id.toString()));
-      console.log(colors.gray('├── Title: ') + task.title);
-      console.log(
-        colors.gray('├── Workspace: ') + colors.cyan(task.worktreePath)
-      );
-      console.log(colors.gray('└── Branch: ') + colors.cyan(task.branchName));
-    }
-
     // Track new task event
     telemetry?.eventNewTask(
       options.fromGithub != null
@@ -937,6 +1001,8 @@ export const taskCommand = async (
     jsonOutput.branch = task.branchName;
     jsonOutput.savedTo = `.rover/tasks/${taskId}/description.json`;
 
+    processManager?.completeLastItem();
+
     // Start Docker container for task execution
     try {
       await startDockerExecution(
@@ -946,11 +1012,20 @@ export const taskCommand = async (
         iterationPath,
         selectedAiAgent,
         json,
-        debug
+        debug,
+        processManager
       );
+
+      processManager?.addItem('Task started in background');
+      processManager?.completeLastItem();
+      processManager?.finish();
     } catch (_err) {
       // If Docker execution fails to start, reset task to NEW status
       task.resetToNew();
+
+      processManager?.addItem('Task started in background');
+      processManager?.failLastItem();
+      processManager?.finish();
 
       jsonOutput.status = task.status;
       jsonOutput.error =
@@ -975,10 +1050,9 @@ export const taskCommand = async (
       ],
     });
   } else {
-    // This error should be really weird. Keeping this branch just in case,
-    // but I don't expect it to trigger because we have several fallbacks
-    jsonOutput.error = 'There was an issue retrieving the task information';
+    jsonOutput.error = `Could not determine the description. Please, provide it.`;
     exitWithError(jsonOutput, json);
+    return;
   }
 
   await telemetry?.shutdown();

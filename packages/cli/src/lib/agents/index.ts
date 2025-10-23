@@ -4,10 +4,15 @@ import GeminiAI from './gemini.js';
 import QwenAI from './qwen.js';
 import type { IPromptTask } from '../prompts/index.js';
 import { AI_AGENT, UserSettings } from '../config.js';
+import type { WorkflowInput } from '@endorhq/agent';
 
 export interface AIAgentTool {
   // Invoke the CLI tool using the SDK / direct mode with the given prompt
   invoke(prompt: string, json: boolean): Promise<string>;
+
+  // Check if the current AI agent is available
+  // It will throw an exception in other case
+  checkAgent(): Promise<void>;
 
   // Expand a brief task description into a full task with title and description
   expandTask(
@@ -36,6 +41,12 @@ export interface AIAgentTool {
     diffContext: string,
     conflictedContent: string
   ): Promise<string | null>;
+
+  // Extract workflow input values from a GitHub issue description
+  extractGithubInputs(
+    issueDescription: string,
+    inputs: WorkflowInput[]
+  ): Promise<Record<string, any> | null>;
 
   // Get Docker mount strings for agent-specific credential files
   getContainerMounts(): string[];

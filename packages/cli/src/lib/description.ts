@@ -14,7 +14,7 @@ import colors from 'ansi-colors';
 import { getLastTaskIteration } from './iteration.js';
 
 // Schema version for migrations
-const CURRENT_SCHEMA_VERSION = '1.0';
+const CURRENT_SCHEMA_VERSION = '1.1';
 
 // Status enum with additional status types
 export type TaskStatus =
@@ -34,6 +34,9 @@ export interface TaskDescriptionSchema {
   title: string;
   description: string;
 
+  // List of inputs for the workflow
+  inputs: Record<string, string>;
+
   // Status & Lifecycle
   status: TaskStatus;
   createdAt: string; // ISO datetime
@@ -45,6 +48,7 @@ export interface TaskDescriptionSchema {
 
   // Execution Context
   iterations: number; // Default: 1
+  workflowName: string;
   worktreePath: string; // Path to git worktree
   branchName: string; // Git branch name
   agent?: string; // AI agent used for execution (claude, gemini, qwen)
@@ -73,6 +77,8 @@ export interface CreateTaskData {
   id: number;
   title: string;
   description: string;
+  inputs: Map<string, string>;
+  workflowName: string;
   uuid?: string; // Optional, will be generated if not provided
   agent?: string; // AI agent to use for execution
   sourceBranch?: string; // Source branch task was created from
@@ -149,12 +155,14 @@ export class TaskDescription {
       uuid: uuid,
       title: taskData.title,
       description: taskData.description,
+      inputs: Object.fromEntries(taskData.inputs),
       status: 'NEW',
       createdAt: now,
       startedAt: now,
       lastIterationAt: now,
       iterations: 1,
       worktreePath: '',
+      workflowName: taskData.workflowName,
       branchName: '',
       agent: taskData.agent,
       sourceBranch: taskData.sourceBranch,
@@ -257,6 +265,8 @@ export class TaskDescription {
     migrated.uuid = data.uuid || randomUUID();
     migrated.title = data.title || 'Unknown Task';
     migrated.description = data.description || '';
+    migrated.inputs = data.inputs || {};
+    migrated.workflowName = data.workflowName || 'swe';
     migrated.status = TaskDescription.migrateStatus(data.status) || 'NEW';
     migrated.createdAt = data.createdAt || new Date().toISOString();
     migrated.iterations = data.iterations || 1;

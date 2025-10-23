@@ -52,12 +52,18 @@ export class ProcessManager {
   private items: ProcessItem[] = [];
   private options: Required<ProcessOptions>;
   private started = false;
+  private spinnerInterval?: NodeJS.Timeout;
+  private spinnerFrameIndex = 0;
+  private readonly spinnerFrames = ['◐', '◓', '◑', '◒'];
+  private readonly spinnerEnabled: boolean;
 
   constructor(options: ProcessOptions) {
     this.options = {
       showTimestamp: true,
       ...options,
     };
+
+    this.spinnerEnabled = this.isInteractiveEnvironment();
   }
 
   /**
@@ -83,6 +89,9 @@ export class ProcessManager {
       this.start();
     }
 
+    this.stopSpinner();
+    this.spinnerFrameIndex = 0;
+
     this.items.push({
       message,
       status: 'in_progress',
@@ -90,6 +99,7 @@ export class ProcessManager {
     });
 
     this.render();
+    this.ensureSpinner();
   }
 
   /**
@@ -122,6 +132,7 @@ export class ProcessManager {
    */
   completeLastItem(): void {
     const lastItem = this.getLastItem();
+    this.stopSpinner();
     lastItem.status = 'completed';
     logUpdate.persist(this.formatItem(lastItem));
     logUpdate.clear();
@@ -136,6 +147,7 @@ export class ProcessManager {
    */
   failLastItem(errorMessage?: string): void {
     const lastItem = this.getLastItem();
+    this.stopSpinner();
     lastItem.status = 'failed';
     if (errorMessage) {
       lastItem.message = errorMessage;
@@ -161,6 +173,7 @@ export class ProcessManager {
    * This ensures the final state is visible in the terminal
    */
   finish(): void {
+    this.stopSpinner();
     logUpdate.done();
   }
 
@@ -217,7 +230,13 @@ export class ProcessManager {
       case 'pending':
         return '○'; // Default color (no color applied)
       case 'in_progress':
-        return colors.cyan('◐'); // Cyan for ongoing work
+        return colors.cyan(
+          this.spinnerFrames[
+            this.spinnerEnabled
+              ? this.spinnerFrameIndex % this.spinnerFrames.length
+              : 0
+          ]
+        ); // Cyan for ongoing work
       case 'completed':
         return colors.green('●'); // Green for success
       case 'failed':
@@ -235,5 +254,59 @@ export class ProcessManager {
     const hours = date.getHours().toString().padStart(2, '0');
     const minutes = date.getMinutes().toString().padStart(2, '0');
     return colors.gray(`${hours}:${minutes}`);
+  }
+
+  /**
+   * Ensure the spinner interval is running for the active in-progress item
+   */
+  private ensureSpinner(): void {
+    if (!this.spinnerEnabled || this.spinnerInterval) {
+      return;
+    }
+
+    this.spinnerInterval = setInterval(() => {
+      const lastItem = this.items[this.items.length - 1];
+      if (!lastItem || lastItem.status !== 'in_progress') {
+        this.stopSpinner();
+        return;
+      }
+
+      this.spinnerFrameIndex =
+        (this.spinnerFrameIndex + 1) % this.spinnerFrames.length;
+
+      this.render();
+    }, 120);
+  }
+
+  /**
+   * Stop the spinner interval when no item is in progress
+   */
+  private stopSpinner(): void {
+    if (this.spinnerInterval) {
+      clearInterval(this.spinnerInterval);
+      this.spinnerInterval = undefined;
+    }
+
+    this.spinnerFrameIndex = 0;
+  }
+
+  /**
+   * Determine if the current environment supports interactive spinners
+   */
+  private isInteractiveEnvironment(): boolean {
+    if (!process.stdout.isTTY) {
+      return false;
+    }
+
+    const { CI, GITHUB_ACTIONS } = process.env;
+    if (GITHUB_ACTIONS) {
+      return false;
+    }
+
+    if (CI && CI !== 'false' && CI !== '0') {
+      return false;
+    }
+
+    return true;
   }
 }

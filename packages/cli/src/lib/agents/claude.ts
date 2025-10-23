@@ -15,6 +15,7 @@ import { parseJsonResponse } from '../../utils/json-parser.js';
 import { homedir, tmpdir, platform } from 'node:os';
 import { join } from 'node:path';
 import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
+import type { WorkflowInput } from '@endorhq/agent';
 
 const findKeychainCredentials = (key: string): string => {
   const result = launchSync(
@@ -83,11 +84,10 @@ class ClaudeAI implements AIAgentTool {
   public AGENT_BIN = 'claude';
   private promptBuilder = new PromptBuilder('claude');
 
-  constructor() {
-    // Check Claude CLI is available
+  async checkAgent(): Promise<void> {
     try {
-      launchSync(this.AGENT_BIN, ['--version']);
-    } catch (err) {
+      await launch(this.AGENT_BIN, ['--version']);
+    } catch (_err) {
       throw new MissingAIAgentError(this.AGENT_BIN);
     }
   }
@@ -214,6 +214,24 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
 
       return response;
     } catch (err) {
+      return null;
+    }
+  }
+
+  async extractGithubInputs(
+    issueDescription: string,
+    inputs: WorkflowInput[]
+  ): Promise<Record<string, any> | null> {
+    const prompt = this.promptBuilder.extractGithubInputsPrompt(
+      issueDescription,
+      inputs
+    );
+
+    try {
+      const response = await this.invoke(prompt, true);
+      return parseJsonResponse<Record<string, any>>(response);
+    } catch (error) {
+      console.error('Failed to extract GitHub inputs with Claude:', error);
       return null;
     }
   }

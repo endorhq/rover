@@ -8,7 +8,6 @@ description: 'Complete software engineering workflow with adaptive complexity ha
 inputs:
   - name: description
     description: 'Detailed task description'
-    label: 'Describe the task you want to complete'
     type: string
     required: true
 

@@ -1,11 +1,10 @@
-import { dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
 // Other templates
 import expandIterationPrompt from './expand-iteration-instructions.md';
 import expandTaskPrompt from './expand-task.md';
 import generateCommitPrompt from './generate-commit-message.md';
 import resolveMergePrompt from './resolve-merge-conflicts.md';
+import extractGithubInputsPrompt from './extract-github-inputs.md';
+import type { WorkflowInput } from '@endorhq/agent';
 
 enum PROMPT_ID {
   // Others
@@ -13,6 +12,7 @@ enum PROMPT_ID {
   ExpandTask = 'ExpandTask',
   GenerateCommit = 'GenerateCommit',
   ResolveMerge = 'ResolveMerge',
+  ExtractGithubInputs = 'ExtractGithubInputs',
 }
 
 const PROMPT_CONTENT: Record<PROMPT_ID, string> = {
@@ -20,6 +20,7 @@ const PROMPT_CONTENT: Record<PROMPT_ID, string> = {
   [PROMPT_ID.ExpandTask]: expandTaskPrompt,
   [PROMPT_ID.GenerateCommit]: generateCommitPrompt,
   [PROMPT_ID.ResolveMerge]: resolveMergePrompt,
+  [PROMPT_ID.ExtractGithubInputs]: extractGithubInputsPrompt,
 };
 
 /**
@@ -54,18 +55,11 @@ export interface IPromptTask {
  * ```
  */
 export class PromptBuilder {
-  private promptsDir: string;
-
   /**
    * Create a new PromptBuilder instance
    * @param agent - The AI agent identifier (e.g., 'claude', 'gemini')
    */
-  constructor(public agent: string = 'claude') {
-    // Get the directory where this file is located
-    const __filename = fileURLToPath(import.meta.url);
-    const __dirname = dirname(__filename);
-    this.promptsDir = __dirname;
-  }
+  constructor(public agent: string = 'claude') {}
 
   /**
    * Load a prompt template from a markdown file and replace placeholders
@@ -223,6 +217,43 @@ ${summaries.join('\n')}
       filePath,
       diffContext,
       conflictedContent,
+    });
+  }
+
+  /**
+   * Generate a prompt for extracting workflow input values from a GitHub issue description.
+   * This method helps parse and extract structured data from unstructured issue text based
+   * on the workflow's required inputs.
+   *
+   * @param issueDescription - The full GitHub issue description text
+   * @param inputs - Array of workflow input definitions that need to be extracted
+   * @returns A formatted prompt string for AI processing
+   *
+   * @example
+   * const builder = new PromptBuilder();
+   * const prompt = builder.extractGithubInputsPrompt(
+   *   'We need to add authentication to the API with JWT tokens',
+   *   [
+   *     { name: 'feature', description: 'Feature to implement', type: 'string', required: true },
+   *     { name: 'urgent', description: 'Is this urgent?', type: 'boolean', required: true }
+   *   ]
+   * );
+   */
+  extractGithubInputsPrompt(
+    issueDescription: string,
+    inputs: WorkflowInput[]
+  ): string {
+    // Format inputs metadata as a readable list
+    const inputsMetadata = inputs
+      .map(input => {
+        const label = input.label || input.description;
+        return `- ${input.name}: (${input.type}${input.required ? ', required' : ''}) ${label}`;
+      })
+      .join('\n');
+
+    return this.loadTemplate(PROMPT_ID.ExtractGithubInputs, {
+      issueDescription,
+      inputsMetadata,
     });
   }
 }
