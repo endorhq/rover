@@ -1,18 +1,18 @@
 import colors from 'ansi-colors';
-import { showTips, TipsOptions } from 'rover-common';
 import { CLIJsonOutput, CLIJsonOutputWithErrors } from '../types.js';
+import { showTips, TipsConfig } from './display.js';
 
 type ExitWithErrorOpts = {
   exitCode?: number;
   tips?: string[];
-  tipsConfig?: TipsOptions;
+  tipsConfig?: TipsConfig;
 };
 
 type ExitWithWarnOpts = ExitWithErrorOpts;
 
 type ExitWithSuccessOpts = {
   tips?: string[];
-  tipsConfig?: TipsOptions;
+  tipsConfig?: TipsConfig;
 };
 
 /**

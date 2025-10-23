@@ -73,6 +73,8 @@ describe('diff command', () => {
       id,
       title,
       description: 'Test task description',
+      inputs: new Map(),
+      workflowName: 'swe',
     });
 
     // Create a git worktree for the task
@@ -110,6 +112,8 @@ describe('diff command', () => {
         id: 1,
         title: 'No Workspace Task',
         description: 'Test',
+        inputs: new Map(),
+        workflowName: 'swe',
       });
 
       await diffCommand('1');
@@ -576,6 +580,8 @@ describe('diff command', () => {
         id: 1,
         title: 'Empty Repo Task',
         description: 'Test',
+        inputs: new Map(),
+        workflowName: 'swe',
       });
 
       const worktreePath = join('.rover', 'tasks', '1', 'workspace');

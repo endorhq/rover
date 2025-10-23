@@ -30,6 +30,8 @@ describe('TaskDescription', () => {
         description: 'Test description',
         agent: 'claude',
         sourceBranch: 'main',
+        inputs: new Map(),
+        workflowName: 'swe',
       });
 
       expect(task.agent).toBe('claude');
@@ -46,6 +48,8 @@ describe('TaskDescription', () => {
         id: 2,
         title: 'Test Task',
         description: 'Test description',
+        inputs: new Map(),
+        workflowName: 'swe',
       });
 
       expect(task.agent).toBeUndefined();
@@ -59,6 +63,8 @@ describe('TaskDescription', () => {
         id: 1,
         title: 'Test Task',
         description: 'Test description',
+        inputs: new Map(),
+        workflowName: 'swe',
       });
 
       task.markMerged();
@@ -73,6 +79,8 @@ describe('TaskDescription', () => {
         id: 2,
         title: 'Test Task',
         description: 'Test description',
+        inputs: new Map(),
+        workflowName: 'swe',
       });
 
       task.markPushed();
@@ -87,6 +95,8 @@ describe('TaskDescription', () => {
         id: 3,
         title: 'Test Task',
         description: 'Test description',
+        inputs: new Map(),
+        workflowName: 'swe',
       });
 
       // Mark as in progress first
@@ -104,6 +114,8 @@ describe('TaskDescription', () => {
         id: 4,
         title: 'Test Task',
         description: 'Test description',
+        inputs: new Map(),
+        workflowName: 'swe',
       });
 
       // Test all new status types
@@ -123,6 +135,8 @@ describe('TaskDescription', () => {
         id: 5,
         title: 'Test Task',
         description: 'Test description',
+        inputs: new Map(),
+        workflowName: 'swe',
       });
 
       task.markCompleted();
@@ -139,6 +153,8 @@ describe('TaskDescription', () => {
       id: 5,
       title: 'Test Task',
       description: 'Test description',
+      inputs: new Map(),
+      workflowName: 'swe',
     });
 
     task.markCompleted();
@@ -157,6 +173,8 @@ describe('TaskDescription', () => {
         id: 6,
         title: 'Migration Test',
         description: 'Test description',
+        inputs: new Map(),
+        workflowName: 'swe',
       });
 
       // Test MERGED migration
@@ -175,6 +193,8 @@ describe('TaskDescription', () => {
         id: 7,
         title: 'Utility Test',
         description: 'Test description',
+        inputs: new Map(),
+        workflowName: 'swe',
       });
 
       // Test NEW status

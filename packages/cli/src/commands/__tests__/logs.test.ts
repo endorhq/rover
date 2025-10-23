@@ -97,6 +97,8 @@ describe('logs command', () => {
       id,
       title,
       description: 'Test task description',
+      inputs: new Map(),
+      workflowName: 'swe',
     });
 
     // Create a git worktree for the task

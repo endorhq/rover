@@ -93,6 +93,8 @@ describe('restart command', async () => {
         id: taskId,
         title: 'Test Task',
         description: 'A test task',
+        inputs: new Map(),
+        workflowName: 'swe',
       });
 
       // Manually set task to FAILED status
@@ -129,6 +131,8 @@ describe('restart command', async () => {
         id: taskId,
         title: 'Test Task',
         description: 'A test task',
+        inputs: new Map(),
+        workflowName: 'swe',
       });
 
       // Manually set task to FAILED status and restart twice
@@ -159,6 +163,8 @@ describe('restart command', async () => {
         id: taskId,
         title: 'Test Task',
         description: 'A test task',
+        inputs: new Map(),
+        workflowName: 'swe',
       });
 
       expect(task.status).toBe('NEW');
@@ -195,6 +201,8 @@ describe('restart command', async () => {
         id: taskId,
         title: 'Test Task',
         description: 'A test task',
+        inputs: new Map(),
+        workflowName: 'swe',
       });
 
       // Manually set to IN_PROGRESS
