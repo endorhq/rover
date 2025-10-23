@@ -29,6 +29,7 @@ import {
   loadEnvsFile,
 } from '../utils/env-variables.js';
 import { loadWorkflowByName } from '../lib/workflow.js';
+import { WorkflowManager } from 'rover-schemas';
 
 const { prompt } = enquirer;
 
@@ -627,13 +628,20 @@ export const taskCommand = async (
   }
 
   // Load the workflow
-  let workflow;
+  let workflow: WorkflowManager;
 
   try {
-    workflow = loadWorkflowByName(workflowName);
+    const loadedWorkflow = loadWorkflowByName(workflowName);
+
+    if (loadedWorkflow) {
+      workflow = loadedWorkflow;
+    } else {
+      jsonOutput.error = `Could no load the '${workflowName}' workflow`;
+      exitWithError(jsonOutput, json);
+      return;
+    }
   } catch (err) {
     jsonOutput.error = `There was an error loading the '${workflowName}' workflow: ${err}`;
-    console.log(err);
     exitWithError(jsonOutput, json);
     return;
   }

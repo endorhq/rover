@@ -1,37 +1,29 @@
 {
-  "name": "@endorhq/agent",
-  "private": true,
+  "name": "rover-schemas",
   "version": "1.0.0",
-  "description": "Provide a library to define and manage AI agent workflows for Rover",
+  "description": "Define project file schemas and utilities to manage them",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "type": "module",
-  "bin": {
-    "rover-agent": "dist/cli.js"
-  },
   "files": [
     "LICENSE.md",
     "dist/*"
   ],
   "scripts": {
-    "build": "tsdown --env.TSUP_DEV=false",
-    "dev": "TSUP_DEV=true tsdown --env.TSUP_DEV=true --watch src/",
+    "build": "tsdown --env.TSUP_DEV=false src/index.ts",
+    "dev": "TSUP_DEV=true tsdown --env.TSUP_DEV=true --watch src/ src/index.ts",
     "format": "prettier --write \"src/**/*.{ts,js,json}\"",
-    "start": "node dist/cli.js",
+    "start": "node dist/index.js",
     "clean": "rm -rf dist",
     "check": "tsc --noEmit",
-    "test": "echo 'no testing yet'",
-    "test:watch": "vitest watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage"
   },
   "author": "The Endor team",
   "dependencies": {
     "yaml": "^2.8.1",
-    "ansi-colors": "^4.1.3",
-    "commander": "^14.0.0",
-    "execa": "^9.6.0",
-    "ora": "^8.2.0",
     "zod": "^4.1.12"
   },
   "devDependencies": {

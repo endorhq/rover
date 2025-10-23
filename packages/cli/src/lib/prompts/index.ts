@@ -4,7 +4,7 @@ import expandTaskPrompt from './expand-task.md';
 import generateCommitPrompt from './generate-commit-message.md';
 import resolveMergePrompt from './resolve-merge-conflicts.md';
 import extractGithubInputsPrompt from './extract-github-inputs.md';
-import type { WorkflowInput } from '@endorhq/agent';
+import type { WorkflowInput } from 'rover-schemas';
 
 enum PROMPT_ID {
   // Others

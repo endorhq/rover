@@ -60,14 +60,19 @@ export const WorkflowOutputSchema = z.object({
 /**
  * Supported AI agent tools/providers
  */
-export const AgentToolSchema = z.enum(['claude', 'gemini', 'codex', 'qwen']);
+export const WorkflowAgentToolSchema = z.enum([
+  'claude',
+  'gemini',
+  'codex',
+  'qwen',
+]);
 
 /**
  * Default configuration when it's not specified. Users will set it using the agent tool
  */
 export const WorkflowDefaultsSchema = z.object({
   /** Default AI tool if not specified in steps */
-  tool: AgentToolSchema.optional(),
+  tool: WorkflowAgentToolSchema.optional(),
   /** Default model if not specified in steps */
   model: z.string().optional(),
 });
@@ -85,7 +90,7 @@ export const WorkflowConfigSchema = z.object({
 /**
  * Base step schema shared by all step types
  */
-const BaseWorkflowStepSchema = z.object({
+const WorkflowBaseStepSchema = z.object({
   /** Unique step identifier */
   id: z.string(),
   /** Human-readable step name */
@@ -95,11 +100,11 @@ const BaseWorkflowStepSchema = z.object({
 /**
  * Agent step configuration
  */
-export const AgentStepSchema = BaseWorkflowStepSchema.extend({
+export const WorkflowAgentStepSchema = WorkflowBaseStepSchema.extend({
   /** Step type - 'agent' */
   type: z.literal('agent'),
   /** AI tool/provider to use (optional, uses workflow default) */
-  tool: AgentToolSchema.optional(),
+  tool: WorkflowAgentToolSchema.optional(),
   /** Specific model version (optional, uses tool default) */
   model: z.string().optional(),
   /** Prompt template with placeholder support */
@@ -120,7 +125,7 @@ export const AgentStepSchema = BaseWorkflowStepSchema.extend({
 /**
  * Command step configuration
  */
-export const CommandStepSchema = BaseWorkflowStepSchema.extend({
+export const WorkflowCommandStepSchema = WorkflowBaseStepSchema.extend({
   /** Step type - 'command' */
   type: z.literal('command'),
   /** Command to execute */
@@ -135,8 +140,8 @@ export const CommandStepSchema = BaseWorkflowStepSchema.extend({
  * Conditional step schema (recursive)
  * Allows branching logic based on conditions
  */
-export const ConditionalStepSchema: z.ZodType<any> =
-  BaseWorkflowStepSchema.extend({
+export const WorkflowConditionalStepSchema: z.ZodType<any> =
+  WorkflowBaseStepSchema.extend({
     /** Step type - 'conditional' */
     type: z.literal('conditional'),
     /** Condition expression to evaluate */
@@ -151,21 +156,20 @@ export const ConditionalStepSchema: z.ZodType<any> =
  * Parallel step schema (recursive)
  * Executes multiple steps concurrently
  */
-export const ParallelStepSchema: z.ZodType<any> = BaseWorkflowStepSchema.extend(
-  {
+export const WorkflowParallelStepSchema: z.ZodType<any> =
+  WorkflowBaseStepSchema.extend({
     /** Step type - 'parallel' */
     type: z.literal('parallel'),
     /** Steps to execute in parallel */
     steps: z.lazy(() => z.array(WorkflowStepSchema)),
-  }
-);
+  });
 
 /**
  * Sequential step schema (recursive)
  * Executes multiple steps in order
  */
-export const SequentialStepSchema: z.ZodType<any> =
-  BaseWorkflowStepSchema.extend({
+export const WorkflowSequentialStepSchema: z.ZodType<any> =
+  WorkflowBaseStepSchema.extend({
     /** Step type - 'sequential' */
     type: z.literal('sequential'),
     /** Ordered list of steps to execute */
@@ -177,7 +181,7 @@ export const SequentialStepSchema: z.ZodType<any> =
  * Forward declared for recursive types
  */
 export const WorkflowStepSchema: z.ZodType<any> = z.union([
-  AgentStepSchema,
+  WorkflowAgentStepSchema,
   // CommandStepSchema,
   // ConditionalStepSchema,
   // ParallelStepSchema,

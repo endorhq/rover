@@ -4,7 +4,7 @@ import GeminiAI from './gemini.js';
 import QwenAI from './qwen.js';
 import type { IPromptTask } from '../prompts/index.js';
 import { AI_AGENT, UserSettings } from '../config.js';
-import type { WorkflowInput } from '@endorhq/agent';
+import type { WorkflowInput } from 'rover-schemas';
 
 export interface AIAgentTool {
   // Invoke the CLI tool using the SDK / direct mode with the given prompt

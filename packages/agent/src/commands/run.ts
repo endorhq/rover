@@ -1,6 +1,6 @@
 import { CommandOutput } from '../cli.js';
 import colors from 'ansi-colors';
-import { AgentWorkflow } from '../lib/workflow.js';
+import { WorkflowManager } from 'rover-schemas';
 import { parseCollectOptions } from '../lib/options.js';
 import { Runner } from '../lib/runner.js';
 import { IterationStatus } from 'rover-common';
@@ -80,7 +80,7 @@ export const runCommand = async (
     }
 
     // Load the agent workflow
-    const agentWorkflow = AgentWorkflow.load(workflowPath);
+    const workflowManager = WorkflowManager.load(workflowPath);
     let providedInputs = new Map();
 
     if (options.inputsJson != null) {
@@ -118,7 +118,7 @@ export const runCommand = async (
     const defaultInputs: Array<string> = [];
 
     // Add default values for required inputs that weren't provided
-    for (const input of agentWorkflow.inputs) {
+    for (const input of workflowManager.inputs) {
       if (!inputs.has(input.name) && input.default !== undefined) {
         inputs.set(input.name, String(input.default));
         defaultInputs.push(input.name);
@@ -126,8 +126,8 @@ export const runCommand = async (
     }
 
     console.log(colors.bold('Agent Workflow'));
-    console.log(colors.gray('├── Name: ') + colors.cyan(agentWorkflow.name));
-    console.log(colors.gray('└── Description: ') + agentWorkflow.description);
+    console.log(colors.gray('├── Name: ') + colors.cyan(workflowManager.name));
+    console.log(colors.gray('└── Description: ') + workflowManager.description);
 
     console.log(colors.bold('\nUser inputs'));
     const inputEntries = Array.from(inputs.entries());
@@ -139,7 +139,7 @@ export const runCommand = async (
     });
 
     // Validate inputs against workflow requirements
-    const validation = agentWorkflow.validateInputs(inputs);
+    const validation = workflowManager.validateInputs(inputs);
 
     // Display warnings if any
     if (validation.warnings.length > 0) {
@@ -163,22 +163,22 @@ export const runCommand = async (
 
       // Print Steps
       console.log(colors.bold('\nSteps'));
-      agentWorkflow.steps.forEach((step, idx) => {
-        const prefix = idx == agentWorkflow.steps.length - 1 ? '└──' : '├──';
+      workflowManager.steps.forEach((step, idx) => {
+        const prefix = idx == workflowManager.steps.length - 1 ? '└──' : '├──';
         console.log(`${prefix} ${idx}. ` + `${step.name}`);
       });
 
       let runSteps = 0;
-      const totalSteps = agentWorkflow.steps.length;
+      const totalSteps = workflowManager.steps.length;
 
       for (
         let stepIndex = 0;
-        stepIndex < agentWorkflow.steps.length;
+        stepIndex < workflowManager.steps.length;
         stepIndex++
       ) {
-        const step = agentWorkflow.steps[stepIndex];
+        const step = workflowManager.steps[stepIndex];
         const runner = new Runner(
-          agentWorkflow,
+          workflowManager,
           step.id,
           inputs,
           stepsOutput,
@@ -259,7 +259,7 @@ export const runCommand = async (
         } else {
           // If step failed, decide whether to continue based on workflow config
           const continueOnError =
-            agentWorkflow.config?.continueOnError || false;
+            workflowManager.config?.continueOnError || false;
           if (!continueOnError) {
             console.log(
               colors.red(
@@ -289,7 +289,7 @@ export const runCommand = async (
       );
       console.log(
         colors.gray('├── Total Steps: ') +
-          colors.cyan(agentWorkflow.steps.length.toString())
+          colors.cyan(workflowManager.steps.length.toString())
       );
 
       const successfulSteps = Array.from(stepsOutput.keys()).length;
@@ -303,7 +303,7 @@ export const runCommand = async (
         colors.gray('├── Failed Steps: ') + colors.red(failedSteps.toString())
       );
 
-      const skippedSteps = agentWorkflow.steps.length - runSteps;
+      const skippedSteps = workflowManager.steps.length - runSteps;
       console.log(
         colors.gray('├── Skipped Steps: ') +
           colors.yellow(failedSteps.toString())

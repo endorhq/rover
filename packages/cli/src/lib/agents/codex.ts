@@ -10,7 +10,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { fileSync } from 'tmp';
-import type { WorkflowInput } from '@endorhq/agent';
+import type { WorkflowInput } from 'rover-schemas';
 
 // Environment variables reference:
 // - https://raw.githubusercontent.com/openai/codex/refs/heads/main/docs/config.md

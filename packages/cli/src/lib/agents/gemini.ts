@@ -9,7 +9,7 @@ import { parseJsonResponse } from '../../utils/json-parser.js';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { existsSync } from 'node:fs';
-import type { WorkflowInput } from '@endorhq/agent';
+import type { WorkflowInput } from 'rover-schemas';
 
 // Environment variables reference:
 // - https://raw.githubusercontent.com/google-gemini/gemini-cli/refs/heads/main/docs/cli/configuration.md

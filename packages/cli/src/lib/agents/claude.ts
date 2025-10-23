@@ -15,7 +15,7 @@ import { parseJsonResponse } from '../../utils/json-parser.js';
 import { homedir, tmpdir, platform } from 'node:os';
 import { join } from 'node:path';
 import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
-import type { WorkflowInput } from '@endorhq/agent';
+import type { WorkflowInput } from 'rover-schemas';
 
 const findKeychainCredentials = (key: string): string => {
   const result = launchSync(

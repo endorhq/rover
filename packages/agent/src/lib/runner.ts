@@ -13,8 +13,8 @@ import {
   renameSync,
   rmSync,
 } from 'node:fs';
-import type { AgentStep, WorkflowOutputType } from './workflow/types.js';
-import { AgentWorkflow } from './workflow.js';
+import type { WorkflowAgentStep, WorkflowOutputType } from 'rover-schemas';
+import { WorkflowManager } from 'rover-schemas';
 import {
   parseAgentError,
   isWaitingForAuthentication,
@@ -43,13 +43,13 @@ export interface RunnerStepResult {
 
 export class Runner {
   // The step to run
-  private step: AgentStep;
+  private step: WorkflowAgentStep;
   // Final tool to run the step
   tool: string;
 
   // Use current data to initialize the runner
   constructor(
-    private workflow: AgentWorkflow,
+    private workflow: WorkflowManager,
     stepId: string,
     private inputs: Map<string, string>,
     private stepsOutput: Map<string, Map<string, string>>,

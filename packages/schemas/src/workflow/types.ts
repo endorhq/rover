@@ -11,12 +11,12 @@ import {
   WorkflowOutputSchema,
   WorkflowDefaultsSchema,
   WorkflowConfigSchema,
-  AgentToolSchema,
-  AgentStepSchema,
-  CommandStepSchema,
-  ConditionalStepSchema,
-  ParallelStepSchema,
-  SequentialStepSchema,
+  WorkflowAgentToolSchema,
+  WorkflowAgentStepSchema,
+  WorkflowCommandStepSchema,
+  WorkflowConditionalStepSchema,
+  WorkflowParallelStepSchema,
+  WorkflowSequentialStepSchema,
   WorkflowStepSchema,
   WorkflowSchema,
 } from './schema.js';
@@ -30,7 +30,7 @@ export type WorkflowOutputType = z.infer<typeof WorkflowOutputTypeSchema>;
 export type WorkflowOutput = z.infer<typeof WorkflowOutputSchema>;
 
 // Agent tool type
-export type AgentTool = z.infer<typeof AgentToolSchema>;
+export type WorkflowAgentTool = z.infer<typeof WorkflowAgentToolSchema>;
 
 // Defaults
 export type WorkflowDefaults = z.infer<typeof WorkflowDefaultsSchema>;
@@ -39,19 +39,23 @@ export type WorkflowDefaults = z.infer<typeof WorkflowDefaultsSchema>;
 export type WorkflowConfig = z.infer<typeof WorkflowConfigSchema>;
 
 // Step types - all inferred from Zod schemas
-export type AgentStep = z.infer<typeof AgentStepSchema>;
-export type CommandStep = z.infer<typeof CommandStepSchema>;
-export type ConditionalStep = z.infer<typeof ConditionalStepSchema>;
-export type ParallelStep = z.infer<typeof ParallelStepSchema>;
-export type SequentialStep = z.infer<typeof SequentialStepSchema>;
+export type WorkflowAgentStep = z.infer<typeof WorkflowAgentStepSchema>;
+export type WorkflowCommandStep = z.infer<typeof WorkflowCommandStepSchema>;
+export type WorkflowConditionalStep = z.infer<
+  typeof WorkflowConditionalStepSchema
+>;
+export type WorkflowParallelStep = z.infer<typeof WorkflowParallelStepSchema>;
+export type WorkflowSequentialStep = z.infer<
+  typeof WorkflowSequentialStepSchema
+>;
 
 // Discriminated union of all step types
-export type WorkflowStep = z.infer<typeof AgentStepSchema>;
+export type WorkflowStep = z.infer<typeof WorkflowAgentStepSchema>;
 
 // Main workflow structure
 export type Workflow = z.infer<typeof WorkflowSchema>;
 
 // Type guards for step types
-export function isAgentStep(step: WorkflowStep): step is AgentStep {
+export function isAgentStep(step: WorkflowStep): step is WorkflowAgentStep {
   return step.type === 'agent';
 }

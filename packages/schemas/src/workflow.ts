@@ -14,15 +14,15 @@ import type {
   WorkflowInput,
   WorkflowOutput,
   WorkflowStep,
-  AgentStep,
+  WorkflowAgentStep,
   WorkflowDefaults,
   WorkflowConfig,
-  AgentTool,
+  WorkflowAgentTool,
 } from './workflow/types.js';
 import {
   WorkflowLoadError,
   WorkflowValidationError,
-} from './workflow/loader.js';
+} from './workflow/errors.js';
 import { isAgentStep } from './workflow/types.js';
 
 // Default step timeout in seconds
@@ -32,7 +32,7 @@ const DEFAULT_STEP_TIMEOUT = 60 * 30; // 30 minutes
  * Workflow configuration class for loading and managing agent workflow definitions.
  * Provides validation, loading, and execution preparation for YAML-based workflows.
  */
-export class AgentWorkflow {
+export class WorkflowManager {
   private data: Workflow;
   filePath: string;
 
@@ -65,7 +65,7 @@ export class AgentWorkflow {
     inputs: WorkflowInput[] = [],
     outputs: WorkflowOutput[] = [],
     steps: WorkflowStep[] = []
-  ): AgentWorkflow {
+  ): WorkflowManager {
     const workflowData = {
       version: CURRENT_WORKFLOW_SCHEMA_VERSION,
       name,
@@ -73,7 +73,7 @@ export class AgentWorkflow {
       inputs,
       outputs,
       defaults: {
-        tool: 'claude' as AgentTool,
+        tool: 'claude' as WorkflowAgentTool,
         model: 'claude-4-sonnet',
       },
       config: {
@@ -83,7 +83,7 @@ export class AgentWorkflow {
       steps,
     };
 
-    const instance = new AgentWorkflow(workflowData, filePath);
+    const instance = new WorkflowManager(workflowData, filePath);
     instance.save();
     return instance;
   }
@@ -91,7 +91,7 @@ export class AgentWorkflow {
   /**
    * Load an existing workflow configuration from YAML file
    */
-  static load(filePath: string): AgentWorkflow {
+  static load(filePath: string): WorkflowManager {
     if (!existsSync(filePath)) {
       throw new WorkflowLoadError(
         `Workflow configuration not found at ${filePath}`
@@ -104,10 +104,10 @@ export class AgentWorkflow {
       const originalVersion = (parsedData as { version?: string }).version;
 
       // Migrate if necessary (returns validated Workflow)
-      const migratedData = AgentWorkflow.migrate(parsedData);
+      const migratedData = WorkflowManager.migrate(parsedData);
 
       // Constructor validates with Zod (safe even though migrate already validated)
-      const instance = new AgentWorkflow(migratedData, filePath);
+      const instance = new WorkflowManager(migratedData, filePath);
 
       // If migration occurred, save the updated data
       if (migratedData.version !== originalVersion) {
@@ -175,7 +175,7 @@ export class AgentWorkflow {
 
   /**
    * Get the effective tool for a step (step-specific or default)
-   * Only works with AgentStep - other step types don't have tool property
+   * Only works with WorkflowAgentStep - other step types don't have tool property
    */
   getStepTool(stepId: string, defaultTool?: string): string | undefined {
     const step = this.data.steps.find(s => s.id === stepId);
@@ -195,7 +195,7 @@ export class AgentWorkflow {
 
   /**
    * Get the effective model for a step (step-specific or default)
-   * Only works with AgentStep - other step types don't have model property
+   * Only works with WorkflowAgentStep - other step types don't have model property
    */
   getStepModel(stepId: string, defaultModel?: string): string | undefined {
     const step = this.data.steps.find(s => s.id === stepId);
@@ -229,7 +229,7 @@ export class AgentWorkflow {
    * Get agent step by ID
    * Throws if the step is not an agent step
    */
-  getAgentStep(stepId: string): AgentStep {
+  getWorkflowAgentStep(stepId: string): WorkflowAgentStep {
     const step = this.getStep(stepId);
     if (!isAgentStep(step)) {
       throw new Error(`Step "${stepId}" is not an agent step`);
@@ -239,7 +239,7 @@ export class AgentWorkflow {
 
   /**
    * Get step timeout (step-specific or global default)
-   * Only works with AgentStep - other step types may not have config
+   * Only works with WorkflowAgentStep - other step types may not have config
    */
   getStepTimeout(stepId: string): number {
     const step = this.getStep(stepId);
@@ -257,7 +257,7 @@ export class AgentWorkflow {
 
   /**
    * Get step retry count
-   * Only works with AgentStep - other step types may not have retries
+   * Only works with WorkflowAgentStep - other step types may not have retries
    */
   getStepRetries(stepId: string): number {
     const step = this.getStep(stepId);
