@@ -42,8 +42,8 @@ describe('ProjectConfig - Environment Variable Configuration', () => {
     expect(existsSync('rover.json')).toBe(true);
     const jsonData = JSON.parse(readFileSync('rover.json', 'utf8'));
 
-    // Version should be 1.1
-    expect(jsonData.version).toBe('1.1');
+    // Version should be 1.2
+    expect(jsonData.version).toBe('1.2');
 
     // Optional fields should not be present if undefined
     expect('envs' in jsonData).toBe(false);
@@ -124,7 +124,7 @@ describe('ProjectConfig - Environment Variable Configuration', () => {
     expect(config.envsFile).toBe('.env.rover');
   });
 
-  it('should migrate from version 1.0 to 1.1 without envs fields', () => {
+  it('should migrate from version 1.0 to 1.2 without envs fields', () => {
     writeFileSync(
       'rover.json',
       JSON.stringify(
@@ -142,8 +142,8 @@ describe('ProjectConfig - Environment Variable Configuration', () => {
 
     const config = ProjectConfig.load();
 
-    // Should be migrated to 1.1
-    expect(config.version).toBe('1.1');
+    // Should be migrated to 1.2
+    expect(config.version).toBe('1.2');
 
     // Optional fields should not be present
     expect(config.envs).toBeUndefined();
@@ -151,12 +151,12 @@ describe('ProjectConfig - Environment Variable Configuration', () => {
 
     // Check saved file
     const jsonData = JSON.parse(readFileSync('rover.json', 'utf8'));
-    expect(jsonData.version).toBe('1.1');
+    expect(jsonData.version).toBe('1.2');
     expect('envs' in jsonData).toBe(false);
     expect('envsFile' in jsonData).toBe(false);
   });
 
-  it('should migrate from version 1.0 to 1.1 preserving envs fields', () => {
+  it('should migrate from version 1.0 to 1.2 preserving envs fields', () => {
     writeFileSync(
       'rover.json',
       JSON.stringify(
@@ -176,8 +176,8 @@ describe('ProjectConfig - Environment Variable Configuration', () => {
 
     const config = ProjectConfig.load();
 
-    // Should be migrated to 1.1
-    expect(config.version).toBe('1.1');
+    // Should be migrated to 1.2
+    expect(config.version).toBe('1.2');
 
     // Should preserve custom fields
     expect(config.envs).toEqual(['NODE_ENV']);
@@ -185,12 +185,12 @@ describe('ProjectConfig - Environment Variable Configuration', () => {
 
     // Check saved file
     const jsonData = JSON.parse(readFileSync('rover.json', 'utf8'));
-    expect(jsonData.version).toBe('1.1');
+    expect(jsonData.version).toBe('1.2');
     expect(jsonData.envs).toEqual(['NODE_ENV']);
     expect(jsonData.envsFile).toBe('.env');
   });
 
-  it('should not re-migrate version 1.1 config', () => {
+  it('should migrate version 1.1 config to 1.2', () => {
     writeFileSync(
       'rover.json',
       JSON.stringify(
@@ -207,14 +207,14 @@ describe('ProjectConfig - Environment Variable Configuration', () => {
       )
     );
 
-    const initialContent = readFileSync('rover.json', 'utf8');
     const config = ProjectConfig.load();
 
-    expect(config.version).toBe('1.1');
+    expect(config.version).toBe('1.2');
 
-    // File should not be modified
-    const finalContent = readFileSync('rover.json', 'utf8');
-    expect(finalContent).toBe(initialContent);
+    // Check saved file has been migrated to 1.2
+    const jsonData = JSON.parse(readFileSync('rover.json', 'utf8'));
+    expect(jsonData.version).toBe('1.2');
+    expect(jsonData.envs).toEqual(['NODE_ENV']);
   });
 
   it('should preserve all existing fields during migration', () => {
@@ -235,7 +235,7 @@ describe('ProjectConfig - Environment Variable Configuration', () => {
 
     const config = ProjectConfig.load();
 
-    expect(config.version).toBe('1.1');
+    expect(config.version).toBe('1.2');
     expect(config.languages).toEqual(['typescript', 'python']);
     expect(config.packageManagers).toEqual(['npm', 'pip']);
     expect(config.taskManagers).toEqual(['make']);
@@ -296,16 +296,110 @@ describe('ProjectConfig - Environment Variable Configuration', () => {
     ]);
   });
 
+  it('should not re-migrate version 1.2 config', () => {
+    writeFileSync(
+      'rover.json',
+      JSON.stringify(
+        {
+          version: '1.2',
+          languages: ['typescript'],
+          packageManagers: ['npm'],
+          taskManagers: [],
+          attribution: true,
+          mcps: [],
+          envs: ['NODE_ENV'],
+          envsFile: '.env',
+        },
+        null,
+        2
+      )
+    );
+
+    const config = ProjectConfig.load();
+
+    // Should remain at version 1.2
+    expect(config.version).toBe('1.2');
+
+    // All fields should be preserved exactly
+    expect(config.languages).toEqual(['typescript']);
+    expect(config.packageManagers).toEqual(['npm']);
+    expect(config.taskManagers).toEqual([]);
+    expect(config.attribution).toBe(true);
+    expect(config.mcps).toEqual([]);
+    expect(config.envs).toEqual(['NODE_ENV']);
+    expect(config.envsFile).toBe('.env');
+
+    // Check saved file remains unchanged
+    const jsonData = JSON.parse(readFileSync('rover.json', 'utf8'));
+    expect(jsonData.version).toBe('1.2');
+    expect(jsonData.mcps).toEqual([]);
+    expect(jsonData.envs).toEqual(['NODE_ENV']);
+    expect(jsonData.envsFile).toBe('.env');
+  });
+
+  it('should migrate mcps field from version 1.0 to 1.2', () => {
+    writeFileSync(
+      'rover.json',
+      JSON.stringify(
+        {
+          version: '1.0',
+          languages: ['typescript'],
+          packageManagers: ['npm'],
+          taskManagers: [],
+          attribution: true,
+          mcps: [
+            {
+              name: 'test-mcp',
+              commandOrUrl: 'npx test-mcp',
+              transport: 'stdio',
+              envs: ['API_KEY'],
+            },
+          ],
+        },
+        null,
+        2
+      )
+    );
+
+    const config = ProjectConfig.load();
+
+    // Should be migrated to 1.2
+    expect(config.version).toBe('1.2');
+
+    // Should preserve mcps field
+    expect(config.mcps).toEqual([
+      {
+        name: 'test-mcp',
+        commandOrUrl: 'npx test-mcp',
+        transport: 'stdio',
+        envs: ['API_KEY'],
+      },
+    ]);
+
+    // Check saved file
+    const jsonData = JSON.parse(readFileSync('rover.json', 'utf8'));
+    expect(jsonData.version).toBe('1.2');
+    expect(jsonData.mcps).toEqual([
+      {
+        name: 'test-mcp',
+        commandOrUrl: 'npx test-mcp',
+        transport: 'stdio',
+        envs: ['API_KEY'],
+      },
+    ]);
+  });
+
   it('should serialize config to JSON correctly', () => {
     writeFileSync(
       'rover.json',
       JSON.stringify(
         {
-          version: '1.1',
+          version: '1.2',
           languages: ['typescript'],
           packageManagers: ['npm'],
           taskManagers: [],
           attribution: true,
+          mcps: [],
           envs: ['NODE_ENV'],
           envsFile: '.env',
         },
@@ -318,11 +412,12 @@ describe('ProjectConfig - Environment Variable Configuration', () => {
     const jsonData = config.toJSON();
 
     expect(jsonData).toEqual({
-      version: '1.1',
+      version: '1.2',
       languages: ['typescript'],
       packageManagers: ['npm'],
       taskManagers: [],
       attribution: true,
+      mcps: [],
       envs: ['NODE_ENV'],
       envsFile: '.env',
     });
