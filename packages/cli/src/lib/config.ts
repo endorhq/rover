@@ -18,6 +18,14 @@ export enum LANGUAGE {
   Ruby = 'ruby',
 }
 
+export interface MCP {
+  name: string;
+  commandOrUrl: string;
+  transport: string;
+  envs?: string[];
+  headers?: string[];
+}
+
 export enum PACKAGE_MANAGER {
   PNPM = 'pnpm',
   NPM = 'npm',
@@ -38,7 +46,7 @@ export enum TASK_MANAGER {
 }
 
 // Schema version for migrations
-export const CURRENT_PROJECT_SCHEMA_VERSION = '1.1';
+export const CURRENT_PROJECT_SCHEMA_VERSION = '1.2';
 
 export interface ProjectConfigSchema {
   // Common values
@@ -51,6 +59,9 @@ export interface ProjectConfigSchema {
 
   // Attribution
   attribution: boolean;
+
+  // MCPs
+  mcps: MCP[];
 
   // Custom environment variables
   envs?: string[];
@@ -104,6 +115,7 @@ export class ProjectConfig {
     const schema: ProjectConfigSchema = {
       version: CURRENT_PROJECT_SCHEMA_VERSION,
       languages: [],
+      mcps: [],
       packageManagers: [],
       taskManagers: [],
       attribution: true,
@@ -136,6 +148,7 @@ export class ProjectConfig {
     const migrated: ProjectConfigSchema = {
       version: CURRENT_PROJECT_SCHEMA_VERSION,
       languages: data.languages || [],
+      mcps: data.mcps || [],
       packageManagers: data.packageManagers || [],
       taskManagers: data.taskManagers || [],
       attribution: data.attribution !== undefined ? data.attribution : true,
@@ -175,6 +188,9 @@ export class ProjectConfig {
   get languages(): LANGUAGE[] {
     return this.data.languages;
   }
+  get mcps(): MCP[] {
+    return this.data.mcps;
+  }
   get packageManagers(): PACKAGE_MANAGER[] {
     return this.data.packageManagers;
   }
@@ -203,6 +219,21 @@ export class ProjectConfig {
     const index = this.data.languages.indexOf(language);
     if (index > -1) {
       this.data.languages.splice(index, 1);
+      this.save();
+    }
+  }
+
+  addMCP(mcp: MCP): void {
+    if (!this.data.mcps.includes(mcp)) {
+      this.data.mcps.push(mcp);
+      this.save();
+    }
+  }
+
+  removeMCP(mcp: MCP): void {
+    const index = this.data.mcps.indexOf(mcp);
+    if (index > -1) {
+      this.data.mcps.splice(index, 1);
       this.save();
     }
   }
