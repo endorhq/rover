@@ -683,7 +683,7 @@ export const taskCommand = async (
       if (!json) {
         console.log(
           colors.yellow(
-            '⚠ Warning: Current branch has uncommitted or untracked changes'
+            '\n⚠ Warning: Current branch has uncommitted or untracked changes'
           )
         );
         console.log(
@@ -693,7 +693,7 @@ export const taskCommand = async (
         );
         console.log(
           colors.gray(`  Example: `) +
-            colors.cyan(`rover task --source-branch main\n`)
+            colors.cyan(`rover task --source-branch main`)
         );
       }
     }
@@ -736,6 +736,15 @@ export const taskCommand = async (
         } catch (err) {
           // Assume the text is just the description
           description = stdinInput;
+          inputsData.set('description', description);
+          if (!json) {
+            showProperties(
+              {
+                Description: description,
+              },
+              { addLineBreak: false }
+            );
+          }
         }
       }
     } else if (fromGithub != null) {
@@ -746,6 +755,7 @@ export const taskCommand = async (
         const issueData = await github.fetchIssue(fromGithub, git.remoteUrl());
         if (issueData) {
           description = issueData.body;
+          inputsData.set('description', description);
 
           if (!issueData.body || issueData.body.length == 0) {
             jsonOutput.error =
@@ -754,52 +764,58 @@ export const taskCommand = async (
             return;
           }
 
-          if (!json) {
-            console.log(colors.green('✓ GitHub issue fetched successfully'));
-            console.log(
-              colors.gray('└── Title: ') + colors.cyan(issueData.title)
-            );
-          }
-
           // Now, let's ask an agent to extract the required inputs from the issue body.
           if (inputs && inputs.length > 0) {
-            if (!json) {
-              console.log(
-                colors.gray('\nExtracting workflow inputs from issue...')
-              );
-            }
-
-            const agentTool = getAIAgentTool(selectedAiAgent);
-            const extractedInputs = await agentTool.extractGithubInputs(
-              issueData.body,
-              inputs
-            );
-
-            if (extractedInputs) {
-              for (const key in extractedInputs) {
-                if (extractedInputs[key] !== null) {
-                  inputsData.set(key, String(extractedInputs[key]));
-                }
-              }
-
+            if (inputs.length == 1 && inputs[0].name === 'description') {
+              // We already have the description!
+              inputsData.set('description', description);
               if (!json) {
-                console.log(
-                  colors.green('✓ Workflow inputs extracted successfully')
+                showProperties(
+                  {
+                    Description: description,
+                  },
+                  { addLineBreak: false }
                 );
               }
             } else {
               if (!json) {
                 console.log(
-                  colors.yellow(
-                    '⚠ Could not extract workflow inputs from issue'
-                  )
+                  colors.gray('\nExtracting workflow inputs from issue...')
                 );
               }
 
-              jsonOutput.error =
-                'Failed to fetch the workflow inputs from issue';
-              exitWithError(jsonOutput, json);
-              return;
+              const agentTool = getAIAgentTool(selectedAiAgent);
+              const extractedInputs = await agentTool.extractGithubInputs(
+                issueData.body,
+                inputs.filter(el => el.name !== 'description')
+              );
+
+              if (extractedInputs) {
+                for (const key in extractedInputs) {
+                  if (extractedInputs[key] !== null) {
+                    inputsData.set(key, String(extractedInputs[key]));
+                  }
+                }
+
+                if (!json) {
+                  console.log(
+                    colors.green('✓ Workflow inputs extracted successfully')
+                  );
+                }
+              } else {
+                if (!json) {
+                  console.log(
+                    colors.yellow(
+                      '⚠ Could not extract workflow inputs from issue'
+                    )
+                  );
+                }
+
+                jsonOutput.error =
+                  'Failed to fetch the workflow inputs from issue';
+                exitWithError(jsonOutput, json);
+                return;
+              }
             }
           }
         } else {

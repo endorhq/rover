@@ -67,6 +67,7 @@ export class SetupBuilder {
       const mcpCommands: string[] = [];
 
       for (const mcp of mcps) {
+        const transport = mcp.transport || 'stdio';
         let cmd = `rover-agent config mcp ${this.agent} "${mcp.name}" --transport "${mcp.transport}"`;
 
         if (mcp.envs && mcp.envs.length > 0) {
