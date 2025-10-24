@@ -87,7 +87,7 @@ echo -e "\n======================================="
 echo "📦 Starting the package manager MCP server"
 echo "======================================="
 export PACKAGE_MANAGER_MCP_PORT=8090
-package-manager-mcp-server $PACKAGE_MANAGER_MCP_PORT &
+RUST_LOG=info package-manager-mcp-server $PACKAGE_MANAGER_MCP_PORT &
 
 while ! nc -w 0 127.0.0.1 "$PACKAGE_MANAGER_MCP_PORT" < /dev/null; do
   echo "Waiting for package manager MCP to be ready at $PACKAGE_MANAGER_MCP_PORT..."
