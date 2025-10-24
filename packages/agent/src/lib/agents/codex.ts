@@ -62,31 +62,54 @@ export class CodexAgent extends BaseAgent {
   ): Promise<void> {
     const args = ['mcp', 'add'];
 
-    if (transport !== 'stdio') {
-      throw new Error(`${this.name} only supports stdio transport`);
-    }
+    if (transport === 'stdio') {
+      if (headers.length > 0) {
+        console.log(
+          colors.yellow(` ${this.name} does not support headers in stdio mode.`)
+        );
+      }
 
-    envs.forEach(env => {
-      if (/\w+=\w+/.test(env)) {
-        args.push(`--env=${env}`);
-      } else {
+      envs.forEach(env => {
+        if (/\w+=\w+/.test(env)) {
+          args.push(`--env=${env}`);
+        } else {
+          console.log(
+            colors.yellow(
+              ` Invalid ${env} environment variable. Use KEY=VALUE format`
+            )
+          );
+        }
+      });
+
+      args.push(name, '--', ...commandOrUrl.split(' '));
+    } else if (transport === 'http') {
+      if (envs.length > 0) {
         console.log(
           colors.yellow(
-            ` Invalid ${env} environment variable. Use KEY=VALUE format`
+            ` ${this.name} only supports environment variables in stdio mode.`
           )
         );
       }
-    });
 
-    if (headers.length > 0) {
-      console.log(
-        colors.yellow(
-          ` ${this.name} does not support HTTP or SSE servers. Ignoring headers.`
-        )
+      // TODO: allow the user to specify what envvar contains the
+      // bearer token.
+      //
+      // Codex works a bit different here: does not support
+      // arbitrary headers at this time but --bearer-token-env-var,
+      // the name of an envvar that holds the bearer token..
+
+      if (headers.length > 0) {
+        console.log(
+          colors.yellow(` ${this.name} does not support arbitrary headers.`)
+        );
+      }
+
+      args.push(name, '--url', commandOrUrl);
+    } else {
+      throw new Error(
+        `Codex does not support other MCP server transports than stdio or http`
       );
     }
-
-    args.push(name, ...commandOrUrl.split(' '));
 
     const result = await launch(this.binary, args);
 

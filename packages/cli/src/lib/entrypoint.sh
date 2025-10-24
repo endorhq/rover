@@ -134,8 +134,17 @@ rover-agent config mcp $AGENT package-manager --transport "http" http://127.0.0.
 # TODO(ereslibre): replace with `rover-agent config mcps` that by
 # default will read /workspace/rover.json.
 configure_all_mcps() {
-  trap 'warn_mcp_configuration_failed' ERR
-  {configureAllMCPs}
+  # Fail as soon as the configuration of one of the provided MCP's
+  # fail. This is because results might not be close to what the user
+  # expects without the required MCP's.
+
+  set -e
+  trap 'warn_mcp_configuration_failed; return 1' ERR
+
+  {configureAllMCPCommands}
+
+  trap - ERR
+  set +e
 }
 
 warn_mcp_configuration_failed() {
