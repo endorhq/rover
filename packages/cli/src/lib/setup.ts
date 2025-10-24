@@ -50,7 +50,6 @@ export class SetupBuilder {
    * Generate and save the setup script to the appropriate task directory
    */
   generateEntrypoint(): string {
-    let configureAllMCPs = '';
     let recoverPermissions = '';
 
     // For Docker rootless, force it to return the permissions to the right users.
@@ -62,10 +61,10 @@ export class SetupBuilder {
     // Generate MCP configuration commands from rover.json
     const projectConfig = ProjectConfig.load();
     const mcps = projectConfig.mcps;
+    let configureAllMCPCommands: string[] = [];
 
     if (mcps && mcps.length > 0) {
-      const mcpCommands: string[] = [];
-
+      configureAllMCPCommands.push('echo "✅ Configuring custom MCPs"');
       for (const mcp of mcps) {
         const transport = mcp.transport || 'stdio';
         let cmd = `rover-agent config mcp ${this.agent} "${mcp.name}" --transport "${mcp.transport}"`;
@@ -84,18 +83,18 @@ export class SetupBuilder {
 
         cmd += ` "${mcp.commandOrUrl}"`;
 
-        mcpCommands.push(cmd);
+        configureAllMCPCommands.push(cmd);
       }
-
-      configureAllMCPs = mcpCommands.join('\n');
     } else {
-      configureAllMCPs = `echo "✅ No MCPs defined in rover.json, skipping custom MCP configuration"`;
+      configureAllMCPCommands.push(
+        'echo "✅ No MCPs defined in rover.json, skipping custom MCP configuration"'
+      );
     }
 
     // Generate script content
     const scriptContent = pupa(entrypointScript, {
       agent: this.agent,
-      configureAllMCPs,
+      configureAllMCPCommands: configureAllMCPCommands.join('\n  '),
       recoverPermissions,
     });
 

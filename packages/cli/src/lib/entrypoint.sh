@@ -87,7 +87,7 @@ echo -e "\n======================================="
 echo "📦 Starting the package manager MCP server"
 echo "======================================="
 export PACKAGE_MANAGER_MCP_PORT=8090
-package-manager-mcp-server $PACKAGE_MANAGER_MCP_PORT &
+RUST_LOG=info package-manager-mcp-server $PACKAGE_MANAGER_MCP_PORT &
 
 while ! nc -w 0 127.0.0.1 "$PACKAGE_MANAGER_MCP_PORT" < /dev/null; do
   echo "Waiting for package manager MCP to be ready at $PACKAGE_MANAGER_MCP_PORT..."
@@ -134,8 +134,17 @@ rover-agent config mcp $AGENT package-manager --transport "http" http://127.0.0.
 # TODO(ereslibre): replace with `rover-agent config mcps` that by
 # default will read /workspace/rover.json.
 configure_all_mcps() {
-  trap 'warn_mcp_configuration_failed' ERR
-  {configureAllMCPs}
+  # Fail as soon as the configuration of one of the provided MCP's
+  # fail. This is because results might not be close to what the user
+  # expects without the required MCP's.
+
+  set -e
+  trap 'warn_mcp_configuration_failed; return 1' ERR
+
+  {configureAllMCPCommands}
+
+  trap - ERR
+  set +e
 }
 
 warn_mcp_configuration_failed() {
