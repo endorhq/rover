@@ -86,7 +86,7 @@ export class CodexAgent extends BaseAgent {
       );
     }
 
-    args.push(name, commandOrUrl);
+    args.push(name, ...commandOrUrl.split(' '));
 
     const result = await launch(this.binary, args);
 

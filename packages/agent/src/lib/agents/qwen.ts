@@ -77,7 +77,7 @@ export class QwenAgent extends BaseAgent {
     // This does not work: gemini mcp add -e MY_VAR=VALUE rover-mcp npx -y @endorhq/rover mcp
     //
     // @https://github.com/google-gemini/gemini-cli/issues/10387
-    args.push(name, commandOrUrl);
+    args.push(name, ...commandOrUrl.split(' '));
 
     envs.forEach(env => {
       if (/\w+=\w+/.test(env)) {

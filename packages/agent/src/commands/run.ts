@@ -322,8 +322,12 @@ export const runCommand = async (
       console.log(colors.gray('└── Status: ') + status);
 
       // Mark workflow as completed in status file
-      output.success = true;
-      statusManager?.complete('Workflow completed successfully');
+      if (failedSteps > 0) {
+        output.success = false;
+      } else {
+        output.success = true;
+        statusManager?.complete('Workflow completed successfully');
+      }
     }
   } catch (err) {
     output.success = false;
