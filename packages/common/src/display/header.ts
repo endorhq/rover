@@ -57,8 +57,9 @@ export const showSplashHeader = () => {
  * @param context - Context path (e.g., current working directory)
  */
 export function showRegularHeader(version: string, context: string): void {
+  const cleanText = `Rover (v${version}) · ${context}`;
   const headerText = `${colors.cyan('Rover')} ${colors.gray(`(v${version})`)} · ${colors.gray(context)}`;
-  const separator = colors.gray('-'.repeat(headerText.length));
+  const separator = colors.gray('-'.repeat(cleanText.length));
 
   console.log(headerText);
   console.log(separator);
