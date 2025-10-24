@@ -224,14 +224,14 @@ export class ProjectConfig {
   }
 
   addMCP(mcp: MCP): void {
-    if (!this.data.mcps.includes(mcp)) {
+    if (!this.data.mcps.some(m => m.name === mcp.name)) {
       this.data.mcps.push(mcp);
       this.save();
     }
   }
 
   removeMCP(mcp: MCP): void {
-    const index = this.data.mcps.indexOf(mcp);
+    const index = this.data.mcps.findIndex(m => m.name === mcp.name);
     if (index > -1) {
       this.data.mcps.splice(index, 1);
       this.save();
