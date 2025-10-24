@@ -34,7 +34,7 @@ import { WorkflowManager } from 'rover-schemas';
 const { prompt } = enquirer;
 
 // Default values
-const AGENT_IMAGE = 'ghcr.io/endorhq/rover/node:v1.3.0';
+const AGENT_IMAGE = 'ghcr.io/endorhq/rover/node:v1.3.1';
 const DEFAULT_WORKFLOW = 'swe';
 
 type validationResult = {
