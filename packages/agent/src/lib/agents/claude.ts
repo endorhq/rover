@@ -143,7 +143,7 @@ export class ClaudeAgent extends BaseAgent {
 
     // @see https://docs.claude.com/en/docs/claude-code/mcp#installing-mcp-servers
     if (transport === 'stdio') {
-      args.push('--', commandOrUrl);
+      args.push('--', ...commandOrUrl.split(' '));
     } else {
       args.push(commandOrUrl);
     }
