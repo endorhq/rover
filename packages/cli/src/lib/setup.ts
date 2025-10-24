@@ -67,7 +67,7 @@ export class SetupBuilder {
       const mcpCommands: string[] = [];
 
       for (const mcp of mcps) {
-        let cmd = `rover-agent config mcp ${this.agent} "${mcp.name}" --transport "${mcp.transport}" "${mcp.commandOrUrl}"`;
+        let cmd = `rover-agent config mcp ${this.agent} "${mcp.name}" --transport "${mcp.transport}"`;
 
         if (mcp.envs && mcp.envs.length > 0) {
           for (const env of mcp.envs) {
@@ -80,6 +80,8 @@ export class SetupBuilder {
             cmd += ` --header "${header}"`;
           }
         }
+
+        cmd += ` "${mcp.commandOrUrl}"`;
 
         mcpCommands.push(cmd);
       }
