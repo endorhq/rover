@@ -6,6 +6,7 @@ import workflowDistPath from './workflows/swe.yml';
 import entrypointScript from './entrypoint.sh';
 import pupa from 'pupa';
 import { fileURLToPath } from 'node:url';
+import { ProjectConfig } from './config.js';
 
 /**
  * SetupBuilder class - Consolidates Docker setup script generation
@@ -49,6 +50,7 @@ export class SetupBuilder {
    * Generate and save the setup script to the appropriate task directory
    */
   generateEntrypoint(): string {
+    let configureAllMCPs = '';
     let recoverPermissions = '';
 
     // For Docker rootless, force it to return the permissions to the right users.
@@ -57,9 +59,40 @@ export class SetupBuilder {
     sudo chown -R root:root /output || true\n`;
     }
 
+    // Generate MCP configuration commands from rover.json
+    const projectConfig = ProjectConfig.load();
+    const mcps = projectConfig.mcps;
+
+    if (mcps && mcps.length > 0) {
+      const mcpCommands: string[] = [];
+
+      for (const mcp of mcps) {
+        let cmd = `rover-agent config mcp ${this.agent} "${mcp.name}" --transport "${mcp.transport}" "${mcp.commandOrUrl}"`;
+
+        if (mcp.envs && mcp.envs.length > 0) {
+          for (const env of mcp.envs) {
+            cmd += ` --env "${env}"`;
+          }
+        }
+
+        if (mcp.headers && mcp.headers.length > 0) {
+          for (const header of mcp.headers) {
+            cmd += ` --header "${header}"`;
+          }
+        }
+
+        mcpCommands.push(cmd);
+      }
+
+      configureAllMCPs = mcpCommands.join('\n');
+    } else {
+      configureAllMCPs = `echo "✅ No MCPs defined in rover.json, skipping custom MCP configuration"`;
+    }
+
     // Generate script content
     const scriptContent = pupa(entrypointScript, {
       agent: this.agent,
+      configureAllMCPs,
       recoverPermissions,
     });
 

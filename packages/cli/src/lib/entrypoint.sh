@@ -66,19 +66,6 @@ check_command() {
     return 0
 }
 
-# Function to install mcp-remote if not available
-ensure_mcp_remote() {
-  if ! check_command mcp-remote; then
-    COMMAND="sudo npm install -g mcp-remote@0.1.29"
-    if $COMMAND; then
-      echo "✅ Installed mcp-remote"
-    else
-      echo "❌ Failed to install mcp-remote"
-      safe_exit 1
-    fi
-  fi
-}
-
 # Function to validate task description file
 validate_task_file() {
     if [ ! -f "/task/description.json" ]; then
@@ -146,50 +133,17 @@ rover-agent config mcp $AGENT package-manager --transport "http" http://127.0.0.
 #
 # TODO(ereslibre): replace with `rover-agent config mcps` that by
 # default will read /workspace/rover.json.
-MCP_COUNT=$(jq -r '.mcps // [] | length' /workspace/rover.json)
-if [ "$MCP_COUNT" -gt 0 ]; then
-  echo "Configuring $MCP_COUNT MCP(s) from rover.json..."
+configure_all_mcps() {
+  trap 'warn_mcp_configuration_failed' ERR
+  {configureAllMCPs}
+}
 
-  # Loop through each MCP
-  for i in $(seq 0 $(($MCP_COUNT - 1))); do
-    # Extract MCP properties
-    MCP_NAME=$(jq -r ".mcps[$i].name" /workspace/rover.json)
-    MCP_COMMAND_OR_URL=$(jq -r ".mcps[$i].commandOrUrl" /workspace/rover.json)
-    MCP_TRANSPORT=$(jq -r ".mcps[$i].transport" /workspace/rover.json)
+warn_mcp_configuration_failed() {
+  echo "❌ Failed to configure MCP servers"
+  safe_exit 1
+}
 
-    # Build the base command
-    CMD="rover-agent config mcp $AGENT \"$MCP_NAME\" --transport \"$MCP_TRANSPORT\" \"$MCP_COMMAND_OR_URL\""
-
-    # Add environment variables if present
-    MCP_ENVS=$(jq -r ".mcps[$i].envs // [] | .[]" /workspace/rover.json 2>/dev/null)
-    if [ -n "$MCP_ENVS" ]; then
-      while IFS= read -r env; do
-        CMD="$CMD --env \"$env\""
-      done <<< "$MCP_ENVS"
-    fi
-
-    # Add headers if present
-    MCP_HEADERS=$(jq -r ".mcps[$i].headers // [] | .[]" /workspace/rover.json 2>/dev/null)
-    if [ -n "$MCP_HEADERS" ]; then
-      while IFS= read -r header; do
-        CMD="$CMD --header \"$header\""
-      done <<< "$MCP_HEADERS"
-    fi
-
-    # Execute the command
-    echo "Configuring MCP: $MCP_NAME"
-    eval $CMD
-
-    if [ $? -eq 0 ]; then
-      echo "✅ $MCP_NAME configured successfully"
-    else
-      echo "❌ Failed to configure $MCP_NAME"
-      safe_exit 1
-    fi
-  done
-else
-  echo "No MCPs defined in rover.json, skipping custom MCP configuration"
-fi
+configure_all_mcps
 
 echo -e "\n📦 Done installing MCP servers"
 
