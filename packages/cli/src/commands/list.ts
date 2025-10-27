@@ -1,9 +1,8 @@
 import colors from 'ansi-colors';
 import { formatTaskStatus, statusColor } from '../utils/task-status.js';
-import { showTips } from '../utils/display.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { getDescriptions, TaskDescriptionSchema } from '../lib/description.js';
-import { VERBOSE } from 'rover-common';
+import { VERBOSE, showTips } from 'rover-common';
 import { IterationStatusManager } from 'rover-schemas';
 import {
   getLastTaskIteration,
@@ -86,11 +85,11 @@ export const listCommand = async (
       } else {
         console.log(colors.yellow('📋 No tasks found'));
 
-        showTips([
+        showTips(
           'Use ' +
-            colors.cyan('rover task') +
-            ' to assign a new task to an agent',
-        ]);
+          colors.cyan('rover task') +
+          ' to assign a new task to an agent'
+        );
       }
       return;
     }
@@ -148,12 +147,13 @@ export const listCommand = async (
       'ID',
       'Title',
       'Agent',
+      'Workflow',
       'Status',
       'Progress',
       'Current Step',
       'Duration',
     ];
-    const columnWidths = [4, 30, 8, 12, 10, 25, 10];
+    const columnWidths = [4, 30, 8, 15, 12, 10, 25, 10];
 
     // Print header
     let headerRow = '';
@@ -188,6 +188,7 @@ export const listCommand = async (
       const colorFunc = statusColor(taskStatus);
 
       const agent = task.agent || '-';
+      const workflow = task.workflowName || '-';
 
       const maybeIterationStatus: (
         iteration?: IterationConfig
@@ -203,16 +204,19 @@ export const listCommand = async (
       row += colors.cyan(task.id.toString().padEnd(columnWidths[0]));
       row += truncateText(title, columnWidths[1] - 1).padEnd(columnWidths[1]);
       row += colors.gray(agent.padEnd(columnWidths[2]));
-      row += colorFunc(formatTaskStatus(taskStatus).padEnd(columnWidths[3])); // +10 for ANSI codes
+      row += colors.gray(
+        truncateText(workflow, columnWidths[3] - 1).padEnd(columnWidths[3])
+      );
+      row += colorFunc(formatTaskStatus(taskStatus).padEnd(columnWidths[4])); // +10 for ANSI codes
       row += formatProgress(
         taskStatus,
         maybeIterationStatus(lastIteration)?.progress || 0
-      ).padEnd(columnWidths[4] + 10);
+      ).padEnd(columnWidths[5] + 10);
       row += colors.gray(
         truncateText(
           maybeIterationStatus(lastIteration)?.currentStep || '-',
-          columnWidths[5] - 1
-        ).padEnd(columnWidths[5])
+          columnWidths[6] - 1
+        ).padEnd(columnWidths[6])
       );
       row += colors.gray(maybeIterationStatus(lastIteration) ? duration : '-');
       console.log(row);
@@ -248,18 +252,9 @@ export const listCommand = async (
     if (!options.watch && !options.watching) {
       showTips([
         'Use ' +
-          colors.cyan('rover list --watch') +
-          ' to monitor the task status',
-        'Use ' +
-          colors.cyan('rover task') +
-          ' to assign a new task to an agent',
+        colors.cyan('rover task') +
+        ' to assign a new task to an agent',
         'Use ' + colors.cyan('rover inspect <id>') + ' to see the task details',
-        'Use ' +
-          colors.cyan('rover logs <id> --follow') +
-          ' to read the task logs',
-        'Use ' +
-          colors.cyan('rover restart <id>') +
-          ' to retry tasks in new or failed statuses',
       ]);
     }
   } catch (error) {
