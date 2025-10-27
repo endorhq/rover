@@ -96,7 +96,7 @@ export class CodexAgent extends BaseAgent {
       //
       // Codex works a bit different here: does not support
       // arbitrary headers at this time but --bearer-token-env-var,
-      // the name of an envvar that holds the bearer token..
+      // the name of an envvar that holds the bearer token.
 
       if (headers.length > 0) {
         console.log(
