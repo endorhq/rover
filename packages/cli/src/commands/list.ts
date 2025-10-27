@@ -153,7 +153,7 @@ export const listCommand = async (
       'Current Step',
       'Duration',
     ];
-    const columnWidths = [4, 30, 8, 15, 12, 10, 25, 10];
+    const columnWidths = [4, 30, 8, 12, 12, 10, 25, 10];
 
     // Print header
     let headerRow = '';
