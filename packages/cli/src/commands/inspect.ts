@@ -5,7 +5,6 @@ import {
   TaskNotFoundError,
   type TaskStatus,
 } from '../lib/description.js';
-import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { getTelemetry } from '../lib/telemetry.js';
 import {
@@ -16,6 +15,7 @@ import {
   showTips,
   showTitle,
 } from 'rover-common';
+import { IterationConfig } from '../lib/iteration.js';
 
 const DEFAULT_FILE_CONTENTS = 'summary.md';
 
@@ -94,85 +94,6 @@ const jsonErrorOutput = (
   };
 };
 
-/**
- * Discover files in iteration directory with tree structure
- */
-const discoverIterationFiles = (
-  taskId: number,
-  iterationId: number
-): string[] => {
-  const iterationDir = join(
-    findProjectRoot(),
-    '.rover',
-    'tasks',
-    taskId.toString(),
-    'iterations',
-    iterationId.toString()
-  );
-
-  if (!existsSync(iterationDir)) {
-    return [];
-  }
-
-  const files: string[] = [];
-
-  const walkDirectory = (dir: string, prefix: string = '') => {
-    try {
-      const entries = readdirSync(dir, { withFileTypes: true });
-      entries.sort((a, b) => {
-        // Directories first, then files
-        if (a.isDirectory() && !b.isDirectory()) return -1;
-        if (!a.isDirectory() && b.isDirectory()) return 1;
-        return a.name.localeCompare(b.name);
-      });
-
-      entries.forEach(entry => {
-        if (entry.name.endsWith('.md')) {
-          files.push(entry.name);
-        }
-      });
-    } catch (error) {
-      // Skip directories that cannot be read
-    }
-  };
-
-  walkDirectory(iterationDir);
-  return files;
-};
-
-export const iterationFiles = (
-  taskId: number,
-  iterationNumber: number,
-  files?: string[]
-) => {
-  if (files === undefined) {
-    files = ['summary.md'];
-  }
-
-  let result = new Map<string, string>();
-
-  const discoveredFiles = discoverIterationFiles(taskId, iterationNumber);
-  for (const file of discoveredFiles) {
-    if (files.includes(file)) {
-      const fileContents = readFileSync(
-        join(
-          findProjectRoot(),
-          '.rover',
-          'tasks',
-          taskId.toString(),
-          'iterations',
-          iterationNumber.toString(),
-          file
-        ),
-        'utf8'
-      );
-      result.set(file, fileContents);
-    }
-  }
-
-  return result;
-};
-
 export const inspectCommand = async (
   taskId: string,
   iterationNumber?: number,
@@ -211,6 +132,17 @@ export const inspectCommand = async (
       iterationNumber = task.iterations;
     }
 
+    // Load the iteration config
+    const iterationPath = join(
+      findProjectRoot(),
+      '.rover',
+      'tasks',
+      numericTaskId.toString(),
+      'iterations',
+      iterationNumber.toString()
+    );
+    const iteration = IterationConfig.load(iterationPath);
+
     if (options.json) {
       // Output JSON format
       const jsonOutput: TaskInspectionOutput = {
@@ -220,7 +152,7 @@ export const inspectCommand = async (
         description: task.description,
         error: task.error,
         failedAt: task.failedAt,
-        files: discoverIterationFiles(numericTaskId, iterationNumber),
+        files: iteration.listMarkdownFiles(),
         formattedStatus: formatTaskStatus(task.status),
         id: task.id,
         iterations: task.iterations,
@@ -268,10 +200,7 @@ export const inspectCommand = async (
 
       showProperties(properties);
 
-      const discoveredFiles = discoverIterationFiles(
-        numericTaskId,
-        iterationNumber
-      );
+      const discoveredFiles = iteration.listMarkdownFiles();
 
       if (discoveredFiles.length > 0) {
         // Show the summary file by default only when it's available
@@ -282,11 +211,7 @@ export const inspectCommand = async (
             : discoveredFiles[discoveredFiles.length - 1],
         ];
 
-        const iterationFileContents = iterationFiles(
-          numericTaskId,
-          iterationNumber,
-          fileFilter
-        );
+        const iterationFileContents = iteration.getMarkdownFiles(fileFilter);
         if (iterationFileContents.size === 0) {
           console.log(
             colors.gray(

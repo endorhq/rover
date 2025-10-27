@@ -268,6 +268,75 @@ export class IterationConfig {
   toJSON(): IterationConfigSchema {
     return { ...this.data };
   }
+
+  /**
+   * Get available markdown files in this iteration directory
+   */
+  getMarkdownFiles(requestedFiles?: string[]): Map<string, string> {
+    const result = new Map<string, string>();
+
+    if (!existsSync(this.iterationPath)) {
+      return result;
+    }
+
+    try {
+      const files = readdirSync(this.iterationPath, { withFileTypes: true })
+        .filter(entry => entry.isFile() && entry.name.endsWith('.md'))
+        .map(entry => entry.name)
+        .sort();
+
+      const filesToRead = requestedFiles || files;
+
+      for (const file of filesToRead) {
+        if (files.includes(file)) {
+          try {
+            const fileContents = readFileSync(
+              join(this.iterationPath, file),
+              'utf8'
+            );
+            result.set(file, fileContents);
+          } catch (error) {
+            if (VERBOSE) {
+              console.error(
+                colors.gray(`Error reading file ${file}: ${error}`)
+              );
+            }
+          }
+        }
+      }
+    } catch (error) {
+      if (VERBOSE) {
+        console.error(
+          colors.gray(`Error listing files in ${this.iterationPath}: ${error}`)
+        );
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Get list of markdown filenames in this iteration directory
+   */
+  listMarkdownFiles(): string[] {
+    if (!existsSync(this.iterationPath)) {
+      return [];
+    }
+
+    try {
+      return readdirSync(this.iterationPath, { withFileTypes: true })
+        .filter(entry => entry.isFile() && entry.name.endsWith('.md'))
+        .map(entry => entry.name)
+        .sort();
+    } catch (error) {
+      if (VERBOSE) {
+        console.error(
+          colors.gray(`Error listing files in ${this.iterationPath}: ${error}`)
+        );
+      }
+      return [];
+    }
+  }
 }
 
 /**
