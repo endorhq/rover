@@ -181,16 +181,17 @@ export const inspectCommand = async (
         ID: `${task.id.toString()} (${colors.gray(task.uuid)})`,
         Title: task.title,
         Status: statusColorFunc(formattedStatus),
+        Workflow: task.workflowName,
         'Git Workspace': `${task.worktreePath} (${colors.gray(task.branchName)})`,
-        Timestamp: `Created at ${new Date(task.createdAt).toLocaleDateString()}`,
+        'Created At': new Date(task.createdAt).toLocaleString(),
       };
 
       if (task.completedAt) {
-        properties['Timestamp'] +=
-          ` | Completed at ${new Date(task.completedAt).toLocaleString()}`;
+        properties['Completed At'] = new Date(
+          task.completedAt
+        ).toLocaleString();
       } else if (task.failedAt) {
-        properties['Timestamp'] +=
-          ` | Failed at ${new Date(task.failedAt).toLocaleString()}`;
+        properties['Failed At'] = new Date(task.failedAt).toLocaleString();
       }
 
       // Show error if failed
