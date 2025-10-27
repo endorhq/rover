@@ -26,6 +26,9 @@ export { showProperties } from './properties.js';
 // Export process utilities
 export { ProcessManager } from './process.js';
 
+// Export utility functions
+export { stripAnsi } from './utils.js';
+
 // Export types
 export type {
   DisplayColor,

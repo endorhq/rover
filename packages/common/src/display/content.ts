@@ -16,6 +16,10 @@ import boxen from 'boxen';
 export const showFile = (filename: string, content: string): void => {
   const contentToDisplay = content.length === 0 ? '-' : content;
   console.log(
-    boxen(contentToDisplay, { title: filename, borderColor: 'gray' })
+    boxen(contentToDisplay, {
+      title: filename,
+      borderColor: 'gray',
+      padding: 1,
+    })
   );
 };

@@ -90,4 +90,30 @@ describe('showTitle', () => {
     const titleLine = consoleOutput[1];
     expect(titleLine).toContain('标题 Title タイトル');
   });
+
+  it('should strip ANSI codes when calculating separator length', () => {
+    // Create a title with ANSI codes
+    const titleWithAnsi = colors.cyan('Colored') + ' Title';
+    showTitle(titleWithAnsi);
+
+    const separatorLine = consoleOutput[2];
+    // Strip ANSI codes from both to compare lengths
+    const separatorWithoutAnsi = separatorLine.replace(/\x1b\[[0-9;]*m/g, '');
+
+    // The visible text is 'Colored Title' which is 13 characters
+    expect(separatorWithoutAnsi.length).toBe(13);
+    expect(separatorWithoutAnsi).toBe('-'.repeat(13));
+  });
+
+  it('should handle title with multiple ANSI codes', () => {
+    const titleWithMultipleAnsi =
+      colors.bold(colors.cyan('Test')) + ' ' + colors.gray('Title');
+    showTitle(titleWithMultipleAnsi);
+
+    const separatorLine = consoleOutput[2];
+    const separatorWithoutAnsi = separatorLine.replace(/\x1b\[[0-9;]*m/g, '');
+
+    // The visible text is 'Test Title' which is 10 characters
+    expect(separatorWithoutAnsi.length).toBe(10);
+  });
 });

@@ -1,4 +1,5 @@
 import colors from 'ansi-colors';
+import { stripAnsi } from './utils.js';
 
 /**
  * Display a section title with bold cyan text and a line break before
@@ -15,5 +16,6 @@ import colors from 'ansi-colors';
 export const showTitle = (title: string): void => {
   console.log();
   console.log(colors.bold(colors.cyan(title)));
-  console.log(colors.gray('-'.repeat(title.length)));
+  const visibleLength = stripAnsi(title).length;
+  console.log(colors.gray('-'.repeat(visibleLength)));
 };

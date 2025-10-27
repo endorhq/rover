@@ -50,6 +50,7 @@ describe('showFile', () => {
     const expected = boxen('content', {
       title: 'test.txt',
       borderColor: 'gray',
+      padding: 1,
     });
 
     expect(output).toBe(expected);
@@ -106,6 +107,7 @@ describe('showFile', () => {
     const expectedBoxen = boxen(content, {
       title: filename,
       borderColor: 'gray',
+      padding: 1,
     });
 
     expect(consoleOutput[0]).toBe(expectedBoxen);
@@ -159,22 +161,23 @@ describe('showFile', () => {
     const output = consoleOutput[0];
     const lines = output.split('\n');
 
-    // Should have exactly 3 lines: top border with title, content, bottom border
-    expect(lines.length).toBe(3);
+    // Should have exactly 5 lines: top border with title, content, bottom border + padding
+    expect(lines.length).toBe(5);
 
     // First line: top border with title
     expect(lines[0]).toMatch(/┌.*example\.txt.*┐/);
 
     // Second line: content with side borders
-    expect(lines[1]).toMatch(/│Hello World.*│/);
+    expect(lines[2]).toMatch(/│.*Hello World.*│/);
 
     // Third line: bottom border
-    expect(lines[2]).toMatch(/└.*┘/);
+    expect(lines[4]).toMatch(/└.*┘/);
 
     // Verify the complete structure matches expected boxen output
     const expected = boxen('Hello World', {
       title: 'example.txt',
       borderColor: 'gray',
+      padding: 1,
     });
     expect(output).toBe(expected);
   });
@@ -186,24 +189,25 @@ describe('showFile', () => {
     const output = consoleOutput[0];
     const lines = output.split('\n');
 
-    // Should have 5 lines: top border, 3 content lines, bottom border
-    expect(lines.length).toBe(5);
+    // Should have 7 lines: top border, 3 content lines, bottom border, + padding
+    expect(lines.length).toBe(7);
 
     // Top border with title
     expect(lines[0]).toMatch(/┌.*multi\.txt.*┐/);
 
     // Three content lines, each with side borders
-    expect(lines[1]).toMatch(/│Line 1.*│/);
-    expect(lines[2]).toMatch(/│Line 2.*│/);
-    expect(lines[3]).toMatch(/│Line 3.*│/);
+    expect(lines[2]).toMatch(/│.*Line 1.*│/);
+    expect(lines[3]).toMatch(/│.*Line 2.*│/);
+    expect(lines[4]).toMatch(/│.*Line 3.*│/);
 
     // Bottom border
-    expect(lines[4]).toMatch(/└.*┘/);
+    expect(lines[6]).toMatch(/└.*┘/);
 
     // Verify complete output matches boxen
     const expected = boxen(content, {
       title: 'multi.txt',
       borderColor: 'gray',
+      padding: 1,
     });
     expect(output).toBe(expected);
   });
@@ -219,6 +223,7 @@ describe('showFile', () => {
     const expected = boxen(content, {
       title: filename,
       borderColor: 'gray',
+      padding: 1,
     });
 
     // Should match exactly

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { supportsTrueColor, rgb } from '../utils.js';
+import { supportsTrueColor, rgb, stripAnsi } from '../utils.js';
 
 describe('utils', () => {
   // Store original env vars
@@ -177,6 +177,70 @@ describe('utils', () => {
       expect(result).toContain(longText);
       expect(result.startsWith('\x1b[38;2;100;100;100m')).toBe(true);
       expect(result.endsWith('\x1b[0m')).toBe(true);
+    });
+  });
+
+  describe('stripAnsi', () => {
+    it('should remove ANSI escape codes from string', () => {
+      const text = '\x1b[31mRed Text\x1b[0m';
+      const result = stripAnsi(text);
+
+      expect(result).toBe('Red Text');
+    });
+
+    it('should handle text without ANSI codes', () => {
+      const text = 'Plain text';
+      const result = stripAnsi(text);
+
+      expect(result).toBe('Plain text');
+    });
+
+    it('should handle multiple ANSI codes', () => {
+      const text = '\x1b[1m\x1b[31mBold Red\x1b[0m\x1b[0m';
+      const result = stripAnsi(text);
+
+      expect(result).toBe('Bold Red');
+    });
+
+    it('should handle RGB ANSI codes', () => {
+      const text = '\x1b[38;2;255;0;0mRed Text\x1b[0m';
+      const result = stripAnsi(text);
+
+      expect(result).toBe('Red Text');
+    });
+
+    it('should handle empty string', () => {
+      const result = stripAnsi('');
+
+      expect(result).toBe('');
+    });
+
+    it('should preserve unicode characters', () => {
+      const text = '\x1b[32m你好世界\x1b[0m';
+      const result = stripAnsi(text);
+
+      expect(result).toBe('你好世界');
+    });
+
+    it('should handle mixed text with ANSI codes', () => {
+      const text = 'Normal \x1b[36mCyan\x1b[0m More normal';
+      const result = stripAnsi(text);
+
+      expect(result).toBe('Normal Cyan More normal');
+    });
+
+    it('should handle text with only ANSI codes', () => {
+      const text = '\x1b[31m\x1b[0m';
+      const result = stripAnsi(text);
+
+      expect(result).toBe('');
+    });
+
+    it('should correctly calculate visible length', () => {
+      const text = '\x1b[1m\x1b[36mTest Title\x1b[0m\x1b[0m';
+      const result = stripAnsi(text);
+
+      expect(result.length).toBe(10); // 'Test Title' is 10 characters
     });
   });
 });

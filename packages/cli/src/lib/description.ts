@@ -636,6 +636,9 @@ export class TaskDescription {
   get version(): string {
     return this.data.version;
   }
+  get workflowName(): string {
+    return this.data.workflowName;
+  }
   get rawData(): TaskDescriptionSchema {
     return this.data;
   }
