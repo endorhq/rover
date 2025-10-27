@@ -3,7 +3,8 @@ import { formatTaskStatus, statusColor } from '../utils/task-status.js';
 import { showTips } from '../utils/display.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { getDescriptions, TaskDescriptionSchema } from '../lib/description.js';
-import { VERBOSE, type IterationStatusSchema } from 'rover-common';
+import { VERBOSE } from 'rover-common';
+import { IterationStatusManager } from 'rover-schemas';
 import {
   getLastTaskIteration,
   getTaskIterations,
@@ -190,7 +191,7 @@ export const listCommand = async (
 
       const maybeIterationStatus: (
         iteration?: IterationConfig
-      ) => IterationStatusSchema | undefined = iteration => {
+      ) => IterationStatusManager | undefined = iteration => {
         try {
           return iteration?.status();
         } catch (e) {

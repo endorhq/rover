@@ -22,3 +22,16 @@ export {
 } from './workflow/errors.js';
 
 export { WorkflowManager } from './workflow.js';
+
+// Iteration Status library
+export {
+  type IterationStatus,
+  type IterationStatusName,
+} from './iteration-status/types.js';
+
+export {
+  IterationStatusLoadError,
+  IterationStatusValidationError,
+} from './iteration-status/errors.js';
+
+export { IterationStatusManager } from './iteration-status.js';

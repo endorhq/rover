@@ -1,39 +1,44 @@
+/**
+ * Iteration status manager for tracking workflow execution progress.
+ * Handles loading, validating, and managing iteration status with file persistence.
+ */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { ZodError } from 'zod';
+import { IterationStatusSchema } from './iteration-status/schema.js';
+import type {
+  IterationStatus,
+  IterationStatusName,
+} from './iteration-status/types.js';
+import {
+  IterationStatusLoadError,
+  IterationStatusValidationError,
+} from './iteration-status/errors.js';
 
 /**
- * Schema for iteration status tracking
+ * IterationStatusManager class - Manages iteration status tracking and persistence.
+ * Provides methods to create, load, update, and save status information with Zod validation.
  */
-export interface IterationStatusSchema {
-  // Original Task ID
-  taskId: string;
-
-  // Status name
-  status: string;
-
-  // Current step name and progress
-  currentStep: string;
-  progress: number;
-
-  // Timestamps
-  startedAt: string;
-  updatedAt: string;
-  completedAt?: string;
-
-  // Error information
-  error?: string;
-}
-
-/**
- * IterationStatus class - Manages iteration status tracking and persistence
- * Provides methods to create, load, update, and save status information
- */
-export class IterationStatus {
-  private data: IterationStatusSchema;
+export class IterationStatusManager {
+  private data: IterationStatus;
   private filePath: string;
 
-  private constructor(data: IterationStatusSchema, filePath: string) {
-    this.data = data;
-    this.filePath = filePath;
+  private constructor(data: unknown, filePath: string) {
+    try {
+      // Validate data with Zod schema
+      this.data = IterationStatusSchema.parse(data);
+      this.filePath = filePath;
+    } catch (error) {
+      if (error instanceof ZodError) {
+        const errorMessages = error.issues
+          .map(err => `  - ${err.path.join('.')}: ${err.message}`)
+          .join('\n');
+        throw new IterationStatusValidationError(
+          `Iteration status validation failed:\n${errorMessages}`,
+          error
+        );
+      }
+      throw error;
+    }
   }
 
   /**
@@ -43,10 +48,10 @@ export class IterationStatus {
     filePath: string,
     taskId: string,
     currentStep: string
-  ): IterationStatus {
+  ): IterationStatusManager {
     const now = new Date().toISOString();
 
-    const schema: IterationStatusSchema = {
+    const statusData = {
       taskId,
       status: 'initializing',
       currentStep,
@@ -55,7 +60,7 @@ export class IterationStatus {
       updatedAt: now,
     };
 
-    const instance = new IterationStatus(schema, filePath);
+    const instance = new IterationStatusManager(statusData, filePath);
     instance.save();
     return instance;
   }
@@ -63,21 +68,36 @@ export class IterationStatus {
   /**
    * Load an existing iteration status from disk
    */
-  static load(filePath: string): IterationStatus {
+  static load(filePath: string): IterationStatusManager {
     if (!existsSync(filePath)) {
-      throw new Error(`Status file not found at ${filePath}`);
+      throw new IterationStatusLoadError(
+        `Status file not found at ${filePath}`
+      );
     }
 
     try {
       const rawData = readFileSync(filePath, 'utf8');
-      const parsedData = JSON.parse(rawData) as IterationStatusSchema;
-      return new IterationStatus(parsedData, filePath);
+      const parsedData = JSON.parse(rawData);
+      return new IterationStatusManager(parsedData, filePath);
     } catch (error) {
-      if (error instanceof SyntaxError) {
-        throw new Error(`Invalid JSON in status file: ${error.message}`);
+      // Re-throw validation errors as-is
+      if (error instanceof IterationStatusValidationError) {
+        throw error;
       }
-      throw new Error(
-        `Failed to load status file: ${error instanceof Error ? error.message : String(error)}`
+      if (error instanceof SyntaxError) {
+        throw new IterationStatusLoadError(
+          `Invalid JSON in status file: ${error.message}`,
+          error
+        );
+      }
+      if (error instanceof Error) {
+        throw new IterationStatusLoadError(
+          `Failed to load status file: ${error.message}`,
+          error
+        );
+      }
+      throw new IterationStatusLoadError(
+        `Failed to load status file: ${String(error)}`
       );
     }
   }
@@ -86,7 +106,7 @@ export class IterationStatus {
    * Update status with new information
    */
   update(
-    status: string,
+    status: IterationStatusName,
     currentStep: string,
     progress: number,
     error?: string
@@ -181,7 +201,7 @@ export class IterationStatus {
   /**
    * Get raw JSON data
    */
-  toJSON(): IterationStatusSchema {
+  toJSON(): IterationStatus {
     return { ...this.data };
   }
 }

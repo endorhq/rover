@@ -4,7 +4,7 @@
  * by building the prompt and passing it.
  */
 
-import { launch, launchSync, VERBOSE, IterationStatus } from 'rover-common';
+import { launch, launchSync, VERBOSE } from 'rover-common';
 import colors from 'ansi-colors';
 import {
   copyFileSync,
@@ -14,7 +14,7 @@ import {
   rmSync,
 } from 'node:fs';
 import type { WorkflowAgentStep, WorkflowOutputType } from 'rover-schemas';
-import { WorkflowManager } from 'rover-schemas';
+import { WorkflowManager, IterationStatusManager } from 'rover-schemas';
 import {
   parseAgentError,
   isWaitingForAuthentication,
@@ -55,7 +55,7 @@ export class Runner {
     private stepsOutput: Map<string, Map<string, string>>,
     private defaultTool: string | undefined,
     private defaultModel: string | undefined,
-    private statusManager?: IterationStatus,
+    private statusManager?: IterationStatusManager,
     private totalSteps: number = 0,
     private currentStepIndex: number = 0
   ) {

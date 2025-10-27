@@ -2,9 +2,9 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { IterationStatus } from '../status.js';
+import { IterationStatusManager } from '../iteration-status.js';
 
-describe('IterationStatus', () => {
+describe('IterationStatusManager', () => {
   let testDir: string;
   let statusFilePath: string;
 
@@ -21,7 +21,7 @@ describe('IterationStatus', () => {
 
   describe('createInitial', () => {
     it('should create a new status file with initial values', () => {
-      const status = IterationStatus.createInitial(
+      const status = IterationStatusManager.createInitial(
         statusFilePath,
         'task-123',
         'Starting task'
@@ -42,7 +42,7 @@ describe('IterationStatus', () => {
     });
 
     it('should persist status data to disk', () => {
-      IterationStatus.createInitial(
+      IterationStatusManager.createInitial(
         statusFilePath,
         'task-456',
         'Initialization step'
@@ -57,7 +57,7 @@ describe('IterationStatus', () => {
     });
 
     it('should set timestamps to ISO format', () => {
-      const status = IterationStatus.createInitial(
+      const status = IterationStatusManager.createInitial(
         statusFilePath,
         'task-789',
         'Start'
@@ -75,14 +75,14 @@ describe('IterationStatus', () => {
   describe('load', () => {
     it('should load existing status file', () => {
       // Create a status file first
-      const created = IterationStatus.createInitial(
+      const created = IterationStatusManager.createInitial(
         statusFilePath,
         'task-abc',
         'Initial step'
       );
 
       // Load it
-      const loaded = IterationStatus.load(statusFilePath);
+      const loaded = IterationStatusManager.load(statusFilePath);
 
       expect(loaded.taskId).toBe(created.taskId);
       expect(loaded.status).toBe(created.status);
@@ -93,7 +93,7 @@ describe('IterationStatus', () => {
     it('should throw error if file does not exist', () => {
       const nonExistentPath = join(testDir, 'nonexistent.json');
 
-      expect(() => IterationStatus.load(nonExistentPath)).toThrow(
+      expect(() => IterationStatusManager.load(nonExistentPath)).toThrow(
         `Status file not found at ${nonExistentPath}`
       );
     });
@@ -103,14 +103,14 @@ describe('IterationStatus', () => {
       const fs = await import('node:fs');
       fs.writeFileSync(statusFilePath, 'invalid json{', 'utf8');
 
-      expect(() => IterationStatus.load(statusFilePath)).toThrow(
+      expect(() => IterationStatusManager.load(statusFilePath)).toThrow(
         'Invalid JSON in status file'
       );
     });
 
     it('should preserve all fields when loading', () => {
       // Create status with all fields
-      const created = IterationStatus.createInitial(
+      const created = IterationStatusManager.createInitial(
         statusFilePath,
         'task-def',
         'Step 1'
@@ -119,7 +119,7 @@ describe('IterationStatus', () => {
       created.complete('Final step');
 
       // Load and verify all fields are preserved
-      const loaded = IterationStatus.load(statusFilePath);
+      const loaded = IterationStatusManager.load(statusFilePath);
 
       expect(loaded.taskId).toBe('task-def');
       expect(loaded.status).toBe('completed');
@@ -132,7 +132,7 @@ describe('IterationStatus', () => {
 
   describe('update', () => {
     it('should update status fields and persist to disk', () => {
-      const status = IterationStatus.createInitial(
+      const status = IterationStatusManager.createInitial(
         statusFilePath,
         'task-update',
         'Initial'
@@ -145,13 +145,13 @@ describe('IterationStatus', () => {
       expect(status.progress).toBe(50);
 
       // Verify persistence
-      const loaded = IterationStatus.load(statusFilePath);
+      const loaded = IterationStatusManager.load(statusFilePath);
       expect(loaded.status).toBe('running');
       expect(loaded.progress).toBe(50);
     });
 
     it('should update timestamp on each update', async () => {
-      const status = IterationStatus.createInitial(
+      const status = IterationStatusManager.createInitial(
         statusFilePath,
         'task-time',
         'Start'
@@ -171,23 +171,23 @@ describe('IterationStatus', () => {
     });
 
     it('should optionally set error field', () => {
-      const status = IterationStatus.createInitial(
+      const status = IterationStatusManager.createInitial(
         statusFilePath,
         'task-error',
         'Start'
       );
 
-      status.update('error', 'Failed step', 30, 'Connection timeout');
+      status.update('failed', 'Failed step', 30, 'Connection timeout');
 
       expect(status.error).toBe('Connection timeout');
 
       // Verify persistence
-      const loaded = IterationStatus.load(statusFilePath);
+      const loaded = IterationStatusManager.load(statusFilePath);
       expect(loaded.error).toBe('Connection timeout');
     });
 
     it('should allow updating without error field', () => {
-      const status = IterationStatus.createInitial(
+      const status = IterationStatusManager.createInitial(
         statusFilePath,
         'task-no-error',
         'Start'
@@ -201,7 +201,7 @@ describe('IterationStatus', () => {
 
   describe('complete', () => {
     it('should mark status as completed with 100% progress', () => {
-      const status = IterationStatus.createInitial(
+      const status = IterationStatusManager.createInitial(
         statusFilePath,
         'task-complete',
         'Start'
@@ -216,7 +216,7 @@ describe('IterationStatus', () => {
     });
 
     it('should set completedAt timestamp', () => {
-      const status = IterationStatus.createInitial(
+      const status = IterationStatusManager.createInitial(
         statusFilePath,
         'task-timestamp',
         'Start'
@@ -236,7 +236,7 @@ describe('IterationStatus', () => {
     });
 
     it('should persist completion to disk', () => {
-      const status = IterationStatus.createInitial(
+      const status = IterationStatusManager.createInitial(
         statusFilePath,
         'task-persist',
         'Start'
@@ -244,7 +244,7 @@ describe('IterationStatus', () => {
 
       status.complete('All done');
 
-      const loaded = IterationStatus.load(statusFilePath);
+      const loaded = IterationStatusManager.load(statusFilePath);
       expect(loaded.status).toBe('completed');
       expect(loaded.progress).toBe(100);
       expect(loaded.completedAt).toBeDefined();
@@ -253,7 +253,7 @@ describe('IterationStatus', () => {
 
   describe('fail', () => {
     it('should mark status as failed with error message', () => {
-      const status = IterationStatus.createInitial(
+      const status = IterationStatusManager.createInitial(
         statusFilePath,
         'task-fail',
         'Start'
@@ -269,7 +269,7 @@ describe('IterationStatus', () => {
     });
 
     it('should set both completedAt and error fields', () => {
-      const status = IterationStatus.createInitial(
+      const status = IterationStatusManager.createInitial(
         statusFilePath,
         'task-fail-both',
         'Start'
@@ -282,7 +282,7 @@ describe('IterationStatus', () => {
     });
 
     it('should persist failure to disk', () => {
-      const status = IterationStatus.createInitial(
+      const status = IterationStatusManager.createInitial(
         statusFilePath,
         'task-persist-fail',
         'Start'
@@ -290,7 +290,7 @@ describe('IterationStatus', () => {
 
       status.fail('Database error', 'Connection refused');
 
-      const loaded = IterationStatus.load(statusFilePath);
+      const loaded = IterationStatusManager.load(statusFilePath);
       expect(loaded.status).toBe('failed');
       expect(loaded.error).toBe('Connection refused');
       expect(loaded.completedAt).toBeDefined();
@@ -299,7 +299,7 @@ describe('IterationStatus', () => {
 
   describe('getter methods', () => {
     it('should provide access to all status fields', () => {
-      const status = IterationStatus.createInitial(
+      const status = IterationStatusManager.createInitial(
         statusFilePath,
         'task-getters',
         'Initial step'
@@ -316,7 +316,7 @@ describe('IterationStatus', () => {
     });
 
     it('should return updated values after modifications', () => {
-      const status = IterationStatus.createInitial(
+      const status = IterationStatusManager.createInitial(
         statusFilePath,
         'task-modified',
         'Start'
@@ -333,7 +333,7 @@ describe('IterationStatus', () => {
 
   describe('toJSON', () => {
     it('should return a copy of status data', () => {
-      const status = IterationStatus.createInitial(
+      const status = IterationStatusManager.createInitial(
         statusFilePath,
         'task-json',
         'Start'
@@ -348,7 +348,7 @@ describe('IterationStatus', () => {
     });
 
     it('should return a new object each time', () => {
-      const status = IterationStatus.createInitial(
+      const status = IterationStatusManager.createInitial(
         statusFilePath,
         'task-copy',
         'Start'
@@ -362,7 +362,7 @@ describe('IterationStatus', () => {
     });
 
     it('should include all fields including optional ones', () => {
-      const status = IterationStatus.createInitial(
+      const status = IterationStatusManager.createInitial(
         statusFilePath,
         'task-all-fields',
         'Start'
@@ -382,14 +382,14 @@ describe('IterationStatus', () => {
     });
 
     it('should not affect original data when modified', () => {
-      const status = IterationStatus.createInitial(
+      const status = IterationStatusManager.createInitial(
         statusFilePath,
         'task-immutable',
         'Start'
       );
 
       const json = status.toJSON();
-      json.status = 'modified';
+      json.status = 'running';
 
       expect(status.status).toBe('initializing');
     });
@@ -397,7 +397,7 @@ describe('IterationStatus', () => {
 
   describe('edge cases', () => {
     it('should handle rapid successive updates', () => {
-      const status = IterationStatus.createInitial(
+      const status = IterationStatusManager.createInitial(
         statusFilePath,
         'task-rapid',
         'Start'
@@ -411,12 +411,12 @@ describe('IterationStatus', () => {
       expect(status.currentStep).toBe('Step 3');
 
       // Verify persistence of final state
-      const loaded = IterationStatus.load(statusFilePath);
+      const loaded = IterationStatusManager.load(statusFilePath);
       expect(loaded.progress).toBe(75);
     });
 
     it('should handle unicode characters in step names and errors', () => {
-      const status = IterationStatus.createInitial(
+      const status = IterationStatusManager.createInitial(
         statusFilePath,
         'task-unicode',
         'Processing データ 🚀'
@@ -428,13 +428,13 @@ describe('IterationStatus', () => {
       expect(status.error).toBe('Erreur système 💥');
 
       // Verify persistence
-      const loaded = IterationStatus.load(statusFilePath);
+      const loaded = IterationStatusManager.load(statusFilePath);
       expect(loaded.currentStep).toBe('进行中');
       expect(loaded.error).toBe('Erreur système 💥');
     });
 
     it('should handle very long error messages', () => {
-      const status = IterationStatus.createInitial(
+      const status = IterationStatusManager.createInitial(
         statusFilePath,
         'task-long-error',
         'Start'
@@ -446,18 +446,18 @@ describe('IterationStatus', () => {
       expect(status.error).toBe(longError);
 
       // Verify persistence
-      const loaded = IterationStatus.load(statusFilePath);
+      const loaded = IterationStatusManager.load(statusFilePath);
       expect(loaded.error).toBe(longError);
     });
 
     it('should handle empty string values', () => {
-      const status = IterationStatus.createInitial(
+      const status = IterationStatusManager.createInitial(
         statusFilePath,
         'task-empty',
         ''
       );
 
-      status.update('', '', 0, '');
+      status.update('running', '', 0, '');
 
       expect(status.currentStep).toBe('');
       expect(status.status).toBe('');
@@ -465,7 +465,7 @@ describe('IterationStatus', () => {
     });
 
     it('should handle progress values at boundaries', () => {
-      const status = IterationStatus.createInitial(
+      const status = IterationStatusManager.createInitial(
         statusFilePath,
         'task-boundaries',
         'Start'

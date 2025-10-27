@@ -180,13 +180,14 @@ export const WorkflowSequentialStepSchema: z.ZodType<any> =
  * Union of all step types (discriminated by 'type' field)
  * Forward declared for recursive types
  */
-export const WorkflowStepSchema: z.ZodType<any> = z.union([
-  WorkflowAgentStepSchema,
-  // CommandStepSchema,
-  // ConditionalStepSchema,
-  // ParallelStepSchema,
-  // SequentialStepSchema,
-]);
+export const WorkflowStepSchema: z.ZodType<any> = WorkflowAgentStepSchema;
+// export const WorkflowStepSchema: z.ZodType<any> = z.union([
+//   WorkflowAgentStepSchema,
+//   // CommandStepSchema,
+//   // ConditionalStepSchema,
+//   // ParallelStepSchema,
+//   // SequentialStepSchema,
+// ]);
 
 /**
  * Complete agent workflow schema

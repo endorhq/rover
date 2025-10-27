@@ -6,7 +6,8 @@ import colors from 'ansi-colors';
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { TaskDescription } from './description.js';
-import { VERBOSE, type IterationStatusSchema } from 'rover-common';
+import { VERBOSE } from 'rover-common';
+import { IterationStatusManager } from 'rover-schemas';
 
 const CURRENT_ITERATION_SCHEMA_VERSION = '1.0';
 export const ITERATION_FILENAME = 'iteration.json';
@@ -45,7 +46,7 @@ export class IterationConfig {
   private data: IterationConfigSchema;
   private filePath: string;
   private iterationPath: string;
-  private statusCache: IterationStatusSchema | undefined;
+  private statusCache: IterationStatusManager | undefined;
 
   constructor(
     data: IterationConfigSchema,
@@ -175,15 +176,14 @@ export class IterationConfig {
   /**
    * Load the iteration status
    */
-  status(): IterationStatusSchema {
+  status(): IterationStatusManager {
     if (this.statusCache) return this.statusCache;
 
     const statusPath = join(this.iterationPath, ITERATION_STATUS_FILENAME);
 
     if (existsSync(statusPath)) {
       try {
-        const content = readFileSync(statusPath, 'utf8');
-        const status = JSON.parse(content) as IterationStatusSchema;
+        const status = IterationStatusManager.load(statusPath);
         this.statusCache = status;
 
         return status;

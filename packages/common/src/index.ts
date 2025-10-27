@@ -19,8 +19,6 @@ export { getVersion } from './version.js';
 
 export { Git } from './git.js';
 
-export { IterationStatus, type IterationStatusSchema } from './status.js';
-
 export {
   requiredClaudeCredentials,
   requiredBedrockCredentials,

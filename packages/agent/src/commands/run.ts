@@ -1,9 +1,8 @@
 import { CommandOutput } from '../cli.js';
 import colors from 'ansi-colors';
-import { WorkflowManager } from 'rover-schemas';
+import { WorkflowManager, IterationStatusManager } from 'rover-schemas';
 import { parseCollectOptions } from '../lib/options.js';
 import { Runner } from '../lib/runner.js';
-import { IterationStatus } from 'rover-common';
 import { existsSync, readFileSync } from 'node:fs';
 
 interface RunCommandOptions {
@@ -38,7 +37,7 @@ export const runCommand = async (
   };
 
   // Declare status manager outside try block so it's accessible in catch
-  let statusManager: IterationStatus | undefined;
+  let statusManager: IterationStatusManager | undefined;
   let totalDuration = 0;
 
   try {
@@ -63,7 +62,7 @@ export const runCommand = async (
     // Create status manager if status file is provided
     if (options.statusFile && options.taskId) {
       try {
-        statusManager = IterationStatus.createInitial(
+        statusManager = IterationStatusManager.createInitial(
           options.statusFile,
           options.taskId,
           'Starting workflow'
