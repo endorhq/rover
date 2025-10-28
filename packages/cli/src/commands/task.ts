@@ -6,13 +6,14 @@ import { getNextTaskId } from '../utils/task-id.js';
 import { homedir, tmpdir, userInfo } from 'node:os';
 import { getAIAgentTool, getUserAIAgent } from '../lib/agents/index.js';
 import { TaskDescription } from '../lib/description.js';
+import { DockerSandbox } from '../lib/sandbox/index.js';
 import { SetupBuilder } from '../lib/setup.js';
 import { AI_AGENT, ProjectConfig } from '../lib/config.js';
 import { IterationConfig } from '../lib/iteration.js';
 import { generateBranchName } from '../utils/branch-name.js';
 import {
   findProjectRoot,
-  launchSync,
+  launch,
   ProcessManager,
   showProperties,
 } from 'rover-common';
@@ -34,7 +35,6 @@ import { WorkflowManager } from 'rover-schemas';
 const { prompt } = enquirer;
 
 // Default values
-const AGENT_IMAGE = 'ghcr.io/endorhq/rover/node:v1.3.1';
 const DEFAULT_WORKFLOW = 'swe';
 
 type validationResult = {
@@ -156,19 +156,21 @@ const updateTaskMetadata = (
   }
 };
 
-function catFile(image: string, file: string): string {
+async function catFile(image: string, file: string): Promise<string> {
   try {
     return (
-      launchSync('docker', [
-        'run',
-        '--entrypoint',
-        '/bin/sh',
-        '--rm',
-        image,
-        '-c',
-        `/bin/cat ${file}`,
-      ])
-        .stdout?.toString()
+      (
+        await launch('docker', [
+          'run',
+          '--entrypoint',
+          '/bin/sh',
+          '--rm',
+          image,
+          '-c',
+          `/bin/cat ${file}`,
+        ])
+      ).stdout
+        ?.toString()
         .trim() || ''
     );
   } catch (error) {
@@ -176,8 +178,8 @@ function catFile(image: string, file: string): string {
   }
 }
 
-function imageUids(image: string): Map<number, string> {
-  const passwdContent = catFile(image, '/etc/passwd');
+async function imageUids(image: string): Promise<Map<number, string>> {
+  const passwdContent = await catFile(image, '/etc/passwd');
   const uidMap = new Map<number, string>();
 
   if (!passwdContent) {
@@ -200,8 +202,8 @@ function imageUids(image: string): Map<number, string> {
   return uidMap;
 }
 
-function imageGids(image: string): Map<number, string> {
-  const groupContent = catFile(image, '/etc/group');
+async function imageGids(image: string): Promise<Map<number, string>> {
+  const groupContent = await catFile(image, '/etc/group');
   const gidMap = new Map<number, string>();
 
   if (!groupContent) {
@@ -226,12 +228,12 @@ function imageGids(image: string): Map<number, string> {
 
 type CurrentUser = string;
 
-export function etcPasswdWithUserInfo(
+export async function etcPasswdWithUserInfo(
   image: string,
   userInfo: { uid: number; gid: number }
-): [string, CurrentUser] {
-  const originalPasswd = catFile(image, '/etc/passwd');
-  const existingUids = imageUids(image);
+): Promise<[string, CurrentUser]> {
+  const originalPasswd = await catFile(image, '/etc/passwd');
+  const existingUids = await imageUids(image);
 
   // Check if current user already exists in the image
   if (existingUids.has(userInfo.uid)) {
@@ -246,12 +248,12 @@ export function etcPasswdWithUserInfo(
 
 type CurrentGroup = string;
 
-export function etcGroupWithUserInfo(
+export async function etcGroupWithUserInfo(
   image: string,
   userInfo: { uid: number; gid: number }
-): [string, CurrentGroup] {
-  const originalGroup = catFile(image, '/etc/group');
-  const existingGids = imageGids(image);
+): Promise<[string, CurrentGroup]> {
+  const originalGroup = await catFile(image, '/etc/group');
+  const existingGids = await imageGids(image);
 
   // Check if current group already exists in the image
   if (existingGids.has(userInfo.gid)) {
@@ -263,271 +265,6 @@ export function etcGroupWithUserInfo(
 
   return [originalGroup + '\n' + groupEntry + '\n', 'agent'];
 }
-
-/**
- * Start environment using containers
- */
-export const startDockerExecution = async (
-  taskId: number,
-  task: TaskDescription,
-  worktreePath: string,
-  iterationPath: string,
-  selectedAiAgent: string,
-  jsonMode?: boolean,
-  debug?: boolean,
-  processManager?: ProcessManager
-) => {
-  const containerName = `rover-task-${taskId}-${task.iterations}`;
-
-  processManager?.addItem(`Prepare sandbox container | Name: ${containerName}`);
-
-  try {
-    // Check if Docker is available
-    launchSync('docker', ['--version']);
-  } catch (error) {
-    if (!jsonMode) {
-      processManager?.failLastItem();
-
-      console.log(colors.red('\n✗ Docker is not available'));
-      console.log(
-        colors.gray('  Please install Docker to use automated task execution')
-      );
-    }
-    return;
-  }
-
-  // Load task description
-  const iterationJsonPath = join(iterationPath, 'iteration.json');
-
-  // Generate setup script using SetupBuilder
-  const setupBuilder = new SetupBuilder(task, selectedAiAgent);
-  const entrypointScriptPath = setupBuilder.generateEntrypoint();
-  const inputsPath = setupBuilder.generateInputs();
-  const workflowPath = setupBuilder.saveWorkflow();
-
-  // Get agent-specific Docker mounts
-  const agent = getAIAgentTool(selectedAiAgent);
-  const dockerMounts: string[] = agent.getContainerMounts();
-  const envVariables: string[] = agent.getEnvironmentVariables();
-
-  // Load project config and merge custom environment variables
-  const projectRoot = findProjectRoot();
-  let customEnvVariables: string[] = [];
-
-  if (ProjectConfig.exists()) {
-    try {
-      const projectConfig = ProjectConfig.load();
-
-      // Parse custom envs array
-      if (projectConfig.envs && projectConfig.envs.length > 0) {
-        customEnvVariables = parseCustomEnvironmentVariables(
-          projectConfig.envs
-        );
-      }
-
-      // Load envs from file
-      if (projectConfig.envsFile) {
-        const fileEnvVariables = loadEnvsFile(
-          projectConfig.envsFile,
-          projectRoot
-        );
-        customEnvVariables = [...customEnvVariables, ...fileEnvVariables];
-      }
-    } catch (error) {
-      // Silently skip if there's an error loading project config
-    }
-  }
-
-  // Merge agent environment variables with custom environment variables
-  // IMPORTANT: Custom environment variables are appended after agent defaults.
-  // In Docker, when the same environment variable appears multiple times, the last
-  // occurrence takes precedence. This means custom environment variables will
-  // override agent defaults if there are conflicts, which is the desired behavior.
-  const allEnvVariables = [...envVariables, ...customEnvVariables];
-
-  processManager?.completeLastItem();
-  processManager?.addItem(`Start sandbox container | Name: ${containerName}`);
-
-  // Clean up any existing container with same name
-  try {
-    launchSync('docker', ['rm', '-f', containerName]);
-  } catch (error) {
-    // Container doesn't exist, which is fine
-  }
-
-  try {
-    let isDockerRootless = false;
-
-    const dockerInfo = launchSync('docker', ['info', '-f', 'json']).stdout;
-    if (dockerInfo) {
-      const info = JSON.parse(dockerInfo.toString());
-      isDockerRootless = (info?.SecurityOptions || []).some((value: string) =>
-        value.includes('rootless')
-      );
-    }
-
-    // Build Docker run command with mounts
-    const dockerArgs = ['run', '--name', containerName, '-d'];
-
-    const userInfo_ = userInfo();
-
-    // If we cannot retrieve the UID in the current environment,
-    // set it to 1000, so that the Rover agent container will be
-    // using this unprivileged UID. This happens typically on
-    // environments such as Windows.
-    if (userInfo_.uid === -1) {
-      userInfo_.uid = 1000;
-    }
-
-    // If we cannot retrieve the GID in the current environment,
-    // set it to 1000, so that the Rover agent container will be
-    // using this unprivileged GID. This happens typically on
-    // environments such as Windows.
-    if (userInfo_.gid === -1) {
-      userInfo_.gid = 1000;
-    }
-
-    const userCredentialsTempPath = mkdtempSync(join(tmpdir(), 'rover-'));
-    const etcPasswd = join(userCredentialsTempPath, 'passwd');
-    const [etcPasswdContents, username] = etcPasswdWithUserInfo(
-      AGENT_IMAGE,
-      userInfo_
-    );
-    writeFileSync(etcPasswd, etcPasswdContents);
-
-    const etcGroup = join(userCredentialsTempPath, 'group');
-    const [etcGroupContents, group] = etcGroupWithUserInfo(
-      AGENT_IMAGE,
-      userInfo_
-    );
-    writeFileSync(etcGroup, etcGroupContents);
-
-    dockerArgs.push(
-      '-v',
-      `${etcPasswd}:/etc/passwd:Z,ro`,
-      '-v',
-      `${etcGroup}:/etc/group:Z,ro`,
-      '--user',
-      `${userInfo_.uid}:${userInfo_.gid}`,
-      '-v',
-      `${worktreePath}:/workspace:Z,rw`,
-      '-v',
-      `${iterationPath}:/output:Z,rw`,
-      ...dockerMounts,
-      '-v',
-      `${entrypointScriptPath}:/entrypoint.sh:Z,ro`,
-      '-v',
-      `${workflowPath}:/workflow.yml:Z,ro`,
-      '-v',
-      `${inputsPath}:/inputs.json:Z,ro`,
-      '-v',
-      `${iterationJsonPath}:/task/description.json:Z,ro`,
-      ...allEnvVariables,
-      '-w',
-      '/workspace',
-      '--entrypoint',
-      '/entrypoint.sh',
-      AGENT_IMAGE,
-      'rover-agent',
-      'run',
-      '/workflow.yml',
-      '--agent-tool',
-      selectedAiAgent,
-      '--task-id',
-      taskId.toString(),
-      '--status-file',
-      '/output/status.json',
-      '--output',
-      '/output',
-      '--inputs-json',
-      '/inputs.json'
-    );
-
-    // Background mode execution
-    try {
-      const containerId = launchSync('docker', dockerArgs)
-        .stdout?.toString()
-        .trim();
-
-      processManager?.completeLastItem();
-
-      // Update task metadata with container ID
-      updateTaskMetadata(
-        taskId,
-        {
-          containerId: containerId,
-          executionStatus: 'running',
-          runningAt: new Date().toISOString(),
-        },
-        jsonMode
-      );
-    } catch (error: any) {
-      processManager?.failLastItem();
-      if (!jsonMode) {
-        console.error(
-          colors.red('Error starting Docker container:'),
-          error.message
-        );
-      }
-
-      // Reset task to NEW status when container fails to start
-      updateTaskMetadata(
-        taskId,
-        {
-          status: 'NEW',
-          executionStatus: 'error',
-          error: error.message,
-          errorAt: new Date().toISOString(),
-        },
-        jsonMode
-      );
-
-      if (!jsonMode) {
-        console.log(
-          colors.yellow('⚠ There was an error during container creation')
-        );
-        console.log(colors.gray('  Resetting the task status to "New"'));
-        console.log(
-          colors.gray('  Use ') +
-            colors.cyan(`rover restart ${taskId}`) +
-            colors.gray(' to retry execution')
-        );
-      }
-
-      // TODO: use exitWithError
-      process.exit(1);
-    }
-  } catch (error) {
-    processManager?.failLastItem();
-    if (!jsonMode) {
-      console.error(colors.red('Error starting Docker container:'), error);
-    }
-
-    // Reset task to NEW status when Docker startup fails
-    updateTaskMetadata(
-      taskId,
-      {
-        status: 'NEW',
-        executionStatus: 'error',
-        error: error instanceof Error ? error.message : String(error),
-        errorAt: new Date().toISOString(),
-      },
-      jsonMode
-    );
-
-    if (!jsonMode) {
-      console.log(colors.yellow('⚠ Task reset to NEW status'));
-      console.log(
-        colors.gray('  Use ') +
-          colors.cyan(`rover restart ${taskId}`) +
-          colors.gray(' to retry execution')
-      );
-    }
-
-    // TODO: use exitWithError
-    process.exit(1);
-  }
-};
 
 /**
  * Interface for the JSON output
@@ -942,13 +679,13 @@ export const taskCommand = async (
     const taskId = getNextTaskId();
 
     // Create .rover/tasks directory structure
-    const endorPath = join(findProjectRoot(), '.rover');
-    const tasksPath = join(endorPath, 'tasks');
+    const roverPath = join(findProjectRoot(), '.rover');
+    const tasksPath = join(roverPath, 'tasks');
     const taskPath = join(tasksPath, taskId.toString());
 
     // Ensure directories exist
-    if (!existsSync(endorPath)) {
-      mkdirSync(endorPath, { recursive: true });
+    if (!existsSync(roverPath)) {
+      mkdirSync(roverPath, { recursive: true });
     }
     if (!existsSync(tasksPath)) {
       mkdirSync(tasksPath, { recursive: true });
@@ -1029,15 +766,17 @@ export const taskCommand = async (
 
     // Start Docker container for task execution
     try {
-      await startDockerExecution(
-        taskId,
-        task,
-        worktreePath,
-        iterationPath,
-        selectedAiAgent,
-        json,
-        debug,
-        processManager
+      const sandbox = new DockerSandbox(task, processManager);
+      const containerId = await sandbox.createAndStart();
+
+      updateTaskMetadata(
+        task.id,
+        {
+          containerId,
+          executionStatus: 'running',
+          runningAt: new Date().toISOString(),
+        },
+        json
       );
 
       processManager?.addItem('Task started in background');

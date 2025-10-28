@@ -14,13 +14,13 @@ export abstract class Sandbox {
   }
 
   abstract isBackendAvailable(): Promise<boolean>;
+  abstract openShellAtWorktree(): Promise<void>;
   protected abstract create(): Promise<string>;
   protected abstract start(): Promise<string>;
   protected abstract remove(): Promise<string>;
   protected abstract stop(): Promise<string>;
   protected abstract logs(): Promise<string>;
   protected abstract followLogs(): AsyncIterable<string>;
-  protected abstract openShellAtWorktree(): Promise<void>;
 
   protected get sandboxName(): string {
     return `rover-task-${this.task.id}-${this.task.iterations}`;

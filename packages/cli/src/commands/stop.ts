@@ -1,12 +1,12 @@
 import colors from 'ansi-colors';
 import { join } from 'node:path';
 import { rmSync } from 'node:fs';
+import { DockerSandbox } from '../lib/sandbox/index.js';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
-import { findProjectRoot, launchSync } from 'rover-common';
+import { findProjectRoot, launch, ProcessManager } from 'rover-common';
 import { exitWithError, exitWithSuccess } from '../utils/exit.js';
 import { CLIJsonOutput } from '../types.js';
 import { getTelemetry } from '../lib/telemetry.js';
-import yoctoSpinner from 'yocto-spinner';
 
 /**
  * Interface for JSON output
@@ -40,6 +40,11 @@ export const stopCommand = async (
     success: false,
   };
 
+  const processManager = json
+    ? undefined
+    : new ProcessManager({ title: 'Stop task' });
+  processManager?.start();
+
   // Convert string taskId to number
   const numericTaskId = parseInt(taskId, 10);
   if (isNaN(numericTaskId)) {
@@ -52,44 +57,15 @@ export const stopCommand = async (
     // Load task using TaskDescription
     const task = TaskDescription.load(numericTaskId);
 
-    if (!json) {
-      console.log(colors.bold('Stopping Task'));
-      console.log(colors.gray('├── ID: ') + colors.cyan(task.id.toString()));
-      console.log(colors.gray('├── Title: ') + task.title);
-      console.log(colors.gray('└── Status: ') + colors.yellow(task.status));
-    }
-
-    const spinner = !json
-      ? yoctoSpinner({ text: 'Stopping task...' }).start()
-      : null;
+    processManager?.addItem(`Stopping Task`);
 
     // Stop Docker container if it exists and is running
     if (task.containerId) {
-      try {
-        launchSync('docker', ['stop', task.containerId]);
-        if (spinner) spinner.text = 'Container stopped';
-        if (!json) {
-          console.log(colors.green('✓ Container stopped'));
-        }
-      } catch (error) {
-        // Container might already be stopped or removed, continue with cleanup
-        if (!json) {
-          console.log(
-            colors.yellow('⚠ Container was already stopped or removed')
-          );
-        }
-      }
-
-      // Try to remove the container
-      if (options.removeAll || options.removeContainer) {
-        try {
-          launchSync('docker', ['rm', '-f', task.containerId]);
-          if (spinner) spinner.text = 'Container removed';
-        } catch (error) {
-          // Container removal might fail, but that's ok
-        }
-      }
+      const sandbox = new DockerSandbox(task, processManager);
+      await sandbox.stopAndRemove();
     }
+
+    processManager?.completeLastItem();
 
     // Update task status to cancelled
     task.updateExecutionStatus('cancelled');
@@ -97,7 +73,7 @@ export const stopCommand = async (
     // Clean up Git worktree and branch
     try {
       // Check if we're in a git repository
-      launchSync('git', ['rev-parse', '--is-inside-work-tree'], {
+      await launch('git', ['rev-parse', '--is-inside-work-tree'], {
         stdio: 'pipe',
       });
 
@@ -107,18 +83,17 @@ export const stopCommand = async (
         (options.removeAll || options.removeGitWorktreeAndBranch)
       ) {
         try {
-          launchSync(
+          await launch(
             'git',
             ['worktree', 'remove', task.worktreePath, '--force'],
             { stdio: 'pipe' }
           );
-          if (spinner) spinner.text = 'Workspace removed';
         } catch (error) {
           // If workspace removal fails, try to remove it manually
           try {
             rmSync(task.worktreePath, { recursive: true, force: true });
             // Remove worktree from git's tracking
-            launchSync('git', ['worktree', 'prune'], { stdio: 'pipe' });
+            await launch('git', ['worktree', 'prune'], { stdio: 'pipe' });
           } catch (manualError) {
             if (!json) {
               console.warn(
@@ -136,7 +111,7 @@ export const stopCommand = async (
       ) {
         try {
           // Check if branch exists
-          launchSync(
+          await launch(
             'git',
             [
               'show-ref',
@@ -147,10 +122,9 @@ export const stopCommand = async (
             { stdio: 'pipe' }
           );
           // Delete the branch
-          launchSync('git', ['branch', '-D', task.branchName], {
+          await launch('git', ['branch', '-D', task.branchName], {
             stdio: 'pipe',
           });
-          if (spinner) spinner.text = 'Branch removed';
         } catch (error) {
           // Branch doesn't exist or couldn't be deleted, which is fine
         }
@@ -171,8 +145,6 @@ export const stopCommand = async (
 
     // Clear workspace information
     task.setWorkspace('', '');
-
-    if (spinner) spinner.success('Task stopped successfully');
 
     jsonOutput = {
       ...jsonOutput,

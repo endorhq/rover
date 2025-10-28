@@ -11,6 +11,7 @@ import {
 } from '../../utils/env-variables.js';
 import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir, userInfo } from 'node:os';
+import { generateRandomId } from '../../utils/branch-name.js';
 
 const AGENT_IMAGE = 'ghcr.io/endorhq/rover/node:v1.3.1';
 
@@ -186,34 +187,95 @@ export class DockerSandbox extends Sandbox {
       '/inputs.json'
     );
 
-    return (await launch('docker', dockerArgs)).stdout?.toString().trim();
+    return (
+      (await launch('docker', dockerArgs)).stdout?.toString().trim() ||
+      this.sandboxName
+    );
   }
 
   protected async start(): Promise<string> {
-    return (await launch('docker', ['start', this.sandboxName])).stdout
-      ?.toString()
-      .trim();
+    return (
+      (
+        await launch('docker', ['start', this.sandboxName], { stdio: 'pipe' })
+      ).stdout
+        ?.toString()
+        .trim() || this.sandboxName
+    );
   }
 
   protected async remove(): Promise<string> {
-    await launch('docker', ['rm', '-f', this.sandboxName]);
-    return this.sandboxName;
+    return (
+      (
+        await launch('docker', ['rm', '-f', this.sandboxName], {
+          stdio: 'pipe',
+        })
+      ).stdout
+        ?.toString()
+        .trim() || this.sandboxName
+    );
   }
 
   protected async stop(): Promise<string> {
-    await launch('docker', ['stop', this.sandboxName]);
-    return this.sandboxName;
+    return (
+      (
+        await launch('docker', ['stop', this.sandboxName], { stdio: 'pipe' })
+      ).stdout
+        ?.toString()
+        .trim() || this.sandboxName
+    );
   }
 
   protected async logs(): Promise<string> {
-    return '';
+    return (
+      (
+        await launch('docker', ['logs', this.sandboxName], { stdio: 'pipe' })
+      ).stdout?.toString() || ''
+    );
   }
 
   protected async *followLogs(): AsyncIterable<string> {
-    yield '';
+    const process = launch('docker', ['logs', '--follow', this.sandboxName]);
+
+    if (!process.stdout) {
+      return;
+    }
+
+    // Stream stdout line by line
+    for await (const chunk of process.stdout) {
+      yield chunk.toString();
+    }
   }
 
-  protected async openShellAtWorktree(): Promise<void> {}
+  async openShellAtWorktree(): Promise<void> {
+    // Check if worktree exists
+    if (!this.task.worktreePath || !existsSync(this.task.worktreePath)) {
+      throw new Error('No worktree found for this task');
+    }
+
+    // Generate a unique container name for the interactive shell
+    const containerName = `rover-shell-${this.task.id}-${generateRandomId()}`;
+
+    // Build Docker run command for interactive shell
+    const dockerArgs = [
+      'run',
+      '--rm', // Remove container when it exits
+      '-it', // Interactive with TTY
+      '--name',
+      containerName,
+      '-v',
+      `${this.task.worktreePath}:/workspace:Z,rw`,
+      '-w',
+      '/workspace',
+      'node:24-alpine',
+      '/bin/sh',
+    ];
+
+    // Start Docker container with direct stdio inheritance for true interactivity
+    await launch('docker', dockerArgs, {
+      reject: false,
+      stdio: 'inherit', // This gives full control to the user
+    });
+  }
 }
 
 async function catFile(image: string, file: string): Promise<string> {

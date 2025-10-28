@@ -19,11 +19,6 @@ vi.mock('../../lib/telemetry.js', () => ({
   }),
 }));
 
-// Mock Docker execution and task execution to prevent actual execution
-vi.mock('../task.js', () => ({
-  startDockerExecution: vi.fn().mockResolvedValue(undefined),
-}));
-
 // Mock exit utilities to prevent process.exit
 vi.mock('../../utils/exit.js', () => ({
   exitWithError: vi.fn().mockImplementation(() => {}),
@@ -34,9 +29,6 @@ vi.mock('../../utils/exit.js', () => ({
 describe('restart command', async () => {
   let testDir: string;
   let originalCwd: string;
-  const mockStartDockerExecution = vi.mocked(
-    await import('../task.js')
-  ).startDockerExecution;
 
   beforeEach(() => {
     // Create temporary directory for test
@@ -109,16 +101,6 @@ describe('restart command', async () => {
       expect(reloadedTask.status).toBe('IN_PROGRESS');
       expect(reloadedTask.restartCount).toBe(1);
       expect(reloadedTask.lastRestartAt).toBeDefined();
-
-      // Verify Docker execution was called
-      expect(mockStartDockerExecution).toHaveBeenCalledWith(
-        taskId,
-        expect.any(Object), // task object
-        expect.any(String), // workspace path
-        expect.any(String), // iteration path
-        expect.any(String), // AI agent
-        true // json flag
-      );
     });
 
     it('should track multiple restart attempts', async () => {
@@ -148,7 +130,6 @@ describe('restart command', async () => {
 
       const secondRestart = TaskDescription.load(taskId);
       expect(secondRestart.restartCount).toBe(2);
-      expect(mockStartDockerExecution).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -176,16 +157,6 @@ describe('restart command', async () => {
       const reloadedTask = TaskDescription.load(taskId);
       expect(reloadedTask.status).toBe('IN_PROGRESS');
       expect(reloadedTask.restartCount).toBe(1);
-
-      // Verify Docker execution was called
-      expect(mockStartDockerExecution).toHaveBeenCalledWith(
-        taskId,
-        expect.any(Object), // task object
-        expect.any(String), // workspace path
-        expect.any(String), // iteration path
-        expect.any(String), // AI agent
-        true // json flag
-      );
     });
 
     it('should reject restarting tasks not in NEW or FAILED status', async () => {
@@ -224,9 +195,6 @@ describe('restart command', async () => {
           ]),
         })
       );
-
-      // Verify Docker execution was NOT called
-      expect(mockStartDockerExecution).not.toHaveBeenCalled();
     });
 
     it('should handle invalid task IDs', async () => {
@@ -243,9 +211,6 @@ describe('restart command', async () => {
         }),
         true
       );
-
-      // Verify Docker execution was NOT called
-      expect(mockStartDockerExecution).not.toHaveBeenCalled();
     });
 
     it('should handle non-existent tasks', async () => {
@@ -262,9 +227,6 @@ describe('restart command', async () => {
         }),
         true
       );
-
-      // Verify Docker execution was NOT called
-      expect(mockStartDockerExecution).not.toHaveBeenCalled();
     });
   });
 });

@@ -7,7 +7,7 @@ import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { CLIJsonOutput } from '../types.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
-import { generateRandomId } from '../utils/branch-name.js';
+import { DockerSandbox } from '../lib/sandbox/index.js';
 
 /**
  * Start an interactive shell for testing task changes
@@ -53,10 +53,11 @@ export const shellCommand = async (
     telemetry?.eventShell();
 
     if (options.container) {
-      // Check if Docker is available
-      try {
-        launchSync('docker', ['--version']);
-      } catch (error) {
+      // Check if Docker is available using the sandbox's availability check
+      const dockerSandbox = new DockerSandbox(task);
+      const isAvailable = await dockerSandbox.isBackendAvailable();
+
+      if (!isAvailable) {
         jsonOutput.error = `Docker is not available. Please install it.`;
         exitWithError(jsonOutput, json);
         return;
@@ -79,33 +80,16 @@ export const shellCommand = async (
 
     if (options.container) {
       try {
-        const containerName = `rover-shell-${numericTaskId}-${generateRandomId()}`;
+        const dockerSandbox = new DockerSandbox(task);
 
-        // Build Docker run command for interactive shell
-        const dockerArgs = [
-          'run',
-          '--rm', // Remove container when it exits
-          '-it', // Interactive with TTY
-          '--name',
-          containerName,
-          '-v',
-          `${task.worktreePath}:/workspace:Z,rw`,
-          '-w',
-          '/workspace',
-          'node:24-alpine',
-          '/bin/sh',
-        ];
+        spinner.success('Shell started');
 
-        // Start Docker container with direct stdio inheritance for true interactivity
-        const containerProcess = launch('docker', dockerArgs, {
-          stdio: 'inherit', // This gives full control to the user
-        });
+        // Use the DockerSandbox implementation to open shell at worktree
+        await dockerSandbox.openShellAtWorktree();
 
-        spinner.success(`Shell started. Container name: ${containerName}`);
-
-        // Wait for the user to exit the container
-        shellProcess = await containerProcess;
+        shellProcess = { exitCode: 0 };
       } catch (error) {
+        spinner.error('Failed to start container shell');
         jsonOutput.error = 'Failed to start container: ' + error;
         exitWithError(jsonOutput, json);
         return;
@@ -170,6 +154,7 @@ export const shellCommand = async (
         const shellInit = launch(shell, shellArgs, {
           stdio: 'inherit',
           cwd: task.worktreePath,
+          reject: false,
         });
 
         spinner.success(`Shell started using ${shell}`);
