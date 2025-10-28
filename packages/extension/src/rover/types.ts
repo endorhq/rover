@@ -15,12 +15,15 @@ export interface RoverTask {
   startedAt: string;
   completedAt?: string;
   error?: string;
+  workflowName?: string;
 }
 
 export interface TaskDetails extends RoverTask {
   description?: string;
   worktreePath?: string;
   branch?: string;
+  workflowName?: string;
+  iterationFiles?: string[];
   iterations?: Array<{
     number: number;
     status: string;

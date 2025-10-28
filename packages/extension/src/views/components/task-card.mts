@@ -210,6 +210,9 @@ export class TaskCard extends LitElement {
             <i class="codicon ${this.getStatusIcon(this.task.status)}"></i>
             ${this.getStatusName(this.task.status)}
           </span>
+          ${this.task.workflowName
+            ? html`<span class="task-workflow">${this.task.workflowName}</span>`
+            : ''}
           ${timeInfo
             ? html`<span class="task-timestamp">${timeInfo}</span>`
             : ''}
