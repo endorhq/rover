@@ -187,12 +187,11 @@ export function createProgram(
       '--from-github <issue>',
       'Fetch task description from a GitHub issue number'
     )
-    // TODO: Uncomment it once we support multiple workflows by default
-    // .option(
-    //   '--workflow, -w <name>',
-    //   'Use a specific workflow to complete this task. The options are: swe, bug-finder.',
-    //   'swe'
-    // )
+    .option(
+      '--workflow, -w <name>',
+      'Use a specific workflow to complete this task. The options are: swe',
+      'swe'
+    )
     .option('-y, --yes', 'Skip all confirmations and run non-interactively')
     .option(
       '-s, --source-branch <branch>',

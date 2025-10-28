@@ -197,7 +197,7 @@ export class RoverCLI {
     sourceBranch?: string,
     workflow?: string
   ): Promise<RoverTask> {
-    const args = ['task', description, '--yes', '--json'];
+    const args = ['task', '--yes', '--json'];
 
     // Add agent option if provided
     if (agent) {
@@ -213,6 +213,8 @@ export class RoverCLI {
     if (workflow) {
       args.push('--workflow', workflow);
     }
+
+    args.push(description);
 
     const { stdout, stderr, exitCode } = await launch(
       this.roverPath,
