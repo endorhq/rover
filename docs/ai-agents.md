@@ -2,7 +2,7 @@
 
 Rover provides a common interface across several AI coding agents that run in the terminal. It supports AI coding agents such as Codex, Claude Code, Gemini CLI, and Qwen. Rover interacts with multiple tools that exposes a different set of arguments, options, and features. Maintaining a stable interface across all of them is required.
 
-Currently, Rover uses the user AI coding agents for:
+Currently, Rover uses AI coding agents for:
 
 - **Internal operations**: 
   - Extract the required inputs for a workflow
@@ -22,7 +22,7 @@ Rover integrates with AI coding agents that run in the terminal, such as Claude 
 2. It must support "non-interactive" mode. Most tools use the `-p` option for this
 3. It must support MCP server configuration
 
-If the AI agent passes all checks, you are good to go. To start with the integration, first solve these questions:
+If the AI agent meets all these requirements, you can proceed with integration. To start with the integration, first solve these questions:
 
 - How does the AI agent authenticate to the remote service?
 - What are the configuration requirements? What files does it need to work?
@@ -39,7 +39,7 @@ Each AI agent is currently defined in two locations:
 - `packages/cli/src/lib/agents`: classes for internal operations
 - `packages/agents/src/`: classes to complete user tasks
 
-Having it in two locations is causing unncessary duplication. In the future, **we will consolidate all AI agents' logic into the `packages/agents` package**.
+Having it in two locations is causing unnecessary duplication. In the future, **we will consolidate all AI agent logic into the `packages/agents` package**.
 
 Key files to consider:
 
@@ -87,14 +87,16 @@ A new agent touches different packages in the project. To test your changes, run
   npm run build
   ```
 
-- Then, build a local sandbox image for testing. Currently, you need to match the value of the `AGENT_IMAGE` constant in the [`task.ts` file](../packages/cli/src/commands/task.ts). This image builds the new `agent` package and install it in the image. We build the final image and publish it during the production release.
+- Then, build a local sandbox image for testing. Currently, you need to match the value of the `AGENT_IMAGE` constant in the [`task.ts` file](../packages/cli/src/commands/task.ts).
 
   ```bash
   # Remember to change "VERSION" with the value from "AGENT_IMAGE"
   docker build -t ghcr.io/endorhq/rover/node:VERSION -f ./images/node/Dockerfile .
   ```
 
-- Now, you need to load the latest CLI version. For that, add an alias to use the development version you just build for the CLI:
+  This image builds the new `agent` package and installs it in the image. We build the final image and publish it during the production release.
+
+- Now, you need to use the latest CLI version. For that, add an alias to use the development version you just built for the CLI:
 
   ```bash
   # You can remove the alias with "unalias rover"
