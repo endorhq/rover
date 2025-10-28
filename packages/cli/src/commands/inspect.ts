@@ -41,6 +41,8 @@ interface TaskInspectionOutput {
   formattedStatus: string;
   /** Numeric task identifier */
   id: number;
+  /** List of markdown files in the iteration directory */
+  iterationFiles?: string[];
   /** Total number of iterations for this task */
   iterations: number;
   /** ISO timestamp of the most recent iteration */
@@ -155,6 +157,7 @@ export const inspectCommand = async (
         files: iteration.listMarkdownFiles(),
         formattedStatus: formatTaskStatus(task.status),
         id: task.id,
+        iterationFiles: iteration.listMarkdownFiles(),
         iterations: task.iterations,
         lastIterationAt: task.lastIterationAt,
         startedAt: task.startedAt,

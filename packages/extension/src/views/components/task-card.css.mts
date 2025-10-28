@@ -104,6 +104,12 @@ const styles = css`
     color: var(--vscode-badge-foreground);
   }
 
+  .task-workflow {
+    font-size: 11px;
+    color: var(--vscode-foreground);
+    flex-shrink: 0;
+  }
+
   .task-timestamp {
     font-size: 11px;
     color: var(--vscode-descriptionForeground);

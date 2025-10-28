@@ -148,14 +148,16 @@ export class TaskDetailsPanel {
         const iterationNumber = parseInt(iterationDir.name);
 
         // Check for common files in iteration directory
-        const commonFiles = [
+        // Use iterationFiles from taskDetails if available, otherwise fall back to hardcoded list
+        const defaultFiles = [
           'context.md',
           'plan.md',
           'changes.md',
           'review.md',
           'summary.md',
         ];
-        const files = commonFiles.map(fileName => {
+        const fileList = taskDetails.iterationFiles || defaultFiles;
+        const files = fileList.map(fileName => {
           const filePath = path.join(iterationPath, fileName);
           const exists = fs.existsSync(filePath);
           return {
