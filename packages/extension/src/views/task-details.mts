@@ -215,7 +215,9 @@ export class TaskDetailsView extends LitElement {
                 'Unknown'}
               </span>
               ${this.taskData.workflowName
-                ? html`<span class="workflow-name">${this.taskData.workflowName}</span>`
+                ? html`<span class="workflow-name"
+                    >${this.taskData.workflowName}</span
+                  >`
                 : ''}
               <span class="time-info">
                 ${this.taskData.createdAt

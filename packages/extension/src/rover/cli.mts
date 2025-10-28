@@ -200,17 +200,17 @@ export class RoverCLI {
     const args = ['task', '--yes', '--json'];
 
     // Add agent option if provided
-    if (agent) {
+    if (agent && agent.length > 0) {
       args.push('--agent', agent);
     }
 
     // Add source branch option if provided
-    if (sourceBranch) {
+    if (sourceBranch && sourceBranch.length > 0) {
       args.push('--source-branch', sourceBranch);
     }
 
     // Add workflow option if provided
-    if (workflow) {
+    if (workflow && workflow.length > 0) {
       args.push('--workflow', workflow);
     }
 
