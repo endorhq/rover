@@ -36,7 +36,8 @@ export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
           await this.handleCreateTask(
             data.description,
             data.agent,
-            data.branch
+            data.branch,
+            data.workflow
           );
           break;
         case 'refreshTasks':
@@ -97,7 +98,8 @@ export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
   private async handleCreateTask(
     description: string,
     agent?: string,
-    branch?: string
+    branch?: string,
+    workflow?: string
   ) {
     try {
       // Show progress bar while creating task
@@ -112,7 +114,8 @@ export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
           const task = await this.cli.createTask(
             description.trim(),
             agent,
-            branch
+            branch,
+            workflow
           );
 
           // Send success message back to webview

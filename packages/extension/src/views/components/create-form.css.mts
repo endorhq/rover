@@ -30,6 +30,18 @@ const styles = css`
     margin: 8px 0 6px;
   }
 
+  .form-field {
+    margin-top: 8px;
+  }
+
+  .form-label {
+    display: block;
+    font-size: 0.75rem;
+    letter-spacing: 0.2px;
+    margin-bottom: 3px;
+    font-weight: 500;
+  }
+
   .form-desc {
     font-size: 0.75rem;
     color: var(--vscode-descriptionForeground);
