@@ -317,9 +317,11 @@ export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
 
     try {
       const settings = await this.cli.getSettings();
+      const cliStatus = await this.cli.checkInstallation();
       this._view.webview.postMessage({
         command: 'updateSettings',
         settings: settings,
+        cliVersion: cliStatus.version,
       });
     } catch (error) {
       console.error('Failed to load settings:', error);

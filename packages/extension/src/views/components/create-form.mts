@@ -14,6 +14,7 @@ export class CreateForm extends LitElement {
   @property({ type: String }) defaultWorkflow: string = '';
   @property({ type: String }) dropdownDirection: 'auto' | 'up' | 'down' =
     'auto';
+  @property({ type: String }) version: string = '';
   @state() private taskInput = '';
   @state() private creatingTask = false;
   @state() private selectedAgent = '';
@@ -37,6 +38,25 @@ export class CreateForm extends LitElement {
   private formatAgentName(agent: string): string {
     // Capitalize first letter
     return agent.charAt(0).toUpperCase() + agent.slice(1);
+  }
+
+  private isVersionAtLeast(version: string, minVersion: string): boolean {
+    if (!version) return false;
+
+    const parseVersion = (v: string): number[] => {
+      const match = v.match(/(\d+)\.(\d+)\.(\d+)/);
+      if (!match) return [0, 0, 0];
+      return [parseInt(match[1]), parseInt(match[2]), parseInt(match[3])];
+    };
+
+    const [major, minor, patch] = parseVersion(version);
+    const [minMajor, minMinor, minPatch] = parseVersion(minVersion);
+
+    if (major > minMajor) return true;
+    if (major < minMajor) return false;
+    if (minor > minMinor) return true;
+    if (minor < minMinor) return false;
+    return patch >= minPatch;
   }
 
   static styles = styles;
@@ -276,51 +296,72 @@ export class CreateForm extends LitElement {
           repository to complete this task in background.
         </p>
 
-        <!-- Workflow Dropdown -->
-        <div class="form-field">
-          <label class="form-label">Workflow</label>
-          <div class="dropdown-container">
-            <button
-              class="dropdown-button"
-              @click=${this.toggleWorkflowDropdown}
-              title="Select workflow"
-            >
-              <i class="codicon codicon-layout"></i>
-              <span>${selectedWorkflow?.label || 'Select workflow'}</span>
-              <i class="codicon codicon-chevron-down"></i>
-            </button>
-
-            ${this.showWorkflowDropdown
-              ? html`
-                  <div
-                    class="dropdown-menu ${this.workflowDropdownDirection ===
-                    'up'
-                      ? 'dropdown-up'
-                      : ''}"
+        <!-- Workflow Dropdown or Upgrade Message -->
+        ${this.isVersionAtLeast(this.version, '1.3.0')
+          ? html`
+              <div class="form-field">
+                <label class="form-label">Workflow</label>
+                <div class="dropdown-container">
+                  <button
+                    class="dropdown-button"
+                    @click=${this.toggleWorkflowDropdown}
+                    title="Select workflow"
                   >
-                    ${this.workflows.map(
-                      workflow => html`
-                        <button
-                          class="dropdown-item ${workflow.id ===
-                          this.selectedWorkflow
-                            ? 'selected'
+                    <i class="codicon codicon-layout"></i>
+                    <span>${selectedWorkflow?.label || 'Select workflow'}</span>
+                    <i class="codicon codicon-chevron-down"></i>
+                  </button>
+
+                  ${this.showWorkflowDropdown
+                    ? html`
+                        <div
+                          class="dropdown-menu ${this
+                            .workflowDropdownDirection === 'up'
+                            ? 'dropdown-up'
                             : ''}"
-                          @click=${(e: Event) =>
-                            this.selectWorkflow(workflow.id, e)}
                         >
-                          <i class="codicon codicon-layout"></i>
-                          <span>${workflow.label}</span>
-                          ${workflow.id === this.selectedWorkflow
-                            ? html`<i class="codicon codicon-check"></i>`
-                            : ''}
-                        </button>
+                          ${this.workflows.map(
+                            workflow => html`
+                              <button
+                                class="dropdown-item ${workflow.id ===
+                                this.selectedWorkflow
+                                  ? 'selected'
+                                  : ''}"
+                                @click=${(e: Event) =>
+                                  this.selectWorkflow(workflow.id, e)}
+                              >
+                                <i class="codicon codicon-layout"></i>
+                                <span>${workflow.label}</span>
+                                ${workflow.id === this.selectedWorkflow
+                                  ? html`<i class="codicon codicon-check"></i>`
+                                  : ''}
+                              </button>
+                            `
+                          )}
+                        </div>
                       `
-                    )}
+                    : ''}
+                </div>
+              </div>
+            `
+          : this.version
+            ? html`
+                <div class="form-field">
+                  <label class="form-label">Workflow</label>
+                  <div class="upgrade-message">
+                    <i class="codicon codicon-info"></i>
+                    <div>
+                      <p>Workflow support requires Rover v1.3.0 or later.</p>
+                      <p>
+                        Your current version: ${this.version}. Please upgrade
+                        using:
+                      </p>
+                      <code>npm install -g @endorhq/rover@latest</code>
+                    </div>
                   </div>
-                `
-              : ''}
-          </div>
-        </div>
+                </div>
+              `
+            : ''}
 
         <div class="form-field">
           <label class="form-label">Description</label>
