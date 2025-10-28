@@ -76,6 +76,44 @@ const styles = css`
     flex-shrink: 0;
   }
 
+  /* Upgrade Message */
+  .upgrade-message {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 12px;
+    background-color: var(--vscode-inputValidation-infoBackground);
+    border: 1px solid var(--vscode-inputValidation-infoBorder);
+    border-radius: 3px;
+    color: var(--vscode-inputValidation-infoForeground);
+    font-size: 11px;
+  }
+
+  .upgrade-message .codicon {
+    font-size: 14px;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .upgrade-message p {
+    margin: 0 0 6px 0;
+  }
+
+  .upgrade-message p:last-child {
+    margin-bottom: 0;
+  }
+
+  .upgrade-message code {
+    display: block;
+    margin-top: 6px;
+    padding: 6px 8px;
+    background-color: var(--vscode-textCodeBlock-background);
+    border-radius: 2px;
+    font-family: var(--vscode-editor-font-family);
+    font-size: 11px;
+    overflow-x: auto;
+  }
+
   /* Form Controls Container */
   .form-controls {
     display: flex;

@@ -27,6 +27,7 @@ export class TasksWebview extends LitElement {
   @state() private defaultAgent: string = '...';
   @state() private branches: string[] = ['...'];
   @state() private defaultBranch: string = '...';
+  @state() private cliVersion: string = '';
 
   // Component styles
   static styles = styles;
@@ -58,6 +59,7 @@ export class TasksWebview extends LitElement {
         this.workflows = message.settings?.workflows || [];
         this.defaultWorkflow =
           this.workflows.length > 0 ? this.workflows[0].id : '';
+        this.cliVersion = message.cliVersion || '';
         break;
       case 'updateBranches':
         this.branches = message.branches?.branches;
@@ -202,6 +204,7 @@ export class TasksWebview extends LitElement {
       .defaultAgent=${this.defaultAgent}
       .branches=${this.branches}
       .defaultBranch=${this.defaultBranch}
+      .version=${this.cliVersion}
       dropdownDirection="auto"
     ></create-form>`;
   }
