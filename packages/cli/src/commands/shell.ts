@@ -7,7 +7,10 @@ import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { CLIJsonOutput } from '../types.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
-import { DockerSandbox } from '../lib/sandbox/index.js';
+import {
+  createSandbox,
+  getAvailableSandboxBackend,
+} from '../lib/sandbox/index.js';
 
 /**
  * Start an interactive shell for testing task changes
@@ -53,12 +56,11 @@ export const shellCommand = async (
     telemetry?.eventShell();
 
     if (options.container) {
-      // Check if Docker is available using the sandbox's availability check
-      const dockerSandbox = new DockerSandbox(task);
-      const isAvailable = await dockerSandbox.isBackendAvailable();
+      // Check if any sandbox backend (Docker or Podman) is available
+      const availableBackend = await getAvailableSandboxBackend();
 
-      if (!isAvailable) {
-        jsonOutput.error = `Docker is not available. Please install it.`;
+      if (!availableBackend) {
+        jsonOutput.error = `Neither Docker nor Podman are available. Please install Docker or Podman.`;
         exitWithError(jsonOutput, json);
         return;
       }
@@ -80,12 +82,12 @@ export const shellCommand = async (
 
     if (options.container) {
       try {
-        const dockerSandbox = new DockerSandbox(task);
+        const sandbox = await createSandbox(task);
 
         spinner.success('Shell started');
 
-        // Use the DockerSandbox implementation to open shell at worktree
-        await dockerSandbox.openShellAtWorktree();
+        // Use the sandbox implementation to open shell at worktree
+        await sandbox.openShellAtWorktree();
 
         shellProcess = { exitCode: 0 };
       } catch (error) {

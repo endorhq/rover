@@ -4,7 +4,7 @@ import { existsSync, mkdirSync } from 'node:fs';
 import { generateBranchName } from '../utils/branch-name.js';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
 import { exitWithError, exitWithSuccess } from '../utils/exit.js';
-import { Sandbox, DockerSandbox } from '../lib/sandbox/index.js';
+import { createSandbox } from '../lib/sandbox/index.js';
 import { UserSettings, AI_AGENT } from '../lib/config.js';
 import { Git } from 'rover-common';
 import { CLIJsonOutput } from '../types.js';
@@ -153,12 +153,12 @@ export const restartCommand = async (
     // Mark task as in progress
     task.markInProgress();
 
-    // Start Docker container for task execution
+    // Start sandbox container for task execution
     try {
-      const sandbox: Sandbox = new DockerSandbox(task);
+      const sandbox = await createSandbox(task);
       await sandbox.createAndStart();
     } catch (error) {
-      // If Docker execution fails, reset task back to NEW status
+      // If sandbox execution fails, reset task back to NEW status
       task.resetToNew();
       throw error;
     }

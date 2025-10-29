@@ -1,7 +1,7 @@
 import colors from 'ansi-colors';
 import { join } from 'node:path';
 import { rmSync } from 'node:fs';
-import { DockerSandbox } from '../lib/sandbox/index.js';
+import { createSandbox } from '../lib/sandbox/index.js';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
 import { findProjectRoot, launch, ProcessManager } from 'rover-common';
 import { exitWithError, exitWithSuccess } from '../utils/exit.js';
@@ -59,9 +59,9 @@ export const stopCommand = async (
 
     processManager?.addItem(`Stopping Task`);
 
-    // Stop Docker container if it exists and is running
+    // Stop sandbox container if it exists and is running
     if (task.containerId) {
-      const sandbox = new DockerSandbox(task, processManager);
+      const sandbox = await createSandbox(task, processManager);
       await sandbox.stopAndRemove();
     }
 

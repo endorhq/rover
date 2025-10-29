@@ -6,7 +6,7 @@ import { getNextTaskId } from '../utils/task-id.js';
 import { homedir, tmpdir, userInfo } from 'node:os';
 import { getAIAgentTool, getUserAIAgent } from '../lib/agents/index.js';
 import { TaskDescription } from '../lib/description.js';
-import { DockerSandbox } from '../lib/sandbox/index.js';
+import { createSandbox } from '../lib/sandbox/index.js';
 import { SetupBuilder } from '../lib/setup.js';
 import { AI_AGENT, ProjectConfig } from '../lib/config.js';
 import { IterationConfig } from '../lib/iteration.js';
@@ -654,9 +654,9 @@ export const taskCommand = async (
 
     processManager?.completeLastItem();
 
-    // Start Docker container for task execution
+    // Start sandbox container for task execution
     try {
-      const sandbox = new DockerSandbox(task, processManager);
+      const sandbox = await createSandbox(task, processManager);
       const containerId = await sandbox.createAndStart();
 
       updateTaskMetadata(

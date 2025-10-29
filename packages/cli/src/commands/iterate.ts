@@ -4,7 +4,7 @@ import { existsSync, readFileSync, mkdirSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { findProjectRoot, launchSync } from 'rover-common';
 import yoctoSpinner from 'yocto-spinner';
-import { Sandbox, DockerSandbox } from '../lib/sandbox/index.js';
+import { createSandbox } from '../lib/sandbox/index.js';
 import {
   getAIAgentTool,
   getUserAIAgent,
@@ -429,8 +429,8 @@ export const iterateCommand = async (
       previousContext
     );
 
-    // Start Docker container for task execution
-    const sandbox: Sandbox = new DockerSandbox(task);
+    // Start sandbox container for task execution
+    const sandbox = await createSandbox(task);
     await sandbox.createAndStart();
 
     result.success = true;
