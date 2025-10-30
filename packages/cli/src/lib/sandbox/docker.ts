@@ -52,7 +52,7 @@ export class DockerSandbox extends Sandbox {
     const setupBuilder = new SetupBuilder(this.task, this.task.agent!);
     const entrypointScriptPath = setupBuilder.generateEntrypoint();
     const inputsPath = setupBuilder.generateInputs();
-    const workflowPath = setupBuilder.saveWorkflow();
+    const workflowPath = setupBuilder.saveWorkflow(this.task.workflowName);
 
     // Get agent-specific Docker mounts
     const agent = getAIAgentTool(this.task.agent!);

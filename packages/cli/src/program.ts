@@ -1,4 +1,4 @@
-import { Command } from 'commander';
+import { Command, Option } from 'commander';
 import { ProjectConfig, UserSettings } from './lib/config.js';
 import { initCommand } from './commands/init.js';
 import { listCommand } from './commands/list.js';
@@ -187,10 +187,13 @@ export function createProgram(
       '--from-github <issue>',
       'Fetch task description from a GitHub issue number'
     )
-    .option(
-      '--workflow, -w <name>',
-      'Use a specific workflow to complete this task. The options are: swe',
-      'swe'
+    .addOption(
+      new Option(
+        '--workflow, -w <name>',
+        'Use a specific workflow to complete this task'
+      )
+        .choices(['swe', 'tech-writer'])
+        .default('swe')
     )
     .option('-y, --yes', 'Skip all confirmations and run non-interactively')
     .option(

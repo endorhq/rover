@@ -65,17 +65,14 @@ steps:
 
       - **Internal developers** (engineers working on the codebase):
         - Focus on: Class definitions, internal architecture, design patterns, code organization
-        - Include: Implementation details, private APIs, development workflows
         - Depth: Deep technical details, assumes familiarity with the codebase
 
       - **End-user developers** (external developers using the library/tool):
         - Focus on: Public APIs, CLI interfaces, library exports, integration guides
-        - Include: Installation, usage examples, API reference, configuration
         - Depth: High-level interfaces, clear examples, assumes general programming knowledge
 
       - **Less technical users** (non-developers, beginners):
         - Focus on: Step-by-step guides, visual aids, simple tasks, troubleshooting
-        - Include: Installation with screenshots, basic workflows, common use cases
         - Depth: Simple language, minimal jargon, assumes little technical background
 
       ### Phase 2: Analyze the codebase
@@ -83,11 +80,8 @@ steps:
       Based on the audience focus identified above and the task description, explore the codebase to find relevant files:
 
       1. Identify what needs to be documented (feature, module, tool, API, etc.)
-      2. Find the main entry points (package.json, go.mod, main files, CLI commands, exported functions, etc.)
-      3. Identify relevant source files, configuration files, and existing documentation
-      4. Note important patterns, dependencies, and architectural decisions
-      5. Consider the documentation journey: what steps will users need? (installation, setup, usage, examples, troubleshooting, etc.)
-      6. Identify what are the key points the documentation must have. Organize the points by relevance.
+      2. Identify relevant source files, configuration files, and existing documentation
+      3. Identify what are the key points the documentation must have. Be concise and keep them to the minimum, most relevant points. Organize the points by relevance.
 
       ### Phase 3: Output
 
@@ -98,22 +92,21 @@ steps:
       - Do not fabricate content; if information is unavailable or irrelevant, skip it
       - Focus on what's relevant for the target audience
       - Follow the template strictly
-      - Just output the template. Skip any text before and after
 
       <template>
       # Documentation Context
 
       ## Target Audience
 
-      [1-2 paragraphs describing the audience and their needs]
+      [1-2 sentences describing the audience and their needs]
 
       ## Documentation Scope
 
-      [1-2 paragraphs describing what needs to be documented]
+      [1 paragraph describing what needs to be documented]
 
       ### Out of the Scope
 
-      [1 paragraph describing what is out of scope and should be documented separately]
+      [List with concise sentences about the information that it's out of scope]
 
       ## Key points
 
@@ -123,15 +116,6 @@ steps:
       - Task definition
       - Create a task
       - Debugging
-
-      ## Documentation Journey
-
-      [Ordered list of key steps users will follow, e.g.:]
-      - Installation
-      - Configuration
-      - Basic usage
-      - Advanced features
-      - Troubleshooting
 
       ## Relevant Files
 
@@ -149,9 +133,9 @@ steps:
 
       - dependency: why it matters for the documentation
 
-      ## Existing Documentation
+      ## Relevant Existing Documentation
 
-      - path/to/existing/docs: what it covers (or "None found" if no existing docs). Ensure you identify if the detected documentation is for the same audience and only reference to the one that matches it.
+      - path/to/existing/docs: only point to documentation files that matches the target audience and are relevant for this documentation
       </template>
     outputs:
       - name: context_file
@@ -198,18 +182,16 @@ steps:
 
       Based on the context, create a comprehensive outline that:
 
-      1. Follows a logical progression matching the documentation journey
-      2. Addresses all key points identified in the context
-      3. Adapts the depth and style to the target audience
-      4. Includes sections for prerequisites, concepts, examples, and troubleshooting
-      5. Ensures each section has a clear purpose and scope
-      6. Uses appropriate headings hierarchy (## for main sections, ### for subsections)
+      1. Follows a logical progression
+      2. Adapts the depth and style to the target audience. By default, be concise
+      3. Avoid over explaning
+      4. Ensures each section has a clear purpose and scope
+      5. Uses appropriate headings hierarchy. Use the "Heading Level" property in the template
+      6. When the target audience are not internal developers, skip any internal logic documentation
 
       For each section, consider:
       - What the user needs to know at this point
       - What they should have learned from previous sections
-      - What examples or code snippets will help
-      - What common issues or questions might arise
 
       ### Phase 3: Output
 
@@ -217,10 +199,7 @@ steps:
 
       Rules:
       - Use clear, descriptive section titles
-      - Include brief notes about what each section should cover
-      - Mark sections that need code examples with [CODE EXAMPLE]
-      - Mark sections that need diagrams/visuals with [VISUAL]
-      - Keep notes concise (1-2 lines per section)
+      - Include a sentence about what each section should cover
       - Follow the template strictly
       - Just output the template. Skip any text before and after
 
@@ -234,36 +213,30 @@ steps:
       ## Document Structure
 
       ### [Section 1 Title - e.g., Introduction]
+      - Heading Level: 1
       - Purpose: [What this section achieves]
       - Content: [Key points to cover]
-      - Notes: [Any special considerations, e.g., [CODE EXAMPLE], [VISUAL]]
+
+      ### [Section 2 Title - e.g., Quick Start]
+      - Heading Level: 1
+      - Purpose: [What this section achieves]
+      - Content: [Key points to cover]
 
       ### [Section 2 Title - e.g., Prerequisites]
+      - Heading Level: 2
       - Purpose: [What this section achieves]
       - Content: [Key points to cover]
-      - Notes: [Any special considerations]
 
       ### [Section 3 Title - e.g., Installation]
+      - Heading Level: 2
       - Purpose: [What this section achieves]
       - Content: [Key points to cover]
-      - Notes: [Any special considerations]
-
-      ### [Section 4 Title - e.g., Quick Start]
-      - Purpose: [What this section achieves]
-      - Content: [Key points to cover]
-      - Notes: [Any special considerations]
 
       [Continue with additional sections as needed...]
 
       ### [Final Section - e.g., Troubleshooting or Next Steps]
       - Purpose: [What this section achieves]
       - Content: [Key points to cover]
-      - Notes: [Any special considerations]
-
-      ## Key Examples Needed
-
-      - [Description of example 1 and where it fits]
-      - [Description of example 2 and where it fits]
 
       ## References to Existing Docs
 
@@ -322,23 +295,24 @@ steps:
       - Avoid unnecessary jargon
 
       **Structure and Flow:**
-      - Follow the outline structure exactly
+      - Follow the outline structure
       - Lead with the main point in each section (Pyramid Principle)
       - Use short paragraphs (3-4 sentences max)
       - Create a logical narrative that guides the reader
       - Ensure each section is complete - incomplete information is worse than none
 
       **Code Examples:**
-      - ALL code examples must be complete and ready to run
+      - All code examples must be complete and ready to run
       - Include all necessary imports and setup
       - Follow the language's conventions and best practices
+      - Ensure code inside blocks are properly indented
       - Add comments to explain complex parts
 
       **Content Requirements:**
       - Start with a Quick Start section if appropriate
       - Explain the "why" before the "how"
       - Provide step-by-step instructions for tasks
-      - Include troubleshooting for common issues
+      - Include troubleshooting for common issues. You do not need to cover all possible edge cases
       - Reference existing documentation where relevant
 
       **Formatting:**
@@ -347,6 +321,7 @@ steps:
       - Use numbered lists for sequential steps
       - Use code blocks with proper language tags
       - Use tables for comparing options or listing parameters
+      - Use tables when describing CLI arguments, configuration properties, API properties, or similar information
       - Bold important terms and warnings
 
       ### Phase 3: Write the documentation
@@ -360,19 +335,17 @@ steps:
          - Flows from previous sections
          - Includes relevant examples
          - Addresses the audience's technical level
-      4. **Examples**: Create working code samples that:
+      4. **Examples**: 1-2 examples. Create working code samples that:
          - Start simple and build complexity
          - Cover common use cases
          - Include error handling
-      5. **Troubleshooting**: Address common issues and solutions
-      6. **Next Steps**: Guide readers to related topics
 
       ### Phase 4: Output
 
       Write your documentation to `draft.md` following this structure. This is mandatory.
 
       Rules:
-      - Follow the outline structure exactly
+      - Follow the outline structure
       - Write complete, production-ready documentation
       - Include all code examples inline
       - Use proper {{inputs.format}} formatting
@@ -393,7 +366,7 @@ steps:
 
   - id: review
     type: agent
-    name: 'Write Review'
+    name: 'Review'
     prompt: |
       You are reviewing and finalizing technical documentation.
 
@@ -427,56 +400,26 @@ steps:
       Review the draft documentation against these criteria:
 
       **Content Completeness:**
-      - Does it follow the outline structure completely?
-      - Are all key points from the context addressed?
-      - Are all promised sections included?
-      - Is the scope properly maintained (nothing missing, nothing extra)?
+      - Does it follow the outline structure?
+      - Are all key points from the context addressed and grouped logically?
 
       **Audience Appropriateness:**
       - Is the language appropriate for {{inputs.audience}}?
       - Is the technical depth correct?
-      - Are concepts explained at the right level?
-      - Are prerequisites clearly stated?
 
-      **Technical Accuracy:**
-      - Are all code examples correct and functional?
-      - Do examples follow language best practices?
-      - Are technical explanations accurate?
-      - Are version numbers and dependencies current?
-
-      **Documentation Quality:**
-      - Is the purpose stated clearly in the introduction?
-      - Does each section flow logically to the next?
-      - Are examples clear and relevant?
+      **Readability:**
       - Is the formatting consistent and clean?
+      - Is the document long or short? Is it easy to read?
 
       ### Phase 2: Apply improvements
 
       Based on your review, improve the documentation:
 
-      1. **Fix any issues found:**
-         - Correct technical inaccuracies
-         - Fill content gaps
-         - Fix code examples that don't work
-         - Improve unclear explanations
-
-      2. **Polish the content:**
-         - Improve clarity and conciseness
-         - Ensure consistent terminology
+      1. Fix any issues found
+      2. Polish the content when required
+         - Improve clarity, conciseness, and consistency
          - Fix grammar and spelling
-         - Optimize paragraph structure (3-4 sentences max)
-
-      3. **Enhance readability:**
-         - Add or improve section transitions
-         - Ensure proper heading hierarchy
-         - Add emphasis (bold) for important concepts
-         - Improve code comments
-
-      4. **Add final touches:**
-         - Add a table of contents if the document is long
-         - Include links to referenced documentation
-         - Add a "Further Reading" or "Related Topics" section if appropriate
-         - Ensure all {{inputs.format}} formatting is correct
+      4. Ensure the document has a valid {{inputs.format}} format
 
       ### Phase 3: Create final documentation
 
@@ -488,6 +431,7 @@ steps:
       - Follow all documentation best practices
       - Be properly formatted in {{inputs.format}}
       - Be appropriate for {{inputs.audience}}
+      - Skip adding a table of content
 
       ### Phase 4: Create summary
 
@@ -509,14 +453,6 @@ steps:
       - [Section name]: [Brief description of content]
       - [Section name]: [Brief description of content]
       [List all major sections]
-
-      ## Documentation approach
-
-      [1-2 paragraphs explaining the approach taken, style choices, and how it addresses the audience needs]
-
-      ## Usage recommendations
-
-      [1 paragraph on how this documentation should be used, maintained, or extended]
 
       ## Related documentation
 
