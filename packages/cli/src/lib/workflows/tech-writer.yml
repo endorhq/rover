@@ -1,0 +1,533 @@
+# Tech Writer Workflow
+# This workflow implements the complete Rover task execution lifecycle:
+# context analysis, planning, implementation, review, fixes, and summary
+version: '1.0'
+name: 'tech-writer'
+description: 'Write documentation and tutorials for your technical projects'
+
+inputs:
+  - name: description
+    description: 'Define the documentation you want me to write'
+    type: string
+    required: true
+  - name: audience
+    description: 'Describe the target audience for this documentation'
+    type: string
+    required: false
+    default: end users
+  - name: format
+    description: 'What is the file format you want the documentation?'
+    type: string
+    required: false
+    default: markdown
+
+outputs:
+  - name: documentation
+    description: 'Final implementation or tutorial'
+    type: file
+    filename: docs.md
+  - name: context
+    description: 'Technical context analysis'
+    type: file
+    filename: context.md
+  - name: outline
+    description: 'Documentation outline'
+    type: file
+    filename: outline.md
+
+config:
+  timeout: 3600
+  continueOnError: false
+
+steps:
+  - id: context
+    type: agent
+    name: 'Context Analysis'
+    prompt: |
+      You are analyzing a codebase to understand what needs to be documented.
+
+      ---
+      Title: 
+      {{inputs.title}}
+
+      Task description: 
+      {{inputs.description}}
+
+      Target audience: 
+      {{inputs.audience}}
+      ---
+
+      Follow these steps to complete the analysis. Do not move to the next phase until you complete the previous one.
+
+      ### Phase 1: Identify the audience perspective
+
+      Based on the target audience "{{inputs.audience}}", determine the documentation focus:
+
+      - **Internal developers** (engineers working on the codebase):
+        - Focus on: Class definitions, internal architecture, design patterns, code organization
+        - Include: Implementation details, private APIs, development workflows
+        - Depth: Deep technical details, assumes familiarity with the codebase
+
+      - **End-user developers** (external developers using the library/tool):
+        - Focus on: Public APIs, CLI interfaces, library exports, integration guides
+        - Include: Installation, usage examples, API reference, configuration
+        - Depth: High-level interfaces, clear examples, assumes general programming knowledge
+
+      - **Less technical users** (non-developers, beginners):
+        - Focus on: Step-by-step guides, visual aids, simple tasks, troubleshooting
+        - Include: Installation with screenshots, basic workflows, common use cases
+        - Depth: Simple language, minimal jargon, assumes little technical background
+
+      ### Phase 2: Analyze the codebase
+
+      Based on the audience focus identified above and the task description, explore the codebase to find relevant files:
+
+      1. Identify what needs to be documented (feature, module, tool, API, etc.)
+      2. Find the main entry points (package.json, go.mod, main files, CLI commands, exported functions, etc.)
+      3. Identify relevant source files, configuration files, and existing documentation
+      4. Note important patterns, dependencies, and architectural decisions
+      5. Consider the documentation journey: what steps will users need? (installation, setup, usage, examples, troubleshooting, etc.)
+      6. Identify what are the key points the documentation must have. Organize the points by relevance.
+
+      ### Phase 3: Output
+
+      Write your structured analysis to `context.md` following this template. This is mandatory.
+
+      Rules:
+      - Use 1-line bullets wherever possible
+      - Do not fabricate content; if information is unavailable or irrelevant, skip it
+      - Focus on what's relevant for the target audience
+      - Follow the template strictly
+      - Just output the template. Skip any text before and after
+
+      <template>
+      # Documentation Context
+
+      ## Target Audience
+
+      [1-2 paragraphs describing the audience and their needs]
+
+      ## Documentation Scope
+
+      [1-2 paragraphs describing what needs to be documented]
+
+      ### Out of the Scope
+
+      [1 paragraph describing what is out of scope and should be documented separately]
+
+      ## Key points
+
+      [Ordered list of key points to cover in the documentation, sorted by relevance. e.g:]
+      - Install the CLI and authenticate the user
+      - Initialize the project
+      - Task definition
+      - Create a task
+      - Debugging
+
+      ## Documentation Journey
+
+      [Ordered list of key steps users will follow, e.g.:]
+      - Installation
+      - Configuration
+      - Basic usage
+      - Advanced features
+      - Troubleshooting
+
+      ## Relevant Files
+
+      ### Primary files
+      - path/to/file:line-range: 1-line description of why this is relevant
+
+      ### Supporting files
+      - path/to/file: 1-line description (optional, only if needed)
+
+      ## Key Concepts
+
+      - concept name: 1-line explanation (only concepts the audience needs to understand)
+
+      ## Dependencies & Prerequisites
+
+      - dependency: why it matters for the documentation
+
+      ## Existing Documentation
+
+      - path/to/existing/docs: what it covers (or "None found" if no existing docs). Ensure you identify if the detected documentation is for the same audience and only reference to the one that matches it.
+      </template>
+    outputs:
+      - name: context_file
+        description: 'Summary of the context analysis'
+        type: file
+        filename: context.md
+
+  - id: outline
+    type: agent
+    name: 'Outline'
+    prompt: |
+      You are creating a detailed outline for technical documentation.
+
+      ---
+      Title:
+      {{inputs.title}}
+
+      Task description:
+      {{inputs.description}}
+
+      Target audience:
+      {{inputs.audience}}
+
+      Documentation format:
+      {{inputs.format}}
+
+      Context:
+      {{steps.context.outputs.context_file}}
+      ---
+
+      Follow these steps to complete the outline. Do not move to the next phase until you complete the previous one.
+
+      ### Phase 1: Review the context
+
+      Read the context analysis carefully to understand:
+      - The target audience and their technical level
+      - The documentation scope and what's out of scope
+      - Key points to cover (sorted by relevance)
+      - The documentation journey users will follow
+      - Key concepts that need explanation
+      - Dependencies and prerequisites
+
+      ### Phase 2: Structure the documentation
+
+      Based on the context, create a comprehensive outline that:
+
+      1. Follows a logical progression matching the documentation journey
+      2. Addresses all key points identified in the context
+      3. Adapts the depth and style to the target audience
+      4. Includes sections for prerequisites, concepts, examples, and troubleshooting
+      5. Ensures each section has a clear purpose and scope
+      6. Uses appropriate headings hierarchy (## for main sections, ### for subsections)
+
+      For each section, consider:
+      - What the user needs to know at this point
+      - What they should have learned from previous sections
+      - What examples or code snippets will help
+      - What common issues or questions might arise
+
+      ### Phase 3: Output
+
+      Write your outline to `outline.md` following this template. This is mandatory.
+
+      Rules:
+      - Use clear, descriptive section titles
+      - Include brief notes about what each section should cover
+      - Mark sections that need code examples with [CODE EXAMPLE]
+      - Mark sections that need diagrams/visuals with [VISUAL]
+      - Keep notes concise (1-2 lines per section)
+      - Follow the template strictly
+      - Just output the template. Skip any text before and after
+
+      <template>
+      # Documentation Outline
+
+      ## Overview
+
+      [1-2 sentences describing what this documentation covers and who it's for]
+
+      ## Document Structure
+
+      ### [Section 1 Title - e.g., Introduction]
+      - Purpose: [What this section achieves]
+      - Content: [Key points to cover]
+      - Notes: [Any special considerations, e.g., [CODE EXAMPLE], [VISUAL]]
+
+      ### [Section 2 Title - e.g., Prerequisites]
+      - Purpose: [What this section achieves]
+      - Content: [Key points to cover]
+      - Notes: [Any special considerations]
+
+      ### [Section 3 Title - e.g., Installation]
+      - Purpose: [What this section achieves]
+      - Content: [Key points to cover]
+      - Notes: [Any special considerations]
+
+      ### [Section 4 Title - e.g., Quick Start]
+      - Purpose: [What this section achieves]
+      - Content: [Key points to cover]
+      - Notes: [Any special considerations]
+
+      [Continue with additional sections as needed...]
+
+      ### [Final Section - e.g., Troubleshooting or Next Steps]
+      - Purpose: [What this section achieves]
+      - Content: [Key points to cover]
+      - Notes: [Any special considerations]
+
+      ## Key Examples Needed
+
+      - [Description of example 1 and where it fits]
+      - [Description of example 2 and where it fits]
+
+      ## References to Existing Docs
+
+      - [Links or references to related documentation that should be mentioned]
+      </template>
+    outputs:
+      - name: outline_file
+        description: 'Outline for the documentation'
+        type: file
+        filename: outline.md
+
+  - id: draft
+    type: agent
+    name: 'Draft'
+    prompt: |
+      You are writing technical documentation based on the prepared outline.
+
+      ---
+      Title:
+      {{inputs.title}}
+
+      Task description:
+      {{inputs.description}}
+
+      Target audience:
+      {{inputs.audience}}
+
+      Documentation format:
+      {{inputs.format}}
+
+      Context:
+      {{steps.context.outputs.context_file}}
+
+      Outline:
+      {{steps.outline.outputs.outline_file}}
+      ---
+
+      Follow these steps to write the documentation. Do not move to the next phase until you complete the previous one.
+
+      ### Phase 1: Review preparation materials
+
+      1. Review the context to understand the audience and scope
+      2. Study the outline to understand the structure and flow
+      3. Note which sections need code examples and visuals
+      4. Identify key concepts that need clear explanation
+
+      ### Phase 2: Apply documentation best practices
+
+      You MUST follow these critical writing principles:
+
+      **Clarity and Audience:**
+      - State the purpose and audience in the first paragraph
+      - Use simple, direct language appropriate for the target audience
+      - Prefer active voice over passive voice
+      - Define technical terms when first introduced
+      - Avoid unnecessary jargon
+
+      **Structure and Flow:**
+      - Follow the outline structure exactly
+      - Lead with the main point in each section (Pyramid Principle)
+      - Use short paragraphs (3-4 sentences max)
+      - Create a logical narrative that guides the reader
+      - Ensure each section is complete - incomplete information is worse than none
+
+      **Code Examples:**
+      - ALL code examples must be complete and ready to run
+      - Include all necessary imports and setup
+      - Follow the language's conventions and best practices
+      - Add comments to explain complex parts
+
+      **Content Requirements:**
+      - Start with a Quick Start section if appropriate
+      - Explain the "why" before the "how"
+      - Provide step-by-step instructions for tasks
+      - Include troubleshooting for common issues
+      - Reference existing documentation where relevant
+
+      **Formatting:**
+      - Use proper heading hierarchy
+      - Use bullet points for lists
+      - Use numbered lists for sequential steps
+      - Use code blocks with proper language tags
+      - Use tables for comparing options or listing parameters
+      - Bold important terms and warnings
+
+      ### Phase 3: Write the documentation
+
+      Based on the outline and best practices, prepare the draft. Select the blocks that are relevant for each section:
+
+      1. **Introduction**: State audience, purpose, and what readers will learn
+      2. **Prerequisites**: List what users need before starting
+      3. **Core Content**: Follow the outline, ensuring each section:
+         - Has a clear purpose
+         - Flows from previous sections
+         - Includes relevant examples
+         - Addresses the audience's technical level
+      4. **Examples**: Create working code samples that:
+         - Start simple and build complexity
+         - Cover common use cases
+         - Include error handling
+      5. **Troubleshooting**: Address common issues and solutions
+      6. **Next Steps**: Guide readers to related topics
+
+      ### Phase 4: Output
+
+      Write your documentation to `draft.md` following this structure. This is mandatory.
+
+      Rules:
+      - Follow the outline structure exactly
+      - Write complete, production-ready documentation
+      - Include all code examples inline
+      - Use proper {{inputs.format}} formatting
+      - Include meta-comments like "[REQUIRED IMAGE]" when you consider it's relevant
+      - Make the documentation self-contained and ready for users
+
+      The documentation should:
+      - Start with a clear title and introduction
+      - Follow the sections defined in the outline
+      - Include all necessary code examples
+      - Be formatted in clean, readable {{inputs.format}}
+      - Be appropriate for the target audience ({{inputs.audience}})
+    outputs:
+      - name: draft_file
+        description: 'Initial document draft file'
+        type: file
+        filename: draft.md
+
+  - id: review
+    type: agent
+    name: 'Write Review'
+    prompt: |
+      You are reviewing and finalizing technical documentation.
+
+      ---
+      Title:
+      {{inputs.title}}
+
+      Task description:
+      {{inputs.description}}
+
+      Target audience:
+      {{inputs.audience}}
+
+      Documentation format:
+      {{inputs.format}}
+
+      Context:
+      {{steps.context.outputs.context_file}}
+
+      Outline:
+      {{steps.outline.outputs.outline_file}}
+
+      Draft:
+      {{steps.draft.outputs.draft_file}}
+      ---
+
+      Follow these steps to review and finalize the documentation. Do not move to the next phase until you complete the previous one.
+
+      ### Phase 1: Quality review
+
+      Review the draft documentation against these criteria:
+
+      **Content Completeness:**
+      - Does it follow the outline structure completely?
+      - Are all key points from the context addressed?
+      - Are all promised sections included?
+      - Is the scope properly maintained (nothing missing, nothing extra)?
+
+      **Audience Appropriateness:**
+      - Is the language appropriate for {{inputs.audience}}?
+      - Is the technical depth correct?
+      - Are concepts explained at the right level?
+      - Are prerequisites clearly stated?
+
+      **Technical Accuracy:**
+      - Are all code examples correct and functional?
+      - Do examples follow language best practices?
+      - Are technical explanations accurate?
+      - Are version numbers and dependencies current?
+
+      **Documentation Quality:**
+      - Is the purpose stated clearly in the introduction?
+      - Does each section flow logically to the next?
+      - Are examples clear and relevant?
+      - Is the formatting consistent and clean?
+
+      ### Phase 2: Apply improvements
+
+      Based on your review, improve the documentation:
+
+      1. **Fix any issues found:**
+         - Correct technical inaccuracies
+         - Fill content gaps
+         - Fix code examples that don't work
+         - Improve unclear explanations
+
+      2. **Polish the content:**
+         - Improve clarity and conciseness
+         - Ensure consistent terminology
+         - Fix grammar and spelling
+         - Optimize paragraph structure (3-4 sentences max)
+
+      3. **Enhance readability:**
+         - Add or improve section transitions
+         - Ensure proper heading hierarchy
+         - Add emphasis (bold) for important concepts
+         - Improve code comments
+
+      4. **Add final touches:**
+         - Add a table of contents if the document is long
+         - Include links to referenced documentation
+         - Add a "Further Reading" or "Related Topics" section if appropriate
+         - Ensure all {{inputs.format}} formatting is correct
+
+      ### Phase 3: Create final documentation
+
+      Write the final, polished documentation to `docs.md`. This is mandatory.
+
+      The final document must:
+      - Be complete and ready for publication
+      - Include all improvements from the review
+      - Follow all documentation best practices
+      - Be properly formatted in {{inputs.format}}
+      - Be appropriate for {{inputs.audience}}
+
+      ### Phase 4: Create summary
+
+      Write a summary of the documentation process to `summary.md`. This is mandatory.
+
+      <template>
+      # Documentation Summary
+
+      ## What was documented
+
+      [1-2 paragraphs describing what documentation was created and its purpose]
+
+      ## Target audience
+
+      [1 paragraph describing the intended readers and their needs]
+
+      ## Key sections included
+
+      - [Section name]: [Brief description of content]
+      - [Section name]: [Brief description of content]
+      [List all major sections]
+
+      ## Documentation approach
+
+      [1-2 paragraphs explaining the approach taken, style choices, and how it addresses the audience needs]
+
+      ## Usage recommendations
+
+      [1 paragraph on how this documentation should be used, maintained, or extended]
+
+      ## Related documentation
+
+      [List any related docs that readers might find useful, or "None" if standalone]
+      </template>
+    outputs:
+      - name: document_file
+        description: 'Documentation file'
+        type: file
+        filename: docs.md
+      - name: summary_file
+        description: 'Summary of the documentation process'
+        type: file
+        filename: summary.md
