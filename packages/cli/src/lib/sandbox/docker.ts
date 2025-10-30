@@ -24,8 +24,12 @@ export class DockerSandbox extends Sandbox {
 
   async isBackendAvailable(): Promise<boolean> {
     try {
-      await launch('docker', ['--version']);
-      return true;
+      // Check if docker command exists and verify it's actual Docker (not Podman)
+      const result = await launch('docker', ['info', '--format', 'json']);
+      const info = JSON.parse(result.stdout?.toString() || '{}');
+
+      // Docker will have ServerVersion set, Podman (even aliased as docker) will not
+      return info.ServerVersion != null;
     } catch (error) {
       return false;
     }
