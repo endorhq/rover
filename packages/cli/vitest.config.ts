@@ -4,12 +4,22 @@ import { readFileSync } from 'node:fs';
 export default defineConfig({
   plugins: [
     {
-      name: 'file-loader',
+      name: 'text-loader',
       transform(_src, id) {
-        if (id.endsWith('.md') || id.endsWith('.sh') || id.endsWith('.yml')) {
+        if (id.endsWith('.md') || id.endsWith('.sh')) {
           const content = readFileSync(id, 'utf-8');
           return {
             code: `export default ${JSON.stringify(content)};`,
+          };
+        }
+      },
+    },
+    {
+      name: 'asset-loader',
+      transform(_src, id) {
+        if (id.endsWith('.yaml') || id.endsWith('.yml')) {
+          return {
+            code: `export default ${JSON.stringify(id)};`,
           };
         }
       },
