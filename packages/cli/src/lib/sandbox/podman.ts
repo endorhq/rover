@@ -12,8 +12,11 @@ import {
 import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir, userInfo } from 'node:os';
 import { generateRandomId } from '../../utils/branch-name.js';
-
-const AGENT_IMAGE = 'ghcr.io/endorhq/rover/node:v1.3.1';
+import {
+  AGENT_IMAGE,
+  etcPasswdWithUserInfo,
+  etcGroupWithUserInfo,
+} from './container-common.js';
 
 export class PodmanSandbox extends Sandbox {
   backend = 'podman';
@@ -108,6 +111,7 @@ export class PodmanSandbox extends Sandbox {
     const userCredentialsTempPath = mkdtempSync(join(tmpdir(), 'rover-'));
     const etcPasswd = join(userCredentialsTempPath, 'passwd');
     const [etcPasswdContents, username] = await etcPasswdWithUserInfo(
+      'podman',
       AGENT_IMAGE,
       userInfo_
     );
@@ -115,6 +119,7 @@ export class PodmanSandbox extends Sandbox {
 
     const etcGroup = join(userCredentialsTempPath, 'group');
     const [etcGroupContents, group] = await etcGroupWithUserInfo(
+      'podman',
       AGENT_IMAGE,
       userInfo_
     );
@@ -250,114 +255,4 @@ export class PodmanSandbox extends Sandbox {
       stdio: 'inherit', // This gives full control to the user
     });
   }
-}
-
-async function catFile(image: string, file: string): Promise<string> {
-  try {
-    return (
-      (
-        await launch('podman', [
-          'run',
-          '--entrypoint',
-          '/bin/sh',
-          '--rm',
-          image,
-          '-c',
-          `/bin/cat ${file}`,
-        ])
-      ).stdout
-        ?.toString()
-        .trim() || ''
-    );
-  } catch (error) {
-    return '';
-  }
-}
-
-async function imageUids(image: string): Promise<Map<number, string>> {
-  const passwdContent = await catFile(image, '/etc/passwd');
-  const uidMap = new Map<number, string>();
-
-  if (!passwdContent) {
-    return uidMap;
-  }
-
-  const lines = passwdContent.split('\n').filter(line => line.trim());
-
-  for (const line of lines) {
-    const fields = line.split(':');
-    if (fields.length >= 3) {
-      const username = fields[0];
-      const uid = parseInt(fields[2], 10);
-      if (!isNaN(uid)) {
-        uidMap.set(uid, username);
-      }
-    }
-  }
-
-  return uidMap;
-}
-
-async function imageGids(image: string): Promise<Map<number, string>> {
-  const groupContent = await catFile(image, '/etc/group');
-  const gidMap = new Map<number, string>();
-
-  if (!groupContent) {
-    return gidMap;
-  }
-
-  const lines = groupContent.split('\n').filter(line => line.trim());
-
-  for (const line of lines) {
-    const fields = line.split(':');
-    if (fields.length >= 3) {
-      const groupname = fields[0];
-      const gid = parseInt(fields[2], 10);
-      if (!isNaN(gid)) {
-        gidMap.set(gid, groupname);
-      }
-    }
-  }
-
-  return gidMap;
-}
-
-type CurrentUser = string;
-
-async function etcPasswdWithUserInfo(
-  image: string,
-  userInfo: { uid: number; gid: number }
-): Promise<[string, CurrentUser]> {
-  const originalPasswd = await catFile(image, '/etc/passwd');
-  const existingUids = await imageUids(image);
-
-  // Check if current user already exists in the image
-  if (existingUids.has(userInfo.uid)) {
-    return [originalPasswd, existingUids.get(userInfo.uid)!];
-  }
-
-  // Create entry for current user
-  const userEntry = `agent:x:${userInfo.uid}:${userInfo.gid}:agent:/home/agent:/bin/sh`;
-
-  return [originalPasswd + '\n' + userEntry + '\n', 'agent'];
-}
-
-type CurrentGroup = string;
-
-async function etcGroupWithUserInfo(
-  image: string,
-  userInfo: { uid: number; gid: number }
-): Promise<[string, CurrentGroup]> {
-  const originalGroup = await catFile(image, '/etc/group');
-  const existingGids = await imageGids(image);
-
-  // Check if current group already exists in the image
-  if (existingGids.has(userInfo.gid)) {
-    return [originalGroup, existingGids.get(userInfo.gid)!];
-  }
-
-  // Create entry for current group
-  const groupEntry = `agent:x:${userInfo.gid}:agent`;
-
-  return [originalGroup + '\n' + groupEntry + '\n', 'agent'];
 }
