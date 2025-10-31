@@ -57,7 +57,7 @@ steps:
       {{inputs.audience}}
       ---
 
-      Follow these steps to complete the analysis. Do not move to the next phase until you complete the previous one.
+      Follow these steps to complete the analysis. Do not start the next phase until you complete the previous one.
 
       ### Phase 1: Identify the audience perspective
 
@@ -106,7 +106,7 @@ steps:
 
       ### Out of the Scope
 
-      [List with concise sentences about the information that it's out of scope]
+      [List with concise sentences the information that it's out of scope]
 
       ## Key points
 
@@ -166,7 +166,7 @@ steps:
       {{steps.context.outputs.context_file}}
       ---
 
-      Follow these steps to complete the outline. Do not move to the next phase until you complete the previous one.
+      Follow these steps to complete the outline. Do not start the next phase until you complete the previous one.
 
       ### Phase 1: Review the context
 
@@ -274,7 +274,7 @@ steps:
       {{steps.outline.outputs.outline_file}}
       ---
 
-      Follow these steps to write the documentation. Do not move to the next phase until you complete the previous one.
+      Follow these steps to write the documentation. Do not start the next phase until you complete the previous one.
 
       ### Phase 1: Review preparation materials
 
@@ -394,7 +394,7 @@ steps:
       {{steps.draft.outputs.draft_file}}
       ---
 
-      Follow these steps to review and finalize the documentation. Do not move to the next phase until you complete the previous one.
+      Follow these steps to review and finalize the documentation. Do not start the next phase until you complete the previous one.
 
       ### Phase 1: Quality review
 
@@ -411,6 +411,7 @@ steps:
       **Readability:**
       - Is the formatting consistent and clean?
       - Is the document long or short? Is it easy to read?
+      - Does it highlight important bits with bold text, without overusing it?
 
       ### Phase 2: Apply improvements
 
