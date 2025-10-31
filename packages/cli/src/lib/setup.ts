@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path';
 import { TaskDescription } from './description.js';
 import { findProjectRoot, launchSync, VERBOSE } from 'rover-common';
 import sweWorkflow from './workflows/swe.yml';
+import techWriterWorkflow from './workflows/tech-writer.yml';
 import entrypointScript from './entrypoint.sh';
 import pupa from 'pupa';
 import { fileURLToPath } from 'node:url';
@@ -126,13 +127,22 @@ export class SetupBuilder {
 
   /**
    * Save the workflow file into the target task.
-   * TODO: Support multiple workflows
    */
-  saveWorkflow(): string {
+  saveWorkflow(workflowName: string): string {
     // Write script to file
     const workflowTaskPath = join(this.taskDir, 'workflow.yml');
     const distDir = dirname(fileURLToPath(import.meta.url));
-    const workflowPath = join(distDir, sweWorkflow);
+    let workflowPath;
+
+    switch (workflowName) {
+      case 'tech-writer': {
+        workflowPath = join(distDir, techWriterWorkflow);
+        break;
+      }
+      default: {
+        workflowPath = join(distDir, sweWorkflow);
+      }
+    }
     cpSync(workflowPath, workflowTaskPath);
 
     return workflowTaskPath;

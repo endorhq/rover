@@ -214,6 +214,11 @@ export class TaskDetailsView extends LitElement {
                 this.taskData.status ||
                 'Unknown'}
               </span>
+              ${this.taskData.workflowName
+                ? html`<span class="workflow-name"
+                    >${this.taskData.workflowName}</span
+                  >`
+                : ''}
               <span class="time-info">
                 ${this.taskData.createdAt
                   ? `Created ${this.formatRelativeTime(new Date(this.taskData.createdAt))}`

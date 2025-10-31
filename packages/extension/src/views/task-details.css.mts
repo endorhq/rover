@@ -74,6 +74,12 @@ const styles = css`
     min-width: 0;
   }
 
+  .workflow-name {
+    font-size: 12px;
+    color: var(--vscode-foreground);
+    flex-shrink: 0;
+  }
+
   .time-info {
     font-size: 12px;
     color: var(--vscode-descriptionForeground);

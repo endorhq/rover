@@ -9,16 +9,23 @@ export class CreateForm extends LitElement {
   @property({ type: String }) defaultAgent: string = 'claude';
   @property({ type: Array }) branches: string[] = ['main'];
   @property({ type: String }) defaultBranch: string = 'main';
+  @property({ type: Array }) workflows: Array<{ id: string; label: string }> =
+    [];
+  @property({ type: String }) defaultWorkflow: string = '';
   @property({ type: String }) dropdownDirection: 'auto' | 'up' | 'down' =
     'auto';
+  @property({ type: String }) version: string = '';
   @state() private taskInput = '';
   @state() private creatingTask = false;
   @state() private selectedAgent = '';
   @state() private selectedBranch = '';
+  @state() private selectedWorkflow = '';
   @state() private showAgentDropdown = false;
   @state() private showBranchDropdown = false;
+  @state() private showWorkflowDropdown = false;
   @state() private agentDropdownDirection: 'up' | 'down' = 'down';
   @state() private branchDropdownDirection: 'up' | 'down' = 'down';
+  @state() private workflowDropdownDirection: 'up' | 'down' = 'down';
   @state() private errorMessage = '';
 
   private getAgentsList() {
@@ -33,6 +40,25 @@ export class CreateForm extends LitElement {
     return agent.charAt(0).toUpperCase() + agent.slice(1);
   }
 
+  private isVersionAtLeast(version: string, minVersion: string): boolean {
+    if (!version) return false;
+
+    const parseVersion = (v: string): number[] => {
+      const match = v.match(/(\d+)\.(\d+)\.(\d+)/);
+      if (!match) return [0, 0, 0];
+      return [parseInt(match[1]), parseInt(match[2]), parseInt(match[3])];
+    };
+
+    const [major, minor, patch] = parseVersion(version);
+    const [minMajor, minMinor, minPatch] = parseVersion(minVersion);
+
+    if (major > minMajor) return true;
+    if (major < minMajor) return false;
+    if (minor > minMinor) return true;
+    if (minor < minMinor) return false;
+    return patch >= minPatch;
+  }
+
   static styles = styles;
 
   connectedCallback() {
@@ -45,12 +71,16 @@ export class CreateForm extends LitElement {
       this.handleTaskCreationFailed.bind(this)
     );
 
-    // Set default selected agent and branch
+    // Set default selected agent, branch, and workflow
     if (!this.selectedAgent) {
       this.selectedAgent = this.defaultAgent || this.agents[0] || 'claude';
     }
     if (!this.selectedBranch) {
       this.selectedBranch = this.defaultBranch || this.branches[0] || 'main';
+    }
+    if (!this.selectedWorkflow && this.workflows.length > 0) {
+      this.selectedWorkflow =
+        this.defaultWorkflow || this.workflows[0]?.id || '';
     }
   }
 
@@ -67,6 +97,11 @@ export class CreateForm extends LitElement {
       this.selectedBranch = this.defaultBranch;
     }
 
+    // Update selected workflow when defaultWorkflow changes
+    if (changedProperties.has('defaultWorkflow') && this.defaultWorkflow) {
+      this.selectedWorkflow = this.defaultWorkflow;
+    }
+
     // Ensure selected agent is still valid when agents list changes
     if (changedProperties.has('agents') && this.agents.length > 0) {
       if (!this.agents.includes(this.selectedAgent)) {
@@ -78,6 +113,15 @@ export class CreateForm extends LitElement {
     if (changedProperties.has('branches') && this.branches.length > 0) {
       if (!this.branches.includes(this.selectedBranch)) {
         this.selectedBranch = this.defaultBranch || this.branches[0];
+      }
+    }
+
+    // Ensure selected workflow is still valid when workflows list changes
+    if (changedProperties.has('workflows') && this.workflows.length > 0) {
+      const workflowIds = this.workflows.map(w => w.id);
+      if (!workflowIds.includes(this.selectedWorkflow)) {
+        this.selectedWorkflow =
+          this.defaultWorkflow || this.workflows[0]?.id || '';
       }
     }
   }
@@ -102,6 +146,7 @@ export class CreateForm extends LitElement {
     if (!this.contains(event.target as Node)) {
       this.showAgentDropdown = false;
       this.showBranchDropdown = false;
+      this.showWorkflowDropdown = false;
     }
   }
 
@@ -133,6 +178,7 @@ export class CreateForm extends LitElement {
         description: description,
         agent: this.selectedAgent,
         branch: this.selectedBranch,
+        workflow: this.selectedWorkflow,
       });
     }
   }
@@ -151,10 +197,24 @@ export class CreateForm extends LitElement {
     this.errorMessage = customEvent.detail?.error || 'Failed to create task';
   }
 
+  private toggleWorkflowDropdown(event: Event) {
+    event.stopPropagation();
+    this.showWorkflowDropdown = !this.showWorkflowDropdown;
+    this.showAgentDropdown = false;
+    this.showBranchDropdown = false;
+
+    if (this.showWorkflowDropdown) {
+      this.workflowDropdownDirection = this.calculateDropdownDirection(
+        event.currentTarget as HTMLElement
+      );
+    }
+  }
+
   private toggleAgentDropdown(event: Event) {
     event.stopPropagation();
     this.showAgentDropdown = !this.showAgentDropdown;
     this.showBranchDropdown = false;
+    this.showWorkflowDropdown = false;
 
     if (this.showAgentDropdown) {
       this.agentDropdownDirection = this.calculateDropdownDirection(
@@ -167,6 +227,7 @@ export class CreateForm extends LitElement {
     event.stopPropagation();
     this.showBranchDropdown = !this.showBranchDropdown;
     this.showAgentDropdown = false;
+    this.showWorkflowDropdown = false;
 
     if (this.showBranchDropdown) {
       this.branchDropdownDirection = this.calculateDropdownDirection(
@@ -193,6 +254,12 @@ export class CreateForm extends LitElement {
     return 'down';
   }
 
+  private selectWorkflow(workflowId: string, event: Event) {
+    event.stopPropagation();
+    this.selectedWorkflow = workflowId;
+    this.showWorkflowDropdown = false;
+  }
+
   private selectAgent(agentId: string, event: Event) {
     event.stopPropagation();
     this.selectedAgent = agentId;
@@ -210,23 +277,102 @@ export class CreateForm extends LitElement {
     return agentsList.find(a => a.id === this.selectedAgent) || agentsList[0];
   }
 
+  private getSelectedWorkflow() {
+    return (
+      this.workflows.find(w => w.id === this.selectedWorkflow) ||
+      this.workflows[0]
+    );
+  }
+
   render() {
     const selectedAgent = this.getSelectedAgent();
+    const selectedWorkflow = this.getSelectedWorkflow();
 
     return html`
       <div class="create-form">
         <h2 class="form-title">Assign a new task to an AI Coding Agent</h2>
         <p class="form-desc">
-          Rover will create an isolated environment with a copy of your
+          Rover will create a sandboxed environment with a copy of your
           repository to complete this task in background.
         </p>
-        <textarea
-          class="form-textarea"
-          placeholder="Provide detailed instructions for this task"
-          .value=${this.taskInput}
-          @input=${(e: InputEvent) =>
-            (this.taskInput = (e.target as HTMLTextAreaElement).value)}
-        ></textarea>
+
+        <!-- Workflow Dropdown or Upgrade Message -->
+        ${this.isVersionAtLeast(this.version, '1.3.0')
+          ? html`
+              <div class="form-field">
+                <label class="form-label">Workflow</label>
+                <div class="dropdown-container">
+                  <button
+                    class="dropdown-button"
+                    @click=${this.toggleWorkflowDropdown}
+                    title="Select workflow"
+                  >
+                    <i class="codicon codicon-layout"></i>
+                    <span>${selectedWorkflow?.label || 'Select workflow'}</span>
+                    <i class="codicon codicon-chevron-down"></i>
+                  </button>
+
+                  ${this.showWorkflowDropdown
+                    ? html`
+                        <div
+                          class="dropdown-menu ${this
+                            .workflowDropdownDirection === 'up'
+                            ? 'dropdown-up'
+                            : ''}"
+                        >
+                          ${this.workflows.map(
+                            workflow => html`
+                              <button
+                                class="dropdown-item ${workflow.id ===
+                                this.selectedWorkflow
+                                  ? 'selected'
+                                  : ''}"
+                                @click=${(e: Event) =>
+                                  this.selectWorkflow(workflow.id, e)}
+                              >
+                                <i class="codicon codicon-layout"></i>
+                                <span>${workflow.label}</span>
+                                ${workflow.id === this.selectedWorkflow
+                                  ? html`<i class="codicon codicon-check"></i>`
+                                  : ''}
+                              </button>
+                            `
+                          )}
+                        </div>
+                      `
+                    : ''}
+                </div>
+              </div>
+            `
+          : this.version
+            ? html`
+                <div class="form-field">
+                  <label class="form-label">Workflow</label>
+                  <div class="upgrade-message">
+                    <i class="codicon codicon-info"></i>
+                    <div>
+                      <p>Workflow support requires Rover v1.3.0 or later.</p>
+                      <p>
+                        Your current version: ${this.version}. Please upgrade
+                        using:
+                      </p>
+                      <code>npm install -g @endorhq/rover@latest</code>
+                    </div>
+                  </div>
+                </div>
+              `
+            : ''}
+
+        <div class="form-field">
+          <label class="form-label">Description</label>
+          <textarea
+            class="form-textarea"
+            placeholder="Provide detailed instructions for this task"
+            .value=${this.taskInput}
+            @input=${(e: InputEvent) =>
+              (this.taskInput = (e.target as HTMLTextAreaElement).value)}
+          ></textarea>
+        </div>
 
         ${this.errorMessage
           ? html`

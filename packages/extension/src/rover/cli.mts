@@ -8,6 +8,11 @@ import {
 } from './types.js';
 import { findProjectRoot, launch, type Options } from 'rover-common';
 
+// TODO: Load workflows dynamically after we allow users to define their own workflows
+const ROVER_DEFAULT_WORKFLOWS = [
+  { id: 'swe', label: 'swe - Software Engineer for coding tasks' },
+];
+
 export class RoverCLI {
   private roverPath: string;
   private workspaceRoot: vscode.Uri | undefined;
@@ -115,7 +120,11 @@ export class RoverCLI {
   /**
    * Get user settings including available agents
    */
-  async getSettings(): Promise<{ aiAgents: string[]; defaultAgent: string }> {
+  async getSettings(): Promise<{
+    aiAgents: string[];
+    defaultAgent: string;
+    workflows: Array<{ id: string; label: string }>;
+  }> {
     try {
       // Read the settings file directly from .rover/settings.json
       const settingsPath = vscode.Uri.joinPath(
@@ -132,6 +141,7 @@ export class RoverCLI {
         return {
           aiAgents: settings.aiAgents || ['claude'],
           defaultAgent: settings.defaults?.aiAgent || 'claude',
+          workflows: ROVER_DEFAULT_WORKFLOWS,
         };
       } catch (error) {
         // If file doesn't exist or can't be read, return defaults
@@ -139,6 +149,7 @@ export class RoverCLI {
         return {
           aiAgents: ['claude'],
           defaultAgent: 'claude',
+          workflows: ROVER_DEFAULT_WORKFLOWS,
         };
       }
     } catch (error) {
@@ -146,6 +157,7 @@ export class RoverCLI {
       return {
         aiAgents: ['claude'],
         defaultAgent: 'claude',
+        workflows: ROVER_DEFAULT_WORKFLOWS,
       };
     }
   }
@@ -182,19 +194,27 @@ export class RoverCLI {
   async createTask(
     description: string,
     agent?: string,
-    sourceBranch?: string
+    sourceBranch?: string,
+    workflow?: string
   ): Promise<RoverTask> {
-    const args = ['task', description, '--yes', '--json'];
+    const args = ['task', '--yes', '--json'];
 
     // Add agent option if provided
-    if (agent) {
+    if (agent && agent.length > 0) {
       args.push('--agent', agent);
     }
 
     // Add source branch option if provided
-    if (sourceBranch) {
+    if (sourceBranch && sourceBranch.length > 0) {
       args.push('--source-branch', sourceBranch);
     }
+
+    // Add workflow option if provided
+    if (workflow && workflow.length > 0) {
+      args.push('--workflow', workflow);
+    }
+
+    args.push(description);
 
     const { stdout, stderr, exitCode } = await launch(
       this.roverPath,

@@ -22,9 +22,12 @@ export class TasksWebview extends LitElement {
   @state() private showingSetupGuide = false;
   @state() private initializationCheckInterval: number | null = null;
   @state() private agents: string[] = ['...'];
+  @state() private workflows: Array<{ id: string; label: string }> = [];
+  @state() private defaultWorkflow: string = '';
   @state() private defaultAgent: string = '...';
   @state() private branches: string[] = ['...'];
   @state() private defaultBranch: string = '...';
+  @state() private cliVersion: string = '';
 
   // Component styles
   static styles = styles;
@@ -53,6 +56,10 @@ export class TasksWebview extends LitElement {
       case 'updateSettings':
         this.agents = message.settings?.aiAgents;
         this.defaultAgent = message.settings?.defaultAgent;
+        this.workflows = message.settings?.workflows || [];
+        this.defaultWorkflow =
+          this.workflows.length > 0 ? this.workflows[0].id : '';
+        this.cliVersion = message.cliVersion || '';
         break;
       case 'updateBranches':
         this.branches = message.branches?.branches;
@@ -192,9 +199,12 @@ export class TasksWebview extends LitElement {
     return html`<create-form
       .vscode=${this.vscode}
       .agents=${this.agents}
+      .workflows=${this.workflows}
+      .defaultWorkflow=${this.defaultWorkflow}
       .defaultAgent=${this.defaultAgent}
       .branches=${this.branches}
       .defaultBranch=${this.defaultBranch}
+      .version=${this.cliVersion}
       dropdownDirection="auto"
     ></create-form>`;
   }

@@ -373,6 +373,11 @@ export const taskCommand = async (
             );
           }
         }
+      } else if (description != null && description.length > 0) {
+        // There are cases like running the CLI from the extension that might
+        // configure an empty stdin, while passing the `description` as argument.
+        // In that case, we also load the description
+        inputsData.set('description', description);
       }
     } else if (fromGithub != null) {
       // Load the inputs from GitHub
