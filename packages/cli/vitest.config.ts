@@ -6,7 +6,7 @@ export default defineConfig({
     {
       name: 'text-loader',
       transform(_src, id) {
-        if (id.endsWith('.md') || id.endsWith('.sh')) {
+        if (id.endsWith('.json') || id.endsWith('.md') || id.endsWith('.sh')) {
           const content = readFileSync(id, 'utf-8');
           return {
             code: `export default ${JSON.stringify(content)};`,

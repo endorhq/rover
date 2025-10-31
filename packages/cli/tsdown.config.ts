@@ -23,6 +23,7 @@ export default defineConfig({
   minify: isProd,
   sourcemap: !isProd,
   loader: {
+    '.json': 'text',
     '.md': 'text',
     '.yml': 'asset',
     '.yaml': 'asset',

@@ -1,0 +1,54 @@
+name: Bump and test CLIs
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * *'
+
+jobs:
+  bump-test-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Bump CLIs
+        run: packages/cli/scripts/bump-cli-versions.sh
+
+      - name: Check for changes
+        id: check-changes
+        run: |
+          if git diff --quiet packages/cli/src/clis.json; then
+            echo "changes-detected=false" >> $GITHUB_OUTPUT
+          else
+            echo "changes-detected=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run CLI tests
+        if: steps.check-changes.outputs.changes-detected == 'true'
+        uses: ./.github/workflows/cli-tests.yml
+
+      - name: Commit and push changes
+        if: steps.check-changes.outputs.changes-detected == 'true'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add packages/cli/src/clis.json
+          git commit -m "chore: bump CLI versions"
+          git push
+
+      - name: Notify Google Chat
+        if: steps.check-changes.outputs.changes-detected == 'true'
+        env:
+          WEBHOOK_URL: ${{ secrets.GOOGLE_CHAT_WEBHOOK }}
+        run: |
+          CLI_VERSIONS=$(cat packages/cli/src/clis.json | jq -r 'to_entries[] | "• \(.key): \(.value)"' | tr '\n' '\\n')
+          curl -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d @- <<EOF
+          {
+            "text": "🚀 *New CLIs Released*\n\n${CLI_VERSIONS}"
+          }
+          EOF

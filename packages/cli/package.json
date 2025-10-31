@@ -31,7 +31,8 @@
   "files": [
     "README.md",
     "LICENSE.md",
-    "dist/*"
+    "dist/*",
+    "src/clis.json"
   ],
   "scripts": {
     "build": "tsdown",
