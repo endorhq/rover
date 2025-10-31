@@ -1,0 +1,6 @@
+{
+  "@anthropic-ai/claude-code": "2.0.5",
+  "@openai/codex": "0.42.0",
+  "@google/gemini-cli": "0.7.0",
+  "@qwen-code/qwen-code": "0.0.14"
+}

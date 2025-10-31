@@ -8,6 +8,19 @@ import pupa from 'pupa';
 import { fileURLToPath } from 'node:url';
 import { ProjectConfig } from './config.js';
 
+import clisJson from '../clis.json' with { type: 'json' };
+
+function packageWithVersion(packageName: string): string | undefined {
+  const clis = clisJson as Record<string, string>;
+  const packageVersion_ = clis[packageName];
+
+  if (packageVersion_ == undefined) {
+    return packageName;
+  }
+
+  return `${packageName}@${packageVersion_}`;
+}
+
 /**
  * SetupBuilder class - Consolidates Docker setup script generation
  * Replaces the existing docker-setup.sh and docker-setup-gemini.sh files
