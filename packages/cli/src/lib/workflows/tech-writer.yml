@@ -307,6 +307,7 @@ steps:
       - Follow the language's conventions and best practices
       - Ensure code inside blocks are properly indented
       - Add comments to explain complex parts
+      - Use the right code block language identifier. For example, "jsonc" for JSON files with comments
 
       **Content Requirements:**
       - Start with a Quick Start section if appropriate
