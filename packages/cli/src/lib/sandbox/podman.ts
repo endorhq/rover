@@ -14,12 +14,13 @@ import { homedir, tmpdir, userInfo } from 'node:os';
 import { generateRandomId } from '../../utils/branch-name.js';
 import {
   AGENT_IMAGE,
+  ContainerBackend,
   etcPasswdWithUserInfo,
   etcGroupWithUserInfo,
 } from './container-common.js';
 
 export class PodmanSandbox extends Sandbox {
-  backend = 'podman';
+  backend = ContainerBackend.Podman;
 
   constructor(task: TaskDescription, processManager?: ProcessManager) {
     super(task, processManager);
@@ -111,7 +112,7 @@ export class PodmanSandbox extends Sandbox {
     const userCredentialsTempPath = mkdtempSync(join(tmpdir(), 'rover-'));
     const etcPasswd = join(userCredentialsTempPath, 'passwd');
     const [etcPasswdContents, username] = await etcPasswdWithUserInfo(
-      'podman',
+      ContainerBackend.Podman,
       AGENT_IMAGE,
       userInfo_
     );
@@ -119,7 +120,7 @@ export class PodmanSandbox extends Sandbox {
 
     const etcGroup = join(userCredentialsTempPath, 'group');
     const [etcGroupContents, group] = await etcGroupWithUserInfo(
-      'podman',
+      ContainerBackend.Podman,
       AGENT_IMAGE,
       userInfo_
     );

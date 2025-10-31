@@ -5,8 +5,13 @@ export const AGENT_IMAGE = 'ghcr.io/endorhq/rover/node:v1.3.1';
 export type CurrentUser = string;
 export type CurrentGroup = string;
 
+export enum ContainerBackend {
+  Docker = 'docker',
+  Podman = 'podman',
+}
+
 export async function catFile(
-  backend: 'docker' | 'podman',
+  backend: ContainerBackend,
   image: string,
   file: string
 ): Promise<string> {
@@ -32,7 +37,7 @@ export async function catFile(
 }
 
 export async function imageUids(
-  backend: 'docker' | 'podman',
+  backend: ContainerBackend,
   image: string
 ): Promise<Map<number, string>> {
   const passwdContent = await catFile(backend, image, '/etc/passwd');
@@ -59,7 +64,7 @@ export async function imageUids(
 }
 
 export async function imageGids(
-  backend: 'docker' | 'podman',
+  backend: ContainerBackend,
   image: string
 ): Promise<Map<number, string>> {
   const groupContent = await catFile(backend, image, '/etc/group');
@@ -86,7 +91,7 @@ export async function imageGids(
 }
 
 export async function etcPasswdWithUserInfo(
-  backend: 'docker' | 'podman',
+  backend: ContainerBackend,
   image: string,
   userInfo: { uid: number; gid: number }
 ): Promise<[string, CurrentUser]> {
@@ -105,7 +110,7 @@ export async function etcPasswdWithUserInfo(
 }
 
 export async function etcGroupWithUserInfo(
-  backend: 'docker' | 'podman',
+  backend: ContainerBackend,
   image: string,
   userInfo: { uid: number; gid: number }
 ): Promise<[string, CurrentGroup]> {
