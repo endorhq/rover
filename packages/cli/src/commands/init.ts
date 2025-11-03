@@ -114,7 +114,7 @@ export const initCommand = async (
   const completeInstallation =
     gitInstalled &&
     dockerInstalled &&
-    (claudeInstalled || geminiInstalled || qwenInstalled);
+    (claudeInstalled || codexInstalled || geminiInstalled || qwenInstalled);
 
   if (completeInstallation) {
     reqSpinner.succeed('Your system is ready!');

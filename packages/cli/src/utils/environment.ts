@@ -42,7 +42,7 @@ const PACKAGE_MANAGER_FILES = {
  * Identify task managers from files
  */
 const TASK_MANAGER_FILES = {
-  [TASK_MANAGER.Just]: ['Jusfile'],
+  [TASK_MANAGER.Just]: ['Justfile'],
   [TASK_MANAGER.Make]: ['Makefile'],
   [TASK_MANAGER.Task]: ['Taskfile.yml', 'Taskfile.yaml'],
 };
