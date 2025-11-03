@@ -460,7 +460,7 @@ describe('IterationStatusManager', () => {
       status.update('running', '', 0, '');
 
       expect(status.currentStep).toBe('');
-      expect(status.status).toBe('');
+      expect(status.status).toBe('running');
       expect(status.error).toBeUndefined();
     });
 

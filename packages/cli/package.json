@@ -45,7 +45,7 @@
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
-    "e2e-test": "vitest --config vitest.e2e.config.ts --run"
+    "e2e-test": "npm run build && vitest --config vitest.e2e.config.ts --run"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.18.1",
