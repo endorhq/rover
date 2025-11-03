@@ -394,6 +394,115 @@ tasks:
       const roverConfig = JSON.parse(readFileSync('rover.json', 'utf8'));
       expect(roverConfig.languages).toEqual(['typescript']);
     });
+
+    it('should successfully re-initialize in a cloned repository with committed rover config', async () => {
+      // Setup: Create mock tools
+      createMockTool('docker', 0, 'Docker version 24.0.0');
+      createMockTool('claude', 0, 'Claude CLI v1.0.0');
+
+      // Step 1: Create a project with package.json and package-lock.json
+      writeFileSync(
+        'package.json',
+        JSON.stringify(
+          {
+            name: 'test-project',
+            version: '1.0.0',
+            type: 'module',
+          },
+          null,
+          2
+        )
+      );
+      // Create package-lock.json to ensure npm is detected
+      writeFileSync('package-lock.json', JSON.stringify({}, null, 2));
+
+      // Step 2: Run rover init for the first time
+      const initResult = await runRoverInit(['--yes']);
+      expect(initResult.exitCode).toBe(0);
+
+      // Verify rover was initialized
+      expect(existsSync('rover.json')).toBe(true);
+      expect(existsSync('.rover/settings.json')).toBe(true);
+      expect(existsSync('.gitignore')).toBe(true);
+
+      // Step 3: Commit the rover configuration
+      await execa('git', ['add', '.'], { cwd: testDir });
+      await execa('git', ['commit', '-m', 'Add rover configuration'], {
+        cwd: testDir,
+      });
+
+      // Step 4: Clone the repository to a new directory
+      const cloneDir = mkdtempSync(join(tmpdir(), 'rover-init-clone-'));
+      await execa('git', ['clone', testDir, cloneDir]);
+
+      // Step 5: Set up mock tools in the cloned directory
+      const cloneMockBinDir = join(cloneDir, '.mock-bin');
+      mkdirSync(cloneMockBinDir, { recursive: true });
+
+      // Create mock tools in the clone's mock bin directory
+      const createMockToolInClone = (
+        toolName: string,
+        exitCode: number = 0,
+        output: string = 'mock version 1.0.0'
+      ) => {
+        const scriptPath = join(cloneMockBinDir, toolName);
+        const scriptContent = `#!/usr/bin/env bash\necho "${output}"\nexit ${exitCode}`;
+        writeFileSync(scriptPath, scriptContent);
+        chmodSync(scriptPath, 0o755);
+      };
+
+      createMockToolInClone('docker', 0, 'Docker version 24.0.0');
+      createMockToolInClone('claude', 0, 'Claude CLI v1.0.0');
+
+      // Step 6: Run rover init in the cloned directory
+      const roverBin = join(__dirname, '../../../dist/index.js');
+      const clonePath = `${cloneMockBinDir}:${originalPath}`;
+
+      const cloneInitResult = await execa(
+        'node',
+        [roverBin, 'init', '--yes'],
+        {
+          cwd: cloneDir,
+          env: {
+            PATH: clonePath,
+            HOME: process.env.HOME,
+            USER: process.env.USER,
+            TMPDIR: process.env.TMPDIR,
+            ROVER_TELEMETRY_DISABLED: '1',
+          },
+          reject: false,
+        }
+      );
+
+      // Debug output if test fails
+      if (cloneInitResult.exitCode !== 0) {
+        console.log('Clone init STDOUT:', cloneInitResult.stdout);
+        console.log('Clone init STDERR:', cloneInitResult.stderr);
+      }
+
+      // Step 7: Verify rover init succeeded in the cloned repo
+      expect(cloneInitResult.exitCode).toBe(0);
+
+      // Verify the cloned repo still has the rover configuration
+      expect(existsSync(join(cloneDir, 'rover.json'))).toBe(true);
+      expect(existsSync(join(cloneDir, '.rover/settings.json'))).toBe(true);
+
+      // Verify the configuration is intact
+      const clonedRoverConfig = JSON.parse(
+        readFileSync(join(cloneDir, 'rover.json'), 'utf8')
+      );
+      expect(clonedRoverConfig.languages).toContain('javascript');
+      expect(clonedRoverConfig.packageManagers).toContain('npm');
+
+      const clonedSettings = JSON.parse(
+        readFileSync(join(cloneDir, '.rover/settings.json'), 'utf8')
+      );
+      expect(clonedSettings.aiAgents).toContain('claude');
+      expect(clonedSettings.defaults.aiAgent).toBe('claude');
+
+      // Cleanup: Remove cloned directory
+      rmSync(cloneDir, { recursive: true, force: true });
+    });
   });
 
   describe('missing requirements', () => {
