@@ -66,6 +66,18 @@ interface TaskInspectionOutput {
 }
 
 /**
+ * JSON output format for raw file content
+ */
+interface RawFileOutput {
+  /** Whether the files were successfully read */
+  success: boolean;
+  /** List of files */
+  files: Array<{ filename: string; content: string }>;
+  /** Error reading the file */
+  error?: string;
+}
+
+/**
  * Build the error JSON output with consistent TaskInspectionOutput shape
  */
 const jsonErrorOutput = (
@@ -99,7 +111,7 @@ const jsonErrorOutput = (
 export const inspectCommand = async (
   taskId: string,
   iterationNumber?: number,
-  options: { json?: boolean; file?: string[] } = {}
+  options: { json?: boolean; file?: string[]; rawFile?: string[] } = {}
 ) => {
   // Convert string taskId to number
   const numericTaskId = parseInt(taskId, 10);
@@ -118,6 +130,28 @@ export const inspectCommand = async (
         colors.gray('Run the ') +
           colors.cyan('rover inspect 1') +
           colors.gray(' to get the task details'),
+      ]);
+    }
+    return;
+  }
+
+  // Validate mutually exclusive options
+  if (options.file && options.rawFile) {
+    if (options.json) {
+      const errorOutput = jsonErrorOutput(
+        'Cannot use both --file and --raw-file options together'
+      );
+      console.log(JSON.stringify(errorOutput, null, 2));
+    } else {
+      console.log(
+        colors.red('✗ Cannot use both --file and --raw-file options together')
+      );
+      showTips([
+        'Use ' +
+          colors.cyan('--file') +
+          ' for formatted output or ' +
+          colors.cyan('--raw-file') +
+          ' for raw output',
       ]);
     }
     return;
@@ -144,6 +178,53 @@ export const inspectCommand = async (
       iterationNumber.toString()
     );
     const iteration = IterationConfig.load(iterationPath);
+
+    // Handle --raw-file option
+    if (options.rawFile) {
+      const rawFileContents = iteration.getMarkdownFiles(options.rawFile);
+
+      if (options.json) {
+        // Output JSON format with RawFileOutput array
+        const rawFileOutput: RawFileOutput = {
+          success: true,
+          files: [],
+        };
+        for (const [filename, content] of rawFileContents.entries()) {
+          rawFileOutput.files.push({
+            filename,
+            content,
+          });
+        }
+        // Add entries for files that were not found
+        for (const requestedFile of options.rawFile) {
+          if (!rawFileContents.has(requestedFile)) {
+            rawFileOutput.files.push({
+              filename: requestedFile,
+              content: '',
+            });
+            rawFileOutput.success = false;
+            rawFileOutput.error = `Error reading file ${requestedFile}. It was not present in the task output.`;
+          }
+        }
+        console.log(JSON.stringify(rawFileOutput, null, 2));
+      } else {
+        // Output raw content without formatting
+        if (rawFileContents.size === 0) {
+          console.error(
+            colors.red(
+              `✗ No files found matching: ${options.rawFile.join(', ')}`
+            )
+          );
+        } else {
+          rawFileContents.forEach(content => {
+            console.log(content);
+          });
+        }
+      }
+      await telemetry?.shutdown();
+      // Return at this point
+      return;
+    }
 
     if (options.json) {
       // Output JSON format

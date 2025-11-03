@@ -259,6 +259,10 @@ export function createProgram(
       'Specific iteration number (defaults to latest)'
     )
     .option('--file <files...>', 'Output iteration file contents')
+    .option(
+      '--raw-file <files...>',
+      'Output raw file contents without formatting (mutually exclusive with --file)'
+    )
     .option('--json', 'Output in JSON format')
     .action(inspectCommand);
 
