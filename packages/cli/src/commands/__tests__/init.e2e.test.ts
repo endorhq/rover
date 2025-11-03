@@ -458,21 +458,17 @@ tasks:
       const roverBin = join(__dirname, '../../../dist/index.js');
       const clonePath = `${cloneMockBinDir}:${originalPath}`;
 
-      const cloneInitResult = await execa(
-        'node',
-        [roverBin, 'init', '--yes'],
-        {
-          cwd: cloneDir,
-          env: {
-            PATH: clonePath,
-            HOME: process.env.HOME,
-            USER: process.env.USER,
-            TMPDIR: process.env.TMPDIR,
-            ROVER_TELEMETRY_DISABLED: '1',
-          },
-          reject: false,
-        }
-      );
+      const cloneInitResult = await execa('node', [roverBin, 'init', '--yes'], {
+        cwd: cloneDir,
+        env: {
+          PATH: clonePath,
+          HOME: process.env.HOME,
+          USER: process.env.USER,
+          TMPDIR: process.env.TMPDIR,
+          ROVER_TELEMETRY_DISABLED: '1',
+        },
+        reject: false,
+      });
 
       // Debug output if test fails
       if (cloneInitResult.exitCode !== 0) {

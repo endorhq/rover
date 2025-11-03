@@ -40,32 +40,6 @@ describe('rover task (e2e)', () => {
     chmodSync(scriptPath, 0o755);
   };
 
-  /**
-   * Creates a mock AI agent that simulates task execution
-   * This mock will create the hello world script when invoked
-   */
-  const createMockAIAgent = (agentName: string) => {
-    const scriptPath = join(mockBinDir, agentName);
-    // Mock AI agent that creates a hello world script
-    const scriptContent = `#!/usr/bin/env bash
-if [[ "$*" == *"hello world"* ]] || [[ "$*" == *"bash script"* ]]; then
-  # Simulate AI agent creating the requested script
-  cat > hello.sh << 'EOF'
-#!/usr/bin/env bash
-echo "Hello World!"
-echo "Current date and time: $(date)"
-EOF
-  chmod +x hello.sh
-  echo "Created hello.sh script"
-  exit 0
-fi
-echo "Mock ${agentName} agent executing task"
-exit 0
-`;
-    writeFileSync(scriptPath, scriptContent);
-    chmodSync(scriptPath, 0o755);
-  };
-
   beforeEach(async () => {
     // Save original state
     originalCwd = process.cwd();
@@ -87,9 +61,6 @@ exit 0
     createMockTool('codex', 127, 'command not found: codex');
     createMockTool('gemini', 127, 'command not found: gemini');
     createMockTool('qwen', 127, 'command not found: qwen');
-
-    // Create mock Claude AI agent that can execute tasks
-    createMockAIAgent('claude');
 
     // Initialize a real git repository
     await execa('git', ['init']);
@@ -136,7 +107,7 @@ exit 0
     // Restore original state
     process.chdir(originalCwd);
     process.env.PATH = originalPath;
-    rmSync(testDir, { recursive: true, force: true });
+    //    rmSync(testDir, { recursive: true, force: true });
   });
 
   /**
@@ -176,10 +147,13 @@ exit 0
       expect(result.exitCode).toBe(0);
 
       // Verify: The script was created
-      expect(existsSync('hello.sh')).toBe(true);
+      expect(existsSync('.rover/tasks/1/workspace/hello.sh')).toBe(true);
 
       // Verify: The script has the expected content
-      const scriptContent = readFileSync('hello.sh', 'utf8');
+      const scriptContent = readFileSync(
+        '.rover/tasks/1/workspace/hello.sh',
+        'utf8'
+      );
       expect(scriptContent).toContain('Hello World');
       expect(scriptContent).toContain('date');
     });
@@ -214,15 +188,16 @@ exit 0
       });
 
       // Should have at least 2 worktrees (main + task worktree)
-      const worktreeLines = worktreeResult.stdout.split('\n').filter(line => line.trim());
+      const worktreeLines = worktreeResult.stdout
+        .split('\n')
+        .filter(line => line.trim());
       expect(worktreeLines.length).toBeGreaterThanOrEqual(1);
     });
   });
 
   describe('error handling', () => {
     it('should fail gracefully if AI agent is not available', async () => {
-      // Setup: Remove the claude mock to simulate missing AI agent
-      rmSync(join(mockBinDir, 'claude'), { force: true });
+      // Setup: Create a failing claude mock to simulate missing AI agent
       createMockTool('claude', 127, 'command not found: claude');
 
       // Execute: Run rover task
