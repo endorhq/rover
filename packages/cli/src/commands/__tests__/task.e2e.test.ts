@@ -130,6 +130,38 @@ describe('rover task (e2e)', () => {
     });
   };
 
+  /**
+   * Helper to wait for a task to reach a specific status
+   * Polls the task status file until the expected status is reached or timeout occurs
+   */
+  const waitForTaskStatus = async (
+    taskId: number,
+    expectedStatus: string,
+    timeoutMs: number = 30000,
+    pollIntervalMs: number = 500
+  ): Promise<void> => {
+    const startTime = Date.now();
+    const taskStatusFile = join(testDir, `.rover/tasks/${taskId}/status.json`);
+
+    while (Date.now() - startTime < timeoutMs) {
+      if (existsSync(taskStatusFile)) {
+        const statusContent = readFileSync(taskStatusFile, 'utf8');
+        const status = JSON.parse(statusContent);
+
+        if (status.status === expectedStatus) {
+          return;
+        }
+      }
+
+      // Wait before next poll
+      await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+    }
+
+    throw new Error(
+      `Timeout waiting for task ${taskId} to reach status "${expectedStatus}" after ${timeoutMs}ms`
+    );
+  };
+
   describe('successful task execution', () => {
     it('should execute a simple task to create a hello world bash script', async () => {
       // Execute: Run rover task with a simple request
@@ -146,12 +178,17 @@ describe('rover task (e2e)', () => {
       // Verify: Command succeeded
       expect(result.exitCode).toBe(0);
 
+      // Wait for task to reach Completed status
+      await waitForTaskStatus(1, 'Completed', 600000);
+
       // Verify: The script was created
-      expect(existsSync('.rover/tasks/1/workspace/hello.sh')).toBe(true);
+      expect(existsSync(`${testDir}/.rover/tasks/1/workspace/hello.sh`)).toBe(
+        true
+      );
 
       // Verify: The script has the expected content
       const scriptContent = readFileSync(
-        '.rover/tasks/1/workspace/hello.sh',
+        `${testDir}/.rover/tasks/1/workspace/hello.sh`,
         'utf8'
       );
       expect(scriptContent).toContain('Hello World');

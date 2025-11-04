@@ -39,7 +39,7 @@ export default defineConfig({
     include: ['**/*.e2e.test.ts', '**/e2e/**/*.test.ts'],
     // Longer timeouts for e2e tests that may involve Docker containers,
     // network operations, and real AI agent interactions
-    testTimeout: 120000, // 2 minutes
+    testTimeout: 1800000, // 30 minutes
     hookTimeout: 60000, // 1 minute
     // Disable coverage for e2e tests (measure integration, not code paths)
     coverage: {
