@@ -56,12 +56,6 @@ describe('rover task (e2e)', () => {
     // Prepend mock bin to PATH so our mock tools are found first
     process.env.PATH = `${mockBinDir}:${originalPath}`;
 
-    // Create failing mocks for all tools by default
-    createMockTool('docker', 0, 'Docker version 24.0.0');
-    createMockTool('codex', 127, 'command not found: codex');
-    createMockTool('gemini', 127, 'command not found: gemini');
-    createMockTool('qwen', 127, 'command not found: qwen');
-
     // Initialize a real git repository
     await execa('git', ['init']);
     await execa('git', ['config', 'user.email', 'test@test.com']);
@@ -107,7 +101,7 @@ describe('rover task (e2e)', () => {
     // Restore original state
     process.chdir(originalCwd);
     process.env.PATH = originalPath;
-    //    rmSync(testDir, { recursive: true, force: true });
+    rmSync(testDir, { recursive: true, force: true });
   });
 
   /**
@@ -141,7 +135,10 @@ describe('rover task (e2e)', () => {
     pollIntervalMs: number = 500
   ): Promise<void> => {
     const startTime = Date.now();
-    const taskStatusFile = join(testDir, `.rover/tasks/${taskId}/status.json`);
+    const taskStatusFile = join(
+      testDir,
+      `.rover/tasks/${taskId}/description.json`
+    );
 
     while (Date.now() - startTime < timeoutMs) {
       if (existsSync(taskStatusFile)) {
@@ -162,6 +159,10 @@ describe('rover task (e2e)', () => {
     );
   };
 
+  const waitForTaskCompletion = async (taskId: number): Promise<void> => {
+    await waitForTaskStatus(taskId, 'COMPLETED', 600000);
+  };
+
   describe('successful task execution', () => {
     it('should execute a simple task to create a hello world bash script', async () => {
       // Execute: Run rover task with a simple request
@@ -178,8 +179,8 @@ describe('rover task (e2e)', () => {
       // Verify: Command succeeded
       expect(result.exitCode).toBe(0);
 
-      // Wait for task to reach Completed status
-      await waitForTaskStatus(1, 'Completed', 600000);
+      // Wait for task to reach COMPLETED status
+      await waitForTaskCompletion(1);
 
       // Verify: The script was created
       expect(existsSync(`${testDir}/.rover/tasks/1/workspace/hello.sh`)).toBe(
@@ -280,6 +281,9 @@ describe('rover task (e2e)', () => {
 
       // Verify: Command succeeded
       expect(result.exitCode).toBe(0);
+
+      // Wait for task to reach COMPLETED status
+      await waitForTaskCompletion(1);
 
       // Verify: Main branch still has the same commit count
       const finalLog = await execa('git', ['log', '--oneline'], {
