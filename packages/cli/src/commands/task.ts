@@ -288,6 +288,8 @@ export const taskCommand = async (
   const requiredInputs = (inputs || [])
     .filter(el => el.required)
     .map(el => el.name);
+  const descriptionOnlyWorkflow =
+    requiredInputs.length === 1 && requiredInputs[0] === 'description';
   const inputsData: Map<string, string> = new Map();
 
   // Validate branch option and check for uncommitted changes
@@ -398,7 +400,7 @@ export const taskCommand = async (
 
           // Now, let's ask an agent to extract the required inputs from the issue body.
           if (inputs && inputs.length > 0) {
-            if (inputs.length == 1 && inputs[0].name === 'description') {
+            if (descriptionOnlyWorkflow) {
               // We already have the description!
               inputsData.set('description', description);
               if (!json) {

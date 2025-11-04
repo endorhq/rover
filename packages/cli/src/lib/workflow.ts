@@ -17,9 +17,11 @@ export const loadWorkflowByName = (
   switch (name) {
     case 'swe': {
       workflowPath = join(distDir, sweWorkflow);
+      break;
     }
     case 'tech-writer': {
       workflowPath = join(distDir, techWriterWorkflow);
+      break;
     }
   }
 
@@ -27,4 +29,6 @@ export const loadWorkflowByName = (
     const workflow = WorkflowManager.load(workflowPath);
     return workflow;
   }
+
+  return undefined;
 };
