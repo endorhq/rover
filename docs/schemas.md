@@ -11,7 +11,8 @@ Each project file, such as `rover.json` or `iteration.json`, have the following 
 - `packages/schemas/src/<name>/schema.js: file schema definition using Zod v4 library
 - `packages/schemas/src/<name>/types.js: TypeScript types inferred from the Zod definition
 - `packages/schemas/src/<name>/errors.js: Custom error types
-- `packages/schemas/src/<name>.js: a wrapper class to load and manage these files
+- `packages/schemas/src/<name>.js: a wrapper class to load and manage a file
+- `packages/schemas/src/<name>-store.js: (optional) a class to load and manage related files. It understands the locations and folder structure to look for them.
 
 ## Common properties
 
@@ -26,11 +27,13 @@ We use `workflow` as an example in the following list:
   - `packages/schemas/src/workflow/types.js`
   - `packages/schemas/src/workflow/errors.js`
   - `packages/schemas/src/workflow.js`
+  - `packages/schemas/src/workflow-store.js`
 - Constant, types, and class names:
   - Zod schema definition: `<Type>Schema`. For example, `WorkflowSchema` and `WorkflowInputTypeSchema`
   - TypeScript types: `<Type>`. For example, `Workflow` and `WorkflowInputType`
   - Custom errors: `<Type><Reason>Error`. For example, `WorkflowLoadError` or `WorkflowValidationError`
   - Wrapper class: `<Type>Manager`. For example, `WorkflowManager`
+  - Store class: `<Type>Store`. For example, `WorkflowStore`
 
 ## Working with multiple versions
 
