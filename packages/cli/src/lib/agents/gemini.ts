@@ -42,7 +42,8 @@ class GeminiAI implements AIAgentTool {
   }
 
   async invoke(prompt: string, json: boolean = false): Promise<string> {
-    const geminiArgs = ['-p'];
+    // Do not add -p, it's deprecated
+    const geminiArgs: string[] = [];
 
     if (json) {
       // Gemini does not have any way to force the JSON output at CLI level.
