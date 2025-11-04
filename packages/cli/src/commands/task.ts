@@ -1,35 +1,29 @@
 import enquirer from 'enquirer';
 import colors from 'ansi-colors';
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { getNextTaskId } from '../utils/task-id.js';
-import { homedir, tmpdir, userInfo } from 'node:os';
+import { homedir } from 'node:os';
 import { getAIAgentTool, getUserAIAgent } from '../lib/agents/index.js';
 import { TaskDescription } from '../lib/description.js';
 import { createSandbox } from '../lib/sandbox/index.js';
-import { SetupBuilder } from '../lib/setup.js';
-import { AI_AGENT, ProjectConfig } from '../lib/config.js';
+import { AI_AGENT } from '../lib/config.js';
 import { IterationConfig } from '../lib/iteration.js';
 import { generateBranchName } from '../utils/branch-name.js';
 import {
   findProjectRoot,
-  launch,
   ProcessManager,
   showProperties,
+  Git,
 } from 'rover-common';
 import { getTelemetry } from '../lib/telemetry.js';
 import { NewTaskProvider } from 'rover-telemetry';
-import { Git } from 'rover-common';
 import { readFromStdin, stdinIsAvailable } from '../utils/stdin.js';
 import { CLIJsonOutput } from '../types.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
 import { GitHub, GitHubError } from '../lib/github.js';
 import { copyEnvironmentFiles } from '../utils/env-files.js';
-import {
-  parseCustomEnvironmentVariables,
-  loadEnvsFile,
-} from '../utils/env-variables.js';
-import { loadWorkflowByName } from '../lib/workflow.js';
+import { initWorkflowStore } from '../lib/workflow.js';
 import { WorkflowManager } from 'rover-schemas';
 
 const { prompt } = enquirer;
@@ -258,7 +252,8 @@ export const taskCommand = async (
   let workflow: WorkflowManager;
 
   try {
-    const loadedWorkflow = loadWorkflowByName(workflowName);
+    const workflowStore = initWorkflowStore();
+    const loadedWorkflow = workflowStore.getWorkflow(workflowName);
 
     if (loadedWorkflow) {
       workflow = loadedWorkflow;

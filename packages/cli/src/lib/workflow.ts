@@ -1,38 +1,36 @@
 // Utilities to load and find workflows.
-import { WorkflowManager } from 'rover-schemas';
+import { WorkflowManager, WorkflowStore } from 'rover-schemas';
 import sweWorkflow from './workflows/swe.yml';
 import techWriterWorkflow from './workflows/tech-writer.yml';
 import { dirname, isAbsolute, join } from 'path';
 import { fileURLToPath } from 'url';
 
 /**
- * Load a workflow based on the given name
+ * Load a workflow from a built-in path.
+ *
+ * @param path the file path pointing to the workflow YAML file
+ * @returns WorkflowManager instance
  */
-export const loadWorkflowByName = (
-  name: string
-): WorkflowManager | undefined => {
+const loadBuiltInWorkflow = (path: string): WorkflowManager => {
   const distDir = dirname(fileURLToPath(import.meta.url));
-  let workflowPath;
+  const workflowPath = isAbsolute(path) ? path : join(distDir, path);
+  return WorkflowManager.load(workflowPath);
+};
 
-  switch (name) {
-    case 'swe': {
-      workflowPath = isAbsolute(sweWorkflow)
-        ? sweWorkflow
-        : join(distDir, sweWorkflow);
-      break;
-    }
-    case 'tech-writer': {
-      workflowPath = isAbsolute(techWriterWorkflow)
-        ? techWriterWorkflow
-        : join(distDir, techWriterWorkflow);
-      break;
-    }
-  }
+/**
+ * Load all the available workflows. Currently, it
+ * only includes the built-in workflows.
+ *
+ * @returns A WorkflowStore containing all loaded workflows
+ */
+export const initWorkflowStore = (): WorkflowStore => {
+  const store = new WorkflowStore();
 
-  if (workflowPath != null) {
-    const workflow = WorkflowManager.load(workflowPath);
-    return workflow;
-  }
+  const swe = loadBuiltInWorkflow(sweWorkflow);
+  store.addWorkflow(swe);
 
-  return undefined;
+  const techWriter = loadBuiltInWorkflow(techWriterWorkflow);
+  store.addWorkflow(techWriter);
+
+  return store;
 };

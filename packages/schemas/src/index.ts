@@ -22,6 +22,7 @@ export {
 } from './workflow/errors.js';
 
 export { WorkflowManager } from './workflow.js';
+export { WorkflowStore } from './workflow-store.js';
 
 // Iteration Status library
 export {
