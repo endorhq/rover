@@ -1,5 +1,5 @@
 import { Command, Option } from 'commander';
-import { ProjectConfig, UserSettings } from './lib/config.js';
+import { AI_AGENT, ProjectConfig, UserSettings } from './lib/config.js';
 import { initCommand } from './commands/init.js';
 import { listCommand } from './commands/list.js';
 import { exitWithError } from './utils/exit.js';
@@ -207,7 +207,7 @@ export function createProgram(
     )
     .option(
       '-a, --agent <agent>',
-      'AI agent to use (claude, codex, gemini, qwen)'
+      `AI agent to use (${Object.values(AI_AGENT).join(', ')})`
     )
     .option('--json', 'Output the result in JSON format')
     .option('--debug', 'Show debug information like running commands')
