@@ -88,6 +88,8 @@ export const getAIAgentTool = (agent: string): AIAgentTool => {
       return new ClaudeAI();
     case 'codex':
       return new CodexAI();
+    case 'cursor':
+      return new CursorAI();
     case 'gemini':
       return new GeminiAI();
     case 'qwen':

@@ -167,7 +167,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
 
     const cursorDirectory = join(homedir(), '.cursor');
     if (existsSync(cursorDirectory)) {
-      dockerMounts.push(`-v`, `${cursorFolder}:/.cursor:Z,ro`);
+      dockerMounts.push(`-v`, `${cursorDirectory}:/.cursor:Z,ro`);
     }
 
     const cursorCredentialsDirectory = join(homedir(), '.config', 'cursor');
