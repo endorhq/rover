@@ -8,13 +8,15 @@ import type { Environment } from '../types.js';
 import {
   checkClaude,
   checkCodex,
+  checkCursor,
   checkDocker,
   checkGemini,
   checkQwen,
   checkGit,
 } from '../utils/system.js';
-import { AI_AGENT, ProjectConfig, UserSettings } from '../lib/config.js';
+import { ProjectConfig, UserSettings } from '../lib/config.js';
 import { showRoverChat, showTips, TIP_TITLES } from '../utils/display.js';
+import { AI_AGENT } from 'rover-common';
 import { getTelemetry } from '../lib/telemetry.js';
 
 // Get the default prompt
@@ -97,6 +99,10 @@ export const initCommand = async (
 
   reqSpinner.text = 'Checking Gemini';
 
+  const cursorInstalled = await checkCursor();
+
+  reqSpinner.text = 'Checking Cursor';
+
   const geminiInstalled = await checkGemini();
 
   reqSpinner.text = 'Checking Qwen';
@@ -128,6 +134,9 @@ export const initCommand = async (
   );
   console.log(
     `├── Codex: ${codexInstalled ? colors.green('✓ Installed') : colors.red('✗ Missing')}`
+  );
+  console.log(
+    `├── Cursor: ${cursorInstalled ? colors.green('✓ Installed') : colors.red('✗ Missing')}`
   );
   console.log(
     `├── Gemini: ${geminiInstalled ? colors.green('✓ Installed') : colors.red('✗ Missing')}`
@@ -179,6 +188,10 @@ export const initCommand = async (
 
     if (codexInstalled) {
       availableAgents.push(AI_AGENT.Codex);
+    }
+
+    if (cursorInstalled) {
+      availableAgents.push(AI_AGENT.Cursor);
     }
 
     if (geminiInstalled) {

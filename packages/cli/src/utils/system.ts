@@ -24,6 +24,8 @@ export const checkClaude = async (): Promise<boolean> =>
   await checkCommand('claude');
 export const checkCodex = async (): Promise<boolean> =>
   await checkCommand('codex');
+export const checkCursor = async (): Promise<boolean> =>
+  await checkCommand('cursor-agent');
 export const checkQwen = async (): Promise<boolean> =>
   await checkCommand('qwen');
 export const checkGemini = async (): Promise<boolean> =>

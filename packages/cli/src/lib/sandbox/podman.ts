@@ -1,10 +1,15 @@
 import { getAIAgentTool, getUserAIAgent } from '../agents/index.js';
 import { join } from 'node:path';
-import { AI_AGENT, ProjectConfig } from '../config.js';
+import { ProjectConfig } from '../config.js';
 import { Sandbox } from './types.js';
 import { SetupBuilder } from '../setup.js';
 import { TaskDescriptionManager } from 'rover-schemas';
-import { findProjectRoot, launch, ProcessManager } from 'rover-common';
+import {
+  AI_AGENT,
+  findProjectRoot,
+  launch,
+  ProcessManager,
+} from 'rover-common';
 import {
   parseCustomEnvironmentVariables,
   loadEnvsFile,

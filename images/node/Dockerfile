@@ -1,3 +1,4 @@
+ARG NIX_AI_TOOLS_REV=ea213e13fde802090a4cdec57631e3374d67d78f
 FROM node:24-alpine AS agent-builder
 COPY . /app
 WORKDIR /app
@@ -6,10 +7,12 @@ RUN npm install && npm run build:agent
 RUN cd ./packages/agent && npm pack && mv *.tgz /rover-agent.tgz
 
 FROM node:24-alpine
+ARG NIX_AI_TOOLS_REV
 ARG TARGETARCH
 ARG PACKAGE_MANAGER_MCP_SERVER_VERSION="v0.1.3"
+ENV NIX_AI_TOOLS_REV=${NIX_AI_TOOLS_REV}
 RUN apk update && \
-    apk add bash file jq python3 sudo uv && \
+    apk add bash file jq nix python3 sudo uv && \
     case ${TARGETARCH} in \
       amd64) ARCH_SUFFIX="x86_64-unknown-linux-musl" ;; \
       arm64) ARCH_SUFFIX="aarch64-unknown-linux-musl" ;; \
@@ -26,3 +29,7 @@ RUN npm install -g /rover-agent.tgz
 
 COPY ./images/node/assets/1-sudoers-setup /etc/sudoers.d/1-agent-setup
 COPY ./images/node/assets/2-sudoers-cleanup /etc/sudoers.d/2-agent-cleanup
+
+# Install agents with special requirements
+COPY ./images/node/assets/nix/nix.conf /etc/nix/nix.conf
+COPY ./images/node/assets/nix/ai-tool-wrapper /usr/local/bin/cursor-agent

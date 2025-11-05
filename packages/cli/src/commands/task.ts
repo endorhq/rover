@@ -7,7 +7,7 @@ import { homedir } from 'node:os';
 import { getAIAgentTool, getUserAIAgent } from '../lib/agents/index.js';
 import { TaskDescriptionManager } from 'rover-schemas';
 import { createSandbox } from '../lib/sandbox/index.js';
-import { AI_AGENT } from '../lib/config.js';
+import { AI_AGENT } from 'rover-common';
 import { IterationManager } from 'rover-schemas';
 import { generateBranchName } from '../utils/branch-name.js';
 import {
@@ -62,6 +62,25 @@ const validations = (selectedAiAgent?: string): validationResult => {
             ' first to set up credentials, using the' +
             colors.cyan('/auth') +
             ' command',
+        ],
+      };
+    }
+  } else if (selectedAiAgent === 'cursor') {
+    const cursorConfig = join(homedir(), '.cursor', 'cli-config.json');
+    const cursorCreds = join(homedir(), '.config', 'cursor', 'auth.json');
+
+    if (!existsSync(cursorConfig)) {
+      return {
+        error: 'Cursor configuration not found',
+        tips: ['Run ' + colors.cyan('cursor-agent') + ' first to configure it'],
+      };
+    }
+
+    if (!existsSync(cursorCreds)) {
+      return {
+        error: 'Cursor credentials not found',
+        tips: [
+          'Run ' + colors.cyan('cursor-agent') + ' first to set up credentials',
         ],
       };
     }
@@ -216,12 +235,14 @@ export const taskCommand = async (
       selectedAiAgent = AI_AGENT.Claude;
     } else if (agentLower === 'codex') {
       selectedAiAgent = AI_AGENT.Codex;
+    } else if (agentLower === 'cursor') {
+      selectedAiAgent = AI_AGENT.Cursor;
     } else if (agentLower === 'gemini') {
       selectedAiAgent = AI_AGENT.Gemini;
     } else if (agentLower === 'qwen') {
       selectedAiAgent = AI_AGENT.Qwen;
     } else {
-      jsonOutput.error = `Invalid agent: ${agent}. Valid options are: claude, codex, gemini, qwen`;
+      jsonOutput.error = `Invalid agent: ${agent}. Valid options are: ${Object.values(AI_AGENT).join(', ')}`;
       exitWithError(jsonOutput, json);
       return;
     }

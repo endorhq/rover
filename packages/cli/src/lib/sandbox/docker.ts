@@ -1,10 +1,15 @@
 import { getAIAgentTool, getUserAIAgent } from '../agents/index.js';
 import { join } from 'node:path';
-import { AI_AGENT, ProjectConfig } from '../config.js';
+import { ProjectConfig } from '../config.js';
 import { Sandbox } from './types.js';
 import { SetupBuilder } from '../setup.js';
 import { TaskDescriptionManager } from 'rover-schemas';
-import { findProjectRoot, launch, ProcessManager } from 'rover-common';
+import {
+  AI_AGENT,
+  findProjectRoot,
+  launch,
+  ProcessManager,
+} from 'rover-common';
 import {
   parseCustomEnvironmentVariables,
   loadEnvsFile,
@@ -205,9 +210,7 @@ export class DockerSandbox extends Sandbox {
 
   protected async start(): Promise<string> {
     return (
-      (
-        await launch('docker', ['start', this.sandboxName], { stdio: 'pipe' })
-      ).stdout
+      (await launch('docker', ['start', this.sandboxName])).stdout
         ?.toString()
         .trim() || this.sandboxName
     );
@@ -215,11 +218,7 @@ export class DockerSandbox extends Sandbox {
 
   protected async remove(): Promise<string> {
     return (
-      (
-        await launch('docker', ['rm', '-f', this.sandboxName], {
-          stdio: 'pipe',
-        })
-      ).stdout
+      (await launch('docker', ['rm', '-f', this.sandboxName])).stdout
         ?.toString()
         .trim() || this.sandboxName
     );
@@ -227,9 +226,7 @@ export class DockerSandbox extends Sandbox {
 
   protected async stop(): Promise<string> {
     return (
-      (
-        await launch('docker', ['stop', this.sandboxName], { stdio: 'pipe' })
-      ).stdout
+      (await launch('docker', ['stop', this.sandboxName])).stdout
         ?.toString()
         .trim() || this.sandboxName
     );
@@ -237,9 +234,8 @@ export class DockerSandbox extends Sandbox {
 
   protected async logs(): Promise<string> {
     return (
-      (
-        await launch('docker', ['logs', this.sandboxName], { stdio: 'pipe' })
-      ).stdout?.toString() || ''
+      (await launch('docker', ['logs', this.sandboxName])).stdout?.toString() ||
+      ''
     );
   }
 

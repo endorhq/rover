@@ -36,6 +36,7 @@ Once you have this information, you can continue with the implementation.
 
 Each AI agent is currently defined in two locations:
 
+- `packages/common/agent.ts`: common agent enumerations
 - `packages/cli/src/lib/agents`: classes for internal operations
 - `packages/agent/src/`: classes to complete user tasks
 
@@ -47,28 +48,24 @@ Having it in two locations is causing unnecessary duplication. In the future, **
 
 | File                                | Purpose                                                                                                                                                                                                        |
 | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `packages/cli/src/program.ts`       | List of available agents for the CLI                                                                                                                                                                           |
 | `packages/cli/src/commands/init.ts` | Check the available AI agents in the user environment                                                                                                                                                          |
-| `packages/cli/src/commands/mcp.ts`  | (_Duplicated_) List of available agents for the CLI                                                                                                                                                            |
 | `packages/cli/src/commands/task.ts` | Validate that required authentication files are available before creating a task                                                                                                                               |
-| `packages/cli/src/lib/config.ts`    | (_Duplicated_) `AI_AGENT` enum with the supported agents                                                                                                                                                       |
 | `packages/cli/src/lib/agents/*`     | A file per agent that defines: supported env variables, required container mounts (for authentication), and logic to run internal operations using an agent. All of them implement the `AIAgentTool` interface |
 | `packages/cli/src/utils/system.ts`  | Methods to check if the AI agent is available in the system                                                                                                                                                    |
 
 **Agent CLI files**
 
-| File                                          | Purpose                                                                                                                           |
-| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `packages/agent/src/cli.ts`                   | (_Duplicated_) Define the list of supported agents to complete a workflow                                                         |
-| `packages/agent/src/commands/config/index.ts` | (_Duplicated_) Define the list of supported agents to configure MCP servers                                                       |
-| `packages/agent/src/lib/runner.ts`            | Define commands to run AI agents                                                                                                  |
-| `packages/agent/src/lib/agents/*`             | (_~Duplicated_) A class per agent that defines the configuration requirements and provides the methods to complete workflow steps |
-| `packages/agent/src/lib/agents/index.ts`      | (_~Duplicated_) Initialize an agent based on the name                                                                             |
+| File                                     | Purpose                                                                                                                           |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/agent/src/lib/runner.ts`       | Define commands to run AI agents                                                                                                  |
+| `packages/agent/src/lib/agents/*`        | (_~Duplicated_) A class per agent that defines the configuration requirements and provides the methods to complete workflow steps |
+| `packages/agent/src/lib/agents/index.ts` | (_~Duplicated_) Initialize an agent based on the name                                                                             |
 
 **Other files**
 
 | File                                      | Purpose                                                              |
 | ----------------------------------------- | -------------------------------------------------------------------- |
+| `packages/common/src/agent.ts`            | List of available agents for the rover CLI and agent CLI             |
 | `packages/schemas/src/workflow/schema.ts` | (_Duplicated_) Supported AI coding agents in the workflow definition |
 
 #### Main Interfaces

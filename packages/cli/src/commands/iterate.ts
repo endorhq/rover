@@ -12,7 +12,7 @@ import {
 } from '../lib/agents/index.js';
 import type { IPromptTask } from '../lib/prompts/index.js';
 import { TaskDescriptionManager, TaskNotFoundError } from 'rover-schemas';
-import { AI_AGENT } from '../lib/config.js';
+import { AI_AGENT } from 'rover-common';
 import { IterationManager } from 'rover-schemas';
 import { getTelemetry } from '../lib/telemetry.js';
 import { showRoverChat } from '../utils/display.js';

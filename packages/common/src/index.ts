@@ -51,3 +51,5 @@ export {
   type DiagramStep,
   type DiagramOptions,
 } from './display/index.js';
+
+export { AI_AGENT } from './agent.js';

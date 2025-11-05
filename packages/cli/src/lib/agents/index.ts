@@ -1,9 +1,11 @@
 import ClaudeAI from './claude.js';
 import CodexAI from './codex.js';
+import CursorAI from './cursor.js';
 import GeminiAI from './gemini.js';
 import QwenAI from './qwen.js';
 import type { IPromptTask } from '../prompts/index.js';
-import { AI_AGENT, UserSettings } from '../config.js';
+import { UserSettings } from '../config.js';
+import { AI_AGENT } from 'rover-common';
 import type { WorkflowInput } from 'rover-schemas';
 
 export interface AIAgentTool {
@@ -87,6 +89,8 @@ export const getAIAgentTool = (agent: string): AIAgentTool => {
       return new ClaudeAI();
     case 'codex':
       return new CodexAI();
+    case 'cursor':
+      return new CursorAI();
     case 'gemini':
       return new GeminiAI();
     case 'qwen':

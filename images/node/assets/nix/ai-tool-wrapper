@@ -1,0 +1,9 @@
+#!/usr/bin/env sh
+
+# Place this file in the filesystem (included in PATH) -- or a symlink
+# to it -- named after the tool that you want to be executed.
+#
+# The list of supported tools can be found at
+#   - https://github.com/numtide/nix-ai-tools/tree/main?tab=readme-ov-file#available-tools
+
+exec nix run --quiet --offline --accept-flake-config github:numtide/nix-ai-tools/${NIX_AI_TOOLS_REV}#$(basename "$0") -- "$@"

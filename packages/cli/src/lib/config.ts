@@ -5,7 +5,7 @@
 import { join, dirname, resolve } from 'node:path';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { FileNotFoundError, InvalidFormatError } from '../errors.js';
-import { findProjectRoot, Git } from 'rover-common';
+import { AI_AGENT, findProjectRoot, Git } from 'rover-common';
 
 // Supported languages
 export enum LANGUAGE {
@@ -279,13 +279,6 @@ export class ProjectConfig {
   toJSON(): ProjectConfigSchema {
     return { ...this.data };
   }
-}
-
-export enum AI_AGENT {
-  Claude = 'claude',
-  Codex = 'codex',
-  Gemini = 'gemini',
-  Qwen = 'qwen',
 }
 
 const CURRENT_USER_SCHEMA_VERSION = '1.0';

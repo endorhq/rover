@@ -23,6 +23,7 @@ import {
   TimeoutError,
 } from './errors.js';
 import { basename, join } from 'node:path';
+import { createAgent } from './agents/index.js';
 
 export interface RunnerStepResult {
   // Step ID
@@ -46,6 +47,19 @@ export class Runner {
   private step: WorkflowAgentStep;
   // Final tool to run the step
   tool: string;
+
+  /**
+   * Get the actual binary name for a given tool name
+   */
+  private static getToolBinary(toolName: string): string {
+    try {
+      const agent = createAgent(toolName);
+      return agent.binary;
+    } catch (err) {
+      // If agent creation fails, fall back to using the tool name as-is
+      return toolName;
+    }
+  }
 
   // Use current data to initialize the runner
   constructor(
@@ -76,7 +90,8 @@ export class Runner {
 
     // Try the step-specific tool first
     try {
-      launchSync(stepTool, ['--version']);
+      const binary = Runner.getToolBinary(stepTool);
+      launchSync(binary, ['--version']);
       availableTool = stepTool;
     } catch (err) {
       console.log(colors.yellow(`${stepTool} is not available in the system`));
@@ -85,7 +100,8 @@ export class Runner {
       const fallbackTool = stepTool || this.workflow.defaults?.tool;
       if (fallbackTool && fallbackTool !== stepTool) {
         try {
-          launchSync(fallbackTool, ['--version']);
+          const fallbackBinary = Runner.getToolBinary(fallbackTool);
+          launchSync(fallbackBinary, ['--version']);
           availableTool = fallbackTool;
           console.log(colors.gray(`Falling back to ${fallbackTool}`));
         } catch (err) {
@@ -172,7 +188,8 @@ export class Runner {
       };
 
       // Launch the process with proper timeout and abort signal
-      const launchPromise = launch(this.tool, args, {
+      const binary = Runner.getToolBinary(this.tool);
+      const launchPromise = launch(binary, args, {
         input: finalPrompt,
         timeout: this.workflow.getStepTimeout(this.step.id) * 1000, // Convert to milliseconds
         cancelSignal: abortController.signal,
@@ -528,6 +545,25 @@ export class Runner {
 
         // Read the input from stdin
         args.push('-');
+
+        return args;
+      }
+      case 'cursor': {
+        const args = [
+          'agent',
+          '--approve-mcps',
+          '--browser',
+          '--force',
+          '--print',
+          '--output-format',
+          'json',
+        ];
+
+        // Add model if specified
+        // TODO: Enable selecting the model
+        // if (model) {
+        //   args.push('--model', model);
+        // }
 
         return args;
       }

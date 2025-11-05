@@ -84,6 +84,11 @@ validate_task_file
 AGENT={agent}
 
 echo -e "\n======================================="
+echo "📦 Running nix daemon"
+echo "======================================="
+sudo nix-daemon &> /dev/null &
+
+echo -e "\n======================================="
 echo "📦 Starting the package manager MCP server"
 echo "======================================="
 export PACKAGE_MANAGER_MCP_PORT=8090

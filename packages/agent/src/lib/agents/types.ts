@@ -11,6 +11,7 @@ export interface ValidationResult {
 
 export interface Agent {
   name: string;
+  binary: string;
   version: string;
 
   getRequiredCredentials(): AgentCredentialFile[];
