@@ -2,7 +2,7 @@ import colors from 'ansi-colors';
 import { formatTaskStatus, statusColor } from '../utils/task-status.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { getDescriptions, TaskDescriptionSchema } from '../lib/description.js';
-import { VERBOSE, showTips } from 'rover-common';
+import { VERBOSE, showTips, Table, TableColumn } from 'rover-common';
 import { IterationStatusManager } from 'rover-schemas';
 import { IterationManager } from 'rover-schemas';
 import { getLastTaskIteration, getTaskIterations } from '../lib/iteration.js';
@@ -52,12 +52,19 @@ const formatProgress = (step?: string, progress?: number): string => {
 };
 
 /**
- * Truncate text to fit column width
+ * Row data for the table
  */
-const truncateText = (text: string, maxLength: number): string => {
-  if (text.length <= maxLength) return text;
-  return text.substring(0, maxLength - 3) + '...';
-};
+interface TaskRow {
+  id: string;
+  title: string;
+  agent: string;
+  workflow: string;
+  status: string;
+  progress: number;
+  currentStep: string;
+  duration: string;
+  error?: string;
+}
 
 export const listCommand = async (
   options: {
@@ -139,37 +146,20 @@ export const listCommand = async (
       return;
     }
 
-    // Table headers
-    const headers = [
-      'ID',
-      'Title',
-      'Agent',
-      'Workflow',
-      'Status',
-      'Progress',
-      'Current Step',
-      'Duration',
-    ];
-    const columnWidths = [4, 30, 8, 12, 12, 10, 25, 10];
+    // Helper to safely get iteration status
+    const maybeIterationStatus = (
+      iteration?: IterationManager
+    ): IterationStatusManager | undefined => {
+      try {
+        return iteration?.status();
+      } catch (e) {
+        return undefined;
+      }
+    };
 
-    // Print header
-    let headerRow = '';
-    headers.forEach((header, index) => {
-      headerRow += colors.bold(header.padEnd(columnWidths[index]));
-    });
-    console.log(headerRow);
-
-    // Print separator
-    let separatorRow = '';
-    columnWidths.forEach(width => {
-      separatorRow += '─'.repeat(width);
-    });
-    console.log(colors.gray(separatorRow));
-
-    // Print rows
-    for (const task of tasks) {
+    // Prepare table data
+    const tableData: TaskRow[] = tasks.map(task => {
       const lastIteration = getLastTaskIteration(task);
-      const title = task.title || 'Unknown Task';
       const taskStatus = task.status;
       const startedAt = task.startedAt;
 
@@ -181,47 +171,91 @@ export const listCommand = async (
         endTime = task.completedAt;
       }
 
-      const duration = formatDuration(startedAt, endTime);
-      const colorFunc = statusColor(taskStatus);
+      const iterationStatus = maybeIterationStatus(lastIteration);
 
-      const agent = task.agent || '-';
-      const workflow = task.workflowName || '-';
-
-      const maybeIterationStatus: (
-        iteration?: IterationManager
-      ) => IterationStatusManager | undefined = iteration => {
-        try {
-          return iteration?.status();
-        } catch (e) {
-          return undefined;
-        }
+      return {
+        id: task.id.toString(),
+        title: task.title || 'Unknown Task',
+        agent: task.agent || '-',
+        workflow: task.workflowName || '-',
+        status: taskStatus,
+        progress: iterationStatus?.progress || 0,
+        currentStep: iterationStatus?.currentStep || '-',
+        duration: iterationStatus ? formatDuration(startedAt, endTime) : '-',
+        error: task.error,
       };
+    });
 
-      let row = '';
-      row += colors.cyan(task.id.toString().padEnd(columnWidths[0]));
-      row += truncateText(title, columnWidths[1] - 1).padEnd(columnWidths[1]);
-      row += colors.gray(agent.padEnd(columnWidths[2]));
-      row += colors.gray(
-        truncateText(workflow, columnWidths[3] - 1).padEnd(columnWidths[3])
-      );
-      row += colorFunc(formatTaskStatus(taskStatus).padEnd(columnWidths[4])); // +10 for ANSI codes
-      row += formatProgress(
-        taskStatus,
-        maybeIterationStatus(lastIteration)?.progress || 0
-      ).padEnd(columnWidths[5] + 10);
-      row += colors.gray(
-        truncateText(
-          maybeIterationStatus(lastIteration)?.currentStep || '-',
-          columnWidths[6] - 1
-        ).padEnd(columnWidths[6])
-      );
-      row += colors.gray(maybeIterationStatus(lastIteration) ? duration : '-');
-      console.log(row);
+    // Define table columns
+    const columns: TableColumn<TaskRow>[] = [
+      {
+        header: 'ID',
+        key: 'id',
+        maxWidth: 4,
+        format: (value: string) => colors.cyan(value),
+      },
+      {
+        header: 'Title',
+        key: 'title',
+        minWidth: 15,
+        maxWidth: 30,
+        truncate: 'ellipsis',
+      },
+      {
+        header: 'Agent',
+        key: 'agent',
+        width: 8,
+        format: (value: string) => colors.gray(value),
+      },
+      {
+        header: 'Workflow',
+        key: 'workflow',
+        minWidth: 8,
+        maxWidth: 12,
+        truncate: 'ellipsis',
+        format: (value: string) => colors.gray(value),
+      },
+      {
+        header: 'Status',
+        key: 'status',
+        width: 12,
+        format: (value: string) => {
+          const colorFunc = statusColor(value);
+          return colorFunc(formatTaskStatus(value));
+        },
+      },
+      {
+        header: 'Progress',
+        key: (row: TaskRow) => formatProgress(row.status, row.progress),
+        width: 10,
+      },
+      {
+        header: 'Current Step',
+        key: 'currentStep',
+        minWidth: 15,
+        maxWidth: 25,
+        truncate: 'ellipsis',
+        format: (value: string) => colors.gray(value),
+      },
+      {
+        header: 'Duration',
+        key: 'duration',
+        width: 10,
+        format: (value: string) => colors.gray(value),
+      },
+    ];
 
-      // Show error in verbose mode
-      if (options.verbose && task.error) {
-        console.log(colors.red(`    Error: ${task.error}`));
-      }
+    // Render the table
+    const table = new Table(columns);
+    table.render(tableData);
+
+    // Show errors in verbose mode
+    if (options.verbose) {
+      tableData.forEach(row => {
+        if (row.error) {
+          console.log(colors.red(`    Error for task ${row.id}: ${row.error}`));
+        }
+      });
     }
 
     // Watch mode (simple refresh every 3 seconds)

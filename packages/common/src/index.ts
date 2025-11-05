@@ -35,6 +35,8 @@ export {
   showList,
   showProperties,
   ProcessManager,
+  Table,
+  renderTable,
   type DisplayColor,
   type TipsOptions,
   type ProcessItemStatus,
@@ -42,4 +44,6 @@ export {
   type ProcessOptions,
   type ListOptions,
   type PropertiesOptions,
+  type TableColumn,
+  type TableOptions,
 } from './display/index.js';

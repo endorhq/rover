@@ -25,6 +25,7 @@ import {
   showSplashHeader,
   showRegularHeader,
 } from 'rover-common';
+import { addWorkflowCommands } from './commands/workflows/index.js';
 
 export function createProgram(
   options: { excludeRuntimeHooks?: boolean } = {}
@@ -345,6 +346,11 @@ export function createProgram(
     .option('-m, --message <message>', 'Commit message')
     .option('--json', 'Output in JSON format')
     .action(pushCommand);
+
+  program.commandsGroup(colors.cyan('Workflows:'));
+
+  // Add all subcommands
+  addWorkflowCommands(program);
 
   program.commandsGroup(colors.cyan('Model Context Protocol:'));
 

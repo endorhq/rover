@@ -26,6 +26,9 @@ export { showProperties } from './properties.js';
 // Export process utilities
 export { ProcessManager } from './process.js';
 
+// Export table utilities
+export { Table, renderTable } from './table.js';
+
 // Export utility functions
 export { stripAnsi } from './utils.js';
 
@@ -39,3 +42,5 @@ export type {
   ListOptions,
   PropertiesOptions,
 } from './types.js';
+
+export type { TableColumn, TableOptions } from './table.js';
