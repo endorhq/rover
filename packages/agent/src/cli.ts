@@ -78,6 +78,7 @@ program
     new Argument('<agent>', 'AI Coding Agent to install').choices([
       'claude',
       'codex',
+      'cursor',
       'gemini',
       'qwen',
     ])
