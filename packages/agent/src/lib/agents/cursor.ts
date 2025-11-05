@@ -4,6 +4,7 @@ import colors from 'ansi-colors';
 import { AgentCredentialFile } from './types.js';
 import { BaseAgent } from './base.js';
 import { launch } from 'rover-common';
+import { mcpJsonSchema } from '../mcp/schema.js';
 
 export class CursorAgent extends BaseAgent {
   name = 'Cursor';
