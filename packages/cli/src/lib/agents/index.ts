@@ -1,5 +1,6 @@
 import ClaudeAI from './claude.js';
 import CodexAI from './codex.js';
+import CursorAI from './cursor.js';
 import GeminiAI from './gemini.js';
 import QwenAI from './qwen.js';
 import type { IPromptTask } from '../prompts/index.js';

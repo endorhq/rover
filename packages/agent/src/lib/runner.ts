@@ -531,6 +531,25 @@ export class Runner {
 
         return args;
       }
+      case 'cursor': {
+        const args = [
+          'agent',
+          '--approve-mcps',
+          '--browser',
+          '--force',
+          '--print',
+          '--output-format',
+          'json',
+        ];
+
+        // Add model if specified
+        // TODO: Enable selecting the model
+        // if (model) {
+        //   args.push('--model', model);
+        // }
+
+        return args;
+      }
       case 'gemini': {
         const args = ['--yolo', '--output-format', 'json'];
 

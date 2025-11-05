@@ -18,12 +18,12 @@ export class CursorAgent extends BaseAgent {
   getRequiredCredentials(): AgentCredentialFile[] {
     return [
       {
-        path: '/.cursor/config.json',
+        path: '/.cursor/cli-config.json',
         description: 'Cursor configuration',
         required: true,
       },
       {
-        path: '/.cursor/auth.json',
+        path: '/.config/cursor/auth.json',
         description: 'Cursor authentication',
         required: false,
       },
