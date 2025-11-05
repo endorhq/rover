@@ -415,7 +415,7 @@ describe('workflow utilities', () => {
           expect(Array.isArray(step.outputs)).toBe(true);
 
           // Each output should have required properties
-          for (const output of step.outputs) {
+          for (const output of (step.outputs || [])) {
             expect(output.name).toBeDefined();
             expect(typeof output.name).toBe('string');
             expect(output.name.length).toBeGreaterThan(0);
