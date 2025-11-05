@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { PromptBuilder } from '../index.js';
-import { IterationConfig } from '../../iteration.js';
+import { IterationManager } from 'rover-schemas';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -8,13 +8,13 @@ import { mkdtempSync, rmSync } from 'node:fs';
 
 describe('PromptBuilder', () => {
   let builder: PromptBuilder;
-  let testIteration: IterationConfig;
+  let testIteration: IterationManager;
   let tempDir: string;
 
   beforeEach(() => {
     builder = new PromptBuilder('claude');
     tempDir = mkdtempSync(join(tmpdir(), 'prompt-test-'));
-    testIteration = IterationConfig.createInitial(
+    testIteration = IterationManager.createInitial(
       tempDir,
       1,
       'Test Task Title',

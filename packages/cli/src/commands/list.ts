@@ -4,11 +4,8 @@ import { getTelemetry } from '../lib/telemetry.js';
 import { getDescriptions, TaskDescriptionSchema } from '../lib/description.js';
 import { VERBOSE, showTips } from 'rover-common';
 import { IterationStatusManager } from 'rover-schemas';
-import {
-  getLastTaskIteration,
-  getTaskIterations,
-  IterationConfig,
-} from '../lib/iteration.js';
+import { IterationManager } from 'rover-schemas';
+import { getLastTaskIteration, getTaskIterations } from '../lib/iteration.js';
 
 /**
  * Format duration from start to now or completion
@@ -114,11 +111,11 @@ export const listCommand = async (
     // JSON output mode
     if (options.json) {
       const jsonOutput: Array<
-        TaskDescriptionSchema & { iterationsData: IterationConfig[] }
+        TaskDescriptionSchema & { iterationsData: IterationManager[] }
       > = [];
 
       tasks.forEach(task => {
-        let iterationsData: IterationConfig[] = [];
+        let iterationsData: IterationManager[] = [];
         try {
           iterationsData = getTaskIterations(task);
         } catch (err) {
@@ -191,7 +188,7 @@ export const listCommand = async (
       const workflow = task.workflowName || '-';
 
       const maybeIterationStatus: (
-        iteration?: IterationConfig
+        iteration?: IterationManager
       ) => IterationStatusManager | undefined = iteration => {
         try {
           return iteration?.status();

@@ -23,6 +23,8 @@
   },
   "author": "The Endor team",
   "dependencies": {
+    "ansi-colors": "^4.1.3",
+    "rover-common": "^1.0.0",
     "yaml": "^2.8.1",
     "zod": "^4.1.12"
   },

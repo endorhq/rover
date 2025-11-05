@@ -13,7 +13,7 @@ import {
 import type { IPromptTask } from '../lib/prompts/index.js';
 import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
 import { AI_AGENT } from '../lib/config.js';
-import { IterationConfig } from '../lib/iteration.js';
+import { IterationManager } from 'rover-schemas';
 import { getTelemetry } from '../lib/telemetry.js';
 import { showRoverChat } from '../utils/display.js';
 import { readFromStdin, stdinIsAvailable } from '../utils/stdin.js';
@@ -420,7 +420,7 @@ export const iterateCommand = async (
     task.markIterating();
 
     // Create new iteration config
-    IterationConfig.createIteration(
+    IterationManager.createIteration(
       iterationPath,
       newIterationNumber,
       task.id,

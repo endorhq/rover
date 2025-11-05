@@ -36,3 +36,20 @@ export {
 } from './iteration-status/errors.js';
 
 export { IterationStatusManager } from './iteration-status.js';
+
+export { ITERATION_STATUS_FILENAME } from './iteration-status/schema.js';
+
+// Iteration library
+export {
+  type Iteration,
+  type IterationPreviousContext,
+} from './iteration/types.js';
+
+export {
+  IterationLoadError,
+  IterationValidationError,
+} from './iteration/errors.js';
+
+export { IterationManager } from './iteration.js';
+
+export { ITERATION_FILENAME } from './iteration/schema.js';

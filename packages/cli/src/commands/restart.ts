@@ -8,7 +8,7 @@ import { createSandbox } from '../lib/sandbox/index.js';
 import { UserSettings, AI_AGENT } from '../lib/config.js';
 import { Git } from 'rover-common';
 import { CLIJsonOutput } from '../types.js';
-import { IterationConfig } from '../lib/iteration.js';
+import { IterationManager } from 'rover-schemas';
 import { getTelemetry } from '../lib/telemetry.js';
 import yoctoSpinner from 'yocto-spinner';
 import { copyEnvironmentFiles } from '../utils/env-files.js';
@@ -130,7 +130,7 @@ export const restartCommand = async (
     // Create initial iteration.json if it doesn't exist
     const iterationJsonPath = join(iterationPath, 'iteration.json');
     if (!existsSync(iterationJsonPath)) {
-      IterationConfig.createInitial(
+      IterationManager.createInitial(
         iterationPath,
         task.id,
         task.title,

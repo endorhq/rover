@@ -15,7 +15,7 @@ import {
   showTips,
   showTitle,
 } from 'rover-common';
-import { IterationConfig } from '../lib/iteration.js';
+import { IterationManager } from 'rover-schemas';
 
 const DEFAULT_FILE_CONTENTS = 'summary.md';
 
@@ -177,7 +177,7 @@ export const inspectCommand = async (
       'iterations',
       iterationNumber.toString()
     );
-    const iteration = IterationConfig.load(iterationPath);
+    const iteration = IterationManager.load(iterationPath);
 
     // Handle --raw-file option
     if (options.rawFile) {

@@ -4,6 +4,9 @@
 
 import { z } from 'zod';
 
+// Filename constants
+export const ITERATION_STATUS_FILENAME = 'status.json';
+
 /**
  * Supported status names
  */

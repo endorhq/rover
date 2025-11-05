@@ -8,7 +8,7 @@ import { getAIAgentTool, getUserAIAgent } from '../lib/agents/index.js';
 import { TaskDescription } from '../lib/description.js';
 import { createSandbox } from '../lib/sandbox/index.js';
 import { AI_AGENT } from '../lib/config.js';
-import { IterationConfig } from '../lib/iteration.js';
+import { IterationManager } from 'rover-schemas';
 import { generateBranchName } from '../utils/branch-name.js';
 import {
   findProjectRoot,
@@ -58,10 +58,10 @@ const validations = (selectedAiAgent?: string): validationResult => {
         error: 'Codex credentials not found',
         tips: [
           'Run ' +
-            colors.cyan('codex') +
-            ' first to set up credentials, using the' +
-            colors.cyan('/auth') +
-            ' command',
+          colors.cyan('codex') +
+          ' first to set up credentials, using the' +
+          colors.cyan('/auth') +
+          ' command',
         ],
       };
     }
@@ -317,7 +317,7 @@ export const taskCommand = async (
         );
         console.log(
           colors.gray(`  Example: `) +
-            colors.cyan(`rover task --source-branch main`)
+          colors.cyan(`rover task --source-branch main`)
         );
       }
     }
@@ -625,7 +625,7 @@ export const taskCommand = async (
     mkdirSync(iterationPath, { recursive: true });
 
     // Create initial iteration.json for the first iteration
-    IterationConfig.createInitial(
+    IterationManager.createInitial(
       iterationPath,
       task.id,
       task.title,
@@ -700,8 +700,8 @@ export const taskCommand = async (
       tips: [
         'Use ' + colors.cyan('rover list') + ' to check the list of tasks',
         'Use ' +
-          colors.cyan(`rover logs -f ${task.id}`) +
-          ' to watch the task logs',
+        colors.cyan(`rover logs -f ${task.id}`) +
+        ' to watch the task logs',
       ],
     });
   } else {
