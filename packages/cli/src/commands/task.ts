@@ -58,10 +58,10 @@ const validations = (selectedAiAgent?: string): validationResult => {
         error: 'Codex credentials not found',
         tips: [
           'Run ' +
-          colors.cyan('codex') +
-          ' first to set up credentials, using the' +
-          colors.cyan('/auth') +
-          ' command',
+            colors.cyan('codex') +
+            ' first to set up credentials, using the' +
+            colors.cyan('/auth') +
+            ' command',
         ],
       };
     }
@@ -317,7 +317,7 @@ export const taskCommand = async (
         );
         console.log(
           colors.gray(`  Example: `) +
-          colors.cyan(`rover task --source-branch main`)
+            colors.cyan(`rover task --source-branch main`)
         );
       }
     }
@@ -700,8 +700,8 @@ export const taskCommand = async (
       tips: [
         'Use ' + colors.cyan('rover list') + ' to check the list of tasks',
         'Use ' +
-        colors.cyan(`rover logs -f ${task.id}`) +
-        ' to watch the task logs',
+          colors.cyan(`rover logs -f ${task.id}`) +
+          ' to watch the task logs',
       ],
     });
   } else {
