@@ -36,7 +36,6 @@
     "check:cli": "npm run check --workspace=./packages/cli",
     "e2e-test": "run-p -l e2e-test:*",
     "e2e-test:cli": "npm run e2e-test --workspace=./packages/cli",
-    "e2e-test:extension": "npm run test --workspace=./packages/extension",
     "test": "run-p -l test:*",
     "test:cli": "npm run test --workspace=./packages/cli",
     "test:agent": "npm run test --workspace=./packages/agent",
