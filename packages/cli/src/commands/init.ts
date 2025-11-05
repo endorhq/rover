@@ -8,6 +8,7 @@ import type { Environment } from '../types.js';
 import {
   checkClaude,
   checkCodex,
+  checkCursor,
   checkDocker,
   checkGemini,
   checkQwen,
@@ -96,6 +97,10 @@ export const initCommand = async (
   const codexInstalled = await checkCodex();
 
   reqSpinner.text = 'Checking Gemini';
+
+  const cursorInstalled = await checkCursor();
+
+  reqSpinner.text = 'Checking Cursor';
 
   const geminiInstalled = await checkGemini();
 
