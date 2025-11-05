@@ -315,6 +315,13 @@ export class WorkflowManager {
   }
 
   /**
+   * Returns the raw data
+   */
+  toObject(): Workflow {
+    return this.data;
+  }
+
+  /**
    * Validate provided inputs against workflow requirements
    * @param providedInputs - Map of input name to value
    * @returns Object with validation result and any errors/warnings

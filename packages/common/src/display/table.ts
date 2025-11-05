@@ -161,7 +161,8 @@ const calculateColumnWidths = <T>(
     }
 
     // Calculate width based on content
-    let maxWidth = getVisibleWidth(column.header);
+    const headerWidth = getVisibleWidth(column.header);
+    let maxWidth = headerWidth;
 
     // Check data rows
     for (const row of data) {
@@ -178,7 +179,8 @@ const calculateColumnWidths = <T>(
       maxWidth = Math.max(maxWidth, column.minWidth);
     }
     if (column.maxWidth !== undefined) {
-      maxWidth = Math.min(maxWidth, column.maxWidth);
+      // Prioritize header width: if header is wider than maxWidth, use header width
+      maxWidth = Math.min(maxWidth, Math.max(column.maxWidth, headerWidth));
     }
 
     widths.push(maxWidth);

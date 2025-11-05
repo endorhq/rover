@@ -575,6 +575,52 @@ describe('Table', () => {
     });
   });
 
+  describe('header width priority', () => {
+    it('should prioritize header width over maxWidth when header is wider', () => {
+      const data: TestData[] = [
+        { id: 1, name: 'Al', status: 'active', score: 95 },
+      ];
+
+      const columns: TableColumn<TestData>[] = [
+        {
+          header: 'Very Long Header Name',
+          key: 'name',
+          maxWidth: 5, // This is shorter than the header
+        },
+      ];
+
+      const table = new Table(columns);
+      table.render(data);
+
+      // The header should not be truncated
+      const headerRow = consoleOutput[0];
+      expect(headerRow).toContain('Very Long Header Name');
+      expect(headerRow).not.toContain('...');
+    });
+
+    it('should still apply maxWidth when content is wider than header', () => {
+      const data: TestData[] = [
+        { id: 1, name: 'Very long content here', status: 'active', score: 95 },
+      ];
+
+      const columns: TableColumn<TestData>[] = [
+        {
+          header: 'Name',
+          key: 'name',
+          maxWidth: 10,
+          truncate: 'ellipsis',
+        },
+      ];
+
+      const table = new Table(columns);
+      table.render(data);
+
+      // The content should be truncated
+      const dataRow = consoleOutput[2];
+      expect(dataRow).toContain('...');
+    });
+  });
+
   describe('column spacing', () => {
     it('should add default spacing of 1 between columns', () => {
       const data: TestData[] = [
