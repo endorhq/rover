@@ -39,21 +39,8 @@ jobs:
       - name: Run TypeScript check
         run: npm run check
 
-      - name: Test Schemas
+      - name: Test
         run: npm run test
-        working-directory: packages/schemas
-
-      - name: Test Agents
-        run: npm run test
-        working-directory: packages/agent
-
-      - name: Test Common
-        run: npm run test
-        working-directory: packages/common
-
-      - name: Test CLI
-        run: npm run test
-        working-directory: packages/cli
 
       - name: Test Build Artifact
         run: node dist/index.js --version

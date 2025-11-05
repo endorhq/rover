@@ -37,7 +37,7 @@ npm run build:telemetry # Build telemetry package only
 # Testing
 npm test              # Run tests for all packages
 npm run test:cli      # Run CLI tests only
-npm run test:extension # Run extension tests only
+npm run e2e:extension # Run extension tests only
 ```
 
 ### Package-Specific Commands
