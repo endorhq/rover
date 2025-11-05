@@ -45,7 +45,7 @@ jobs:
 
       - name: Test Agents
         run: npm run test
-        working-directory: packages/agents
+        working-directory: packages/agent
 
       - name: Test Common
         run: npm run test
