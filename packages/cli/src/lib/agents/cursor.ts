@@ -174,7 +174,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
     if (existsSync(cursorCredentialsDirectory)) {
       dockerMounts.push(
         `-v`,
-        `${cursorCredentialsDirectory}:/.config/cursor:Z,ro`
+        `${cursorCredentialsDirectory}:/.cursor-credentials:Z,ro`
       );
     }
 

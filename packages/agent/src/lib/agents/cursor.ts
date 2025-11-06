@@ -10,9 +10,48 @@ export class CursorAgent extends BaseAgent {
   name = 'Cursor';
   binary = 'cursor';
 
-  getInstallCommand(): string {
-    const packageSpec = `@cursor/cli@${this.version}`;
-    return `npm install -g ${packageSpec}`;
+  async install(): Promise<void> {
+    const colors = await import('ansi-colors').then(m => m.default);
+
+    console.log(colors.bold(`\nInstalling ${this.name} CLI`));
+    console.log(colors.gray('└── Running installation script'));
+
+    try {
+      const { launchSync } = await import('rover-common');
+      const result = launchSync(
+        'bash',
+        ['-c', 'curl https://cursor.com/install -fsS | bash'],
+        {
+          stdio: 'inherit',
+        }
+      );
+
+      if (result.failed) {
+        const errorMessage = result.stderr || result.stdout || 'Unknown error';
+        throw new Error(
+          `Installation command failed with exit code ${result.exitCode}: ${errorMessage}`
+        );
+      }
+
+      console.log(colors.green(`✓ ${this.name} CLI installed successfully`));
+    } catch (error: any) {
+      if (error.exitCode !== undefined) {
+        const stderr = error.stderr || '';
+        const stdout = error.stdout || '';
+        const output = stderr || stdout || error.message;
+        throw new Error(
+          `Failed to install ${this.name} CLI (exit code ${error.exitCode}): ${output}`
+        );
+      } else if (error.code === 'ENOENT') {
+        throw new Error(
+          `Failed to install ${this.name} CLI: Command 'bash' or 'curl' not found. Please ensure they are installed and in PATH.`
+        );
+      } else {
+        throw new Error(
+          `Failed to install ${this.name} CLI: ${error.message || error}`
+        );
+      }
+    }
   }
 
   getRequiredCredentials(): AgentCredentialFile[] {
@@ -23,9 +62,9 @@ export class CursorAgent extends BaseAgent {
         required: true,
       },
       {
-        path: '/.config/cursor/auth.json',
+        path: '/.cursor-credentials/auth.json',
         description: 'Cursor authentication',
-        required: false,
+        required: true,
       },
     ];
   }
