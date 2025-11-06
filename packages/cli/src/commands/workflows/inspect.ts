@@ -9,24 +9,13 @@ import {
   showDiagram,
   type DiagramStep,
 } from 'rover-common';
-import { WorkflowManager } from 'rover-schemas';
+import { readFileSync } from 'node:fs';
 
 interface InspectWorkflowCommandOptions {
   // Output formats
   json: boolean;
   raw: boolean;
 }
-
-/**
- * Load a workflow by name from the workflow store.
- *
- * @param name The name of the workflow to load
- * @returns WorkflowManager instance or undefined if not found
- */
-const loadWorkflowByName = (name: string): WorkflowManager | undefined => {
-  const workflowStore = initWorkflowStore();
-  return workflowStore.getWorkflow(name);
-};
 
 /**
  * Inspect a specific workflow showing detailed information.
@@ -40,7 +29,8 @@ export const inspectWorkflowCommand = async (
 ) => {
   try {
     // Load the workflow
-    const workflow = loadWorkflowByName(workflowName);
+    const workflowStore = initWorkflowStore();
+    const workflow = workflowStore.getWorkflow(workflowName);
 
     if (!workflow) {
       if (options.json) {
@@ -69,7 +59,10 @@ export const inspectWorkflowCommand = async (
 
     // Handle --raw flag: output workflow as YAML
     if (options.raw) {
-      console.log(workflow.toYaml());
+      // Read the file directly. There's an issue with the toYaml method.
+      // It adds extra breaklines in the prompts.
+      // @see https://github.com/eemeli/yaml/issues/639#issuecomment-3381575231
+      console.log(readFileSync(workflow.filePath, 'utf-8'));
       return;
     }
 
@@ -145,7 +138,8 @@ export const inspectWorkflowCommand = async (
           parts.push(`(${details.join(', ')})`);
         }
 
-        inputProperties[input.name] = parts.join(' ') || colors.gray('No description');
+        inputProperties[input.name] =
+          parts.join(' ') || colors.gray('No description');
       });
       showProperties(inputProperties);
     }
@@ -168,22 +162,11 @@ export const inspectWorkflowCommand = async (
       const diagramSteps: DiagramStep[] = workflow.steps.map(step => {
         const items: string[] = [];
 
-        // Add description if present
-        if (step.description) {
-          items.push(colors.gray(`• ${step.description}`));
-        }
-
-        // Add step type info
-        items.push(colors.gray(`• Type: ${step.type}`));
-
-        // Add step ID
-        items.push(colors.gray(`• ID: ${step.id}`));
-
         // Add outputs if present
         if (step.outputs && step.outputs.length > 0) {
-          items.push(
-            colors.gray(`• Outputs: ${step.outputs.map(o => o.name).join(', ')}`)
-          );
+          step.outputs.forEach(output => {
+            items.push(`${colors.cyan('→')} ${output.name}`);
+          });
         }
 
         return {
@@ -192,7 +175,7 @@ export const inspectWorkflowCommand = async (
         };
       });
 
-      showDiagram(diagramSteps, { addLineBreak: true });
+      showDiagram(diagramSteps, { addLineBreak: false });
     }
   } catch (error) {
     if (options.json) {
