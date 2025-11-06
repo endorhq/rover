@@ -80,3 +80,23 @@ export interface PropertiesOptions {
   /** Whether to add a line break before the properties (default: false) */
   addLineBreak?: boolean;
 }
+
+/**
+ * A single step in a diagram
+ */
+export interface DiagramStep {
+  /** Title of the step */
+  title: string;
+  /** Items to display in the step (e.g., file names) */
+  items: string[];
+}
+
+/**
+ * Options for displaying diagrams
+ */
+export interface DiagramOptions {
+  /** Whether to add a line break before the diagram (default: false) */
+  addLineBreak?: boolean;
+  /** Maximum width for diagram boxes (default: 80) */
+  maxWidth?: number;
+}
