@@ -13,6 +13,7 @@ export abstract class BaseAgent implements Agent {
   }
 
   abstract getRequiredCredentials(): AgentCredentialFile[];
+  abstract getInstallCommand(): string;
   abstract copyCredentials(targetDir: string): Promise<void>;
   abstract configureMCP(
     name: string,
@@ -21,12 +22,6 @@ export abstract class BaseAgent implements Agent {
     envs: string[],
     headers: string[]
   ): Promise<void>;
-
-  getInstallCommand(): string {
-    throw new Error(
-      `${this.name}: getInstallCommand() must be implemented when using default install()`
-    );
-  }
 
   protected ensureDirectory(dirPath: string): void {
     try {
