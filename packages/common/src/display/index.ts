@@ -29,6 +29,9 @@ export { ProcessManager } from './process.js';
 // Export table utilities
 export { Table, renderTable } from './table.js';
 
+// Export diagram utilities
+export { showDiagram } from './diagram.js';
+
 // Export utility functions
 export { stripAnsi } from './utils.js';
 
@@ -41,6 +44,8 @@ export type {
   ProcessOptions,
   ListOptions,
   PropertiesOptions,
+  DiagramStep,
+  DiagramOptions,
 } from './types.js';
 
 export type { TableColumn, TableOptions } from './table.js';
