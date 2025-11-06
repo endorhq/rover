@@ -1,3 +1,6 @@
+/**
+ * TaskDescriptionManager class - Centralized management of task metadata
+ */
 import {
   readFileSync,
   writeFileSync,
@@ -10,126 +13,30 @@ import {
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { findProjectRoot, VERBOSE } from 'rover-common';
-import colors from 'ansi-colors';
-import { getLastTaskIteration } from './iteration.js';
-
-// Schema version for migrations
-const CURRENT_SCHEMA_VERSION = '1.1';
-
-// Status enum with additional status types
-export type TaskStatus =
-  | 'NEW'
-  | 'IN_PROGRESS'
-  | 'ITERATING'
-  | 'COMPLETED'
-  | 'FAILED'
-  | 'MERGED'
-  | 'PUSHED';
-
-// Complete unified schema
-export interface TaskDescriptionSchema {
-  // Core Identity
-  id: number; // Task ID (matches folder name)
-  uuid: string; // Unique identifier
-  title: string;
-  description: string;
-
-  // List of inputs for the workflow
-  inputs: Record<string, string>;
-
-  // Status & Lifecycle
-  status: TaskStatus;
-  createdAt: string; // ISO datetime
-  startedAt?: string; // ISO datetime
-  completedAt?: string; // ISO datetime
-  failedAt?: string; // ISO datetime
-  lastIterationAt?: string; // ISO datetime
-  lastStatusCheck?: string; // ISO datetime
-
-  // Execution Context
-  iterations: number; // Default: 1
-  workflowName: string;
-  worktreePath: string; // Path to git worktree
-  branchName: string; // Git branch name
-  agent?: string; // AI agent used for execution (claude, gemini, qwen)
-  sourceBranch?: string; // Source branch task was created from
-
-  // Docker Execution
-  containerId?: string; // Docker container ID
-  executionStatus?: string; // Execution status (running, completed, failed, error)
-  runningAt?: string; // ISO datetime when execution started
-  errorAt?: string; // ISO datetime when error occurred
-  exitCode?: number; // Process exit code
-
-  // Error Handling
-  error?: string; // Error message if failed
-
-  // Restart Tracking
-  restartCount?: number; // Number of times task has been restarted
-  lastRestartAt?: string; // ISO datetime of last restart
-
-  // Metadata
-  version: string; // Schema version for migrations
-}
-
-// Data required to create a new task
-export interface CreateTaskData {
-  id: number;
-  title: string;
-  description: string;
-  inputs: Map<string, string>;
-  workflowName: string;
-  uuid?: string; // Optional, will be generated if not provided
-  agent?: string; // AI agent to use for execution
-  sourceBranch?: string; // Source branch task was created from
-}
-
-// Metadata for status updates
-export interface StatusMetadata {
-  timestamp?: string;
-  error?: string;
-}
-
-// Metadata for iteration updates
-export interface IterationMetadata {
-  title?: string;
-  description?: string;
-  timestamp?: string;
-}
-
-// Custom exception classes
-export class TaskNotFoundError extends Error {
-  constructor(taskId: number) {
-    super(`Task ${taskId} not found`);
-    this.name = 'TaskNotFoundError';
-  }
-}
-
-export class TaskValidationError extends Error {
-  constructor(message: string) {
-    super(`Task validation error: ${message}`);
-    this.name = 'TaskValidationError';
-  }
-}
-
-export class TaskSchemaError extends Error {
-  constructor(message: string) {
-    super(`Task schema error: ${message}`);
-    this.name = 'TaskSchemaError';
-  }
-}
-
-export class TaskFileError extends Error {
-  constructor(message: string) {
-    super(`Task file error: ${message}`);
-    this.name = 'TaskFileError';
-  }
-}
+import {
+  TaskDescriptionSchema,
+  CreateTaskData,
+  StatusMetadata,
+  IterationMetadata,
+  TaskStatus,
+} from './task-description/types.js';
+import {
+  TaskNotFoundError,
+  TaskValidationError,
+  TaskSchemaError,
+  TaskFileError,
+} from './task-description/errors.js';
+import {
+  CURRENT_TASK_DESCRIPTION_SCHEMA_VERSION,
+  TaskDescriptionSchema as TaskDescriptionZodSchema,
+} from './task-description/schema.js';
+import { ZodError } from 'zod';
+import { IterationManager } from './iteration.js';
 
 /**
- * TaskDescription class - Centralized management of task metadata
+ * TaskDescriptionManager class - Centralized management of task metadata
  */
-export class TaskDescription {
+export class TaskDescriptionManager {
   private data: TaskDescriptionSchema;
   private taskId: number;
   private filePath: string;
@@ -146,7 +53,7 @@ export class TaskDescription {
   /**
    * Create a new task with initial metadata
    */
-  static create(taskData: CreateTaskData): TaskDescription {
+  static create(taskData: CreateTaskData): TaskDescriptionManager {
     const now = new Date().toISOString();
     const uuid = taskData.uuid || randomUUID();
 
@@ -166,10 +73,10 @@ export class TaskDescription {
       branchName: '',
       agent: taskData.agent,
       sourceBranch: taskData.sourceBranch,
-      version: CURRENT_SCHEMA_VERSION,
+      version: CURRENT_TASK_DESCRIPTION_SCHEMA_VERSION,
     };
 
-    const instance = new TaskDescription(schema, taskData.id);
+    const instance = new TaskDescriptionManager(schema, taskData.id);
 
     // Ensure task directory exists
     const taskDir = join(
@@ -188,8 +95,8 @@ export class TaskDescription {
   /**
    * Load an existing task from disk
    */
-  static load(taskId: number): TaskDescription {
-    const filePath = TaskDescription.getTaskDescriptionPath(taskId);
+  static load(taskId: number): TaskDescriptionManager {
+    const filePath = TaskDescriptionManager.getTaskDescriptionPath(taskId);
 
     if (!existsSync(filePath)) {
       throw new TaskNotFoundError(taskId);
@@ -200,13 +107,13 @@ export class TaskDescription {
       const parsedData = JSON.parse(rawData);
 
       // Migrate if necessary
-      const migratedData = TaskDescription.migrate(parsedData, taskId);
+      const migratedData = TaskDescriptionManager.migrate(parsedData, taskId);
 
-      const instance = new TaskDescription(migratedData, taskId);
+      const instance = new TaskDescriptionManager(migratedData, taskId);
 
       // If migration occurred, save the updated data
       if (migratedData.version !== parsedData.version) {
-        TaskDescription.createBackup(filePath);
+        TaskDescriptionManager.createBackup(filePath);
         instance.save();
       }
 
@@ -225,7 +132,7 @@ export class TaskDescription {
    * Check if a task exists
    */
   static exists(taskId: number): boolean {
-    const filePath = TaskDescription.getTaskDescriptionPath(taskId);
+    const filePath = TaskDescriptionManager.getTaskDescriptionPath(taskId);
     return existsSync(filePath);
   }
 
@@ -252,7 +159,7 @@ export class TaskDescription {
 
   private static migrate(data: any, taskId: number): TaskDescriptionSchema {
     // If already current version, return as-is
-    if (data.version === CURRENT_SCHEMA_VERSION) {
+    if (data.version === CURRENT_TASK_DESCRIPTION_SCHEMA_VERSION) {
       return data as TaskDescriptionSchema;
     }
 
@@ -267,12 +174,13 @@ export class TaskDescription {
     migrated.description = data.description || '';
     migrated.inputs = data.inputs || {};
     migrated.workflowName = data.workflowName || 'swe';
-    migrated.status = TaskDescription.migrateStatus(data.status) || 'NEW';
+    migrated.status =
+      TaskDescriptionManager.migrateStatus(data.status) || 'NEW';
     migrated.createdAt = data.createdAt || new Date().toISOString();
     migrated.iterations = data.iterations || 1;
     migrated.worktreePath = data.worktreePath || '';
     migrated.branchName = data.branchName || '';
-    migrated.version = CURRENT_SCHEMA_VERSION;
+    migrated.version = CURRENT_TASK_DESCRIPTION_SCHEMA_VERSION;
 
     // Preserve all execution-related fields
     migrated.containerId = data.containerId || '';
@@ -328,7 +236,7 @@ export class TaskDescription {
   }
 
   private getTaskDescriptionPath(taskId: number): string {
-    return TaskDescription.getTaskDescriptionPath(taskId);
+    return TaskDescriptionManager.getTaskDescriptionPath(taskId);
   }
 
   // CRUD Operations
@@ -350,53 +258,8 @@ export class TaskDescription {
    * Reload data from disk
    */
   reload(): void {
-    const reloaded = TaskDescription.load(this.taskId);
+    const reloaded = TaskDescriptionManager.load(this.taskId);
     this.data = reloaded.data;
-  }
-
-  /**
-   * Update the current status based on the latest iteration
-   */
-  updateStatus(): void {
-    const iteration = getLastTaskIteration(this);
-
-    if (iteration != null) {
-      const status = iteration.status();
-      let statusName: TaskStatus;
-      let timestamp;
-      let error;
-
-      switch (status.status) {
-        case 'completed':
-          statusName = status.status.toUpperCase() as TaskStatus;
-          timestamp = status.completedAt;
-          break;
-        case 'failed':
-          statusName = 'FAILED';
-          timestamp = status.completedAt;
-          error = status.error;
-          break;
-        case 'running':
-          statusName = 'ITERATING';
-          timestamp = status.updatedAt;
-          break;
-        default:
-          statusName = 'IN_PROGRESS';
-          timestamp = status.updatedAt;
-          break;
-      }
-
-      // The merged / pushed status is already a completed state
-      if (
-        statusName === 'COMPLETED' &&
-        ['MERGED', 'PUSHED'].includes(this.status)
-      ) {
-        return;
-      }
-
-      const metadata = { timestamp, error };
-      this.setStatus(statusName, metadata);
-    }
   }
 
   /**
@@ -537,6 +400,138 @@ export class TaskDescription {
     this.save();
   }
 
+  /**
+   * Load all iterations for this task
+   * @returns Array of IterationManager instances, sorted by iteration number (descending)
+   */
+  getIterations(): IterationManager[] {
+    const iterations: IterationManager[] = [];
+    const iterationsPath = this.iterationsPath();
+
+    if (existsSync(iterationsPath)) {
+      try {
+        const iterationsIds = readdirSync(iterationsPath, {
+          withFileTypes: true,
+        })
+          .filter(dirent => dirent.isDirectory())
+          .map(dirent => parseInt(dirent.name, 10))
+          .filter(num => !isNaN(num))
+          .sort((a, b) => b - a); // Sort descending to get latest first
+
+        iterationsIds.forEach(id => {
+          try {
+            iterations.push(
+              IterationManager.load(join(iterationsPath, id.toString()))
+            );
+          } catch (err) {
+            // For now, just logging
+            if (VERBOSE) {
+              console.error(
+                `Error loading iteration ${id} for task ${this.taskId}: ${err}`
+              );
+            }
+          }
+        });
+      } catch (err) {
+        if (VERBOSE) {
+          console.error(
+            `Error retrieving iterations for task ${this.taskId}: ${err}`
+          );
+        }
+
+        throw new Error('There was an error retrieving the task iterations');
+      }
+    }
+
+    return iterations;
+  }
+
+  /**
+   * Retrieve the latest iteration for this task
+   * @returns The most recent IterationManager instance, or undefined if none exist
+   */
+  getLastIteration(): IterationManager | undefined {
+    let taskIteration: IterationManager | undefined;
+    const iterationsPath = this.iterationsPath();
+
+    if (existsSync(iterationsPath)) {
+      try {
+        const iterationsIds = readdirSync(iterationsPath, {
+          withFileTypes: true,
+        })
+          .filter(dirent => dirent.isDirectory())
+          .map(dirent => parseInt(dirent.name, 10))
+          .filter(num => !isNaN(num))
+          .sort((a, b) => b - a); // Sort descending to get latest first
+
+        if (iterationsIds.length > 0) {
+          taskIteration = IterationManager.load(
+            join(iterationsPath, iterationsIds[0].toString())
+          );
+        } else {
+          if (VERBOSE) {
+            console.error(`Did not find any iteration for task ${this.taskId}`);
+          }
+        }
+      } catch (err) {
+        if (VERBOSE) {
+          console.error(
+            `Error retrieving iterations for task ${this.taskId}: ${err}`
+          );
+        }
+
+        throw new Error('There was an error retrieving the task iterations');
+      }
+    }
+
+    return taskIteration;
+  }
+
+  /**
+   * Update the task status based on the latest iteration
+   */
+  updateStatusFromIteration(): void {
+    const iteration = this.getLastIteration();
+
+    if (iteration != null) {
+      const status = iteration.status();
+      let statusName: TaskStatus;
+      let timestamp;
+      let error;
+
+      switch (status.status) {
+        case 'completed':
+          statusName = status.status.toUpperCase() as TaskStatus;
+          timestamp = status.completedAt;
+          break;
+        case 'failed':
+          statusName = 'FAILED';
+          timestamp = status.completedAt;
+          error = status.error;
+          break;
+        case 'running':
+          statusName = 'ITERATING';
+          timestamp = status.updatedAt;
+          break;
+        default:
+          statusName = 'IN_PROGRESS';
+          timestamp = status.updatedAt;
+          break;
+      }
+
+      // The merged / pushed status is already a completed state
+      if (
+        statusName === 'COMPLETED' &&
+        ['MERGED', 'PUSHED'].includes(this.data.status)
+      ) {
+        return;
+      }
+
+      const metadata = { timestamp, error };
+      this.setStatus(statusName, metadata);
+    }
+  }
+
   // Workspace Management
 
   /**
@@ -641,6 +636,9 @@ export class TaskDescription {
   }
   get rawData(): TaskDescriptionSchema {
     return this.data;
+  }
+  get inputs(): Record<string, string> {
+    return this.data.inputs;
   }
 
   // Data Modification (Setters)
@@ -777,93 +775,19 @@ export class TaskDescription {
 
   // Validation
 
+  /**
+   * Validate the task data using Zod schema
+   */
   private validate(): void {
-    const errors: string[] = [];
+    const result = TaskDescriptionZodSchema.safeParse(this.data);
 
-    // Required fields
-    if (!this.data.id) errors.push('id is required');
-    if (!this.data.uuid) errors.push('uuid is required');
-    if (!this.data.title) errors.push('title is required');
-    if (!this.data.description) errors.push('description is required');
-    if (!this.data.status) errors.push('status is required');
-    if (!this.data.createdAt) errors.push('createdAt is required');
-
-    // Type validation
-    if (typeof this.data.id !== 'number') errors.push('id must be a number');
-    if (typeof this.data.iterations !== 'number')
-      errors.push('iterations must be a number');
-    if (this.data.iterations < 1) errors.push('iterations must be at least 1');
-
-    // Status enum validation
-    const validStatuses: TaskStatus[] = [
-      'NEW',
-      'IN_PROGRESS',
-      'ITERATING',
-      'COMPLETED',
-      'FAILED',
-      'MERGED',
-      'PUSHED',
-    ];
-    if (!validStatuses.includes(this.data.status)) {
-      errors.push(`status must be one of: ${validStatuses.join(', ')}`);
-    }
-
-    // Date format validation (basic ISO check)
-    const dateFields = [
-      'createdAt',
-      'startedAt',
-      'completedAt',
-      'failedAt',
-      'lastIterationAt',
-      'lastStatusCheck',
-    ];
-    for (const field of dateFields) {
-      const value = this.data[field as keyof TaskDescriptionSchema];
-      if (value && typeof value === 'string' && isNaN(Date.parse(value))) {
-        errors.push(`${field} must be a valid ISO date string`);
-      }
-    }
-
-    if (errors.length > 0) {
-      throw new TaskValidationError(errors.join(', '));
+    if (!result.success) {
+      const errorMessages = result.error.issues
+        .map(err => `  - ${err.path.join('.')}: ${err.message}`)
+        .join('\n');
+      throw new TaskValidationError(
+        `Task validation failed:\n${errorMessages}`
+      );
     }
   }
 }
-
-/**
- * Retrieves all tasks description from the given folder.
- */
-export const getDescriptions = (): TaskDescription[] => {
-  const tasks: TaskDescription[] = [];
-
-  try {
-    const roverPath = join(findProjectRoot(), '.rover');
-    const tasksPath = join(roverPath, 'tasks');
-
-    if (existsSync(tasksPath)) {
-      const taskIds = readdirSync(tasksPath, { withFileTypes: true })
-        .filter(dirent => dirent.isDirectory())
-        .map(dirent => parseInt(dirent.name, 10))
-        .filter(name => !isNaN(name)) // Only numeric task IDs
-        .sort((a, b) => b - a); // Sort descending
-
-      taskIds.forEach(id => {
-        try {
-          tasks.push(TaskDescription.load(id));
-        } catch (err) {
-          if (VERBOSE) {
-            console.error(colors.gray(`Error loading task ${id}: ` + err));
-          }
-        }
-      });
-    }
-  } catch (err) {
-    if (VERBOSE) {
-      console.error(colors.gray('Error retrieving descriptions: ' + err));
-    }
-
-    throw new Error('There was an error retrieving the task descriptions');
-  }
-
-  return tasks;
-};

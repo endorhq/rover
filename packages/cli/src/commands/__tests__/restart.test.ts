@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execSync } from 'node:child_process';
 import { restartCommand } from '../restart.js';
-import { TaskDescription } from '../../lib/description.js';
+import { TaskDescriptionManager } from 'rover-schemas';
 
 // Mock external dependencies
 vi.mock('../../lib/telemetry.js', () => ({
@@ -81,7 +81,7 @@ describe('restart command', async () => {
       const taskDir = join(testDir, '.rover', 'tasks', taskId.toString());
       mkdirSync(taskDir, { recursive: true });
 
-      const task = TaskDescription.create({
+      const task = TaskDescriptionManager.create({
         id: taskId,
         title: 'Test Task',
         description: 'A test task',
@@ -97,7 +97,7 @@ describe('restart command', async () => {
       await restartCommand(taskId.toString(), { json: true });
 
       // Verify task was restarted
-      const reloadedTask = TaskDescription.load(taskId);
+      const reloadedTask = TaskDescriptionManager.load(taskId);
       expect(reloadedTask.status).toBe('IN_PROGRESS');
       expect(reloadedTask.restartCount).toBe(1);
       expect(reloadedTask.lastRestartAt).toBeDefined();
@@ -109,7 +109,7 @@ describe('restart command', async () => {
       const taskDir = join(testDir, '.rover', 'tasks', taskId.toString());
       mkdirSync(taskDir, { recursive: true });
 
-      const task = TaskDescription.create({
+      const task = TaskDescriptionManager.create({
         id: taskId,
         title: 'Test Task',
         description: 'A test task',
@@ -121,14 +121,14 @@ describe('restart command', async () => {
       task.markFailed('This task failed');
       await restartCommand(taskId.toString(), { json: true });
 
-      const firstRestart = TaskDescription.load(taskId);
+      const firstRestart = TaskDescriptionManager.load(taskId);
       expect(firstRestart.restartCount).toBe(1);
 
       // Set back to failed and restart again
       firstRestart.markFailed('This task failed');
       await restartCommand(taskId.toString(), { json: true });
 
-      const secondRestart = TaskDescription.load(taskId);
+      const secondRestart = TaskDescriptionManager.load(taskId);
       expect(secondRestart.restartCount).toBe(2);
     });
   });
@@ -140,7 +140,7 @@ describe('restart command', async () => {
       const taskDir = join(testDir, '.rover', 'tasks', taskId.toString());
       mkdirSync(taskDir, { recursive: true });
 
-      const task = TaskDescription.create({
+      const task = TaskDescriptionManager.create({
         id: taskId,
         title: 'Test Task',
         description: 'A test task',
@@ -154,7 +154,7 @@ describe('restart command', async () => {
       await restartCommand(taskId.toString(), { json: true });
 
       // Verify task was restarted successfully
-      const reloadedTask = TaskDescription.load(taskId);
+      const reloadedTask = TaskDescriptionManager.load(taskId);
       expect(reloadedTask.status).toBe('IN_PROGRESS');
       expect(reloadedTask.restartCount).toBe(1);
     });
@@ -168,7 +168,7 @@ describe('restart command', async () => {
       const taskDir = join(testDir, '.rover', 'tasks', taskId.toString());
       mkdirSync(taskDir, { recursive: true });
 
-      const task = TaskDescription.create({
+      const task = TaskDescriptionManager.create({
         id: taskId,
         title: 'Test Task',
         description: 'A test task',

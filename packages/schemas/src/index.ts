@@ -53,3 +53,24 @@ export {
 export { IterationManager } from './iteration.js';
 
 export { ITERATION_FILENAME } from './iteration/schema.js';
+
+// Task Description library
+export {
+  type TaskStatus,
+  type TaskDescriptionSchema,
+  type CreateTaskData,
+  type StatusMetadata,
+  type IterationMetadata,
+} from './task-description/types.js';
+
+export {
+  TaskNotFoundError,
+  TaskValidationError,
+  TaskSchemaError,
+  TaskFileError,
+} from './task-description/errors.js';
+
+export { TaskDescriptionManager } from './task-description.js';
+export { TaskDescriptionStore } from './task-description-store.js';
+
+export { CURRENT_TASK_DESCRIPTION_SCHEMA_VERSION } from './task-description/schema.js';

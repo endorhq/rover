@@ -4,7 +4,7 @@ import { existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { findProjectRoot, launchSync } from 'rover-common';
 import yoctoSpinner from 'yocto-spinner';
-import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
+import { TaskDescriptionManager, TaskNotFoundError } from 'rover-schemas';
 import { getTelemetry } from '../lib/telemetry.js';
 
 const { prompt } = enquirer;
@@ -23,7 +23,7 @@ export const resetCommand = async (
 
   try {
     // Load task using TaskDescription
-    const task = TaskDescription.load(numericTaskId);
+    const task = TaskDescriptionManager.load(numericTaskId);
     const taskPath = join(
       findProjectRoot(),
       '.rover',

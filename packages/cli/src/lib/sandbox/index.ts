@@ -5,7 +5,7 @@ export { PodmanSandbox } from './podman.js';
 import { DockerSandbox } from './docker.js';
 import { PodmanSandbox } from './podman.js';
 import { Sandbox } from './types.js';
-import { TaskDescription } from '../description.js';
+import { TaskDescriptionManager } from 'rover-schemas';
 import { ProcessManager } from 'rover-common';
 
 /**
@@ -17,13 +17,13 @@ export async function getAvailableSandboxBackend(): Promise<
   'docker' | 'podman' | null
 > {
   // Try Docker first
-  const dockerSandbox = new DockerSandbox({} as TaskDescription);
+  const dockerSandbox = new DockerSandbox({} as TaskDescriptionManager);
   if (await dockerSandbox.isBackendAvailable()) {
     return 'docker';
   }
 
   // Try Podman as fallback
-  const podmanSandbox = new PodmanSandbox({} as TaskDescription);
+  const podmanSandbox = new PodmanSandbox({} as TaskDescriptionManager);
   if (await podmanSandbox.isBackendAvailable()) {
     return 'podman';
   }
@@ -40,7 +40,7 @@ export async function getAvailableSandboxBackend(): Promise<
  * @throws Error if neither Docker nor Podman are available
  */
 export async function createSandbox(
-  task: TaskDescription,
+  task: TaskDescriptionManager,
   processManager?: ProcessManager
 ): Promise<Sandbox> {
   // Try Docker first (priority)

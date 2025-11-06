@@ -11,7 +11,7 @@ import {
   type AIAgentTool,
 } from '../lib/agents/index.js';
 import type { IPromptTask } from '../lib/prompts/index.js';
-import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
+import { TaskDescriptionManager, TaskNotFoundError } from 'rover-schemas';
 import { AI_AGENT } from '../lib/config.js';
 import { IterationManager } from 'rover-schemas';
 import { getTelemetry } from '../lib/telemetry.js';
@@ -238,7 +238,7 @@ export const iterateCommand = async (
 
   try {
     // Load task using TaskDescription first to get agent preference
-    const task = TaskDescription.load(numericTaskId);
+    const task = TaskDescriptionManager.load(numericTaskId);
 
     // Load AI agent selection - prefer task's agent, fall back to user settings
     let selectedAiAgent = task.agent || AI_AGENT.Claude; // Use task agent if available

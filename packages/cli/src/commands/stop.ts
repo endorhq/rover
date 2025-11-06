@@ -2,7 +2,7 @@ import colors from 'ansi-colors';
 import { join } from 'node:path';
 import { rmSync } from 'node:fs';
 import { createSandbox } from '../lib/sandbox/index.js';
-import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
+import { TaskDescriptionManager, TaskNotFoundError } from 'rover-schemas';
 import { findProjectRoot, launch, ProcessManager } from 'rover-common';
 import { exitWithError, exitWithSuccess } from '../utils/exit.js';
 import { CLIJsonOutput } from '../types.js';
@@ -55,7 +55,7 @@ export const stopCommand = async (
 
   try {
     // Load task using TaskDescription
-    const task = TaskDescription.load(numericTaskId);
+    const task = TaskDescriptionManager.load(numericTaskId);
 
     processManager?.addItem(`Stopping Task`);
 

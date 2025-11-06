@@ -2,7 +2,7 @@ import colors from 'ansi-colors';
 import enquirer from 'enquirer';
 import { rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
+import { TaskDescriptionManager, TaskNotFoundError } from 'rover-schemas';
 import { getTelemetry } from '../lib/telemetry.js';
 import { showRoverChat } from '../utils/display.js';
 import { statusColor } from '../utils/task-status.js';
@@ -52,12 +52,12 @@ export const deleteCommand = async (
   }
 
   // Load all tasks and validate they exist
-  const tasksToDelete: TaskDescription[] = [];
+  const tasksToDelete: TaskDescriptionManager[] = [];
   const invalidTaskIds: number[] = [];
 
   for (const numericTaskId of numericTaskIds) {
     try {
-      const task = TaskDescription.load(numericTaskId);
+      const task = TaskDescriptionManager.load(numericTaskId);
       tasksToDelete.push(task);
     } catch (error) {
       if (error instanceof TaskNotFoundError) {

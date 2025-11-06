@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { AI_AGENT, ProjectConfig } from '../config.js';
 import { Sandbox } from './types.js';
 import { SetupBuilder } from '../setup.js';
-import { TaskDescription } from '../description.js';
+import { TaskDescriptionManager } from 'rover-schemas';
 import { findProjectRoot, launch, ProcessManager } from 'rover-common';
 import {
   parseCustomEnvironmentVariables,
@@ -22,7 +22,7 @@ import {
 export class DockerSandbox extends Sandbox {
   backend = ContainerBackend.Docker;
 
-  constructor(task: TaskDescription, processManager?: ProcessManager) {
+  constructor(task: TaskDescriptionManager, processManager?: ProcessManager) {
     super(task, processManager);
   }
 

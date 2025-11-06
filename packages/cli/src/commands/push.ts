@@ -2,7 +2,7 @@ import colors from 'ansi-colors';
 import enquirer from 'enquirer';
 import yoctoSpinner from 'yocto-spinner';
 import { existsSync } from 'node:fs';
-import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
+import { TaskDescriptionManager, TaskNotFoundError } from 'rover-schemas';
 import { getTelemetry } from '../lib/telemetry.js';
 import { CLIJsonOutput } from '../types.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
@@ -93,7 +93,7 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
 
   try {
     // Load task using TaskDescription
-    const task = TaskDescription.load(numericTaskId);
+    const task = TaskDescriptionManager.load(numericTaskId);
 
     result.taskTitle = task.title;
     result.branchName = task.branchName;

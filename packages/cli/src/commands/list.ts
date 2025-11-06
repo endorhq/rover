@@ -1,11 +1,10 @@
 import colors from 'ansi-colors';
 import { formatTaskStatus, statusColor } from '../utils/task-status.js';
 import { getTelemetry } from '../lib/telemetry.js';
-import { getDescriptions, TaskDescriptionSchema } from '../lib/description.js';
+import { TaskDescriptionStore, TaskDescriptionSchema } from 'rover-schemas';
 import { VERBOSE, showTips } from 'rover-common';
 import { IterationStatusManager } from 'rover-schemas';
 import { IterationManager } from 'rover-schemas';
-import { getLastTaskIteration, getTaskIterations } from '../lib/iteration.js';
 
 /**
  * Format duration from start to now or completion
@@ -70,7 +69,7 @@ export const listCommand = async (
   const telemetry = getTelemetry();
 
   try {
-    const tasks = getDescriptions();
+    const tasks = TaskDescriptionStore.getAllDescriptions();
 
     if (!options.watching) {
       telemetry?.eventListTasks();
@@ -94,7 +93,7 @@ export const listCommand = async (
     // Update task status
     tasks.forEach(task => {
       try {
-        task.updateStatus();
+        task.updateStatusFromIteration();
       } catch (err) {
         if (!options.json) {
           console.log(
@@ -117,7 +116,7 @@ export const listCommand = async (
       tasks.forEach(task => {
         let iterationsData: IterationManager[] = [];
         try {
-          iterationsData = getTaskIterations(task);
+          iterationsData = task.getIterations();
         } catch (err) {
           if (VERBOSE) {
             console.error(
@@ -168,7 +167,7 @@ export const listCommand = async (
 
     // Print rows
     for (const task of tasks) {
-      const lastIteration = getLastTaskIteration(task);
+      const lastIteration = task.getLastIteration();
       const title = task.title || 'Unknown Task';
       const taskStatus = task.status;
       const startedAt = task.startedAt;

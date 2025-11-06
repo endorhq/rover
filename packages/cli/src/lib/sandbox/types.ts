@@ -1,14 +1,14 @@
 import { ProcessManager } from 'rover-common';
 
-import { TaskDescription } from '../description.js';
+import { TaskDescriptionManager } from 'rover-schemas';
 
 export abstract class Sandbox {
   abstract backend: string;
 
   processManager?: ProcessManager;
-  task: TaskDescription;
+  task: TaskDescriptionManager;
 
-  constructor(task: TaskDescription, processManager?: ProcessManager) {
+  constructor(task: TaskDescriptionManager, processManager?: ProcessManager) {
     this.task = task;
     this.processManager = processManager;
   }

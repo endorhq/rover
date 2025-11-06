@@ -2,9 +2,9 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { TaskDescription, TaskStatus } from '../description.js';
+import { TaskDescriptionManager, TaskStatus } from '../index.js';
 
-describe('TaskDescription', () => {
+describe('TaskDescriptionManager', () => {
   let testDir: string;
   let originalCwd: string;
 
@@ -24,7 +24,7 @@ describe('TaskDescription', () => {
 
   describe('agent and sourceBranch fields', () => {
     it('should store agent and sourceBranch when creating task', () => {
-      const task = TaskDescription.create({
+      const task = TaskDescriptionManager.create({
         id: 1,
         title: 'Test Task',
         description: 'Test description',
@@ -38,13 +38,13 @@ describe('TaskDescription', () => {
       expect(task.sourceBranch).toBe('main');
 
       // Verify persistence
-      const reloaded = TaskDescription.load(1);
+      const reloaded = TaskDescriptionManager.load(1);
       expect(reloaded.agent).toBe('claude');
       expect(reloaded.sourceBranch).toBe('main');
     });
 
     it('should handle tasks without agent and sourceBranch fields', () => {
-      const task = TaskDescription.create({
+      const task = TaskDescriptionManager.create({
         id: 2,
         title: 'Test Task',
         description: 'Test description',
@@ -59,7 +59,7 @@ describe('TaskDescription', () => {
 
   describe('new status types', () => {
     it('should support MERGED status', () => {
-      const task = TaskDescription.create({
+      const task = TaskDescriptionManager.create({
         id: 1,
         title: 'Test Task',
         description: 'Test description',
@@ -75,7 +75,7 @@ describe('TaskDescription', () => {
     });
 
     it('should support PUSHED status', () => {
-      const task = TaskDescription.create({
+      const task = TaskDescriptionManager.create({
         id: 2,
         title: 'Test Task',
         description: 'Test description',
@@ -91,7 +91,7 @@ describe('TaskDescription', () => {
     });
 
     it('should support resetting to NEW status', () => {
-      const task = TaskDescription.create({
+      const task = TaskDescriptionManager.create({
         id: 3,
         title: 'Test Task',
         description: 'Test description',
@@ -110,7 +110,7 @@ describe('TaskDescription', () => {
     });
 
     it('should handle MERGED and PUSHED in status validation', () => {
-      const task = TaskDescription.create({
+      const task = TaskDescriptionManager.create({
         id: 4,
         title: 'Test Task',
         description: 'Test description',
@@ -131,7 +131,7 @@ describe('TaskDescription', () => {
     });
 
     it('should not set completedAt when marking as MERGED', () => {
-      const task = TaskDescription.create({
+      const task = TaskDescriptionManager.create({
         id: 5,
         title: 'Test Task',
         description: 'Test description',
@@ -149,7 +149,7 @@ describe('TaskDescription', () => {
   });
 
   it('should not set completedAt when marking as PUSHED', () => {
-    const task = TaskDescription.create({
+    const task = TaskDescriptionManager.create({
       id: 5,
       title: 'Test Task',
       description: 'Test description',
@@ -169,7 +169,7 @@ describe('TaskDescription', () => {
   describe('status migration', () => {
     it('should migrate old status values to new enum including MERGED and PUSHED', () => {
       // Test the static migration method indirectly by loading tasks with old data
-      const task = TaskDescription.create({
+      const task = TaskDescriptionManager.create({
         id: 6,
         title: 'Migration Test',
         description: 'Test description',
@@ -181,7 +181,7 @@ describe('TaskDescription', () => {
       task.setStatus('MERGED' as TaskStatus);
       task.save();
 
-      const reloadedTask = TaskDescription.load(6);
+      const reloadedTask = TaskDescriptionManager.load(6);
       expect(reloadedTask.status).toBe('MERGED');
       expect(reloadedTask.isMerged()).toBe(true);
     });
@@ -189,7 +189,7 @@ describe('TaskDescription', () => {
 
   describe('utility methods', () => {
     it('should provide correct utility methods for new statuses', () => {
-      const task = TaskDescription.create({
+      const task = TaskDescriptionManager.create({
         id: 7,
         title: 'Utility Test',
         description: 'Test description',

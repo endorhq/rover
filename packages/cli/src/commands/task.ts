@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { getNextTaskId } from '../utils/task-id.js';
 import { homedir } from 'node:os';
 import { getAIAgentTool, getUserAIAgent } from '../lib/agents/index.js';
-import { TaskDescription } from '../lib/description.js';
+import { TaskDescriptionManager } from 'rover-schemas';
 import { createSandbox } from '../lib/sandbox/index.js';
 import { AI_AGENT } from '../lib/config.js';
 import { IterationManager } from 'rover-schemas';
@@ -115,8 +115,8 @@ const updateTaskMetadata = (
   jsonMode?: boolean
 ) => {
   try {
-    if (TaskDescription.exists(taskId)) {
-      const task = TaskDescription.load(taskId);
+    if (TaskDescriptionManager.exists(taskId)) {
+      const task = TaskDescriptionManager.load(taskId);
 
       // Apply updates to the task object based on the updates parameter
       if (updates.status) {
@@ -585,7 +585,7 @@ export const taskCommand = async (
     mkdirSync(taskPath, { recursive: true });
 
     // Create task using TaskDescription class
-    const task = TaskDescription.create({
+    const task = TaskDescriptionManager.create({
       id: taskId,
       title: expandedTask!.title,
       description: expandedTask!.description,

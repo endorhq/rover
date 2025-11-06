@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { launchSync } from 'rover-common';
 import { diffCommand } from '../diff.js';
-import { TaskDescription } from '../../lib/description.js';
+import { TaskDescriptionManager } from 'rover-schemas';
 
 // Mock external dependencies
 vi.mock('../../lib/telemetry.js', () => ({
@@ -69,7 +69,7 @@ describe('diff command', () => {
 
   // Helper to create a test task with a worktree
   const createTestTask = (id: number, title: string = 'Test Task') => {
-    const task = TaskDescription.create({
+    const task = TaskDescriptionManager.create({
       id,
       title,
       description: 'Test task description',
@@ -108,7 +108,7 @@ describe('diff command', () => {
 
     it('should handle task without workspace', async () => {
       // Create task without workspace
-      const task = TaskDescription.create({
+      const task = TaskDescriptionManager.create({
         id: 1,
         title: 'No Workspace Task',
         description: 'Test',
@@ -576,7 +576,7 @@ describe('diff command', () => {
       launchSync('git', ['config', 'commit.gpgsign', 'false']);
       mkdirSync('.rover/tasks', { recursive: true });
 
-      const task = TaskDescription.create({
+      const task = TaskDescriptionManager.create({
         id: 1,
         title: 'Empty Repo Task',
         description: 'Test',

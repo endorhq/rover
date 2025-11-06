@@ -2,7 +2,7 @@ import colors from 'ansi-colors';
 import { join } from 'node:path';
 import { existsSync, mkdirSync } from 'node:fs';
 import { generateBranchName } from '../utils/branch-name.js';
-import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
+import { TaskDescriptionManager, TaskNotFoundError } from 'rover-schemas';
 import { exitWithError, exitWithSuccess } from '../utils/exit.js';
 import { createSandbox } from '../lib/sandbox/index.js';
 import { UserSettings, AI_AGENT } from '../lib/config.js';
@@ -49,7 +49,7 @@ export const restartCommand = async (
 
   try {
     // Load task using TaskDescription
-    const task = TaskDescription.load(numericTaskId);
+    const task = TaskDescriptionManager.load(numericTaskId);
 
     // Check if task is in NEW or FAILED status
     if (!task.isNew() && !task.isFailed()) {

@@ -2,7 +2,7 @@ import colors from 'ansi-colors';
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { findProjectRoot, launch, launchSync } from 'rover-common';
-import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
+import { TaskDescriptionManager, TaskNotFoundError } from 'rover-schemas';
 import { getTelemetry } from '../lib/telemetry.js';
 import { showTips } from '../utils/display.js';
 import { CLIJsonOutput } from '../types.js';
@@ -64,7 +64,7 @@ export const logsCommand = async (
 
   try {
     // Load task using TaskDescription
-    const task = TaskDescription.load(numericTaskId);
+    const task = TaskDescriptionManager.load(numericTaskId);
 
     // Parse iteration number if provided
     let targetIteration: number | undefined;

@@ -1,6 +1,6 @@
 import { writeFileSync, chmodSync, mkdirSync, cpSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { TaskDescription } from './description.js';
+import { TaskDescriptionManager } from 'rover-schemas';
 import { findProjectRoot, launchSync, VERBOSE } from 'rover-common';
 import sweWorkflow from './workflows/swe.yml';
 import techWriterWorkflow from './workflows/tech-writer.yml';
@@ -15,11 +15,11 @@ import { ProjectConfig } from './config.js';
  */
 export class SetupBuilder {
   private agent: string;
-  private task: TaskDescription;
+  private task: TaskDescriptionManager;
   private taskDir: string;
   private isDockerRootless: boolean;
 
-  constructor(taskDescription: TaskDescription, agent: string) {
+  constructor(taskDescription: TaskDescriptionManager, agent: string) {
     this.agent = agent;
     this.task = taskDescription;
 
@@ -164,7 +164,10 @@ export class SetupBuilder {
   /**
    * Static factory method to create and generate setup script
    */
-  static generate(taskDescription: TaskDescription, agent: string): string {
+  static generate(
+    taskDescription: TaskDescriptionManager,
+    agent: string
+  ): string {
     const builder = new SetupBuilder(taskDescription, agent);
     return builder.generateEntrypoint();
   }

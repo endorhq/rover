@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { launchSync } from 'rover-common';
 import { logsCommand } from '../logs.js';
-import { TaskDescription } from '../../lib/description.js';
+import { TaskDescriptionManager } from 'rover-schemas';
 
 // Mock external dependencies
 vi.mock('../../lib/telemetry.js', () => ({
@@ -93,7 +93,7 @@ describe('logs command', () => {
     title: string = 'Test Task',
     containerId?: string
   ) => {
-    const task = TaskDescription.create({
+    const task = TaskDescriptionManager.create({
       id,
       title,
       description: 'Test task description',

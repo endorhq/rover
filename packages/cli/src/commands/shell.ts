@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs';
 import { launch, launchSync } from 'rover-common';
 import yoctoSpinner from 'yocto-spinner';
 import { statusColor } from '../utils/task-status.js';
-import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
+import { TaskDescriptionManager, TaskNotFoundError } from 'rover-schemas';
 import { getTelemetry } from '../lib/telemetry.js';
 import { CLIJsonOutput } from '../types.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
@@ -37,7 +37,7 @@ export const shellCommand = async (
 
   try {
     // Load task using TaskDescription
-    const task = TaskDescription.load(numericTaskId);
+    const task = TaskDescriptionManager.load(numericTaskId);
 
     const colorFunc = statusColor(task.status);
 

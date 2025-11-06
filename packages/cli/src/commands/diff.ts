@@ -1,6 +1,6 @@
 import colors from 'ansi-colors';
 import { existsSync } from 'node:fs';
-import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
+import { TaskDescriptionManager, TaskNotFoundError } from 'rover-schemas';
 import { getTelemetry } from '../lib/telemetry.js';
 import { Git } from 'rover-common';
 import { showTips } from '../utils/display.js';
@@ -22,7 +22,7 @@ export const diffCommand = async (
     const git = new Git();
 
     // Load task using TaskDescription
-    const task = TaskDescription.load(numericTaskId);
+    const task = TaskDescriptionManager.load(numericTaskId);
 
     // Check if worktree exists
     if (!task.worktreePath || !existsSync(task.worktreePath)) {

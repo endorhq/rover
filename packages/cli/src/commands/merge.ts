@@ -4,7 +4,7 @@ import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import yoctoSpinner from 'yocto-spinner';
 import { getAIAgentTool, type AIAgentTool } from '../lib/agents/index.js';
-import { TaskDescription, TaskNotFoundError } from '../lib/description.js';
+import { TaskDescriptionManager, TaskNotFoundError } from 'rover-schemas';
 import { UserSettings, AI_AGENT, ProjectConfig } from '../lib/config.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { Git } from 'rover-common';
@@ -278,7 +278,7 @@ export const mergeCommand = async (
 
   try {
     // Load task using TaskDescription
-    const task = TaskDescription.load(numericTaskId);
+    const task = TaskDescriptionManager.load(numericTaskId);
 
     jsonOutput.taskTitle = task.title;
     jsonOutput.branchName = task.branchName;

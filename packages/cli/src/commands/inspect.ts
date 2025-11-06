@@ -1,10 +1,10 @@
 import colors from 'ansi-colors';
 import { formatTaskStatus, statusColor } from '../utils/task-status.js';
 import {
-  TaskDescription,
+  TaskDescriptionManager,
   TaskNotFoundError,
   type TaskStatus,
-} from '../lib/description.js';
+} from 'rover-schemas';
 import { join } from 'node:path';
 import { getTelemetry } from '../lib/telemetry.js';
 import {
@@ -83,7 +83,7 @@ interface RawFileOutput {
 const jsonErrorOutput = (
   error: string,
   taskId?: number,
-  task?: TaskDescription
+  task?: TaskDescriptionManager
 ): TaskInspectionOutput => {
   return {
     branchName: task?.branchName || '',
@@ -162,7 +162,7 @@ export const inspectCommand = async (
 
   try {
     // Load task using TaskDescription
-    const task = TaskDescription.load(numericTaskId);
+    const task = TaskDescriptionManager.load(numericTaskId);
 
     if (iterationNumber === undefined) {
       iterationNumber = task.iterations;
