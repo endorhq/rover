@@ -57,12 +57,14 @@
     "nanoid": "^5.0.9",
     "ora": "^8.2.0",
     "pupa": "^3.3.0",
+    "tar": "^7.4.3",
     "tmp": "^0.2.5",
     "yocto-spinner": "^1.0.0"
   },
   "devDependencies": {
     "@types/node": "^24.1.0",
     "@types/react": "^19.1.8",
+    "@types/tar": "^6.1.13",
     "@types/tmp": "^0.2.6",
     "@vitest/ui": "^2.1.8",
     "tsdown": "^0.13.0",

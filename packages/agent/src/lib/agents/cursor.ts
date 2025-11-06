@@ -8,11 +8,44 @@ import { mcpJsonSchema } from '../mcp/schema.js';
 
 export class CursorAgent extends BaseAgent {
   name = 'Cursor';
-  binary = 'cursor';
+  binary = 'cursor-agent';
 
-  getInstallCommand(): string {
-    const packageSpec = `@cursor/cli@${this.version}`;
-    return `npm install -g ${packageSpec}`;
+  async install(): Promise<void> {
+    console.log(colors.bold(`\nInstalling ${this.name} CLI`));
+    console.log(colors.gray('└── Using official Cursor installer'));
+
+    try {
+      const result = await launch('/bin/bash', [
+        '-c',
+        'curl https://cursor.com/install -fsS | bash',
+      ]);
+
+      if (result.exitCode !== 0) {
+        const errorMessage = result.stderr || result.stdout || 'Unknown error';
+        throw new Error(
+          `Installation failed with exit code ${result.exitCode}: ${errorMessage}`
+        );
+      }
+
+      console.log(colors.green(`✓ ${this.name} CLI installed successfully`));
+    } catch (error: any) {
+      if (error.exitCode !== undefined) {
+        const stderr = error.stderr || '';
+        const stdout = error.stdout || '';
+        const output = stderr || stdout || error.message;
+        throw new Error(
+          `Failed to install ${this.name} CLI (exit code ${error.exitCode}): ${output}`
+        );
+      } else if (error.code === 'ENOENT') {
+        throw new Error(
+          `Failed to install ${this.name} CLI: bash command not found`
+        );
+      } else {
+        throw new Error(
+          `Failed to install ${this.name} CLI: ${error.message || error}`
+        );
+      }
+    }
   }
 
   getRequiredCredentials(): AgentCredentialFile[] {

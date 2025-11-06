@@ -6,22 +6,87 @@ import {
 } from './index.js';
 import { PromptBuilder, IPromptTask } from '../prompts/index.js';
 import { parseJsonResponse } from '../../utils/json-parser.js';
-import { existsSync, readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
+import { existsSync, readFileSync, createWriteStream, mkdirSync } from 'node:fs';
+import { homedir, platform, arch } from 'node:os';
 import { join } from 'node:path';
 import { fileSync } from 'tmp';
+import { pipeline } from 'node:stream/promises';
+import { createGunzip } from 'node:zlib';
+import { extract } from 'tar';
 import type { WorkflowInput } from 'rover-schemas';
 
 class CursorAI implements AIAgentTool {
   // constants
   public AGENT_BIN = 'cursor-agent';
   private promptBuilder = new PromptBuilder('cursor');
+  private version = '2025.11.06-8fe8a63';
 
   async checkAgent(): Promise<void> {
     try {
       await launch(this.AGENT_BIN, ['--version']);
     } catch (_err) {
       throw new MissingAIAgentError(this.AGENT_BIN);
+    }
+  }
+
+  async install(installPath?: string): Promise<void> {
+    // Determine OS and architecture
+    const os = platform();
+    const architecture = arch();
+
+    // Map Node.js platform to Cursor download platform
+    let downloadOs: 'linux' | 'darwin';
+    if (os === 'linux') {
+      downloadOs = 'linux';
+    } else if (os === 'darwin') {
+      downloadOs = 'darwin';
+    } else {
+      throw new Error(`Unsupported platform: ${os}`);
+    }
+
+    // Map Node.js architecture to Cursor download architecture
+    let downloadArch: 'x64' | 'arm64';
+    if (architecture === 'x64') {
+      downloadArch = 'x64';
+    } else if (architecture === 'arm64') {
+      downloadArch = 'arm64';
+    } else {
+      throw new Error(`Unsupported architecture: ${architecture}`);
+    }
+
+    // Construct download URL
+    const downloadUrl = `https://downloads.cursor.com/lab/${this.version}/${downloadOs}/${downloadArch}/agent-cli-package.tar.gz`;
+
+    // Determine installation directory
+    const targetDir = installPath || join(homedir(), '.cursor', 'bin');
+
+    // Create target directory if it doesn't exist
+    if (!existsSync(targetDir)) {
+      mkdirSync(targetDir, { recursive: true });
+    }
+
+    try {
+      // Download the file
+      const response = await fetch(downloadUrl);
+
+      if (!response.ok) {
+        throw new Error(`Failed to download: ${response.statusText}`);
+      }
+
+      if (!response.body) {
+        throw new Error('Response body is empty');
+      }
+
+      // Extract tar.gz directly to target directory
+      await pipeline(
+        response.body as any,
+        createGunzip(),
+        extract({ cwd: targetDir })
+      );
+
+      console.log(`Successfully installed cursor-agent to ${targetDir}`);
+    } catch (error) {
+      throw new Error(`Failed to install cursor-agent: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
