@@ -16,13 +16,37 @@ export type LaunchSyncOptions = SyncOptions & {
   mightLogSensitiveInformation?: boolean;
 };
 
+// Cache for project root to avoid redundant Git operations
+let projectRootCache: string | null = null;
+
 /**
- * Find the project root directory by searching for rover.json in parent directories
- * up to the Git repository root
+ * Find the Git repository root directory. Falls back to current working directory
+ * if not in a Git repository. Result is cached for the process lifetime to avoid
+ * redundant Git subprocess calls.
  */
 export function findProjectRoot(): string {
+  if (projectRootCache !== null) {
+    return projectRootCache;
+  }
+
   const git = new Git();
-  return git.getRepositoryRoot() || process.cwd();
+  projectRootCache = git.getRepositoryRoot() || process.cwd();
+  return projectRootCache;
+}
+
+/**
+ * Clear the cached project root. Useful for testing or edge cases where
+ * the repository root might change during process execution.
+ *
+ * @example
+ * // In tests, clear cache between test cases
+ * afterEach(() => clearProjectRootCache());
+ *
+ * // In long-running processes, clear cache when workspace changes
+ * vscode.workspace.onDidChangeWorkspaceFolders(() => clearProjectRootCache());
+ */
+export function clearProjectRootCache(): void {
+  projectRootCache = null;
 }
 
 const log = (stream: string) => {
