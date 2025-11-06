@@ -226,7 +226,9 @@ export const listCommand = async (
       },
       {
         header: 'Progress',
-        key: (row: TaskRow) => formatProgress(row.status, row.progress),
+        key: 'progress',
+        format: (_value: string, row: TaskRow) =>
+          formatProgress(row.status, row.progress),
         width: 10,
       },
       {
