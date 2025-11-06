@@ -3,6 +3,7 @@
  */
 import { Command } from 'commander';
 import { listWorkflowsCommand } from './list.js';
+import { inspectWorkflowCommand } from './inspect.js';
 
 export const addWorkflowCommands = (program: Command) => {
   // Add the subcommand
@@ -16,4 +17,11 @@ export const addWorkflowCommands = (program: Command) => {
     .description('List all available workflows')
     .option('--json', 'Output the list in JSON format', false)
     .action(listWorkflowsCommand);
+
+  command
+    .command('inspect <workflow-name>')
+    .description('Display detailed information about a specific workflow')
+    .option('--json', 'Output workflow details in JSON format', false)
+    .option('--raw', 'Output workflow as raw YAML', false)
+    .action(inspectWorkflowCommand);
 };
