@@ -1,14 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import {
-  mkdtempSync,
-  rmSync,
-  existsSync,
-  writeFileSync,
-  mkdirSync,
-} from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { launchSync } from 'rover-common';
+import { clearProjectRootCache } from 'rover-common';
 import { logsCommand } from '../logs.js';
 import { TaskDescription } from '../../lib/description.js';
 
@@ -85,6 +79,7 @@ describe('logs command', () => {
     process.chdir(originalCwd);
     rmSync(testDir, { recursive: true, force: true });
     vi.clearAllMocks();
+    clearProjectRootCache();
   });
 
   // Helper to create a test task with container ID

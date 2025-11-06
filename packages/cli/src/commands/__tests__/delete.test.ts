@@ -8,7 +8,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { launchSync } from 'rover-common';
+import { clearProjectRootCache, launchSync } from 'rover-common';
 import { deleteCommand } from '../delete.js';
 import { TaskDescription } from '../../lib/description.js';
 
@@ -68,6 +68,7 @@ describe('delete command', () => {
     process.chdir(originalCwd);
     rmSync(testDir, { recursive: true, force: true });
     vi.clearAllMocks();
+    clearProjectRootCache();
   });
 
   // Helper to create a test task

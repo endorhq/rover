@@ -8,7 +8,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { launchSync } from 'rover-common';
+import { clearProjectRootCache, launchSync } from 'rover-common';
 import { ProjectConfig } from '../config.js';
 
 describe('ProjectConfig - Environment Variable Configuration', () => {
@@ -34,6 +34,8 @@ describe('ProjectConfig - Environment Variable Configuration', () => {
 
     // Clean up temp directory
     rmSync(testDir, { recursive: true, force: true });
+
+    clearProjectRootCache();
   });
 
   it('should create new config without envs and envsFile fields', () => {

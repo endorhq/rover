@@ -8,7 +8,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { launchSync } from 'rover-common';
+import { clearProjectRootCache, launchSync } from 'rover-common';
 import { initCommand } from '../init.js';
 import { CURRENT_PROJECT_SCHEMA_VERSION } from '../../lib/config.js';
 
@@ -61,6 +61,8 @@ describe('init command', () => {
 
     // Clear all mocks
     vi.clearAllMocks();
+
+    clearProjectRootCache();
   });
 
   it('should create rover.json with detected TypeScript/Node.js environment', async () => {
