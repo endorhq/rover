@@ -2,6 +2,7 @@
 // These commands changes the configuration for the different agents.
 
 import { Argument, Command } from 'commander';
+import { AI_AGENT } from 'rover-common';
 import { DEFAULT_MCP_TRANSPORT, mcpInstallCommand } from './mcp.js';
 
 // Simple helper to collect multiple options using the same key
@@ -22,7 +23,7 @@ export const addConfigCommands = (program: Command) => {
       new Argument(
         '<agent>',
         'AI Coding Agent to add the MCP server to'
-      ).choices(['claude', 'codex', 'gemini', 'qwen'])
+      ).choices(Object.values(AI_AGENT))
     )
     .argument('<name>', 'The name of the MCP server')
     .argument('<commandOrUrl>', 'The command or URL to run this MCP server')

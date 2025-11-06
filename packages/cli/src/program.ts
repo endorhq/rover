@@ -1,5 +1,6 @@
 import { Command, Option } from 'commander';
-import { AI_AGENT, ProjectConfig, UserSettings } from './lib/config.js';
+import { ProjectConfig, UserSettings } from './lib/config.js';
+import { AI_AGENT } from 'rover-common';
 import { initCommand } from './commands/init.js';
 import { listCommand } from './commands/list.js';
 import { exitWithError } from './utils/exit.js';

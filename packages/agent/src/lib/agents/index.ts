@@ -4,6 +4,7 @@ import { CodexAgent } from './codex.js';
 import { CursorAgent } from './cursor.js';
 import { GeminiAgent } from './gemini.js';
 import { QwenAgent } from './qwen.js';
+import { AI_AGENT } from 'rover-common';
 
 export * from './types.js';
 export { ClaudeAgent } from './claude.js';
@@ -29,11 +30,11 @@ export function createAgent(
       return new QwenAgent(version);
     default:
       throw new Error(
-        `Unknown agent: ${agentName}. Supported agents: claude, codex, cursor, gemini, qwen`
+        `Unknown agent: ${agentName}. Supported agents: ${Object.values(AI_AGENT).join(', ')}`
       );
   }
 }
 
 export function getSupportedAgents(): string[] {
-  return ['claude', 'codex', 'cursor', 'gemini', 'qwen'];
+  return Object.values(AI_AGENT);
 }

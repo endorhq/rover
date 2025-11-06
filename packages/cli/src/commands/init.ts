@@ -14,8 +14,9 @@ import {
   checkQwen,
   checkGit,
 } from '../utils/system.js';
-import { AI_AGENT, ProjectConfig, UserSettings } from '../lib/config.js';
+import { ProjectConfig, UserSettings } from '../lib/config.js';
 import { showRoverChat, showTips, TIP_TITLES } from '../utils/display.js';
+import { AI_AGENT } from 'rover-common';
 import { getTelemetry } from '../lib/telemetry.js';
 
 // Get the default prompt

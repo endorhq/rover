@@ -16,6 +16,7 @@ import { iterateCommand } from '../commands/iterate.js';
 import { restartCommand } from '../commands/restart.js';
 import { resetCommand } from '../commands/reset.js';
 import { stopCommand } from '../commands/stop.js';
+import { AI_AGENT } from 'rover-common';
 import { z } from 'zod';
 
 /**
@@ -95,7 +96,7 @@ export const mcpCommand = async () => {
     fromGithub: z.string().optional(),
     sourceBranch: z.string().optional(),
     targetBranch: z.string().optional(),
-    agent: z.enum(['claude', 'codex', 'gemini', 'qwen']).optional(),
+    agent: z.nativeEnum(AI_AGENT).optional(),
   });
 
   server.registerTool(

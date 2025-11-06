@@ -4,7 +4,8 @@ import CursorAI from './cursor.js';
 import GeminiAI from './gemini.js';
 import QwenAI from './qwen.js';
 import type { IPromptTask } from '../prompts/index.js';
-import { AI_AGENT, UserSettings } from '../config.js';
+import { UserSettings } from '../config.js';
+import { AI_AGENT } from 'rover-common';
 import type { WorkflowInput } from 'rover-schemas';
 
 export interface AIAgentTool {

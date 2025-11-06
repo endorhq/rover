@@ -7,7 +7,7 @@ import { homedir } from 'node:os';
 import { getAIAgentTool, getUserAIAgent } from '../lib/agents/index.js';
 import { TaskDescription } from '../lib/description.js';
 import { createSandbox } from '../lib/sandbox/index.js';
-import { AI_AGENT } from '../lib/config.js';
+import { AI_AGENT } from 'rover-common';
 import { IterationManager } from 'rover-schemas';
 import { generateBranchName } from '../utils/branch-name.js';
 import {
@@ -216,12 +216,14 @@ export const taskCommand = async (
       selectedAiAgent = AI_AGENT.Claude;
     } else if (agentLower === 'codex') {
       selectedAiAgent = AI_AGENT.Codex;
+    } else if (agentLower === 'cursor') {
+      selectedAiAgent = AI_AGENT.Cursor;
     } else if (agentLower === 'gemini') {
       selectedAiAgent = AI_AGENT.Gemini;
     } else if (agentLower === 'qwen') {
       selectedAiAgent = AI_AGENT.Qwen;
     } else {
-      jsonOutput.error = `Invalid agent: ${agent}. Valid options are: claude, codex, gemini, qwen`;
+      jsonOutput.error = `Invalid agent: ${agent}. Valid options are: ${Object.values(AI_AGENT).join(', ')}`;
       exitWithError(jsonOutput, json);
       return;
     }
