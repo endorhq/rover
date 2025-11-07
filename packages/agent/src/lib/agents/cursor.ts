@@ -11,8 +11,9 @@ export class CursorAgent extends BaseAgent {
   binary = 'cursor';
 
   getInstallCommand(): string {
-    const packageSpec = `@cursor/cli@${this.version}`;
-    return `npm install -g ${packageSpec}`;
+    // As of now, cursor comes installed within the container image.
+
+    return '';
   }
 
   getRequiredCredentials(): AgentCredentialFile[] {
@@ -25,7 +26,7 @@ export class CursorAgent extends BaseAgent {
       {
         path: '/.config/cursor/auth.json',
         description: 'Cursor authentication',
-        required: false,
+        required: true,
       },
     ];
   }
