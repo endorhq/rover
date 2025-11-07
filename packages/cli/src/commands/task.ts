@@ -65,25 +65,6 @@ const validations = (selectedAiAgent?: string): validationResult => {
         ],
       };
     }
-  } else if (selectedAiAgent === 'cursor') {
-    const cursorConfig = join(homedir(), '.cursor', 'cli-config.json');
-    const cursorCreds = join(homedir(), '.config', 'cursor', 'auth.json');
-
-    if (!existsSync(cursorConfig)) {
-      return {
-        error: 'Cursor configuration not found',
-        tips: ['Run ' + colors.cyan('cursor-agent') + ' first to configure it'],
-      };
-    }
-
-    if (!existsSync(cursorCreds)) {
-      return {
-        error: 'Cursor credentials not found',
-        tips: [
-          'Run ' + colors.cyan('cursor-agent') + ' first to set up credentials',
-        ],
-      };
-    }
   } else if (selectedAiAgent === 'gemini') {
     // Check Gemini credentials if needed
     const geminiFile = join(homedir(), '.gemini', 'settings.json');

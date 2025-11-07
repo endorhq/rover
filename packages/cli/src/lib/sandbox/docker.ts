@@ -210,7 +210,9 @@ export class DockerSandbox extends Sandbox {
 
   protected async start(): Promise<string> {
     return (
-      (await launch('docker', ['start', this.sandboxName])).stdout
+      (
+        await launch('docker', ['start', this.sandboxName])
+      ).stdout
         ?.toString()
         .trim() || this.sandboxName
     );
@@ -218,7 +220,9 @@ export class DockerSandbox extends Sandbox {
 
   protected async remove(): Promise<string> {
     return (
-      (await launch('docker', ['rm', '-f', this.sandboxName])).stdout
+      (
+        await launch('docker', ['rm', '-f', this.sandboxName])
+      ).stdout
         ?.toString()
         .trim() || this.sandboxName
     );
@@ -226,7 +230,9 @@ export class DockerSandbox extends Sandbox {
 
   protected async stop(): Promise<string> {
     return (
-      (await launch('docker', ['stop', this.sandboxName])).stdout
+      (
+        await launch('docker', ['stop', this.sandboxName])
+      ).stdout
         ?.toString()
         .trim() || this.sandboxName
     );
@@ -234,8 +240,9 @@ export class DockerSandbox extends Sandbox {
 
   protected async logs(): Promise<string> {
     return (
-      (await launch('docker', ['logs', this.sandboxName])).stdout?.toString() ||
-      ''
+      (
+        await launch('docker', ['logs', this.sandboxName])
+      ).stdout?.toString() || ''
     );
   }
 
