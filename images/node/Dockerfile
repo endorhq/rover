@@ -1,3 +1,4 @@
+ARG NIX_AI_TOOLS_REV=79b5358a65e82cc839e95b82c89c08481ee94e57
 FROM node:24-alpine AS agent-builder
 COPY . /app
 WORKDIR /app
@@ -6,8 +7,10 @@ RUN npm install && npm run build:agent
 RUN cd ./packages/agent && npm pack && mv *.tgz /rover-agent.tgz
 
 FROM node:24-alpine
+ARG NIX_AI_TOOLS_REV
 ARG TARGETARCH
 ARG PACKAGE_MANAGER_MCP_SERVER_VERSION="v0.1.3"
+ENV NIX_AI_TOOLS_REV=${NIX_AI_TOOLS_REV}
 RUN apk update && \
     apk add bash file jq nix python3 sudo uv && \
     case ${TARGETARCH} in \
@@ -28,3 +31,6 @@ COPY ./images/node/assets/1-sudoers-setup /etc/sudoers.d/1-agent-setup
 COPY ./images/node/assets/2-sudoers-cleanup /etc/sudoers.d/2-agent-cleanup
 
 # Install agents with special requirements
+COPY ./images/node/assets/nix/nix.conf /etc/nix/nix.conf
+RUN nix build --accept-flake-config github:numtide/nix-ai-tools/${NIX_AI_TOOLS_REV}#cursor-agent
+COPY ./images/node/assets/nix/ai-tool-wrapper /usr/local/bin/cursor-agent
