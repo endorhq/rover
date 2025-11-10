@@ -89,7 +89,7 @@ echo "======================================="
 echo ">> environment is"
 env
 echo "<< environment is"
-sudo nix-daemon &
+sudo nix-daemon &> /dev/null &
 
 echo -e "\n======================================="
 echo "📦 Starting the package manager MCP server"
