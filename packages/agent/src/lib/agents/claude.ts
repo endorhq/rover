@@ -92,7 +92,9 @@ export class ClaudeAgent extends BaseAgent {
           );
         } else if (cred.path.includes('gcloud')) {
           // Copy the entire folder
-          cpSync(cred.path, join(targetDir, '.config'), { recursive: true });
+          cpSync(cred.path, join(targetDir, '.config', 'gcloud'), {
+            recursive: true,
+          });
           console.log(colors.gray('├── Copied: ') + colors.cyan(cred.path));
         } else {
           // Copy file right away
