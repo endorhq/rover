@@ -32,13 +32,13 @@ export class CursorAgent extends BaseAgent {
   async copyCredentials(targetDir: string): Promise<void> {
     console.log(colors.bold(`\nCopying ${this.name} credentials`));
 
-    this.ensureDirectory(targetDir);
+    this.ensureDirectory(join(targetDir, '.cursor'));
+    this.ensureDirectory(join(targetDir, '.config', 'cursor'));
 
     const credentials = this.getRequiredCredentials();
     for (const cred of credentials) {
       if (existsSync(cred.path)) {
-        const filename = cred.path.split('/').pop()!;
-        copyFileSync(cred.path, join(targetDir, filename));
+        copyFileSync(cred.path, join(targetDir, cred.path));
         console.log(colors.gray('├── Copied: ') + colors.cyan(cred.path));
       }
     }
