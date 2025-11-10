@@ -112,7 +112,8 @@ echo "======================================="
 
 # Agent-specific CLI installation and credential setup
 echo -e "\n📦 Installing Agent CLI and setting up credentials"
-sudo rover-agent install $AGENT --user-dir $HOME
+# Pass the environment variables to ensure it loads the right credentials
+sudo -E rover-agent install $AGENT --user-dir $HOME
 # Set the right permissions after installing and moving credentials
 sudo chown -R $(id -u):$(id -g) $HOME
 
