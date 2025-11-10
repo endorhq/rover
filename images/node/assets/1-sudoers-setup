@@ -1,3 +1,6 @@
+# Preserve key environment variables
+Defaults env_keep += "NIX_AI_TOOLS_REV"
+
 # Rover agent group; if there is no matching gid within the container
 # with the host gid, the `agent` group will be used.
 %agent ALL=(ALL) NOPASSWD: ALL

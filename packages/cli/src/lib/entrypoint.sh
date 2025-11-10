@@ -86,6 +86,9 @@ AGENT={agent}
 echo -e "\n======================================="
 echo "📦 Running nix daemon"
 echo "======================================="
+echo ">> environment is"
+env
+echo "<< environment is"
 sudo nix-daemon &
 
 echo -e "\n======================================="
