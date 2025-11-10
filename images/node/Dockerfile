@@ -32,5 +32,4 @@ COPY ./images/node/assets/2-sudoers-cleanup /etc/sudoers.d/2-agent-cleanup
 
 # Install agents with special requirements
 COPY ./images/node/assets/nix/nix.conf /etc/nix/nix.conf
-RUN nix build --accept-flake-config github:numtide/nix-ai-tools/${NIX_AI_TOOLS_REV}#cursor-agent
 COPY ./images/node/assets/nix/ai-tool-wrapper /usr/local/bin/cursor-agent

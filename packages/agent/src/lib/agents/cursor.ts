@@ -8,12 +8,11 @@ import { mcpJsonSchema } from '../mcp/schema.js';
 
 export class CursorAgent extends BaseAgent {
   name = 'Cursor';
-  binary = 'cursor';
+  binary = 'cursor-agent';
 
   getInstallCommand(): string {
-    // As of now, cursor comes installed within the container image.
-
-    return '';
+    // return `nix build --accept-flake-config github:numtide/nix-ai-tools/${process.env.NIX_AI_TOOLS_REV}#cursor-agent`;
+    return `nix build --accept-flake-config github:numtide/nix-ai-tools/79b5358a65e82cc839e95b82c89c08481ee94e57#cursor-agent`;
   }
 
   getRequiredCredentials(): AgentCredentialFile[] {
