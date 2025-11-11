@@ -83,10 +83,12 @@ validate_task_file
 # Setup the agent
 AGENT={agent}
 
-echo -e "\n======================================="
-echo "📦 Running nix daemon"
-echo "======================================="
-sudo nix-daemon &> /dev/null &
+if [ "$AGENT" = "cursor" ]; then
+  echo -e "\n======================================="
+  echo "📦 Running nix daemon"
+  echo "======================================="
+  sudo nix-daemon &> /dev/null &
+fi
 
 echo -e "\n======================================="
 echo "📦 Starting the package manager MCP server"
