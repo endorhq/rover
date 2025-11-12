@@ -136,7 +136,10 @@ describe('logs command', () => {
         expect.objectContaining({
           error: "Invalid task ID 'invalid' - must be a number",
         }),
-        false
+        false,
+        expect.objectContaining({
+          telemetry: expect.anything(),
+        })
       );
     });
 
@@ -149,7 +152,10 @@ describe('logs command', () => {
         expect.objectContaining({
           error: "Invalid task ID '' - must be a number",
         }),
-        false
+        false,
+        expect.objectContaining({
+          telemetry: expect.anything(),
+        })
       );
     });
 
@@ -163,7 +169,10 @@ describe('logs command', () => {
         expect.objectContaining({
           error: 'The task with ID 1 was not found',
         }),
-        false
+        false,
+        expect.objectContaining({
+          telemetry: expect.anything(),
+        })
       );
     });
   });
@@ -178,7 +187,10 @@ describe('logs command', () => {
         expect.objectContaining({
           error: 'The task with ID 999 was not found',
         }),
-        false
+        false,
+        expect.objectContaining({
+          telemetry: expect.anything(),
+        })
       );
     });
 
@@ -191,7 +203,10 @@ describe('logs command', () => {
         expect.objectContaining({
           error: 'The task with ID -1 was not found',
         }),
-        false
+        false,
+        expect.objectContaining({
+          telemetry: expect.anything(),
+        })
       );
     });
   });
@@ -209,7 +224,10 @@ describe('logs command', () => {
         expect.objectContaining({
           error: "Invalid iteration number: 'invalid'",
         }),
-        false
+        false,
+        expect.objectContaining({
+          telemetry: expect.anything(),
+        })
       );
     });
 
@@ -226,7 +244,10 @@ describe('logs command', () => {
           error:
             "Iteration 5 not found for task '2'. Available iterations: 1, 2",
         }),
-        false
+        false,
+        expect.objectContaining({
+          telemetry: expect.anything(),
+        })
       );
     });
   });
@@ -249,7 +270,10 @@ describe('logs command', () => {
           logs: '',
           success: false,
         }),
-        false
+        false,
+        expect.objectContaining({
+          telemetry: expect.anything(),
+        })
       );
     });
 
@@ -270,7 +294,10 @@ describe('logs command', () => {
           logs: '',
           success: false,
         }),
-        true
+        true,
+        expect.objectContaining({
+          telemetry: expect.anything(),
+        })
       );
     });
   });
@@ -290,7 +317,10 @@ describe('logs command', () => {
           logs: '',
           success: false,
         }),
-        false
+        false,
+        expect.objectContaining({
+          telemetry: expect.anything(),
+        })
       );
     });
 
@@ -308,7 +338,10 @@ describe('logs command', () => {
           logs: '',
           success: false,
         }),
-        true
+        true,
+        expect.objectContaining({
+          telemetry: expect.anything(),
+        })
       );
     });
   });
@@ -513,7 +546,10 @@ Last line`;
           logs: '',
           success: false,
         }),
-        false
+        false,
+        expect.objectContaining({
+          telemetry: expect.anything(),
+        })
       );
     });
   });
@@ -542,7 +578,10 @@ Last line`;
           logs: '',
           success: false,
         }),
-        false
+        false,
+        expect.objectContaining({
+          telemetry: expect.anything(),
+        })
       );
     });
 
@@ -563,7 +602,10 @@ Last line`;
         expect.objectContaining({
           error: 'Error retrieving container logs: Docker daemon not running',
         }),
-        false
+        false,
+        expect.objectContaining({
+          telemetry: expect.anything(),
+        })
       );
     });
 
@@ -587,7 +629,10 @@ Last line`;
           error:
             'Error retrieving container logs: permission denied while trying to connect to the Docker daemon socket',
         }),
-        false
+        false,
+        expect.objectContaining({
+          telemetry: expect.anything(),
+        })
       );
     });
   });

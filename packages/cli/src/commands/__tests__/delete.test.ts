@@ -103,7 +103,10 @@ describe('delete command', () => {
             "Invalid task ID 'invalid' - must be a number",
           ]),
         }),
-        false
+        false,
+        expect.objectContaining({
+          telemetry: expect.anything(),
+        })
       );
     });
 
@@ -118,7 +121,10 @@ describe('delete command', () => {
             "Invalid task ID '' - must be a number",
           ]),
         }),
-        false
+        false,
+        expect.objectContaining({
+          telemetry: expect.anything(),
+        })
       );
     });
 
@@ -133,7 +139,10 @@ describe('delete command', () => {
           errors: ['Task with ID 1 was not found'],
           success: false,
         },
-        false
+        false,
+        expect.objectContaining({
+          telemetry: expect.anything(),
+        })
       );
     });
   });
@@ -149,7 +158,10 @@ describe('delete command', () => {
           errors: ['Task with ID 999 was not found'],
           success: false,
         },
-        false
+        false,
+        expect.objectContaining({
+          telemetry: expect.anything(),
+        })
       );
     });
 
@@ -163,7 +175,10 @@ describe('delete command', () => {
           errors: ['Task with ID -1 was not found'],
           success: false,
         },
-        false
+        false,
+        expect.objectContaining({
+          telemetry: expect.anything(),
+        })
       );
     });
   });
@@ -189,7 +204,10 @@ describe('delete command', () => {
           success: true,
           errors: [],
         },
-        false
+        false,
+        expect.objectContaining({
+          telemetry: expect.anything(),
+        })
       );
     });
 
@@ -206,7 +224,10 @@ describe('delete command', () => {
           success: true,
           errors: [],
         },
-        true
+        true,
+        expect.objectContaining({
+          telemetry: expect.anything(),
+        })
       );
       expect(existsSync('.rover/tasks/2')).toBe(false);
     });
@@ -237,7 +258,10 @@ describe('delete command', () => {
           success: true,
           errors: [],
         },
-        false
+        false,
+        expect.objectContaining({
+          telemetry: expect.anything(),
+        })
       );
       expect(existsSync('.rover/tasks/4')).toBe(false);
     });
@@ -260,7 +284,10 @@ describe('delete command', () => {
           success: false,
           errors: ['Task deletion cancelled'],
         },
-        false
+        false,
+        expect.objectContaining({
+          telemetry: expect.anything(),
+        })
       );
 
       // Task should still exist
@@ -285,7 +312,10 @@ describe('delete command', () => {
           success: false,
           errors: ['Task deletion cancelled'],
         },
-        false
+        false,
+        expect.objectContaining({
+          telemetry: expect.anything(),
+        })
       );
 
       // Task should still exist (not deleted)
@@ -309,7 +339,10 @@ describe('delete command', () => {
           success: true,
           errors: [],
         },
-        false
+        false,
+        expect.objectContaining({
+          telemetry: expect.anything(),
+        })
       );
 
       // Task should be deleted
@@ -330,7 +363,10 @@ describe('delete command', () => {
           success: true,
           errors: [],
         },
-        true
+        true,
+        expect.objectContaining({
+          telemetry: expect.anything(),
+        })
       );
       expect(existsSync('.rover/tasks/7')).toBe(false);
     });
@@ -435,7 +471,10 @@ describe('delete command', () => {
           success: true,
           errors: [],
         },
-        false
+        false,
+        expect.objectContaining({
+          telemetry: expect.anything(),
+        })
       );
       expect(existsSync('.rover/tasks/17')).toBe(false);
     });
@@ -450,7 +489,10 @@ describe('delete command', () => {
           errors: ['Task with ID 0 was not found'],
           success: false,
         },
-        false
+        false,
+        expect.objectContaining({
+          telemetry: expect.anything(),
+        })
       );
     });
 
@@ -464,7 +506,10 @@ describe('delete command', () => {
           errors: ['Task with ID 999999999 was not found'],
           success: false,
         },
-        false
+        false,
+        expect.objectContaining({
+          telemetry: expect.anything(),
+        })
       );
     });
   });
@@ -483,7 +528,10 @@ describe('delete command', () => {
           success: true,
           errors: [],
         },
-        true // JSON mode
+        true, // JSON mode
+        expect.objectContaining({
+          telemetry: expect.anything(),
+        })
       );
       expect(existsSync('.rover/tasks/18')).toBe(false);
     });
@@ -509,7 +557,10 @@ describe('delete command', () => {
           success: true,
           errors: [],
         },
-        false
+        false,
+        expect.objectContaining({
+          telemetry: expect.anything(),
+        })
       );
 
       // All tasks should be deleted
@@ -531,7 +582,10 @@ describe('delete command', () => {
           success: true,
           errors: ['Task with ID 999 was not found'],
         },
-        false
+        false,
+        expect.objectContaining({
+          telemetry: expect.anything(),
+        })
       );
 
       // Valid task should be deleted
@@ -555,7 +609,10 @@ describe('delete command', () => {
           success: false,
           errors: ['Task deletion cancelled'],
         },
-        false
+        false,
+        expect.objectContaining({
+          telemetry: expect.anything(),
+        })
       );
 
       // Both tasks should still exist

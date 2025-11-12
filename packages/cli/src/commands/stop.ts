@@ -49,7 +49,7 @@ export const stopCommand = async (
   const numericTaskId = parseInt(taskId, 10);
   if (isNaN(numericTaskId)) {
     jsonOutput.error = `Invalid task ID '${taskId}' - must be a number`;
-    exitWithError(jsonOutput, json);
+    await exitWithError(jsonOutput, json, { telemetry });
     return;
   }
 
@@ -154,7 +154,7 @@ export const stopCommand = async (
       status: task.status,
       stoppedAt: new Date().toISOString(),
     };
-    exitWithSuccess('Task stopped successfully!', jsonOutput, json, {
+    await exitWithSuccess('Task stopped successfully!', jsonOutput, json, {
       tips: [
         'Use ' + colors.cyan(`rover logs ${task.id}`) + ' to check the logs',
         'Use ' +
@@ -164,15 +164,16 @@ export const stopCommand = async (
           colors.cyan(`rover delete ${task.id}`) +
           ' to delete and clean up the task',
       ],
+      telemetry,
     });
   } catch (error) {
     if (error instanceof TaskNotFoundError) {
       jsonOutput.error = `The task with ID ${numericTaskId} was not found`;
-      exitWithError(jsonOutput, json);
+      await exitWithError(jsonOutput, json, { telemetry });
       return;
     } else {
       jsonOutput.error = `There was an error stopping the task: ${error}`;
-      exitWithError(jsonOutput, json);
+      await exitWithError(jsonOutput, json, { telemetry });
       return;
     }
   } finally {

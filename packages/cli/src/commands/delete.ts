@@ -47,7 +47,7 @@ export const deleteCommand = async (
   }
 
   if (jsonOutput.errors.length > 0) {
-    exitWithErrors(jsonOutput, json);
+    await exitWithErrors(jsonOutput, json, { telemetry });
     return;
   }
 
@@ -86,7 +86,7 @@ export const deleteCommand = async (
   // Exit early if no valid tasks to delete
   if (tasksToDelete.length === 0) {
     jsonOutput.success = false;
-    exitWithErrors(jsonOutput, json);
+    await exitWithErrors(jsonOutput, json, { telemetry });
     await telemetry?.shutdown();
     return;
   }
@@ -139,7 +139,7 @@ export const deleteCommand = async (
 
   if (!confirmDeletion) {
     jsonOutput.errors?.push('Task deletion cancelled');
-    exitWithErrors(jsonOutput, json);
+    await exitWithErrors(jsonOutput, json, { telemetry });
     await telemetry?.shutdown();
     return;
   }
@@ -190,19 +190,21 @@ export const deleteCommand = async (
     jsonOutput.success = allSucceeded;
 
     if (allSucceeded) {
-      exitWithSuccess(
+      await exitWithSuccess(
         `All tasks (IDs: ${succeededTasks.join(' ')}) deleted successfully`,
         jsonOutput,
-        json
+        json,
+        { telemetry }
       );
     } else if (someSucceeded) {
-      exitWithWarn(
+      await exitWithWarn(
         `Some tasks (IDs: ${succeededTasks.join(' ')}) deleted successfully`,
         jsonOutput,
-        json
+        json,
+        { telemetry }
       );
     } else {
-      exitWithErrors(jsonOutput, json);
+      await exitWithErrors(jsonOutput, json, { telemetry });
     }
 
     await telemetry?.shutdown();

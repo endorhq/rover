@@ -7,6 +7,7 @@ import { Table, TableColumn } from 'rover-common';
 import { CLIJsonOutput } from '../../types.js';
 import { exitWithError, exitWithSuccess } from '../../utils/exit.js';
 import { Workflow } from 'rover-schemas';
+import { getTelemetry } from '../../lib/telemetry.js';
 
 interface ListWorkflowsCommandOptions {
   // Output format
@@ -38,14 +39,16 @@ interface WorkflowRow {
 export const listWorkflowsCommand = async (
   options: ListWorkflowsCommandOptions
 ) => {
+  const telemetry = getTelemetry();
   const workflowStore = initWorkflowStore();
   const output: ListWorkflowsOutput = {
     success: false,
     workflows: [],
   };
 
-  // Output the table
   try {
+    // Track list workflows event
+    telemetry?.eventListWorkflows();
     if (options.json) {
       // For the JSON, add some extra information.
       output.success = true;
@@ -53,7 +56,7 @@ export const listWorkflowsCommand = async (
         .getAllWorkflows()
         .map(wf => wf.toObject());
 
-      exitWithSuccess('', output, options.json);
+      await exitWithSuccess('', output, options.json, { telemetry });
     } else {
       // Define table columns
       const columns: TableColumn<WorkflowRow>[] = [
@@ -103,6 +106,8 @@ export const listWorkflowsCommand = async (
     }
   } catch (error) {
     output.error = 'Error loading the workflows.';
-    exitWithError(output, options.json);
+    await exitWithError(output, options.json, { telemetry });
+  } finally {
+    await telemetry?.shutdown();
   }
 };

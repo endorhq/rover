@@ -9,8 +9,9 @@
     "dist/*"
   ],
   "scripts": {
-    "build": "tsdown --env.TSUP_DEV=false src/index.ts",
-    "dev": "TSUP_DEV=true tsdown --env.TSUP_DEV=true --watch src/ src/index.ts",
+    "build": "tsdown",
+    "build-dev": "TSUP_DEV=true tsdown",
+    "dev": "TSUP_DEV=true tsdown --watch src/",
     "start": "node dist/index.js",
     "clean": "rm -rf dist",
     "check": "tsc --noEmit",

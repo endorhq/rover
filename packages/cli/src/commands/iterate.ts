@@ -191,7 +191,7 @@ export const iterateCommand = async (
     if (!finalInstructions) {
       if (json) {
         result.error = 'Instructions are required in JSON mode';
-        exitWithError(result, json);
+        await exitWithError(result, json, { telemetry });
         return;
       } else {
         showRoverChat(
@@ -216,7 +216,9 @@ export const iterateCommand = async (
         });
         finalInstructions = input;
       } catch (_err) {
-        exitWithWarn('Task deletion cancelled', result, json);
+        await exitWithWarn('Task deletion cancelled', result, json, {
+          telemetry,
+        });
         return;
       }
     }
@@ -435,7 +437,7 @@ export const iterateCommand = async (
 
     result.success = true;
 
-    exitWithSuccess('Iteration started successfully', result, json, {
+    await exitWithSuccess('Iteration started successfully', result, json, {
       tips: [
         'Use ' + colors.cyan('rover list') + ' to check the list of tasks',
         'Use ' +
@@ -445,6 +447,7 @@ export const iterateCommand = async (
           colors.cyan(`rover inspect ${task.id}`) +
           ' to check the task status',
       ],
+      telemetry,
     });
   } catch (error) {
     if (error instanceof TaskNotFoundError) {

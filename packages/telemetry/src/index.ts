@@ -3,7 +3,6 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
 import { v4 as uuidv4 } from 'uuid';
-import devConfig, { prodConfig } from './config.js';
 import { NewTaskMetadata, IterateMetadata, InitMetadata } from './types.js';
 
 export enum NewTaskProvider {
@@ -11,7 +10,9 @@ export enum NewTaskProvider {
   GITHUB = 'github',
 }
 
-const config = process.env.TSUP_DEV === 'true' ? devConfig : prodConfig;
+// Config is injected at build time via tsdown define
+declare const __BUILD_CONFIG__: { apiKey: string; host: string };
+const config = __BUILD_CONFIG__;
 
 // Constants
 const CONFIG_DIR = join(homedir(), '.config', 'rover');
@@ -48,10 +49,16 @@ enum EVENT_IDS {
   PUSH_BRANCH = 'push_branch',
   // Reset current changes
   RESET = 'reset',
+  // Restart a task
+  RESTART_TASK = 'restart_task',
   // Open shell in container
   SHELL = 'shell',
   // Stop a task
   STOP_TASK = 'stop',
+  // List workflows
+  LIST_WORKFLOWS = 'list_workflows',
+  // Inspect workflow
+  INSPECT_WORKFLOW = 'inspect_workflow',
   // Open a workspace in the extension
   OPEN_WORKSPACE = 'open_workspace',
 }
@@ -107,9 +114,10 @@ class Telemetry {
 
   // Event definition
 
-  eventNewTask(provider: NewTaskProvider) {
+  eventNewTask(provider: NewTaskProvider, workflow?: string) {
     const metadata: NewTaskMetadata = {
       provider,
+      workflow,
     };
 
     this.capture(EVENT_IDS.NEW_TASK, metadata);
@@ -179,6 +187,18 @@ class Telemetry {
     this.capture(EVENT_IDS.STOP_TASK);
   }
 
+  eventRestartTask() {
+    this.capture(EVENT_IDS.RESTART_TASK);
+  }
+
+  eventListWorkflows() {
+    this.capture(EVENT_IDS.LIST_WORKFLOWS);
+  }
+
+  eventInspectWorkflow() {
+    this.capture(EVENT_IDS.INSPECT_WORKFLOW);
+  }
+
   eventOpenWorkspace() {
     this.capture(EVENT_IDS.OPEN_WORKSPACE);
   }
@@ -204,7 +224,7 @@ class Telemetry {
   private capture(event: EVENT_IDS, properties: object = {}) {
     this.client.capture({
       distinctId: this.userId,
-      event: event,
+      event,
       properties: {
         from: this.telemetryFrom,
         ...properties,

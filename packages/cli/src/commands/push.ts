@@ -73,7 +73,7 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
   const numericTaskId = parseInt(taskId, 10);
   if (isNaN(numericTaskId)) {
     result.error = `Invalid task ID '${taskId}' - must be a number`;
-    exitWithError(result, json);
+    await exitWithError(result, json, { telemetry });
     return;
   }
 
@@ -100,7 +100,7 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
 
     if (!task.worktreePath || !existsSync(task.worktreePath)) {
       result.error = 'Task workspace not found';
-      exitWithError(result, json);
+      await exitWithError(result, json, { telemetry });
       return;
     }
 
@@ -133,7 +133,7 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
 
         if (!unpushedCommits) {
           result.success = true;
-          exitWithWarn('No changes to push', result, json);
+          await exitWithWarn('No changes to push', result, json, { telemetry });
           return;
         }
       } catch {
@@ -188,7 +188,7 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
       } catch (error: any) {
         result.error = `Failed to commit changes: ${error.message}`;
         commitSpinner?.error('Failed to commit changes');
-        exitWithError(result, json);
+        await exitWithError(result, json, { telemetry });
         return;
       }
     }
@@ -232,13 +232,13 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
         } catch (retryError: any) {
           pushSpinner?.error('Failed to push branch');
           result.error = `Failed to push branch: ${retryError.message}`;
-          exitWithError(result, json);
+          await exitWithError(result, json, { telemetry });
           return;
         }
       } else {
         pushSpinner?.error('Failed to push branch');
         result.error = `Failed to push branch: ${error.message}`;
-        exitWithError(result, json);
+        await exitWithError(result, json, { telemetry });
         return;
       }
     }
@@ -345,19 +345,20 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
       );
     }
 
-    exitWithSuccess('Push completed successfully!', result, json, {
+    await exitWithSuccess('Push completed successfully!', result, json, {
       tips,
       tipsConfig: {
         title: TIP_TITLES.NEXT_STEPS,
       },
+      telemetry,
     });
   } catch (error: any) {
     if (error instanceof TaskNotFoundError) {
       result.error = `The task with ID ${numericTaskId} was not found`;
-      exitWithError(result, json);
+      await exitWithError(result, json, { telemetry });
     } else {
       result.error = `There was an error deleting the task: ${error}`;
-      exitWithError(result, json);
+      await exitWithError(result, json, { telemetry });
     }
   } finally {
     await telemetry?.shutdown();

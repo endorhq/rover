@@ -10,6 +10,7 @@ import {
   type DiagramStep,
 } from 'rover-common';
 import { readFileSync } from 'node:fs';
+import { getTelemetry } from '../../lib/telemetry.js';
 
 interface InspectWorkflowCommandOptions {
   // Output formats
@@ -27,7 +28,12 @@ export const inspectWorkflowCommand = async (
   workflowName: string,
   options: InspectWorkflowCommandOptions
 ) => {
+  const telemetry = getTelemetry();
+
   try {
+    // Track inspect workflow event
+    telemetry?.eventInspectWorkflow();
+
     // Load the workflow
     const workflowStore = initWorkflowStore();
     const workflow = workflowStore.getWorkflow(workflowName);
@@ -194,5 +200,7 @@ export const inspectWorkflowCommand = async (
     } else {
       console.error(colors.red('Error inspecting workflow:'), error);
     }
+  } finally {
+    await telemetry?.shutdown();
   }
 };

@@ -58,7 +58,7 @@ export const logsCommand = async (
   const numericTaskId = parseInt(taskId, 10);
   if (isNaN(numericTaskId)) {
     jsonOutput.error = `Invalid task ID '${taskId}' - must be a number`;
-    exitWithError(jsonOutput, json);
+    await exitWithError(jsonOutput, json, { telemetry });
     return;
   }
 
@@ -72,7 +72,7 @@ export const logsCommand = async (
       targetIteration = parseInt(iterationNumber, 10);
       if (isNaN(targetIteration)) {
         jsonOutput.error = `Invalid iteration number: '${iterationNumber}'`;
-        exitWithError(jsonOutput, json);
+        await exitWithError(jsonOutput, json, { telemetry });
         return;
       }
     }
@@ -83,10 +83,11 @@ export const logsCommand = async (
     );
 
     if (availableIterations.length === 0) {
-      exitWithWarn(
+      await exitWithWarn(
         `No iterations found for task '${numericTaskId}'`,
         jsonOutput,
-        json
+        json,
+        { telemetry }
       );
       return;
     }
@@ -98,7 +99,7 @@ export const logsCommand = async (
     // Check if specific iteration exists (if requested)
     if (targetIteration && !availableIterations.includes(targetIteration)) {
       jsonOutput.error = `Iteration ${targetIteration} not found for task '${numericTaskId}'. Available iterations: ${availableIterations.join(', ')}`;
-      exitWithError(jsonOutput, json);
+      await exitWithError(jsonOutput, json, { telemetry });
       return;
     }
 
@@ -106,10 +107,11 @@ export const logsCommand = async (
     const containerId = task.containerId;
 
     if (!containerId) {
-      exitWithWarn(
+      await exitWithWarn(
         `No container found for task '${numericTaskId}'. Logs are only available for recent tasks`,
         jsonOutput,
-        json
+        json,
+        { telemetry }
       );
       return;
     }
@@ -184,10 +186,11 @@ export const logsCommand = async (
           launchSync('docker', ['logs', containerId])?.stdout?.toString() || '';
 
         if (logs.trim() === '') {
-          exitWithWarn(
+          await exitWithWarn(
             'No logs available for this container. Logs are only available for recent tasks',
             jsonOutput,
-            json
+            json,
+            { telemetry }
           );
           return;
         } else {
@@ -209,15 +212,16 @@ export const logsCommand = async (
         }
       } catch (dockerError: any) {
         if (dockerError.message.includes('No such container')) {
-          exitWithWarn(
+          await exitWithWarn(
             'No logs available for this container. Logs are only available for recent tasks',
             jsonOutput,
-            json
+            json,
+            { telemetry }
           );
           return;
         } else {
           jsonOutput.error = `Error retrieving container logs: ${dockerError.message}`;
-          exitWithError(jsonOutput, json);
+          await exitWithError(jsonOutput, json, { telemetry });
           return;
         }
       }
@@ -258,10 +262,10 @@ export const logsCommand = async (
   } catch (error) {
     if (error instanceof TaskNotFoundError) {
       jsonOutput.error = `The task with ID ${numericTaskId} was not found`;
-      exitWithError(jsonOutput, json);
+      await exitWithError(jsonOutput, json, { telemetry });
     } else {
       jsonOutput.error = `There was an error reading task logs: ${error}`;
-      exitWithError(jsonOutput, json);
+      await exitWithError(jsonOutput, json, { telemetry });
     }
   } finally {
     await telemetry?.shutdown();

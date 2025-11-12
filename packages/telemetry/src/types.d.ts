@@ -1,5 +1,6 @@
 export type NewTaskMetadata = {
   provider: NewTaskProvider;
+  workflow?: string;
 };
 
 export type IterateMetadata = {

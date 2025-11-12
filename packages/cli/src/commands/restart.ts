@@ -43,7 +43,7 @@ export const restartCommand = async (
   const numericTaskId = parseInt(taskId, 10);
   if (isNaN(numericTaskId)) {
     jsonOutput.error = `Invalid task ID '${taskId}' - must be a number`;
-    exitWithError(jsonOutput, json);
+    await exitWithError(jsonOutput, json, { telemetry });
     return;
   }
 
@@ -54,13 +54,14 @@ export const restartCommand = async (
     // Check if task is in NEW or FAILED status
     if (!task.isNew() && !task.isFailed()) {
       jsonOutput.error = `Task ${taskId} is not in NEW or FAILED status (current: ${task.status})`;
-      exitWithError(jsonOutput, json, {
+      await exitWithError(jsonOutput, json, {
         tips: [
           'Only NEW and FAILED tasks can be restarted',
           'Use ' +
             colors.cyan(`rover inspect ${taskId}`) +
             colors.gray(' to find out the current task status'),
         ],
+        telemetry,
       });
       return;
     }
@@ -153,6 +154,9 @@ export const restartCommand = async (
     // Mark task as in progress
     task.markInProgress();
 
+    // Track restart event
+    telemetry?.eventRestartTask();
+
     // Start sandbox container for task execution
     try {
       const sandbox = await createSandbox(task);
@@ -174,7 +178,7 @@ export const restartCommand = async (
       restartedAt: restartedAt,
     };
 
-    exitWithSuccess('Task restarted succesfully!', jsonOutput, json, {
+    await exitWithSuccess('Task restarted succesfully!', jsonOutput, json, {
       tips: [
         'Use ' + colors.cyan('rover list') + ' to check the list of tasks',
         'Use ' +
@@ -184,17 +188,18 @@ export const restartCommand = async (
           colors.cyan(`rover inspect ${task.id}`) +
           ' to check the task status',
       ],
+      telemetry,
     });
 
     return;
   } catch (error) {
     if (error instanceof TaskNotFoundError) {
       jsonOutput.error = `The task with ID ${numericTaskId} was not found`;
-      exitWithError(jsonOutput, json);
+      await exitWithError(jsonOutput, json, { telemetry });
       return;
     } else {
       jsonOutput.error = `There was an error restarting the task: ${error}`;
-      exitWithError(jsonOutput, json);
+      await exitWithError(jsonOutput, json, { telemetry });
       return;
     }
   } finally {

@@ -1,11 +1,13 @@
 import colors from 'ansi-colors';
 import { CLIJsonOutput, CLIJsonOutputWithErrors } from '../types.js';
 import { showTips, TipsConfig } from './display.js';
+import Telemetry from 'rover-telemetry';
 
 type ExitWithErrorOpts = {
   exitCode?: number;
   tips?: string[];
   tipsConfig?: TipsConfig;
+  telemetry?: Telemetry;
 };
 
 type ExitWithWarnOpts = ExitWithErrorOpts;
@@ -13,6 +15,7 @@ type ExitWithWarnOpts = ExitWithErrorOpts;
 type ExitWithSuccessOpts = {
   tips?: string[];
   tipsConfig?: TipsConfig;
+  telemetry?: Telemetry;
 };
 
 /**
@@ -46,12 +49,17 @@ export const exitWithError = (
  * It can also show a set of tips to show after the error messages.
  * It will show only on non-json outputs.
  */
-export const exitWithErrors = (
+export const exitWithErrors = async (
   jsonOutput: CLIJsonOutputWithErrors,
   json: boolean | undefined,
   options: ExitWithErrorOpts = {}
 ) => {
-  const { tips, tipsConfig, exitCode } = options;
+  const { tips, tipsConfig, exitCode, telemetry } = options;
+
+  // Flush telemetry before exiting
+  if (telemetry) {
+    await telemetry.shutdown();
+  }
 
   if (json === true) {
     console.log(JSON.stringify(jsonOutput, null, 2));
@@ -69,13 +77,18 @@ export const exitWithErrors = (
  * Exits the program with a warning message. By default, it just returns a 0
  * exitCode, but you can change it.
  */
-export const exitWithWarn = (
+export const exitWithWarn = async (
   warnMessage: string,
   jsonOutput: CLIJsonOutput,
   json: boolean | undefined,
   options: ExitWithWarnOpts = {}
 ) => {
-  const { tips, tipsConfig, exitCode } = options;
+  const { tips, tipsConfig, exitCode, telemetry } = options;
+
+  // Flush telemetry before exiting
+  if (telemetry) {
+    await telemetry.shutdown();
+  }
 
   if (json === true) {
     console.log(JSON.stringify(jsonOutput, null, 2));
@@ -92,13 +105,18 @@ export const exitWithWarn = (
  * Exits the program showing a success message and an optional
  * set of tips.
  */
-export const exitWithSuccess = (
+export const exitWithSuccess = async (
   successMessage: string,
   jsonOutput: CLIJsonOutput,
   json: boolean | undefined,
   options: ExitWithSuccessOpts = {}
 ) => {
-  const { tips, tipsConfig } = options;
+  const { tips, tipsConfig, telemetry } = options;
+
+  // Flush telemetry before exiting
+  if (telemetry) {
+    await telemetry.shutdown();
+  }
 
   if (json === true) {
     console.log(JSON.stringify(jsonOutput, null, 2));

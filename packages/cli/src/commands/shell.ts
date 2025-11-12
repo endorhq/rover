@@ -31,7 +31,7 @@ export const shellCommand = async (
   const numericTaskId = parseInt(taskId, 10);
   if (isNaN(numericTaskId)) {
     jsonOutput.error = `Invalid task ID '${taskId}' - must be a number`;
-    exitWithError(jsonOutput, json);
+    await exitWithError(jsonOutput, json, { telemetry });
     return;
   }
 
@@ -49,7 +49,7 @@ export const shellCommand = async (
     // Check if worktree exists
     if (!task.worktreePath || !existsSync(task.worktreePath)) {
       jsonOutput.error = `No worktree found for this task`;
-      exitWithError(jsonOutput, json);
+      await exitWithError(jsonOutput, json, { telemetry });
       return;
     }
 
@@ -61,7 +61,7 @@ export const shellCommand = async (
 
       if (!availableBackend) {
         jsonOutput.error = `Neither Docker nor Podman are available. Please install Docker or Podman.`;
-        exitWithError(jsonOutput, json);
+        await exitWithError(jsonOutput, json, { telemetry });
         return;
       }
     }
@@ -93,7 +93,7 @@ export const shellCommand = async (
       } catch (error) {
         spinner.error('Failed to start container shell');
         jsonOutput.error = 'Failed to start container: ' + error;
-        exitWithError(jsonOutput, json);
+        await exitWithError(jsonOutput, json, { telemetry });
         return;
       }
     } else {
@@ -166,7 +166,7 @@ export const shellCommand = async (
       } catch (error) {
         spinner.error(`Failed to start shell ${shell}`);
         jsonOutput.error = 'Failed to start shell: ' + error;
-        exitWithError(jsonOutput, json);
+        await exitWithError(jsonOutput, json, { telemetry });
         return;
       }
     }
@@ -174,22 +174,25 @@ export const shellCommand = async (
     if (shellProcess) {
       // Handle process completion
       if (shellProcess.exitCode === 0) {
-        exitWithSuccess('Shell session ended', jsonOutput, json);
+        await exitWithSuccess('Shell session ended', jsonOutput, json, {
+          telemetry,
+        });
       } else {
-        exitWithWarn(
+        await exitWithWarn(
           `Shell session ended with code ${shellProcess.exitCode}`,
           jsonOutput,
-          json
+          json,
+          { telemetry }
         );
       }
     }
   } catch (error) {
     if (error instanceof TaskNotFoundError) {
       jsonOutput.error = `The task with ID ${numericTaskId} was not found`;
-      exitWithError(jsonOutput, json);
+      await exitWithError(jsonOutput, json, { telemetry });
     } else {
       jsonOutput.error = `There was an error starting the shell: ${error}`;
-      exitWithError(jsonOutput, json);
+      await exitWithError(jsonOutput, json, { telemetry });
     }
   } finally {
     await telemetry?.shutdown();

@@ -15,6 +15,7 @@ import { TaskDescriptionManager } from 'rover-schemas';
 // Mock external dependencies
 vi.mock('../../lib/telemetry.js', () => ({
   getTelemetry: vi.fn().mockReturnValue({
+    eventRestartTask: vi.fn(),
     shutdown: vi.fn().mockResolvedValue(undefined),
   }),
 }));
@@ -193,6 +194,7 @@ describe('restart command', async () => {
           tips: expect.arrayContaining([
             'Only NEW and FAILED tasks can be restarted',
           ]),
+          telemetry: expect.anything(),
         })
       );
     });
@@ -209,7 +211,10 @@ describe('restart command', async () => {
         expect.objectContaining({
           error: expect.stringContaining('Invalid task ID'),
         }),
-        true
+        true,
+        expect.objectContaining({
+          telemetry: expect.anything(),
+        })
       );
     });
 
@@ -225,7 +230,10 @@ describe('restart command', async () => {
         expect.objectContaining({
           error: expect.stringContaining('not found'),
         }),
-        true
+        true,
+        expect.objectContaining({
+          telemetry: expect.anything(),
+        })
       );
     });
   });

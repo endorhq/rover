@@ -35,6 +35,7 @@
   ],
   "scripts": {
     "build": "tsdown",
+    "build-dev": "TSUP_DEV=true tsdown",
     "dev": "TSUP_DEV=true tsdown --watch src/",
     "start": "node dist/index.js",
     "clean": "rm -rf dist",
