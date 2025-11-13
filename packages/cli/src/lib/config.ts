@@ -66,6 +66,10 @@ export interface ProjectConfigSchema {
   // Custom environment variables
   envs?: string[];
   envsFile?: string;
+
+  // Agent configuration
+  agentImage?: string;
+  initScript?: string;
 }
 
 const PROJECT_CONFIG_FILE = 'rover.json';
@@ -154,6 +158,8 @@ export class ProjectConfig {
       attribution: data.attribution !== undefined ? data.attribution : true,
       ...(data.envs !== undefined ? { envs: data.envs } : {}),
       ...(data.envsFile !== undefined ? { envsFile: data.envsFile } : {}),
+      ...(data.agentImage !== undefined ? { agentImage: data.agentImage } : {}),
+      ...(data.initScript !== undefined ? { initScript: data.initScript } : {}),
     };
 
     return migrated;
@@ -205,6 +211,12 @@ export class ProjectConfig {
   }
   get envsFile(): string | undefined {
     return this.data.envsFile;
+  }
+  get agentImage(): string | undefined {
+    return this.data.agentImage;
+  }
+  get initScript(): string | undefined {
+    return this.data.initScript;
   }
 
   // Data Modification (Setters)

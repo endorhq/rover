@@ -171,6 +171,8 @@ export TASK_ID TASK_TITLE TASK_DESCRIPTION
 echo -e "\n👤 Removing privileges after completing the setup!"
 sudo rm /etc/sudoers.d/1-agent-setup
 
+{initScriptExecution}
+
 # Execute the complete task workflow
 echo -e "\n======================================="
 echo "🚀 Running Workflow"

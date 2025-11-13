@@ -1,6 +1,56 @@
 import { launch } from 'rover-common';
+import { ProjectConfig } from '../config.js';
+import colors from 'ansi-colors';
 
 export const AGENT_IMAGE = 'ghcr.io/endorhq/rover/node:v1.3.4';
+
+/**
+ * Resolves the agent image to use, with precedence:
+ * 1. AGENT_IMAGE environment variable
+ * 2. agentImage from ProjectConfig
+ * 3. AGENT_IMAGE constant (default)
+ */
+export function resolveAgentImage(projectConfig?: ProjectConfig): string {
+  // Check environment variable first
+  const envImage = process.env.AGENT_IMAGE;
+  if (envImage) {
+    return envImage;
+  }
+
+  // Check project config if available
+  if (projectConfig?.agentImage) {
+    return projectConfig.agentImage;
+  }
+
+  // Fall back to default constant
+  return AGENT_IMAGE;
+}
+
+/**
+ * Checks if a custom agent image is being used and prints a warning if so
+ */
+export function warnIfCustomImage(projectConfig?: ProjectConfig): void {
+  const envImage = process.env.AGENT_IMAGE;
+  const configImage = projectConfig?.agentImage;
+
+  // Only warn if a custom image is configured (not using the default)
+  if (envImage || configImage) {
+    const customImage = envImage || configImage;
+    console.log(
+      colors.yellow(
+        '\n⚠ Note: Using custom agent image: ' + colors.cyan(customImage!)
+      )
+    );
+    console.log(
+      colors.yellow(
+        '  This might have side effects on the expected behavior of Rover if this image is incompatible'
+      )
+    );
+    console.log(
+      colors.yellow('  with the reference image: ' + colors.cyan(AGENT_IMAGE))
+    );
+  }
+}
 
 export type CurrentUser = string;
 export type CurrentGroup = string;
