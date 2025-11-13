@@ -338,4 +338,186 @@ describe('ProjectConfig - Environment Variable Configuration', () => {
     expect(jsonData.envs).toEqual(['NODE_ENV']);
     expect(jsonData.envsFile).toBe('.env');
   });
+
+  it('should create new config without agentImage and initScript fields', () => {
+    const config = ProjectConfig.create();
+
+    expect(existsSync('rover.json')).toBe(true);
+    const jsonData = JSON.parse(readFileSync('rover.json', 'utf8'));
+
+    // Optional fields should not be present if undefined
+    expect('agentImage' in jsonData).toBe(false);
+    expect('initScript' in jsonData).toBe(false);
+
+    // Getters should return undefined
+    expect(config.agentImage).toBeUndefined();
+    expect(config.initScript).toBeUndefined();
+  });
+
+  it('should create config with custom agentImage', () => {
+    writeFileSync(
+      'rover.json',
+      JSON.stringify(
+        {
+          version: '1.2',
+          languages: ['typescript'],
+          packageManagers: ['npm'],
+          taskManagers: [],
+          attribution: true,
+          mcps: [],
+          agentImage: 'custom/agent:v2.0.0',
+        },
+        null,
+        2
+      )
+    );
+
+    const config = ProjectConfig.load();
+
+    expect(config.agentImage).toBe('custom/agent:v2.0.0');
+    expect(config.initScript).toBeUndefined();
+  });
+
+  it('should create config with initScript path', () => {
+    writeFileSync(
+      'rover.json',
+      JSON.stringify(
+        {
+          version: '1.2',
+          languages: ['typescript'],
+          packageManagers: ['npm'],
+          taskManagers: [],
+          attribution: true,
+          mcps: [],
+          initScript: 'scripts/init.sh',
+        },
+        null,
+        2
+      )
+    );
+
+    const config = ProjectConfig.load();
+
+    expect(config.initScript).toBe('scripts/init.sh');
+    expect(config.agentImage).toBeUndefined();
+  });
+
+  it('should create config with both agentImage and initScript', () => {
+    writeFileSync(
+      'rover.json',
+      JSON.stringify(
+        {
+          version: '1.2',
+          languages: ['typescript'],
+          packageManagers: ['npm'],
+          taskManagers: [],
+          attribution: true,
+          mcps: [],
+          agentImage: 'custom/agent:v2.0.0',
+          initScript: 'scripts/init.sh',
+        },
+        null,
+        2
+      )
+    );
+
+    const config = ProjectConfig.load();
+
+    expect(config.agentImage).toBe('custom/agent:v2.0.0');
+    expect(config.initScript).toBe('scripts/init.sh');
+  });
+
+  it('should migrate from version 1.0 to 1.2 preserving agentImage and initScript', () => {
+    writeFileSync(
+      'rover.json',
+      JSON.stringify(
+        {
+          version: '1.0',
+          languages: ['typescript'],
+          packageManagers: ['npm'],
+          taskManagers: [],
+          attribution: true,
+          agentImage: 'custom/agent:legacy',
+          initScript: 'init.sh',
+        },
+        null,
+        2
+      )
+    );
+
+    const config = ProjectConfig.load();
+
+    // Should be migrated to 1.2
+    expect(config.version).toBe('1.2');
+
+    // Should preserve custom fields
+    expect(config.agentImage).toBe('custom/agent:legacy');
+    expect(config.initScript).toBe('init.sh');
+
+    // Check saved file
+    const jsonData = JSON.parse(readFileSync('rover.json', 'utf8'));
+    expect(jsonData.version).toBe('1.2');
+    expect(jsonData.agentImage).toBe('custom/agent:legacy');
+    expect(jsonData.initScript).toBe('init.sh');
+  });
+
+  it('should migrate version 1.1 config with agentImage to 1.2', () => {
+    writeFileSync(
+      'rover.json',
+      JSON.stringify(
+        {
+          version: '1.1',
+          languages: ['typescript'],
+          packageManagers: ['npm'],
+          taskManagers: [],
+          attribution: true,
+          agentImage: 'ghcr.io/custom/rover:v1.0',
+        },
+        null,
+        2
+      )
+    );
+
+    const config = ProjectConfig.load();
+
+    expect(config.version).toBe('1.2');
+
+    // Check saved file has been migrated to 1.2
+    const jsonData = JSON.parse(readFileSync('rover.json', 'utf8'));
+    expect(jsonData.version).toBe('1.2');
+    expect(jsonData.agentImage).toBe('ghcr.io/custom/rover:v1.0');
+  });
+
+  it('should preserve all fields including agentImage and initScript during migration', () => {
+    writeFileSync(
+      'rover.json',
+      JSON.stringify(
+        {
+          version: '1.0',
+          languages: ['typescript', 'python'],
+          packageManagers: ['npm', 'pip'],
+          taskManagers: ['make'],
+          attribution: false,
+          envs: ['NODE_ENV'],
+          envsFile: '.env',
+          agentImage: 'myregistry/agent:custom',
+          initScript: 'scripts/setup.sh',
+        },
+        null,
+        2
+      )
+    );
+
+    const config = ProjectConfig.load();
+
+    expect(config.version).toBe('1.2');
+    expect(config.languages).toEqual(['typescript', 'python']);
+    expect(config.packageManagers).toEqual(['npm', 'pip']);
+    expect(config.taskManagers).toEqual(['make']);
+    expect(config.attribution).toBe(false);
+    expect(config.envs).toEqual(['NODE_ENV']);
+    expect(config.envsFile).toBe('.env');
+    expect(config.agentImage).toBe('myregistry/agent:custom');
+    expect(config.initScript).toBe('scripts/setup.sh');
+  });
 });

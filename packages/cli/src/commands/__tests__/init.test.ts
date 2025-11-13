@@ -21,6 +21,7 @@ vi.mock('../../utils/system.js', async () => {
     checkDocker: vi.fn().mockResolvedValue(true),
     checkClaude: vi.fn().mockResolvedValue(true),
     checkCodex: vi.fn().mockResolvedValue(false),
+    checkCursor: vi.fn().mockResolvedValue(false),
     checkQwen: vi.fn().mockResolvedValue(false),
     checkGemini: vi.fn().mockResolvedValue(false),
     checkGitHubCLI: vi.fn().mockResolvedValue(false),
@@ -215,11 +216,11 @@ describe('init command', () => {
   });
 
   it('should require at least one AI agent to be installed', async () => {
-    const { checkClaude, checkCodex, checkQwen, checkGemini } = await import(
-      '../../utils/system.js'
-    );
+    const { checkClaude, checkCodex, checkCursor, checkQwen, checkGemini } =
+      await import('../../utils/system.js');
     vi.mocked(checkClaude).mockResolvedValueOnce(false);
     vi.mocked(checkCodex).mockResolvedValueOnce(false);
+    vi.mocked(checkCursor).mockResolvedValueOnce(false);
     vi.mocked(checkQwen).mockResolvedValueOnce(false);
     vi.mocked(checkGemini).mockResolvedValueOnce(false);
 
@@ -237,11 +238,11 @@ describe('init command', () => {
   });
 
   it('should handle multiple AI agents being available', async () => {
-    const { checkClaude, checkCodex, checkQwen, checkGemini } = await import(
-      '../../utils/system.js'
-    );
+    const { checkClaude, checkCodex, checkCursor, checkQwen, checkGemini } =
+      await import('../../utils/system.js');
     vi.mocked(checkClaude).mockResolvedValueOnce(true);
     vi.mocked(checkCodex).mockResolvedValueOnce(false);
+    vi.mocked(checkCursor).mockResolvedValueOnce(false);
     vi.mocked(checkQwen).mockResolvedValueOnce(false);
     vi.mocked(checkGemini).mockResolvedValueOnce(true);
 
