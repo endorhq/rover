@@ -22,6 +22,8 @@ import {
   ContainerBackend,
   etcPasswdWithUserInfo,
   etcGroupWithUserInfo,
+  resolveAgentImage,
+  warnIfCustomImage,
 } from './container-common.js';
 
 export class DockerSandbox extends Sandbox {
@@ -75,10 +77,11 @@ export class DockerSandbox extends Sandbox {
     // Load project config and merge custom environment variables
     const projectRoot = findProjectRoot();
     let customEnvVariables: string[] = [];
+    let projectConfig: ProjectConfig | undefined;
 
     if (ProjectConfig.exists()) {
       try {
-        const projectConfig = ProjectConfig.load();
+        projectConfig = ProjectConfig.load();
 
         // Parse custom envs array
         if (projectConfig.envs && projectConfig.envs.length > 0) {
@@ -144,11 +147,17 @@ export class DockerSandbox extends Sandbox {
       userInfo_.gid = 1000;
     }
 
+    // Resolve the agent image from env var, config, or default
+    const agentImage = resolveAgentImage(projectConfig);
+
+    // Warn if using a custom agent image
+    warnIfCustomImage(projectConfig);
+
     const userCredentialsTempPath = mkdtempSync(join(tmpdir(), 'rover-'));
     const etcPasswd = join(userCredentialsTempPath, 'passwd');
     const [etcPasswdContents, username] = await etcPasswdWithUserInfo(
       ContainerBackend.Docker,
-      AGENT_IMAGE,
+      agentImage,
       userInfo_
     );
     writeFileSync(etcPasswd, etcPasswdContents);
@@ -156,7 +165,7 @@ export class DockerSandbox extends Sandbox {
     const etcGroup = join(userCredentialsTempPath, 'group');
     const [etcGroupContents, group] = await etcGroupWithUserInfo(
       ContainerBackend.Docker,
-      AGENT_IMAGE,
+      agentImage,
       userInfo_
     );
     writeFileSync(etcGroup, etcGroupContents);
@@ -180,13 +189,24 @@ export class DockerSandbox extends Sandbox {
       '-v',
       `${inputsPath}:/inputs.json:Z,ro`,
       '-v',
-      `${iterationJsonPath}:/task/description.json:Z,ro`,
+      `${iterationJsonPath}:/task/description.json:Z,ro`
+    );
+
+    // Mount initScript if provided in project config
+    if (projectConfig?.initScript) {
+      const initScriptAbsPath = join(projectRoot, projectConfig.initScript);
+      if (existsSync(initScriptAbsPath)) {
+        dockerArgs.push('-v', `${initScriptAbsPath}:/init-script.sh:Z,ro`);
+      }
+    }
+
+    dockerArgs.push(
       ...allEnvVariables,
       '-w',
       '/workspace',
       '--entrypoint',
       '/entrypoint.sh',
-      AGENT_IMAGE,
+      agentImage,
       'rover-agent',
       'run',
       '/workflow.yml',
