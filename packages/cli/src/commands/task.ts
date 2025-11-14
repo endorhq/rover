@@ -3,11 +3,11 @@ import colors from 'ansi-colors';
 import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { getNextTaskId } from '../utils/task-id.js';
-import { homedir } from 'node:os';
+import { homedir, platform } from 'node:os';
 import { getAIAgentTool, getUserAIAgent } from '../lib/agents/index.js';
 import { TaskDescriptionManager } from 'rover-schemas';
 import { createSandbox } from '../lib/sandbox/index.js';
-import { AI_AGENT } from 'rover-common';
+import { AI_AGENT, launchSync } from 'rover-common';
 import { IterationManager } from 'rover-schemas';
 import { generateBranchName } from '../utils/branch-name.js';
 import {
@@ -67,21 +67,11 @@ const validations = (selectedAiAgent?: string): validationResult => {
     }
   } else if (selectedAiAgent === 'cursor') {
     const cursorConfig = join(homedir(), '.cursor', 'cli-config.json');
-    const cursorCreds = join(homedir(), '.config', 'cursor', 'auth.json');
 
     if (!existsSync(cursorConfig)) {
       return {
         error: 'Cursor configuration not found',
         tips: ['Run ' + colors.cyan('cursor-agent') + ' first to configure it'],
-      };
-    }
-
-    if (!existsSync(cursorCreds)) {
-      return {
-        error: 'Cursor credentials not found',
-        tips: [
-          'Run ' + colors.cyan('cursor-agent') + ' first to set up credentials',
-        ],
       };
     }
   } else if (selectedAiAgent === 'gemini') {
@@ -586,8 +576,17 @@ export const taskCommand = async (
 
     processManager?.completeLastItem();
 
-    inputsData.set('description', expandedTask!.description);
-    inputsData.set('title', expandedTask!.title);
+    if (!expandedTask) {
+      jsonOutput.error = `Failed to expand task description using ${selectedAiAgent}`;
+      await exitWithError(jsonOutput, json, {
+        tips: ['Check your agent configuration and try again'],
+        telemetry,
+      });
+      return;
+    }
+
+    inputsData.set('description', expandedTask.description);
+    inputsData.set('title', expandedTask.title);
 
     processManager?.addItem('Create the task workspace');
 

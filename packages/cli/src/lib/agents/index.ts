@@ -5,8 +5,17 @@ import GeminiAI from './gemini.js';
 import QwenAI from './qwen.js';
 import type { IPromptTask } from '../prompts/index.js';
 import { UserSettings } from '../config.js';
-import { AI_AGENT } from 'rover-common';
+import { AI_AGENT, launchSync } from 'rover-common';
 import type { WorkflowInput } from 'rover-schemas';
+
+export const findKeychainCredentials = (key: string): string => {
+  const result = launchSync(
+    'security',
+    ['find-generic-password', '-s', key, '-w'],
+    { mightLogSensitiveInformation: true }
+  );
+  return result.stdout?.toString() || '';
+};
 
 export interface AIAgentTool {
   // Invoke the CLI tool using the SDK / direct mode with the given prompt

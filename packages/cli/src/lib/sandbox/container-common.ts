@@ -1,6 +1,6 @@
 import { launch } from 'rover-common';
 
-export const AGENT_IMAGE = 'ghcr.io/endorhq/rover/node:v1.3.3';
+export const AGENT_IMAGE = 'ghcr.io/endorhq/rover/node:v1.3.4';
 
 export type CurrentUser = string;
 export type CurrentGroup = string;

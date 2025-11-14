@@ -7,6 +7,7 @@ import {
 } from 'rover-common';
 import {
   AIAgentTool,
+  findKeychainCredentials,
   InvokeAIAgentError,
   MissingAIAgentError,
 } from './index.js';
@@ -16,15 +17,6 @@ import { homedir, tmpdir, platform } from 'node:os';
 import { join } from 'node:path';
 import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
 import type { WorkflowInput } from 'rover-schemas';
-
-const findKeychainCredentials = (key: string): string => {
-  const result = launchSync(
-    'security',
-    ['find-generic-password', '-s', key, '-w'],
-    { mightLogSensitiveInformation: true }
-  );
-  return result.stdout?.toString() || '';
-};
 
 // Environment variables reference:
 // - https://docs.claude.com/en/docs/claude-code/settings.md

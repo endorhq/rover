@@ -1,10 +1,10 @@
 import { existsSync, copyFileSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { homedir } from 'node:os';
+import { homedir, platform } from 'node:os';
 import colors from 'ansi-colors';
 import { AgentCredentialFile } from './types.js';
 import { BaseAgent } from './base.js';
-import { launch } from 'rover-common';
+import { launch, launchSync } from 'rover-common';
 import { mcpJsonSchema } from '../mcp/schema.js';
 
 export class CursorAgent extends BaseAgent {
@@ -20,7 +20,7 @@ export class CursorAgent extends BaseAgent {
       {
         path: '/.cursor/cli-config.json',
         description: 'Cursor configuration',
-        required: true,
+        required: false,
       },
       {
         path: '/.config/cursor/auth.json',
@@ -36,6 +36,7 @@ export class CursorAgent extends BaseAgent {
     this.ensureDirectory(join(targetDir, '.cursor'));
     this.ensureDirectory(join(targetDir, '.config', 'cursor'));
 
+    // Copy existing credential files
     const credentials = this.getRequiredCredentials();
     for (const cred of credentials) {
       if (existsSync(cred.path)) {
