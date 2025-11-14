@@ -1,15 +1,39 @@
 import { existsSync, copyFileSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { homedir } from 'node:os';
+import { homedir, platform } from 'node:os';
 import colors from 'ansi-colors';
 import { AgentCredentialFile } from './types.js';
 import { BaseAgent } from './base.js';
-import { launch } from 'rover-common';
+import { launch, launchSync } from 'rover-common';
 import { mcpJsonSchema } from '../mcp/schema.js';
 
 export class CursorAgent extends BaseAgent {
   name = 'Cursor';
   binary = 'cursor-agent';
+
+  /**
+   * Reads a credential from macOS Keychain
+   * @param service The keychain service/item name
+   * @returns The credential value or null if not found
+   */
+  private readFromKeychain(service: string): string | null {
+    if (platform() !== 'darwin') {
+      return null;
+    }
+
+    try {
+      const { stdout } = launchSync('security', [
+        'find-generic-password',
+        '-s',
+        service,
+        '-w',
+      ]);
+      return stdout?.toString().trim() || null;
+    } catch (_err) {
+      // Credential not found in keychain
+      return null;
+    }
+  }
 
   getInstallCommand(): string {
     return `nix build --no-link --accept-flake-config github:numtide/nix-ai-tools/${process.env.NIX_AI_TOOLS_REV}#cursor-agent`;
@@ -36,11 +60,48 @@ export class CursorAgent extends BaseAgent {
     this.ensureDirectory(join(targetDir, '.cursor'));
     this.ensureDirectory(join(targetDir, '.config', 'cursor'));
 
+    // Copy existing credential files
     const credentials = this.getRequiredCredentials();
     for (const cred of credentials) {
-      if (existsSync(cred.path)) {
-        copyFileSync(cred.path, join(targetDir, cred.path));
+      const sourcePath = join(homedir(), cred.path);
+      if (existsSync(sourcePath)) {
+        copyFileSync(sourcePath, join(targetDir, cred.path));
         console.log(colors.gray('├── Copied: ') + colors.cyan(cred.path));
+      }
+    }
+
+    // On macOS, extract credentials from Keychain
+    if (platform() === 'darwin') {
+      const accessToken = this.readFromKeychain('cursor-access-token');
+      const refreshToken = this.readFromKeychain('cursor-refresh-token');
+
+      if (accessToken || refreshToken) {
+        const authData: Record<string, string> = {};
+        if (accessToken) {
+          authData.accessToken = accessToken;
+        }
+        if (refreshToken) {
+          authData.refreshToken = refreshToken;
+        }
+
+        const authPath = join(targetDir, '.config', 'cursor', 'auth.json');
+
+        // Merge with existing auth.json if it exists
+        let existingAuth: Record<string, any> = {};
+        if (existsSync(authPath)) {
+          try {
+            existingAuth = JSON.parse(readFileSync(authPath, 'utf-8'));
+          } catch (_err) {
+            // Invalid JSON, will overwrite
+          }
+        }
+
+        const mergedAuth = { ...existingAuth, ...authData };
+        writeFileSync(authPath, JSON.stringify(mergedAuth, null, 2), 'utf-8');
+        console.log(
+          colors.gray('├── Extracted from Keychain: ') +
+            colors.cyan('cursor tokens')
+        );
       }
     }
 

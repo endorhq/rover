@@ -7,7 +7,7 @@ import {
 import { PromptBuilder, IPromptTask } from '../prompts/index.js';
 import { parseJsonResponse } from '../../utils/json-parser.js';
 import { existsSync, readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
+import { homedir, platform } from 'node:os';
 import { join } from 'node:path';
 import { fileSync } from 'tmp';
 import type { WorkflowInput } from 'rover-schemas';
@@ -19,10 +19,37 @@ const CURSOR_ENV_VARS = [
   'CURSOR_API_KEY',
 ];
 
+// macOS Keychain items for Cursor
+const CURSOR_KEYCHAIN_ITEMS = ['cursor-access-token', 'cursor-refresh-token'];
+
 class CursorAI implements AIAgentTool {
   // constants
   public AGENT_BIN = 'cursor-agent';
   private promptBuilder = new PromptBuilder('cursor');
+
+  /**
+   * Reads a credential from macOS Keychain
+   * @param service The keychain service/item name
+   * @returns The credential value or null if not found
+   */
+  private readFromKeychain(service: string): string | null {
+    if (platform() !== 'darwin') {
+      return null;
+    }
+
+    try {
+      const { stdout } = launchSync('security', [
+        'find-generic-password',
+        '-s',
+        service,
+        '-w',
+      ]);
+      return stdout?.toString().trim() || null;
+    } catch (_err) {
+      // Credential not found in keychain
+      return null;
+    }
+  }
 
   async checkAgent(): Promise<void> {
     try {
@@ -33,7 +60,7 @@ class CursorAI implements AIAgentTool {
   }
 
   async invoke(prompt: string, json: boolean = false): Promise<string> {
-    const cursorArgs = ['agent', '--print', prompt];
+    const cursorArgs = ['agent', '--print'];
     if (json) {
       cursorArgs.push('--output-format');
       cursorArgs.push('json');
@@ -191,9 +218,23 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
   getEnvironmentVariables(): string[] {
     const envVars: string[] = [];
 
+    // Add standard environment variables
     for (const key of CURSOR_ENV_VARS) {
       if (process.env[key] !== undefined) {
         envVars.push('-e', key);
+      }
+    }
+
+    // On macOS, extract credentials from Keychain and make them available
+    if (platform() === 'darwin') {
+      for (const keychainItem of CURSOR_KEYCHAIN_ITEMS) {
+        const value = this.readFromKeychain(keychainItem);
+        if (value) {
+          // Convert keychain item name to environment variable name
+          // e.g., cursor-access-token -> CURSOR_ACCESS_TOKEN
+          const envVarName = keychainItem.toUpperCase().replace(/-/g, '_');
+          envVars.push('-e', `${envVarName}=${value}`);
+        }
       }
     }
 
