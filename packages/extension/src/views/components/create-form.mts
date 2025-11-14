@@ -2,6 +2,20 @@ import { LitElement, html } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import styles from './create-form.css.mjs';
 
+interface WorkflowInput {
+  name: string;
+  description: string;
+  type: string;
+  required: boolean;
+  default?: any;
+}
+
+interface Workflow {
+  id: string;
+  label: string;
+  inputs?: WorkflowInput[];
+}
+
 @customElement('create-form')
 export class CreateForm extends LitElement {
   @property({ type: Object }) vscode: any = null;
@@ -9,8 +23,7 @@ export class CreateForm extends LitElement {
   @property({ type: String }) defaultAgent: string = 'claude';
   @property({ type: Array }) branches: string[] = ['main'];
   @property({ type: String }) defaultBranch: string = 'main';
-  @property({ type: Array }) workflows: Array<{ id: string; label: string }> =
-    [];
+  @property({ type: Array }) workflows: Workflow[] = [];
   @property({ type: String }) defaultWorkflow: string = '';
   @property({ type: String }) dropdownDirection: 'auto' | 'up' | 'down' =
     'auto';
@@ -27,6 +40,7 @@ export class CreateForm extends LitElement {
   @state() private branchDropdownDirection: 'up' | 'down' = 'down';
   @state() private workflowDropdownDirection: 'up' | 'down' = 'down';
   @state() private errorMessage = '';
+  @state() private workflowInputValues: Record<string, any> = {};
 
   private getAgentsList() {
     return this.agents.map(agent => ({
@@ -81,6 +95,7 @@ export class CreateForm extends LitElement {
     if (!this.selectedWorkflow && this.workflows.length > 0) {
       this.selectedWorkflow =
         this.defaultWorkflow || this.workflows[0]?.id || '';
+      this.initializeWorkflowInputs();
     }
   }
 
@@ -119,10 +134,18 @@ export class CreateForm extends LitElement {
     // Ensure selected workflow is still valid when workflows list changes
     if (changedProperties.has('workflows') && this.workflows.length > 0) {
       const workflowIds = this.workflows.map(w => w.id);
-      if (!workflowIds.includes(this.selectedWorkflow)) {
+      const previouslySelectedWorkflowStillExists = workflowIds.includes(
+        this.selectedWorkflow
+      );
+
+      if (!previouslySelectedWorkflowStillExists) {
+        // Selected workflow no longer exists, switch to default
         this.selectedWorkflow =
           this.defaultWorkflow || this.workflows[0]?.id || '';
+        // Only reinitialize inputs when switching workflows
+        this.initializeWorkflowInputs();
       }
+      // If the selected workflow still exists, preserve user-entered values
     }
   }
 
@@ -168,6 +191,21 @@ export class CreateForm extends LitElement {
       return;
     }
 
+    // Validate required workflow inputs
+    const workflow = this.getSelectedWorkflow();
+    if (workflow && workflow.inputs) {
+      const requiredInputs = workflow.inputs.filter(
+        input => input.required && input.name !== 'description'
+      );
+      for (const input of requiredInputs) {
+        const value = this.workflowInputValues[input.name];
+        if (value === undefined || value === null || value === '') {
+          this.errorMessage = `Required field "${input.description || input.name}" is missing`;
+          return;
+        }
+      }
+    }
+
     // Clear any previous error and start creating
     this.errorMessage = '';
     this.creatingTask = true;
@@ -179,6 +217,7 @@ export class CreateForm extends LitElement {
         agent: this.selectedAgent,
         branch: this.selectedBranch,
         workflow: this.selectedWorkflow,
+        workflowInputs: this.workflowInputValues,
       });
     }
   }
@@ -258,6 +297,54 @@ export class CreateForm extends LitElement {
     event.stopPropagation();
     this.selectedWorkflow = workflowId;
     this.showWorkflowDropdown = false;
+    this.initializeWorkflowInputs();
+  }
+
+  private initializeWorkflowInputs() {
+    const workflow = this.workflows.find(w => w.id === this.selectedWorkflow);
+    if (!workflow || !workflow.inputs) {
+      this.workflowInputValues = {};
+      return;
+    }
+
+    const inputValues: Record<string, any> = {};
+    workflow.inputs.forEach(input => {
+      if (input.default !== undefined) {
+        inputValues[input.name] = input.default;
+      } else if (input.type === 'boolean') {
+        inputValues[input.name] = false;
+      } else {
+        inputValues[input.name] = '';
+      }
+    });
+    this.workflowInputValues = inputValues;
+  }
+
+  private handleWorkflowInputChange(inputName: string, value: any) {
+    // Validate and sanitize the input value based on its type
+    const workflow = this.getSelectedWorkflow();
+    const inputDef = workflow?.inputs?.find(input => input.name === inputName);
+
+    if (inputDef) {
+      // Type-specific validation
+      if (inputDef.type === 'number') {
+        // Ensure it's a valid number or empty string for optional fields
+        if (value !== '' && (isNaN(value) || !isFinite(value))) {
+          // Invalid number, don't update
+          return;
+        }
+      } else if (inputDef.type === 'string') {
+        // Limit string length to prevent abuse (max 10000 characters)
+        if (typeof value === 'string' && value.length > 10000) {
+          value = value.substring(0, 10000);
+        }
+      }
+    }
+
+    this.workflowInputValues = {
+      ...this.workflowInputValues,
+      [inputName]: value,
+    };
   }
 
   private selectAgent(agentId: string, event: Event) {
@@ -282,6 +369,83 @@ export class CreateForm extends LitElement {
       this.workflows.find(w => w.id === this.selectedWorkflow) ||
       this.workflows[0]
     );
+  }
+
+  private renderWorkflowInputs() {
+    const workflow = this.getSelectedWorkflow();
+    if (!workflow || !workflow.inputs || workflow.inputs.length === 0) {
+      return html``;
+    }
+
+    // Filter out 'description' input as it's handled by the main description textarea
+    const customInputs = workflow.inputs.filter(
+      input => input.name !== 'description'
+    );
+    if (customInputs.length === 0) {
+      return html``;
+    }
+
+    return html`
+      <div class="workflow-inputs">
+        ${customInputs.map(input => {
+          const value =
+            this.workflowInputValues[input.name] ?? input.default ?? '';
+
+          return html`
+            <div class="form-field">
+              <label class="form-label">
+                ${input.description || input.name}
+                ${input.required ? html`<span class="required">*</span>` : ''}
+              </label>
+              ${input.type === 'boolean'
+                ? html`
+                    <label class="checkbox-container">
+                      <input
+                        type="checkbox"
+                        .checked=${value}
+                        @change=${(e: Event) =>
+                          this.handleWorkflowInputChange(
+                            input.name,
+                            (e.target as HTMLInputElement).checked
+                          )}
+                      />
+                      <span>${input.description || input.name}</span>
+                    </label>
+                  `
+                : input.type === 'number'
+                  ? html`
+                      <input
+                        type="number"
+                        class="form-input"
+                        .value=${value}
+                        placeholder="${input.description || ''}"
+                        @input=${(e: InputEvent) => {
+                          const val = (e.target as HTMLInputElement).value;
+                          this.handleWorkflowInputChange(
+                            input.name,
+                            val === '' ? '' : Number(val)
+                          );
+                        }}
+                      />
+                    `
+                  : html`
+                      <input
+                        type="text"
+                        class="form-input"
+                        .value=${value}
+                        placeholder="${input.description || ''}"
+                        @input=${(e: InputEvent) =>
+                          this.handleWorkflowInputChange(
+                            input.name,
+                            (e.target as HTMLInputElement).value
+                          )}
+                      />
+                    `}
+            </div>
+          `;
+        })}
+      </div>
+    `;
   }
 
   render() {
@@ -362,6 +526,9 @@ export class CreateForm extends LitElement {
                 </div>
               `
             : ''}
+
+        <!-- Workflow custom inputs -->
+        ${this.renderWorkflowInputs()}
 
         <div class="form-field">
           <label class="form-label">Description</label>
