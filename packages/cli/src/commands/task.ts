@@ -3,11 +3,11 @@ import colors from 'ansi-colors';
 import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { getNextTaskId } from '../utils/task-id.js';
-import { homedir } from 'node:os';
+import { homedir, platform } from 'node:os';
 import { getAIAgentTool, getUserAIAgent } from '../lib/agents/index.js';
 import { TaskDescriptionManager } from 'rover-schemas';
 import { createSandbox } from '../lib/sandbox/index.js';
-import { AI_AGENT } from 'rover-common';
+import { AI_AGENT, launchSync } from 'rover-common';
 import { IterationManager } from 'rover-schemas';
 import { generateBranchName } from '../utils/branch-name.js';
 import {
@@ -76,7 +76,28 @@ const validations = (selectedAiAgent?: string): validationResult => {
       };
     }
 
-    if (!existsSync(cursorCreds)) {
+    // Check for credentials in auth.json file or macOS keychain
+    let hasCredentials = existsSync(cursorCreds);
+
+    // On macOS, also check if credentials are in the keychain
+    if (!hasCredentials && platform() === 'darwin') {
+      try {
+        // Check if at least one credential exists in keychain
+        const accessToken = launchSync('security', [
+          'find-generic-password',
+          '-s',
+          'cursor-access-token',
+          '-w',
+        ]);
+        if (accessToken.stdout?.toString().trim()) {
+          hasCredentials = true;
+        }
+      } catch (_err) {
+        // Credential not found in keychain
+      }
+    }
+
+    if (!hasCredentials) {
       return {
         error: 'Cursor credentials not found',
         tips: [
@@ -586,8 +607,17 @@ export const taskCommand = async (
 
     processManager?.completeLastItem();
 
-    inputsData.set('description', expandedTask!.description);
-    inputsData.set('title', expandedTask!.title);
+    if (!expandedTask) {
+      jsonOutput.error = `Failed to expand task description using ${selectedAiAgent}`;
+      await exitWithError(jsonOutput, json, {
+        tips: ['Check your agent configuration and try again'],
+        telemetry,
+      });
+      return;
+    }
+
+    inputsData.set('description', expandedTask.description);
+    inputsData.set('title', expandedTask.title);
 
     processManager?.addItem('Create the task workspace');
 
