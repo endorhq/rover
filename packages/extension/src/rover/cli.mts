@@ -8,11 +8,6 @@ import {
 } from './types.js';
 import { findProjectRoot, launch, type Options } from 'rover-common';
 
-// TODO: Load workflows dynamically after we allow users to define their own workflows
-const ROVER_DEFAULT_WORKFLOWS = [
-  { id: 'swe', label: 'swe - Software Engineer for coding tasks' },
-];
-
 export class RoverCLI {
   private roverPath: string;
   private workspaceRoot: vscode.Uri | undefined;
@@ -118,12 +113,65 @@ export class RoverCLI {
   }
 
   /**
+   * Get available workflows from CLI
+   */
+  async getWorkflows(): Promise<
+    Array<{
+      id: string;
+      label: string;
+      inputs?: Array<{
+        name: string;
+        description: string;
+        type: string;
+        required: boolean;
+        default?: any;
+      }>;
+    }>
+  > {
+    try {
+      const { stdout, stderr, exitCode } = await launch(
+        this.roverPath,
+        ['workflows', 'list', '--json'],
+        this.getLaunchOptions()
+      );
+      if (exitCode != 0 || !stdout) {
+        throw new Error(
+          `error listing workflows (stdout: ${stdout}; stderr: ${stderr}; exit code: ${exitCode})`
+        );
+      }
+      const result = JSON.parse(stdout.toString());
+      if (result.workflows) {
+        return result.workflows.map((wf: any) => ({
+          id: wf.name,
+          label: `${wf.name} - ${wf.description}`,
+          inputs: wf.inputs,
+        }));
+      }
+      return [];
+    } catch (error) {
+      console.error('Failed to load workflows:', error);
+      // Return default workflow as fallback
+      return [{ id: 'swe', label: 'swe - Software Engineer for coding tasks' }];
+    }
+  }
+
+  /**
    * Get user settings including available agents
    */
   async getSettings(): Promise<{
     aiAgents: string[];
     defaultAgent: string;
-    workflows: Array<{ id: string; label: string }>;
+    workflows: Array<{
+      id: string;
+      label: string;
+      inputs?: Array<{
+        name: string;
+        description: string;
+        type: string;
+        required: boolean;
+        default?: any;
+      }>;
+    }>;
   }> {
     try {
       // Read the settings file directly from .rover/settings.json
@@ -138,26 +186,30 @@ export class RoverCLI {
           await vscode.workspace.fs.readFile(settingsPath);
         const settings = JSON.parse(new TextDecoder().decode(settingsContent));
 
+        const workflows = await this.getWorkflows();
+
         return {
           aiAgents: settings.aiAgents || ['claude'],
           defaultAgent: settings.defaults?.aiAgent || 'claude',
-          workflows: ROVER_DEFAULT_WORKFLOWS,
+          workflows,
         };
       } catch (error) {
         // If file doesn't exist or can't be read, return defaults
         console.error('Failed to load settings:', error);
+        const workflows = await this.getWorkflows();
         return {
           aiAgents: ['claude'],
           defaultAgent: 'claude',
-          workflows: ROVER_DEFAULT_WORKFLOWS,
+          workflows,
         };
       }
     } catch (error) {
       console.error('Failed to load settings:', error);
+      const workflows = await this.getWorkflows();
       return {
         aiAgents: ['claude'],
         defaultAgent: 'claude',
-        workflows: ROVER_DEFAULT_WORKFLOWS,
+        workflows,
       };
     }
   }
@@ -195,7 +247,8 @@ export class RoverCLI {
     description: string,
     agent?: string,
     sourceBranch?: string,
-    workflow?: string
+    workflow?: string,
+    workflowInputs?: Record<string, any>
   ): Promise<RoverTask> {
     const args = ['task', '--yes', '--json'];
 
@@ -214,12 +267,41 @@ export class RoverCLI {
       args.push('--workflow', workflow);
     }
 
-    args.push(description);
+    // Prepare launch options with workflow inputs passed via stdin as JSON
+    let launchOptions = this.getLaunchOptions();
+    const hasWorkflowInputs =
+      workflowInputs && Object.keys(workflowInputs).length > 0;
+
+    // When using workflows with inputs, pass description via stdin along with other inputs
+    // Otherwise, pass it as a positional argument
+    if (workflow && (hasWorkflowInputs || description)) {
+      // Filter out empty values and include description
+      const filteredInputs: Record<string, any> = {
+        description: description,
+      };
+
+      if (workflowInputs) {
+        for (const [key, value] of Object.entries(workflowInputs)) {
+          if (value !== undefined && value !== null && value !== '') {
+            filteredInputs[key] = value;
+          }
+        }
+      }
+
+      // Pass all workflow inputs (including description) via stdin as JSON
+      launchOptions = {
+        ...launchOptions,
+        input: JSON.stringify(filteredInputs),
+      };
+    } else {
+      // No workflow or no inputs, pass description as positional argument
+      args.push(description);
+    }
 
     const { stdout, stderr, exitCode } = await launch(
       this.roverPath,
       args,
-      this.getLaunchOptions()
+      launchOptions
     );
     if (exitCode != 0 || !stdout) {
       throw new Error(
