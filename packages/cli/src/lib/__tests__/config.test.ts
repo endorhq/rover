@@ -365,7 +365,9 @@ describe('ProjectConfig - Environment Variable Configuration', () => {
           taskManagers: [],
           attribution: true,
           mcps: [],
-          agentImage: 'custom/agent:v2.0.0',
+          sandbox: {
+            agentImage: 'custom/agent:v2.0.0',
+          },
         },
         null,
         2
@@ -389,7 +391,9 @@ describe('ProjectConfig - Environment Variable Configuration', () => {
           taskManagers: [],
           attribution: true,
           mcps: [],
-          initScript: 'scripts/init.sh',
+          sandbox: {
+            initScript: 'scripts/init.sh',
+          },
         },
         null,
         2
@@ -413,8 +417,10 @@ describe('ProjectConfig - Environment Variable Configuration', () => {
           taskManagers: [],
           attribution: true,
           mcps: [],
-          agentImage: 'custom/agent:v2.0.0',
-          initScript: 'scripts/init.sh',
+          sandbox: {
+            agentImage: 'custom/agent:v2.0.0',
+            initScript: 'scripts/init.sh',
+          },
         },
         null,
         2
@@ -457,8 +463,8 @@ describe('ProjectConfig - Environment Variable Configuration', () => {
     // Check saved file
     const jsonData = JSON.parse(readFileSync('rover.json', 'utf8'));
     expect(jsonData.version).toBe('1.2');
-    expect(jsonData.agentImage).toBe('custom/agent:legacy');
-    expect(jsonData.initScript).toBe('init.sh');
+    expect(jsonData.sandbox.agentImage).toBe('custom/agent:legacy');
+    expect(jsonData.sandbox.initScript).toBe('init.sh');
   });
 
   it('should migrate version 1.1 config with agentImage to 1.2', () => {
@@ -481,11 +487,12 @@ describe('ProjectConfig - Environment Variable Configuration', () => {
     const config = ProjectConfig.load();
 
     expect(config.version).toBe('1.2');
+    expect(config.agentImage).toBe('ghcr.io/custom/rover:v1.0');
 
     // Check saved file has been migrated to 1.2
     const jsonData = JSON.parse(readFileSync('rover.json', 'utf8'));
     expect(jsonData.version).toBe('1.2');
-    expect(jsonData.agentImage).toBe('ghcr.io/custom/rover:v1.0');
+    expect(jsonData.sandbox.agentImage).toBe('ghcr.io/custom/rover:v1.0');
   });
 
   it('should preserve all fields including agentImage and initScript during migration', () => {

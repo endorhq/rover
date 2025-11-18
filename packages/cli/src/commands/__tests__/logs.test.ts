@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { clearProjectRootCache } from 'rover-common';
 import { logsCommand } from '../logs.js';
 import { TaskDescriptionManager } from 'rover-schemas';
+import { setJsonMode } from '../../lib/global-state.js';
 
 // Mock external dependencies
 vi.mock('../../lib/telemetry.js', () => ({
@@ -80,6 +81,7 @@ describe('logs command', () => {
     rmSync(testDir, { recursive: true, force: true });
     vi.clearAllMocks();
     clearProjectRootCache();
+    setJsonMode(false);
   });
 
   // Helper to create a test task with container ID
@@ -136,7 +138,6 @@ describe('logs command', () => {
         expect.objectContaining({
           error: "Invalid task ID 'invalid' - must be a number",
         }),
-        false,
         expect.objectContaining({
           telemetry: expect.anything(),
         })
@@ -152,7 +153,6 @@ describe('logs command', () => {
         expect.objectContaining({
           error: "Invalid task ID '' - must be a number",
         }),
-        false,
         expect.objectContaining({
           telemetry: expect.anything(),
         })
@@ -169,7 +169,6 @@ describe('logs command', () => {
         expect.objectContaining({
           error: 'The task with ID 1 was not found',
         }),
-        false,
         expect.objectContaining({
           telemetry: expect.anything(),
         })
@@ -187,7 +186,6 @@ describe('logs command', () => {
         expect.objectContaining({
           error: 'The task with ID 999 was not found',
         }),
-        false,
         expect.objectContaining({
           telemetry: expect.anything(),
         })
@@ -203,7 +201,6 @@ describe('logs command', () => {
         expect.objectContaining({
           error: 'The task with ID -1 was not found',
         }),
-        false,
         expect.objectContaining({
           telemetry: expect.anything(),
         })
@@ -224,7 +221,6 @@ describe('logs command', () => {
         expect.objectContaining({
           error: "Invalid iteration number: 'invalid'",
         }),
-        false,
         expect.objectContaining({
           telemetry: expect.anything(),
         })
@@ -244,7 +240,6 @@ describe('logs command', () => {
           error:
             "Iteration 5 not found for task '2'. Available iterations: 1, 2",
         }),
-        false,
         expect.objectContaining({
           telemetry: expect.anything(),
         })
@@ -270,7 +265,6 @@ describe('logs command', () => {
           logs: '',
           success: false,
         }),
-        false,
         expect.objectContaining({
           telemetry: expect.anything(),
         })
@@ -294,7 +288,6 @@ describe('logs command', () => {
           logs: '',
           success: false,
         }),
-        true,
         expect.objectContaining({
           telemetry: expect.anything(),
         })
@@ -317,7 +310,6 @@ describe('logs command', () => {
           logs: '',
           success: false,
         }),
-        false,
         expect.objectContaining({
           telemetry: expect.anything(),
         })
@@ -338,7 +330,6 @@ describe('logs command', () => {
           logs: '',
           success: false,
         }),
-        true,
         expect.objectContaining({
           telemetry: expect.anything(),
         })
@@ -546,7 +537,6 @@ Last line`;
           logs: '',
           success: false,
         }),
-        false,
         expect.objectContaining({
           telemetry: expect.anything(),
         })
@@ -578,7 +568,6 @@ Last line`;
           logs: '',
           success: false,
         }),
-        false,
         expect.objectContaining({
           telemetry: expect.anything(),
         })
@@ -602,7 +591,6 @@ Last line`;
         expect.objectContaining({
           error: 'Error retrieving container logs: Docker daemon not running',
         }),
-        false,
         expect.objectContaining({
           telemetry: expect.anything(),
         })
@@ -629,7 +617,6 @@ Last line`;
           error:
             'Error retrieving container logs: permission denied while trying to connect to the Docker daemon socket',
         }),
-        false,
         expect.objectContaining({
           telemetry: expect.anything(),
         })

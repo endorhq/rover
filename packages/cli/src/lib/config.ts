@@ -150,6 +150,24 @@ export class ProjectConfig {
       return data as ProjectConfigSchema;
     }
 
+    // Prepare sandbox object for v1.2
+    let sandbox: { agentImage?: string; initScript?: string } | undefined;
+
+    // Check if agentImage or initScript exist at the top level (from v1.0/v1.1)
+    if (data.agentImage !== undefined || data.initScript !== undefined) {
+      sandbox = {
+        ...(data.agentImage !== undefined
+          ? { agentImage: data.agentImage }
+          : {}),
+        ...(data.initScript !== undefined
+          ? { initScript: data.initScript }
+          : {}),
+      };
+    } else if (data.sandbox !== undefined) {
+      // If sandbox already exists, preserve it
+      sandbox = data.sandbox;
+    }
+
     // For now, just ensure all required fields exist
     const migrated: ProjectConfigSchema = {
       version: CURRENT_PROJECT_SCHEMA_VERSION,
@@ -160,7 +178,7 @@ export class ProjectConfig {
       attribution: data.attribution !== undefined ? data.attribution : true,
       ...(data.envs !== undefined ? { envs: data.envs } : {}),
       ...(data.envsFile !== undefined ? { envsFile: data.envsFile } : {}),
-      ...(data.sandbox !== undefined ? { sandbox: data.sandbox } : {}),
+      ...(sandbox !== undefined ? { sandbox } : {}),
     };
 
     return migrated;

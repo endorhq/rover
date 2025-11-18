@@ -103,7 +103,6 @@ describe('delete command', () => {
             "Invalid task ID 'invalid' - must be a number",
           ]),
         }),
-        false,
         expect.objectContaining({
           telemetry: expect.anything(),
         })
@@ -121,7 +120,6 @@ describe('delete command', () => {
             "Invalid task ID '' - must be a number",
           ]),
         }),
-        false,
         expect.objectContaining({
           telemetry: expect.anything(),
         })
@@ -139,7 +137,6 @@ describe('delete command', () => {
           errors: ['Task with ID 1 was not found'],
           success: false,
         },
-        false,
         expect.objectContaining({
           telemetry: expect.anything(),
         })
@@ -158,7 +155,6 @@ describe('delete command', () => {
           errors: ['Task with ID 999 was not found'],
           success: false,
         },
-        false,
         expect.objectContaining({
           telemetry: expect.anything(),
         })
@@ -175,7 +171,6 @@ describe('delete command', () => {
           errors: ['Task with ID -1 was not found'],
           success: false,
         },
-        false,
         expect.objectContaining({
           telemetry: expect.anything(),
         })
@@ -204,7 +199,6 @@ describe('delete command', () => {
           success: true,
           errors: [],
         },
-        false,
         expect.objectContaining({
           telemetry: expect.anything(),
         })
@@ -224,7 +218,6 @@ describe('delete command', () => {
           success: true,
           errors: [],
         },
-        true,
         expect.objectContaining({
           telemetry: expect.anything(),
         })
@@ -258,7 +251,6 @@ describe('delete command', () => {
           success: true,
           errors: [],
         },
-        false,
         expect.objectContaining({
           telemetry: expect.anything(),
         })
@@ -284,7 +276,6 @@ describe('delete command', () => {
           success: false,
           errors: ['Task deletion cancelled'],
         },
-        false,
         expect.objectContaining({
           telemetry: expect.anything(),
         })
@@ -312,7 +303,6 @@ describe('delete command', () => {
           success: false,
           errors: ['Task deletion cancelled'],
         },
-        false,
         expect.objectContaining({
           telemetry: expect.anything(),
         })
@@ -339,7 +329,6 @@ describe('delete command', () => {
           success: true,
           errors: [],
         },
-        false,
         expect.objectContaining({
           telemetry: expect.anything(),
         })
@@ -363,7 +352,6 @@ describe('delete command', () => {
           success: true,
           errors: [],
         },
-        true,
         expect.objectContaining({
           telemetry: expect.anything(),
         })
@@ -471,7 +459,6 @@ describe('delete command', () => {
           success: true,
           errors: [],
         },
-        false,
         expect.objectContaining({
           telemetry: expect.anything(),
         })
@@ -489,7 +476,6 @@ describe('delete command', () => {
           errors: ['Task with ID 0 was not found'],
           success: false,
         },
-        false,
         expect.objectContaining({
           telemetry: expect.anything(),
         })
@@ -506,7 +492,6 @@ describe('delete command', () => {
           errors: ['Task with ID 999999999 was not found'],
           success: false,
         },
-        false,
         expect.objectContaining({
           telemetry: expect.anything(),
         })
@@ -528,7 +513,6 @@ describe('delete command', () => {
           success: true,
           errors: [],
         },
-        true, // JSON mode
         expect.objectContaining({
           telemetry: expect.anything(),
         })
@@ -557,7 +541,6 @@ describe('delete command', () => {
           success: true,
           errors: [],
         },
-        false,
         expect.objectContaining({
           telemetry: expect.anything(),
         })
@@ -582,7 +565,6 @@ describe('delete command', () => {
           success: true,
           errors: ['Task with ID 999 was not found'],
         },
-        false,
         expect.objectContaining({
           telemetry: expect.anything(),
         })
@@ -609,7 +591,6 @@ describe('delete command', () => {
           success: false,
           errors: ['Task deletion cancelled'],
         },
-        false,
         expect.objectContaining({
           telemetry: expect.anything(),
         })

@@ -189,7 +189,6 @@ describe('restart command', async () => {
         expect.objectContaining({
           error: expect.stringContaining('not in NEW or FAILED status'),
         }),
-        true,
         expect.objectContaining({
           tips: expect.arrayContaining([
             'Only NEW and FAILED tasks can be restarted',
@@ -211,7 +210,6 @@ describe('restart command', async () => {
         expect.objectContaining({
           error: expect.stringContaining('Invalid task ID'),
         }),
-        true,
         expect.objectContaining({
           telemetry: expect.anything(),
         })
@@ -230,7 +228,6 @@ describe('restart command', async () => {
         expect.objectContaining({
           error: expect.stringContaining('not found'),
         }),
-        true,
         expect.objectContaining({
           telemetry: expect.anything(),
         })
