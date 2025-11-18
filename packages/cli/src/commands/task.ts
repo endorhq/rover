@@ -582,7 +582,7 @@ export const taskCommand = async (
 
     if (!expandedTask) {
       jsonOutput.error = `Failed to expand task description using ${selectedAiAgent}`;
-      await exitWithError(jsonOutput, json, {
+      await exitWithError(jsonOutput, {
         tips: ['Check your agent configuration and try again'],
         telemetry,
       });

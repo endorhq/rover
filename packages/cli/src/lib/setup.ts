@@ -96,21 +96,16 @@ export class SetupBuilder {
     let initScriptExecution = '';
     if (projectConfig.initScript) {
       initScriptExecution = `
-# Execute initialization script if provided
-if [ -f "/init-script.sh" ]; then
-  echo -e "\\n======================================="
-  echo "🔧 Running initialization script"
-  echo "======================================="
-  chmod +x /init-script.sh
-  /bin/sh /init-script.sh
-  if [ $? -eq 0 ]; then
-    echo "✅ Initialization script completed successfully"
-  else
-    echo "❌ Initialization script failed"
-    safe_exit 1
-  fi
+echo -e "\\n======================================="
+echo "🔧 Running initialization script"
+echo "======================================="
+chmod +x /init-script.sh
+/bin/sh /init-script.sh
+if [ $? -eq 0 ]; then
+  echo "✅ Initialization script completed successfully"
 else
-  echo "✅ No initialization script provided, skipping"
+  echo "❌ Initialization script failed"
+  safe_exit 1
 fi
 `;
     }
