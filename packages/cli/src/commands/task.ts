@@ -574,15 +574,16 @@ export const taskCommand = async (
       findProjectRoot()
     );
 
-    processManager?.completeLastItem();
-
     if (!expandedTask) {
       jsonOutput.error = `Failed to expand task description using ${selectedAiAgent}`;
       await exitWithError(jsonOutput, json, {
         tips: ['Check your agent configuration and try again'],
         telemetry,
       });
+      processManager?.failLastItem();
       return;
+    } else {
+      processManager?.completeLastItem();
     }
 
     inputsData.set('description', expandedTask.description);
