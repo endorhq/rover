@@ -11,6 +11,7 @@ import {
 } from 'rover-common';
 import { readFileSync } from 'node:fs';
 import { getTelemetry } from '../../lib/telemetry.js';
+import { isJsonMode, setJsonMode } from '../../lib/global-state.js';
 
 interface InspectWorkflowCommandOptions {
   // Output formats
@@ -29,6 +30,9 @@ export const inspectWorkflowCommand = async (
   options: InspectWorkflowCommandOptions
 ) => {
   const telemetry = getTelemetry();
+  if (options.json !== undefined) {
+    setJsonMode(options.json);
+  }
 
   try {
     // Track inspect workflow event
@@ -39,7 +43,7 @@ export const inspectWorkflowCommand = async (
     const workflow = workflowStore.getWorkflow(workflowName);
 
     if (!workflow) {
-      if (options.json) {
+      if (isJsonMode()) {
         console.log(
           JSON.stringify(
             {
@@ -73,7 +77,7 @@ export const inspectWorkflowCommand = async (
     }
 
     // Handle --json flag: output workflow as JSON
-    if (options.json) {
+    if (isJsonMode()) {
       console.log(
         JSON.stringify(
           {
@@ -184,7 +188,7 @@ export const inspectWorkflowCommand = async (
       showDiagram(diagramSteps, { addLineBreak: false });
     }
   } catch (error) {
-    if (options.json) {
+    if (isJsonMode()) {
       console.log(
         JSON.stringify(
           {

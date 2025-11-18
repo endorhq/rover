@@ -8,6 +8,7 @@ import { CLIJsonOutput } from '../../types.js';
 import { exitWithError, exitWithSuccess } from '../../utils/exit.js';
 import { Workflow } from 'rover-schemas';
 import { getTelemetry } from '../../lib/telemetry.js';
+import { isJsonMode, setJsonMode } from '../../lib/global-state.js';
 
 interface ListWorkflowsCommandOptions {
   // Output format
@@ -40,6 +41,10 @@ export const listWorkflowsCommand = async (
   options: ListWorkflowsCommandOptions
 ) => {
   const telemetry = getTelemetry();
+  if (options.json !== undefined) {
+    setJsonMode(options.json);
+  }
+
   const workflowStore = initWorkflowStore();
   const output: ListWorkflowsOutput = {
     success: false,
@@ -49,14 +54,14 @@ export const listWorkflowsCommand = async (
   try {
     // Track list workflows event
     telemetry?.eventListWorkflows();
-    if (options.json) {
+    if (isJsonMode()) {
       // For the JSON, add some extra information.
       output.success = true;
       output.workflows = workflowStore
         .getAllWorkflows()
         .map(wf => wf.toObject());
 
-      await exitWithSuccess('', output, options.json, { telemetry });
+      await exitWithSuccess('', output, { telemetry });
     } else {
       // Define table columns
       const columns: TableColumn<WorkflowRow>[] = [
@@ -106,7 +111,7 @@ export const listWorkflowsCommand = async (
     }
   } catch (error) {
     output.error = 'Error loading the workflows.';
-    await exitWithError(output, options.json, { telemetry });
+    await exitWithError(output, { telemetry });
   } finally {
     await telemetry?.shutdown();
   }

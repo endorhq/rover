@@ -2,6 +2,7 @@ import colors from 'ansi-colors';
 import { CLIJsonOutput, CLIJsonOutputWithErrors } from '../types.js';
 import { showTips, TipsConfig } from './display.js';
 import Telemetry from 'rover-telemetry';
+import { isJsonMode } from '../lib/global-state.js';
 
 type ExitWithErrorOpts = {
   exitCode?: number;
@@ -28,7 +29,6 @@ type ExitWithSuccessOpts = {
  */
 export const exitWithError = (
   jsonOutput: CLIJsonOutput,
-  json: boolean | undefined,
   options: ExitWithErrorOpts = {}
 ) => {
   exitWithErrors(
@@ -36,7 +36,6 @@ export const exitWithError = (
       success: jsonOutput.success,
       errors: jsonOutput.error ? [jsonOutput.error] : [],
     },
-    json,
     options
   );
 };
@@ -51,7 +50,6 @@ export const exitWithError = (
  */
 export const exitWithErrors = async (
   jsonOutput: CLIJsonOutputWithErrors,
-  json: boolean | undefined,
   options: ExitWithErrorOpts = {}
 ) => {
   const { tips, tipsConfig, exitCode, telemetry } = options;
@@ -61,7 +59,7 @@ export const exitWithErrors = async (
     await telemetry.shutdown();
   }
 
-  if (json === true) {
+  if (isJsonMode()) {
     console.log(JSON.stringify(jsonOutput, null, 2));
   } else {
     for (const error of jsonOutput.errors) {
@@ -80,7 +78,6 @@ export const exitWithErrors = async (
 export const exitWithWarn = async (
   warnMessage: string,
   jsonOutput: CLIJsonOutput,
-  json: boolean | undefined,
   options: ExitWithWarnOpts = {}
 ) => {
   const { tips, tipsConfig, exitCode, telemetry } = options;
@@ -90,7 +87,7 @@ export const exitWithWarn = async (
     await telemetry.shutdown();
   }
 
-  if (json === true) {
+  if (isJsonMode()) {
     console.log(JSON.stringify(jsonOutput, null, 2));
   } else {
     console.log(colors.yellow(`\n⚠ ${warnMessage}`));
@@ -108,7 +105,6 @@ export const exitWithWarn = async (
 export const exitWithSuccess = async (
   successMessage: string,
   jsonOutput: CLIJsonOutput,
-  json: boolean | undefined,
   options: ExitWithSuccessOpts = {}
 ) => {
   const { tips, tipsConfig, telemetry } = options;
@@ -118,7 +114,7 @@ export const exitWithSuccess = async (
     await telemetry.shutdown();
   }
 
-  if (json === true) {
+  if (isJsonMode()) {
     console.log(JSON.stringify(jsonOutput, null, 2));
   } else {
     console.log(colors.green(`\n✓ ${successMessage}`));

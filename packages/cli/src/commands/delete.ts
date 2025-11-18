@@ -13,6 +13,7 @@ import {
 } from '../utils/exit.js';
 import { CLIJsonOutputWithErrors } from '../types.js';
 import { findProjectRoot, Git } from 'rover-common';
+import { isJsonMode, setJsonMode } from '../lib/global-state.js';
 
 const { prompt } = enquirer;
 
@@ -25,6 +26,10 @@ export const deleteCommand = async (
   taskIds: string[],
   options: { json?: boolean; yes?: boolean } = {}
 ) => {
+  if (options.json !== undefined) {
+    setJsonMode(options.json);
+  }
+
   const telemetry = getTelemetry();
   const git = new Git();
 
@@ -47,7 +52,7 @@ export const deleteCommand = async (
   }
 
   if (jsonOutput.errors.length > 0) {
-    await exitWithErrors(jsonOutput, json, { telemetry });
+    await exitWithErrors(jsonOutput, { telemetry });
     return;
   }
 
@@ -86,13 +91,13 @@ export const deleteCommand = async (
   // Exit early if no valid tasks to delete
   if (tasksToDelete.length === 0) {
     jsonOutput.success = false;
-    await exitWithErrors(jsonOutput, json, { telemetry });
+    await exitWithErrors(jsonOutput, { telemetry });
     await telemetry?.shutdown();
     return;
   }
 
   // Show tasks information and get single confirmation
-  if (!json) {
+  if (!isJsonMode()) {
     showRoverChat(["It's time to cleanup some tasks!"]);
 
     console.log(
@@ -139,7 +144,7 @@ export const deleteCommand = async (
 
   if (!confirmDeletion) {
     jsonOutput.errors?.push('Task deletion cancelled');
-    await exitWithErrors(jsonOutput, json, { telemetry });
+    await exitWithErrors(jsonOutput, { telemetry });
     await telemetry?.shutdown();
     return;
   }
@@ -193,18 +198,16 @@ export const deleteCommand = async (
       await exitWithSuccess(
         `All tasks (IDs: ${succeededTasks.join(' ')}) deleted successfully`,
         jsonOutput,
-        json,
         { telemetry }
       );
     } else if (someSucceeded) {
       await exitWithWarn(
         `Some tasks (IDs: ${succeededTasks.join(' ')}) deleted successfully`,
         jsonOutput,
-        json,
         { telemetry }
       );
     } else {
-      await exitWithErrors(jsonOutput, json, { telemetry });
+      await exitWithErrors(jsonOutput, { telemetry });
     }
 
     await telemetry?.shutdown();

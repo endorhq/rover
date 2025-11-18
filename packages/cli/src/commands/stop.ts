@@ -7,6 +7,7 @@ import { findProjectRoot, launch, ProcessManager } from 'rover-common';
 import { exitWithError, exitWithSuccess } from '../utils/exit.js';
 import { CLIJsonOutput } from '../types.js';
 import { getTelemetry } from '../lib/telemetry.js';
+import { isJsonMode, setJsonMode } from '../lib/global-state.js';
 
 /**
  * Interface for JSON output
@@ -30,6 +31,10 @@ export const stopCommand = async (
     removeGitWorktreeAndBranch?: boolean;
   } = {}
 ) => {
+  if (options.json !== undefined) {
+    setJsonMode(options.json);
+  }
+
   const telemetry = getTelemetry();
 
   // Track stop task event
@@ -49,7 +54,7 @@ export const stopCommand = async (
   const numericTaskId = parseInt(taskId, 10);
   if (isNaN(numericTaskId)) {
     jsonOutput.error = `Invalid task ID '${taskId}' - must be a number`;
-    await exitWithError(jsonOutput, json, { telemetry });
+    await exitWithError(jsonOutput, { telemetry });
     return;
   }
 
@@ -95,7 +100,7 @@ export const stopCommand = async (
             // Remove worktree from git's tracking
             await launch('git', ['worktree', 'prune'], { stdio: 'pipe' });
           } catch (manualError) {
-            if (!json) {
+            if (!isJsonMode()) {
               console.warn(
                 colors.yellow('Warning: Could not remove workspace directory')
               );
@@ -154,7 +159,7 @@ export const stopCommand = async (
       status: task.status,
       stoppedAt: new Date().toISOString(),
     };
-    await exitWithSuccess('Task stopped successfully!', jsonOutput, json, {
+    await exitWithSuccess('Task stopped successfully!', jsonOutput, {
       tips: [
         'Use ' + colors.cyan(`rover logs ${task.id}`) + ' to check the logs',
         'Use ' +
@@ -169,11 +174,11 @@ export const stopCommand = async (
   } catch (error) {
     if (error instanceof TaskNotFoundError) {
       jsonOutput.error = `The task with ID ${numericTaskId} was not found`;
-      await exitWithError(jsonOutput, json, { telemetry });
+      await exitWithError(jsonOutput, { telemetry });
       return;
     } else {
       jsonOutput.error = `There was an error stopping the task: ${error}`;
-      await exitWithError(jsonOutput, json, { telemetry });
+      await exitWithError(jsonOutput, { telemetry });
       return;
     }
   } finally {

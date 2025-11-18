@@ -25,6 +25,8 @@ import {
   resolveAgentImage,
   warnIfCustomImage,
 } from './container-common.js';
+import { isJsonMode } from '../global-state.js';
+import colors from 'ansi-colors';
 
 export class PodmanSandbox extends Sandbox {
   backend = ContainerBackend.Podman;
@@ -167,6 +169,12 @@ export class PodmanSandbox extends Sandbox {
       const initScriptAbsPath = join(projectRoot, projectConfig.initScript);
       if (existsSync(initScriptAbsPath)) {
         podmanArgs.push('-v', `${initScriptAbsPath}:/init-script.sh:Z,ro`);
+      } else if (!isJsonMode()) {
+        console.log(
+          colors.yellow(
+            `⚠ Warning: initScript '${projectConfig.initScript}' does not exist`
+          )
+        );
       }
     }
 

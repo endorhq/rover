@@ -7,6 +7,7 @@ import { getTelemetry } from '../lib/telemetry.js';
 import { showTips } from '../utils/display.js';
 import { CLIJsonOutput } from '../types.js';
 import { exitWithError, exitWithWarn } from '../utils/exit.js';
+import { isJsonMode, setJsonMode } from '../lib/global-state.js';
 
 /**
  * Interface for JSON output
@@ -44,6 +45,10 @@ export const logsCommand = async (
   iterationNumber?: string,
   options: { follow?: boolean; json?: boolean } = {}
 ) => {
+  if (options.json !== undefined) {
+    setJsonMode(options.json);
+  }
+
   // Init telemetry
   const telemetry = getTelemetry();
 
@@ -58,7 +63,7 @@ export const logsCommand = async (
   const numericTaskId = parseInt(taskId, 10);
   if (isNaN(numericTaskId)) {
     jsonOutput.error = `Invalid task ID '${taskId}' - must be a number`;
-    await exitWithError(jsonOutput, json, { telemetry });
+    await exitWithError(jsonOutput, { telemetry });
     return;
   }
 
@@ -72,7 +77,7 @@ export const logsCommand = async (
       targetIteration = parseInt(iterationNumber, 10);
       if (isNaN(targetIteration)) {
         jsonOutput.error = `Invalid iteration number: '${iterationNumber}'`;
-        await exitWithError(jsonOutput, json, { telemetry });
+        await exitWithError(jsonOutput, { telemetry });
         return;
       }
     }
@@ -86,7 +91,6 @@ export const logsCommand = async (
       await exitWithWarn(
         `No iterations found for task '${numericTaskId}'`,
         jsonOutput,
-        json,
         { telemetry }
       );
       return;
@@ -99,7 +103,7 @@ export const logsCommand = async (
     // Check if specific iteration exists (if requested)
     if (targetIteration && !availableIterations.includes(targetIteration)) {
       jsonOutput.error = `Iteration ${targetIteration} not found for task '${numericTaskId}'. Available iterations: ${availableIterations.join(', ')}`;
-      await exitWithError(jsonOutput, json, { telemetry });
+      await exitWithError(jsonOutput, { telemetry });
       return;
     }
 
@@ -110,14 +114,13 @@ export const logsCommand = async (
       await exitWithWarn(
         `No container found for task '${numericTaskId}'. Logs are only available for recent tasks`,
         jsonOutput,
-        json,
         { telemetry }
       );
       return;
     }
 
     // Display header
-    if (!json) {
+    if (!isJsonMode()) {
       console.log(colors.bold(`Task ${numericTaskId} Logs`));
       console.log(colors.gray('├── Title: ') + task.title);
       console.log(
@@ -127,7 +130,7 @@ export const logsCommand = async (
 
     telemetry?.eventLogs();
 
-    if (!json) {
+    if (!isJsonMode()) {
       console.log('');
       console.log(colors.bold('Execution Log\n'));
     }
@@ -189,12 +192,11 @@ export const logsCommand = async (
           await exitWithWarn(
             'No logs available for this container. Logs are only available for recent tasks',
             jsonOutput,
-            json,
             { telemetry }
           );
           return;
         } else {
-          if (json) {
+          if (isJsonMode()) {
             // Store logs
             jsonOutput.logs = logs;
           } else {
@@ -215,13 +217,12 @@ export const logsCommand = async (
           await exitWithWarn(
             'No logs available for this container. Logs are only available for recent tasks',
             jsonOutput,
-            json,
             { telemetry }
           );
           return;
         } else {
           jsonOutput.error = `Error retrieving container logs: ${dockerError.message}`;
-          await exitWithError(jsonOutput, json, { telemetry });
+          await exitWithError(jsonOutput, { telemetry });
           return;
         }
       }
@@ -262,10 +263,10 @@ export const logsCommand = async (
   } catch (error) {
     if (error instanceof TaskNotFoundError) {
       jsonOutput.error = `The task with ID ${numericTaskId} was not found`;
-      await exitWithError(jsonOutput, json, { telemetry });
+      await exitWithError(jsonOutput, { telemetry });
     } else {
       jsonOutput.error = `There was an error reading task logs: ${error}`;
-      await exitWithError(jsonOutput, json, { telemetry });
+      await exitWithError(jsonOutput, { telemetry });
     }
   } finally {
     await telemetry?.shutdown();

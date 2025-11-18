@@ -16,6 +16,7 @@ import {
   showTitle,
 } from 'rover-common';
 import { IterationManager } from 'rover-schemas';
+import { isJsonMode, setJsonMode } from '../lib/global-state.js';
 
 const DEFAULT_FILE_CONTENTS = 'summary.md';
 
@@ -113,11 +114,15 @@ export const inspectCommand = async (
   iterationNumber?: number,
   options: { json?: boolean; file?: string[]; rawFile?: string[] } = {}
 ) => {
+  if (options.json !== undefined) {
+    setJsonMode(options.json);
+  }
+
   // Convert string taskId to number
   const numericTaskId = parseInt(taskId, 10);
 
   if (isNaN(numericTaskId)) {
-    if (options.json) {
+    if (isJsonMode()) {
       const errorOutput = jsonErrorOutput(
         `Invalid task ID '${taskId}' - must be a number`
       );
@@ -137,7 +142,7 @@ export const inspectCommand = async (
 
   // Validate mutually exclusive options
   if (options.file && options.rawFile) {
-    if (options.json) {
+    if (isJsonMode()) {
       const errorOutput = jsonErrorOutput(
         'Cannot use both --file and --raw-file options together'
       );
@@ -183,7 +188,7 @@ export const inspectCommand = async (
     if (options.rawFile) {
       const rawFileContents = iteration.getMarkdownFiles(options.rawFile);
 
-      if (options.json) {
+      if (isJsonMode()) {
         // Output JSON format with RawFileOutput array
         const rawFileOutput: RawFileOutput = {
           success: true,
@@ -226,7 +231,7 @@ export const inspectCommand = async (
       return;
     }
 
-    if (options.json) {
+    if (isJsonMode()) {
       // Output JSON format
       const jsonOutput: TaskInspectionOutput = {
         branchName: task.branchName,
@@ -343,14 +348,14 @@ export const inspectCommand = async (
     await telemetry?.shutdown();
   } catch (error) {
     if (error instanceof TaskNotFoundError) {
-      if (options.json) {
+      if (isJsonMode()) {
         const errorOutput = jsonErrorOutput(error.message, numericTaskId);
         console.log(JSON.stringify(errorOutput, null, 2));
       } else {
         console.log(colors.red(`✗ ${error.message}`));
       }
     } else {
-      if (options.json) {
+      if (isJsonMode()) {
         const errorOutput = jsonErrorOutput(
           `Error inspecting task: ${error}`,
           numericTaskId

@@ -25,6 +25,7 @@ import { GitHub, GitHubError } from '../lib/github.js';
 import { copyEnvironmentFiles } from '../utils/env-files.js';
 import { initWorkflowStore } from '../lib/workflow.js';
 import { WorkflowManager } from 'rover-schemas';
+import { setJsonMode, isJsonMode } from '../lib/global-state.js';
 
 const { prompt } = enquirer;
 
@@ -200,6 +201,11 @@ export const taskCommand = async (
   const { yes, json, fromGithub, debug, sourceBranch, targetBranch, agent } =
     options;
 
+  // Set global JSON mode for tests and backwards compatibility
+  if (json !== undefined) {
+    setJsonMode(json);
+  }
+
   const workflowName = options.workflow || DEFAULT_WORKFLOW;
 
   const jsonOutput: TaskTaskOutput = {
@@ -210,7 +216,7 @@ export const taskCommand = async (
   const roverPath = join(findProjectRoot(), '.rover');
   if (!existsSync(roverPath)) {
     jsonOutput.error = 'Rover is not initialized in this directory';
-    await exitWithError(jsonOutput, json, {
+    await exitWithError(jsonOutput, {
       tips: ['Run ' + colors.cyan('rover init') + ' first'],
       telemetry,
     });
@@ -234,7 +240,7 @@ export const taskCommand = async (
       selectedAiAgent = AI_AGENT.Qwen;
     } else {
       jsonOutput.error = `Invalid agent: ${agent}. Valid options are: ${Object.values(AI_AGENT).join(', ')}`;
-      await exitWithError(jsonOutput, json, { telemetry });
+      await exitWithError(jsonOutput, { telemetry });
       return;
     }
   } else {
@@ -254,7 +260,7 @@ export const taskCommand = async (
 
   if (valid != null) {
     jsonOutput.error = valid.error;
-    await exitWithError(jsonOutput, json, {
+    await exitWithError(jsonOutput, {
       tips: valid.tips,
       telemetry,
     });
@@ -272,18 +278,18 @@ export const taskCommand = async (
       workflow = loadedWorkflow;
     } else {
       jsonOutput.error = `Could no load the '${workflowName}' workflow`;
-      await exitWithError(jsonOutput, json, { telemetry });
+      await exitWithError(jsonOutput, { telemetry });
       return;
     }
   } catch (err) {
     jsonOutput.error = `There was an error loading the '${workflowName}' workflow: ${err}`;
-    await exitWithError(jsonOutput, json, { telemetry });
+    await exitWithError(jsonOutput, { telemetry });
     return;
   }
 
   if (workflow == null) {
     jsonOutput.error = `The workflow ${workflow} does not exist`;
-    await exitWithError(jsonOutput, json, { telemetry });
+    await exitWithError(jsonOutput, { telemetry });
     return;
   }
 
@@ -308,7 +314,7 @@ export const taskCommand = async (
     // Validate specified branch exists
     if (!git.branchExists(sourceBranch)) {
       jsonOutput.error = `Branch '${sourceBranch}' does not exist`;
-      await exitWithError(jsonOutput, json, { telemetry });
+      await exitWithError(jsonOutput, { telemetry });
       return;
     }
   } else {
@@ -402,7 +408,7 @@ export const taskCommand = async (
           if (!issueData.body || issueData.body.length == 0) {
             jsonOutput.error =
               'The GitHub issue description is empty. Add more details to the issue so the Agent can complete it successfully.';
-            await exitWithError(jsonOutput, json, { telemetry });
+            await exitWithError(jsonOutput, { telemetry });
             return;
           }
 
@@ -455,14 +461,14 @@ export const taskCommand = async (
 
                 jsonOutput.error =
                   'Failed to fetch the workflow inputs from issue';
-                await exitWithError(jsonOutput, json, { telemetry });
+                await exitWithError(jsonOutput, { telemetry });
                 return;
               }
             }
           }
         } else {
           jsonOutput.error = 'Failed to fetch issue from GitHub';
-          await exitWithError(jsonOutput, json, { telemetry });
+          await exitWithError(jsonOutput, { telemetry });
           return;
         }
       } catch (err) {
@@ -472,7 +478,7 @@ export const taskCommand = async (
           jsonOutput.error = `Failed to fetch issue from GitHub: ${err}`;
         }
 
-        await exitWithError(jsonOutput, json, { telemetry });
+        await exitWithError(jsonOutput, { telemetry });
         return;
       }
     } else {
@@ -535,7 +541,7 @@ export const taskCommand = async (
           }
         } catch (err) {
           jsonOutput.error = 'Task creation cancelled';
-          await exitWithWarn('Task creation cancelled', jsonOutput, json, {
+          await exitWithWarn('Task creation cancelled', jsonOutput, {
             exitCode: 1,
             telemetry,
           });
@@ -553,7 +559,7 @@ export const taskCommand = async (
 
     if (missing.length > 0) {
       jsonOutput.error = `The workflow requires the following missing properties: ${missing.join(', ')}`;
-      await exitWithError(jsonOutput, json, { telemetry });
+      await exitWithError(jsonOutput, { telemetry });
       return;
     }
   }
@@ -630,7 +636,7 @@ export const taskCommand = async (
       copyEnvironmentFiles(findProjectRoot(), worktreePath);
     } catch (error) {
       jsonOutput.error = 'Error creating git workspace: ' + error;
-      await exitWithError(jsonOutput, json, { telemetry });
+      await exitWithError(jsonOutput, { telemetry });
       return;
     }
 
@@ -710,7 +716,7 @@ export const taskCommand = async (
       jsonOutput.status = task.status;
       jsonOutput.error =
         "Task was created, but reset to 'New' due to an error running the container";
-      await exitWithWarn(jsonOutput.error, jsonOutput, json, {
+      await exitWithWarn(jsonOutput.error, jsonOutput, {
         exitCode: 1,
         tips: [
           'Use ' + colors.cyan(`rover restart ${taskId}`) + ' to retry it',
@@ -722,7 +728,7 @@ export const taskCommand = async (
 
     jsonOutput.success = true;
 
-    await exitWithSuccess('Task was created successfully', jsonOutput, json, {
+    await exitWithSuccess('Task was created successfully', jsonOutput, {
       tips: [
         'Use ' + colors.cyan('rover list') + ' to check the list of tasks',
         'Use ' +
@@ -733,7 +739,7 @@ export const taskCommand = async (
     });
   } else {
     jsonOutput.error = `Could not determine the description. Please, provide it.`;
-    await exitWithError(jsonOutput, json, { telemetry });
+    await exitWithError(jsonOutput, { telemetry });
     return;
   }
 

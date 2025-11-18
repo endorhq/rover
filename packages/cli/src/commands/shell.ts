@@ -7,6 +7,7 @@ import { TaskDescriptionManager, TaskNotFoundError } from 'rover-schemas';
 import { getTelemetry } from '../lib/telemetry.js';
 import { CLIJsonOutput } from '../types.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
+import { isJsonMode, setJsonMode } from '../lib/global-state.js';
 import {
   createSandbox,
   getAvailableSandboxBackend,
@@ -31,7 +32,7 @@ export const shellCommand = async (
   const numericTaskId = parseInt(taskId, 10);
   if (isNaN(numericTaskId)) {
     jsonOutput.error = `Invalid task ID '${taskId}' - must be a number`;
-    await exitWithError(jsonOutput, json, { telemetry });
+    await exitWithError(jsonOutput, { telemetry });
     return;
   }
 
@@ -49,7 +50,7 @@ export const shellCommand = async (
     // Check if worktree exists
     if (!task.worktreePath || !existsSync(task.worktreePath)) {
       jsonOutput.error = `No worktree found for this task`;
-      await exitWithError(jsonOutput, json, { telemetry });
+      await exitWithError(jsonOutput, { telemetry });
       return;
     }
 
@@ -61,7 +62,7 @@ export const shellCommand = async (
 
       if (!availableBackend) {
         jsonOutput.error = `Neither Docker nor Podman are available. Please install Docker or Podman.`;
-        await exitWithError(jsonOutput, json, { telemetry });
+        await exitWithError(jsonOutput, { telemetry });
         return;
       }
     }
@@ -93,7 +94,7 @@ export const shellCommand = async (
       } catch (error) {
         spinner.error('Failed to start container shell');
         jsonOutput.error = 'Failed to start container: ' + error;
-        await exitWithError(jsonOutput, json, { telemetry });
+        await exitWithError(jsonOutput, { telemetry });
         return;
       }
     } else {
@@ -166,7 +167,7 @@ export const shellCommand = async (
       } catch (error) {
         spinner.error(`Failed to start shell ${shell}`);
         jsonOutput.error = 'Failed to start shell: ' + error;
-        await exitWithError(jsonOutput, json, { telemetry });
+        await exitWithError(jsonOutput, { telemetry });
         return;
       }
     }
@@ -174,14 +175,13 @@ export const shellCommand = async (
     if (shellProcess) {
       // Handle process completion
       if (shellProcess.exitCode === 0) {
-        await exitWithSuccess('Shell session ended', jsonOutput, json, {
+        await exitWithSuccess('Shell session ended', jsonOutput, {
           telemetry,
         });
       } else {
         await exitWithWarn(
           `Shell session ended with code ${shellProcess.exitCode}`,
           jsonOutput,
-          json,
           { telemetry }
         );
       }
@@ -189,10 +189,10 @@ export const shellCommand = async (
   } catch (error) {
     if (error instanceof TaskNotFoundError) {
       jsonOutput.error = `The task with ID ${numericTaskId} was not found`;
-      await exitWithError(jsonOutput, json, { telemetry });
+      await exitWithError(jsonOutput, { telemetry });
     } else {
       jsonOutput.error = `There was an error starting the shell: ${error}`;
-      await exitWithError(jsonOutput, json, { telemetry });
+      await exitWithError(jsonOutput, { telemetry });
     }
   } finally {
     await telemetry?.shutdown();

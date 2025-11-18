@@ -5,6 +5,7 @@ import { TaskDescriptionStore, TaskDescriptionSchema } from 'rover-schemas';
 import { VERBOSE, showTips, Table, TableColumn } from 'rover-common';
 import { IterationStatusManager } from 'rover-schemas';
 import { IterationManager } from 'rover-schemas';
+import { isJsonMode, setJsonMode } from '../lib/global-state.js';
 
 /**
  * Format duration from start to now or completion
@@ -73,6 +74,10 @@ export const listCommand = async (
     watching?: boolean;
   } = {}
 ) => {
+  if (options.json !== undefined) {
+    setJsonMode(options.json);
+  }
+
   const telemetry = getTelemetry();
 
   try {
@@ -83,7 +88,7 @@ export const listCommand = async (
     }
 
     if (tasks.length === 0) {
-      if (options.json) {
+      if (isJsonMode()) {
         console.log(JSON.stringify([]));
       } else {
         console.log(colors.yellow('📋 No tasks found'));
@@ -102,7 +107,7 @@ export const listCommand = async (
       try {
         task.updateStatusFromIteration();
       } catch (err) {
-        if (!options.json) {
+        if (!isJsonMode()) {
           console.log(
             `\n${colors.yellow(`⚠ Failed to update the status of task ${task.id}`)}`
           );
@@ -115,7 +120,7 @@ export const listCommand = async (
     });
 
     // JSON output mode
-    if (options.json) {
+    if (isJsonMode()) {
       const jsonOutput: Array<
         TaskDescriptionSchema & { iterationsData: IterationManager[] }
       > = [];

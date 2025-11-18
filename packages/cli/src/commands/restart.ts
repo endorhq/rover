@@ -10,6 +10,7 @@ import { AI_AGENT, Git } from 'rover-common';
 import { CLIJsonOutput } from '../types.js';
 import { IterationManager } from 'rover-schemas';
 import { getTelemetry } from '../lib/telemetry.js';
+import { isJsonMode, setJsonMode } from '../lib/global-state.js';
 import yoctoSpinner from 'yocto-spinner';
 import { copyEnvironmentFiles } from '../utils/env-files.js';
 import { findProjectRoot } from 'rover-common';
@@ -32,6 +33,10 @@ export const restartCommand = async (
   taskId: string,
   options: { json?: boolean } = {}
 ) => {
+  if (options.json !== undefined) {
+    setJsonMode(options.json);
+  }
+
   const telemetry = getTelemetry();
 
   const json = options.json === true;
@@ -43,7 +48,7 @@ export const restartCommand = async (
   const numericTaskId = parseInt(taskId, 10);
   if (isNaN(numericTaskId)) {
     jsonOutput.error = `Invalid task ID '${taskId}' - must be a number`;
-    await exitWithError(jsonOutput, json, { telemetry });
+    await exitWithError(jsonOutput, { telemetry });
     return;
   }
 
@@ -54,7 +59,7 @@ export const restartCommand = async (
     // Check if task is in NEW or FAILED status
     if (!task.isNew() && !task.isFailed()) {
       jsonOutput.error = `Task ${taskId} is not in NEW or FAILED status (current: ${task.status})`;
-      await exitWithError(jsonOutput, json, {
+      await exitWithError(jsonOutput, {
         tips: [
           'Only NEW and FAILED tasks can be restarted',
           'Use ' +
@@ -79,7 +84,7 @@ export const restartCommand = async (
         selectedAiAgent = userSettings.defaultAiAgent || AI_AGENT.Claude;
       }
     } catch (error) {
-      if (!json) {
+      if (!isJsonMode()) {
         console.log(
           colors.yellow('⚠ Could not load user settings, defaulting to Claude')
         );
@@ -139,7 +144,7 @@ export const restartCommand = async (
       );
     }
 
-    if (!json) {
+    if (!isJsonMode()) {
       console.log(colors.bold('Restarting Task'));
       console.log(colors.gray('├── ID: ') + colors.cyan(task.id.toString()));
       console.log(colors.gray('├── Title: ') + task.title);
@@ -178,7 +183,7 @@ export const restartCommand = async (
       restartedAt: restartedAt,
     };
 
-    await exitWithSuccess('Task restarted succesfully!', jsonOutput, json, {
+    await exitWithSuccess('Task restarted succesfully!', jsonOutput, {
       tips: [
         'Use ' + colors.cyan('rover list') + ' to check the list of tasks',
         'Use ' +
@@ -195,11 +200,11 @@ export const restartCommand = async (
   } catch (error) {
     if (error instanceof TaskNotFoundError) {
       jsonOutput.error = `The task with ID ${numericTaskId} was not found`;
-      await exitWithError(jsonOutput, json, { telemetry });
+      await exitWithError(jsonOutput, { telemetry });
       return;
     } else {
       jsonOutput.error = `There was an error restarting the task: ${error}`;
-      await exitWithError(jsonOutput, json, { telemetry });
+      await exitWithError(jsonOutput, { telemetry });
       return;
     }
   } finally {

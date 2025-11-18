@@ -27,6 +27,7 @@ import {
   showRegularHeader,
 } from 'rover-common';
 import { addWorkflowCommands } from './commands/workflows/index.js';
+import { setJsonMode, isJsonMode } from './lib/global-state.js';
 
 export function createProgram(
   options: { excludeRuntimeHooks?: boolean } = {}
@@ -36,6 +37,10 @@ export function createProgram(
 
   if (!options.excludeRuntimeHooks) {
     program
+      .hook('preAction', (_thisCommand, actionCommand) => {
+        // Set global JSON mode flag based on command options
+        setJsonMode(actionCommand.opts().json === true);
+      })
       .hook('preAction', (thisCommand, _actionCommand) => {
         setVerbose(thisCommand.opts().verbose);
       })
@@ -73,7 +78,6 @@ export function createProgram(
               error: 'Git is not installed',
               success: false,
             },
-            actionCommand.opts().json === true,
             {
               tips: ['Install git and try again'],
             }
@@ -85,7 +89,6 @@ export function createProgram(
               error: 'Not in a git repository',
               success: false,
             },
-            actionCommand.opts().json === true,
             {
               tips: [
                 'Rover requires the project to be in a git repository. You can initialize a git repository by running ' +
@@ -100,7 +103,6 @@ export function createProgram(
               error: 'No commits found in git repository',
               success: false,
             },
-            actionCommand.opts().json === true,
             {
               tips: [
                 'Git worktree requires at least one commit in the repository in order to have common history',
@@ -143,7 +145,7 @@ export function createProgram(
       .hook('preAction', (_thisCommand, actionCommand) => {
         const commandName = actionCommand.name();
 
-        if (actionCommand.opts().json === true) {
+        if (isJsonMode()) {
           // Do not print anything for JSON
           return;
         }

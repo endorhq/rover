@@ -19,6 +19,7 @@ import { showRoverChat } from '../utils/display.js';
 import { readFromStdin, stdinIsAvailable } from '../utils/stdin.js';
 import { CLIJsonOutput } from '../types.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
+import { isJsonMode, setJsonMode } from '../lib/global-state.js';
 
 const { prompt } = enquirer;
 
@@ -139,6 +140,10 @@ export const iterateCommand = async (
   instructions?: string,
   options: { json?: boolean } = {}
 ): Promise<void> => {
+  if (options.json !== undefined) {
+    setJsonMode(options.json);
+  }
+
   const telemetry = getTelemetry();
   const json = options.json === true;
   const result: IterateResult = {
@@ -153,7 +158,7 @@ export const iterateCommand = async (
   const numericTaskId = parseInt(taskId, 10);
   if (isNaN(numericTaskId)) {
     result.error = `Invalid task ID '${taskId}' - must be a number`;
-    if (options.json) {
+    if (isJsonMode()) {
       console.log(JSON.stringify(result, null, 2));
     } else {
       console.log(colors.red(`✗ ${result.error}`));
@@ -172,7 +177,7 @@ export const iterateCommand = async (
       const stdinInput = await readFromStdin();
       if (stdinInput) {
         finalInstructions = stdinInput;
-        if (!options.json) {
+        if (!isJsonMode()) {
           showRoverChat(
             [
               "hey human! Let's iterate on this task.",
@@ -189,9 +194,9 @@ export const iterateCommand = async (
 
     // If still no instructions and not in JSON mode, prompt user
     if (!finalInstructions) {
-      if (json) {
+      if (isJsonMode()) {
         result.error = 'Instructions are required in JSON mode';
-        await exitWithError(result, json, { telemetry });
+        await exitWithError(result, { telemetry });
         return;
       } else {
         showRoverChat(
@@ -216,14 +221,14 @@ export const iterateCommand = async (
         });
         finalInstructions = input;
       } catch (_err) {
-        await exitWithWarn('Task deletion cancelled', result, json, {
+        await exitWithWarn('Task deletion cancelled', result, {
           telemetry,
         });
         return;
       }
     }
   } else {
-    if (!json) {
+    if (!isJsonMode()) {
       showRoverChat(
         [
           "hey human! Let's iterate on this task.",
@@ -250,7 +255,7 @@ export const iterateCommand = async (
       try {
         selectedAiAgent = getUserAIAgent();
       } catch (_err) {
-        if (!json) {
+        if (!isJsonMode()) {
           console.log(
             colors.yellow(
               '⚠ Could not load user settings, defaulting to Claude'
@@ -259,7 +264,7 @@ export const iterateCommand = async (
         }
       }
     } else {
-      if (!options.json) {
+      if (!isJsonMode()) {
         console.log(colors.gray(`Using agent from task: ${selectedAiAgent}`));
       }
     }
@@ -274,7 +279,7 @@ export const iterateCommand = async (
     );
     result.taskTitle = task.title;
 
-    if (!options.json) {
+    if (!isJsonMode()) {
       console.log(colors.bold('Task Details'));
       console.log(colors.gray('├── ID: ') + colors.cyan(task.id.toString()));
       console.log(colors.gray('├── Task Title: ') + task.title);
@@ -291,7 +296,7 @@ export const iterateCommand = async (
     );
 
     // Expand task with AI
-    if (!options.json) {
+    if (!isJsonMode()) {
       console.log('');
     }
 
@@ -315,7 +320,7 @@ export const iterateCommand = async (
         if (spinner) spinner.success('Task iteration expanded!');
       } else {
         if (spinner) spinner.error('Failed to expand task iteration');
-        if (!options.json) {
+        if (!isJsonMode()) {
           console.log(
             colors.yellow(
               '\n⚠ AI expansion failed. Using manual iteration approach.'
@@ -342,13 +347,13 @@ export const iterateCommand = async (
       };
     }
 
-    if (!options.json) {
+    if (!isJsonMode()) {
       console.log('');
     }
 
     if (!expandedTask) {
       result.error = 'Could not create iteration';
-      if (options.json) {
+      if (isJsonMode()) {
         console.log(JSON.stringify(result, null, 2));
       } else {
         console.log(colors.red('✗ Could not create iteration'));
@@ -360,7 +365,7 @@ export const iterateCommand = async (
     result.expandedDescription = expandedTask.description;
 
     // Skip confirmation and refinement instructions if --json flag is passed
-    if (!options.json) {
+    if (!isJsonMode()) {
       // Display the expanded iteration
       console.log(colors.bold('Iteration:'));
       console.log(
@@ -374,7 +379,7 @@ export const iterateCommand = async (
       launchSync('git', ['rev-parse', '--is-inside-work-tree']);
     } catch (error) {
       result.error = 'Not in a git repository';
-      if (options.json) {
+      if (isJsonMode()) {
         console.log(JSON.stringify(result, null, 2));
       } else {
         console.log(colors.red('✗ Not in a git repository'));
@@ -386,7 +391,7 @@ export const iterateCommand = async (
     // Ensure workspace exists
     if (!task.worktreePath || !existsSync(task.worktreePath)) {
       result.error = 'No workspace found for this task';
-      if (options.json) {
+      if (isJsonMode()) {
         console.log(JSON.stringify(result, null, 2));
       } else {
         console.log(colors.red('✗ No workspace found for this task'));
@@ -437,7 +442,7 @@ export const iterateCommand = async (
 
     result.success = true;
 
-    await exitWithSuccess('Iteration started successfully', result, json, {
+    await exitWithSuccess('Iteration started successfully', result, {
       tips: [
         'Use ' + colors.cyan('rover list') + ' to check the list of tasks',
         'Use ' +
@@ -458,7 +463,7 @@ export const iterateCommand = async (
       result.error = 'Unknown error creating task iteration';
     }
 
-    if (options.json) {
+    if (isJsonMode()) {
       console.log(JSON.stringify(result, null, 2));
     } else {
       if (error instanceof TaskNotFoundError) {
