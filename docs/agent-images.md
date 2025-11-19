@@ -1,60 +1,48 @@
 # Agent images
 
-Agents in Rover run in isolated environments, as much as possible. The
-idea behind this strategy is that the agent can make as many changes
-as it needs in order to improve, implement, build, check, test... on a
-given project, without impacting the host machine.
-
-When Rover runs, it is possible to choose what image will be used to
-spawn the agent in. This gives flexibility to have specific OS's
-(e.g. Alpine, Debian, Ubuntu), as well as some core tooling already
-installed for the project, what will increase development speed,
-because the agent won't need to install new packages.
+Agents in Rover run in isolated environments ([sandbox](https://docs.endor.dev/rover/concepts/sandbox/)). These environments give agents a way to modify the environment to improve, implement, build, check, and test a given project, without impacting the host machine. Rover uses Alpine linux as the base image for the default sandbox images we provide. The main reason is to keep these images minimal and give agents access to a rich package ecosystem (`apk`).
 
 ## Rover provided agent images
 
+There are two types of images: development and tagged images. In general, the development images are used. Tagged images are only used when a new rover release is created.
+
 ### Development images
 
-The code at the `main` branch points to
-`ghcr.io/endorhq/rover/agent-dev:latest`. Automation builds and pushes
-to this image when a new commit is pushed to the `main` branch.
+The code at the `main` branch points to `ghcr.io/endorhq/rover/agent-dev:latest`. Automation builds and pushes to this image when a new commit is pushed to the `main` branch.
 
 ### Tagged images
 
-Whenever we create a new tag in Rover, a new image will be pushed with
-that tag name at: `ghcr.io/endorhq/rover/agent:<tag>`.
+Whenever we create a new tag in Rover, a new image will be pushed with that tag name at: `ghcr.io/endorhq/rover/agent:<tag>`.
 
-## Using your own agent image
+Note that tagged images are named `agent` as opposed to development images that are named `agent-dev`. This is so that when a new tag is pushed to the `ghcr.io/endorhq/rover/agent` image, the `ghcr.io/endorhq/rover/agent-dev:latest` image is not affected.
+
+#### Release
+
+Releasing a new tag for an image is done through the [Release workflow](../.github/workflows/release.yml). This workflow will tag the source code, as well as build a new agent image, with the source code updated to point to that agent image
+
+## Develop a new agent image
+
+Some changes might require updating the `rover-agent` CLI that runs in the container during development, or we might want to update the base image or perform some changes to it. In that case, a new image of the `rover-agent` image has to be built.
 
 ### Minimum image requirements
 
-The minimum requirements for the image follows:
+In case that you are experimenting to build a very different agent image than the current one, the minimum requirements for the image follows.
 
 #### Node
 
-Regardless of the base image you use, Node 24 is a prerequisite, as
-[`rover-agent`](https://github.com/endorhq/rover/tree/main/packages/agent)
-is a Node application.
+Regardless of the base image you use, Node 24 is a prerequisite, as [`rover-agent`](https://github.com/endorhq/rover/tree/main/packages/agent) is a Node application.
 
 #### Package Manager MCP
 
-The [package-manager
-MCP](https://github.com/endorhq/package-manager-mcp) is a static
-binary that allows the configured agent to search and install packages
-in the container.
+The [package-manager MCP](https://github.com/endorhq/package-manager-mcp) is a static binary that allows the configured agent to search and install packages in the container.
 
-It is expected that a binary named `package-manager-mcp-server` exists
-in the `$PATH`. It will be configured during the agent set up phase.
+It is expected that a binary named `package-manager-mcp-server` exists in the `$PATH`. It will be configured during the agent set up phase.
 
-You can find the static binaries in the [Releases
-list](https://github.com/endorhq/package-manager-mcp/releases).
+You can find the static binaries in the [Releases list](https://github.com/endorhq/package-manager-mcp/releases).
 
 #### Reserved directories
 
-Reserved directories may or may not exist in the container
-image. However, their original contents won't be available during
-Agent execution, as host paths will be mounted in these directories
-automatically by Rover.
+Reserved directories may or may not exist in the container image. However, their original contents won't be available during Agent execution, as host paths will be mounted in these directories automatically by Rover.
 
 - `/workspace`: mountpoint used for the user project.
 
@@ -62,8 +50,11 @@ automatically by Rover.
 
 #### Sudo
 
-`sudo` needs to be available. The Rover agent CLI goes through two
-main steps:
+`sudo` needs to be available in the system. The reason behind this decision is because we need to run Agents in an unattended mode so that they can finish the task without asking many intermediate questions. However, usually, inside a container, we are identified as the `root` user. Many agents will refuse to run if they are super user, so that we run the agent with an unprivileged user, and use `sudo` with it.
+
+In rootless containers, we do use `sudo` as well.
+
+The Rover agent CLI goes through two main steps:
 
 1. Setting up the environment and installing system dependencies
 2. Running the chosen agent
@@ -73,18 +64,10 @@ Ideally, there should be two `sudo` profiles:
 - `/etc/sudoers.d/1-agent-setup`
 - `/etc/sudoers.d/2-agent-cleanup`
 
-The contents of this files will depend on the default groups present
-in the base image to be configured for Rover. However, a good rule of
-thumb is to take `/etc/group` from the base and configure both
-accordingly, adding an extra group `agent` that will be created
-automatically by Rover if necessary.
+The contents of this files will depend on the default groups present in the base image to be configured for Rover. However, a good rule of thumb is to take `/etc/group` from the base and configure both accordingly, adding an extra group `agent` that will be created automatically by Rover if necessary.
 
-Rover will remove `/etc/sudoers.d/1-agent-setup` before handing
-control to the agent. From that point on, the
-`/etc/sudoers.d/2-agent-cleanup` will determine what the agent is able
-to do with `sudo`: it is highly recommended to reduce the list of
-commands that could be executed with root permissions without
-password.
+Rover will remove `/etc/sudoers.d/1-agent-setup` before handing control to the agent. From that point on, the
+`/etc/sudoers.d/2-agent-cleanup` will determine what the agent is able to do with `sudo`: it is highly recommended to reduce the list of commands that could be executed with root permissions without password.
 
 An example for `node:24-alpine` follows:
 
