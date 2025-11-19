@@ -2,9 +2,23 @@
 
 Agents in Rover run in isolated environments ([sandbox](https://docs.endor.dev/rover/concepts/sandbox/)). These environments give agents a way to modify the environment to improve, implement, build, check, and test a given project, without impacting the host machine. Rover uses Alpine linux as the base image for the default sandbox images we provide. The main reason is to keep these images minimal and give agents access to a rich package ecosystem (`apk`).
 
-## Rover provided agent images
+## Agent images
 
 There are two types of images: development and tagged images. In general, the development images are used. Tagged images are only used when a new rover release is created.
+
+### Base image
+
+The base image is Alpine Linux as it is a good fit for Agents in the spirit of being developer friendly, using less disk space, and because it's built for simplicity. It also has a very rich [package offering](https://pkgs.alpinelinux.org/packages).
+
+The base image is built with the following [Dockerfile](../images/node/Dockerfile).
+
+#### Agent installation
+
+In general, when a new agent session is requested within the container, we install it with `npm install -g` or with the instructions provided by the Agent maintainers.
+
+In some circumstances this has not been possible, because of incompatibilities. Such as an example is the [Cursor Agent](https://forum.cursor.com/t/cursor-agent-does-not-work-with-non-glibc-based-distributions-such-as-alpine-linux/141571). For those cases, we have `nix` based setup (package also installed with the `Dockerfile`).
+
+By having the `cursor-agent` through `nix`, we are able to pull a compatible glibc, and use that without any issues.
 
 ### Development images
 
