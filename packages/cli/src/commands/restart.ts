@@ -165,7 +165,10 @@ export const restartCommand = async (
     // Start sandbox container for task execution
     try {
       const sandbox = await createSandbox(task);
-      await sandbox.createAndStart();
+      const containerId = await sandbox.createAndStart();
+
+      // Update task metadata with new container ID
+      task.setContainerInfo(containerId, 'running');
     } catch (error) {
       // If sandbox execution fails, reset task back to NEW status
       task.resetToNew();
