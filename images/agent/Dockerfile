@@ -27,9 +27,9 @@ COPY --from=agent-builder /rover-agent.tgz /rover-agent.tgz
 RUN npm install -g mcp-remote@0.1.29
 RUN npm install -g /rover-agent.tgz
 
-COPY ./images/node/assets/1-sudoers-setup /etc/sudoers.d/1-agent-setup
-COPY ./images/node/assets/2-sudoers-cleanup /etc/sudoers.d/2-agent-cleanup
+COPY ./images/agent/assets/1-sudoers-setup /etc/sudoers.d/1-agent-setup
+COPY ./images/agent/assets/2-sudoers-cleanup /etc/sudoers.d/2-agent-cleanup
 
 # Install agents with special requirements
-COPY ./images/node/assets/nix/nix.conf /etc/nix/nix.conf
-COPY ./images/node/assets/nix/ai-tool-wrapper /usr/local/bin/cursor-agent
+COPY ./images/agent/assets/nix/nix.conf /etc/nix/nix.conf
+COPY ./images/agent/assets/nix/ai-tool-wrapper /usr/local/bin/cursor-agent

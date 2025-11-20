@@ -2,7 +2,7 @@
   "name": "endor-rover",
   "displayName": "Rover",
   "description": "Collaborate with AI agents to complete any task",
-  "version": "1.4.0",
+  "version": "0.0.0-dev",
   "publisher": "endor",
   "engines": {
     "vscode": "^1.102.0"

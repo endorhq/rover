@@ -45,3 +45,14 @@ jobs:
       - name: Test Build Artifact
         run: node dist/index.js --version
         working-directory: packages/cli
+
+  build-dev-image:
+    if: github.event_name == 'push'
+    needs: build
+    uses: ./.github/workflows/build-image.yml
+    permissions:
+      contents: read
+      packages: write
+    with:
+      tag: latest
+      image-name: ghcr.io/${{ github.repository }}/agent-dev

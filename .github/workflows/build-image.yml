@@ -14,6 +14,26 @@ on:
         type: string
         required: true
         default: 'linux/amd64,linux/arm64'
+      image-name:
+        description: 'Image name (e.g., ghcr.io/endorhq/rover/agent)'
+        type: string
+        required: false
+        default: 'ghcr.io/endorhq/rover/agent'
+  workflow_call:
+    inputs:
+      tag:
+        description: 'Image tag (e.g., v1.0.0, latest)'
+        type: string
+        required: true
+      platforms:
+        description: 'Target platforms'
+        type: string
+        required: false
+        default: 'linux/amd64,linux/arm64'
+      image-name:
+        description: 'Image name (e.g., ghcr.io/endorhq/rover/agent)'
+        type: string
+        required: false
 
 jobs:
   build-and-push:
@@ -51,7 +71,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository }}/node
+          images: ${{ inputs.image-name || format('ghcr.io/{0}/agent', github.repository) }}
           tags: |
             type=raw,value=${{ inputs.tag }}
 
@@ -59,7 +79,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./images/node/Dockerfile
+          file: ./images/agent/Dockerfile
           platforms: ${{ inputs.platforms }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
@@ -71,7 +91,7 @@ jobs:
         if: success()
         env:
           IMAGE_TAG: ${{ inputs.tag }}
-          IMAGE_URL: 'ghcr.io/${{ github.repository }}/node:${{ inputs.tag }}'
+          IMAGE_URL: 'ghcr.io/${{ github.repository }}/agent:${{ inputs.tag }}'
         run: |
           echo "✅ Successfully built and pushed Docker image"
           echo "Image: ${IMAGE_URL}"

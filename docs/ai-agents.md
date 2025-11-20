@@ -114,7 +114,7 @@ A new agent touches different packages in the project. To test your changes, run
 
   ```bash
   # Remember to change "VERSION" with the value from "AGENT_IMAGE"
-  docker build -t ghcr.io/endorhq/rover/node:VERSION -f ./images/node/Dockerfile .
+  docker build -t ghcr.io/endorhq/rover/node:VERSION -f ./images/agent/Dockerfile .
   ```
 
   This image builds the new `agent` package and installs it in the image. We build the final image and publish it during the production release.

@@ -30,7 +30,18 @@ on:
         default: false
 
 jobs:
+  build-image:
+    if: inputs.project == 'cli' && inputs.dryRun == false
+    uses: ./.github/workflows/build-image.yml
+    with:
+      tag: v${{ inputs.targetVersion }}
+    permissions:
+      contents: read
+      packages: write
+
   release:
+    needs: build-image
+    if: always() && (needs.build-image.result == 'success' || needs.build-image.result == 'skipped')
     timeout-minutes: 15
     environment: production
     runs-on: ubuntu-latest
@@ -57,6 +68,33 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+
+      - name: Create or Update Release Branch
+        run: |
+          git config user.name "${{ github.actor }}"
+          git config user.email "${{ github.actor }}@users.noreply.github.com"
+
+          # Extract major.minor from version (e.g., 1.2.3 -> 1.2)
+          VERSION="${{ inputs.targetVersion }}"
+          MAJOR_MINOR=$(echo "$VERSION" | cut -d. -f1,2)
+          BRANCH_NAME="release/${{ inputs.project }}/v${MAJOR_MINOR}"
+
+          echo "Target version: $VERSION"
+          echo "Release branch: $BRANCH_NAME"
+
+          # Fetch remote branches to check if release branch exists
+          git fetch origin
+
+          # Check if branch exists remotely
+          if git ls-remote --heads origin "$BRANCH_NAME" | grep -q "$BRANCH_NAME"; then
+            echo "Branch $BRANCH_NAME already exists, checking it out..."
+            git checkout -B "$BRANCH_NAME" "origin/$BRANCH_NAME"
+          else
+            echo "Creating new branch $BRANCH_NAME..."
+            git checkout -b "$BRANCH_NAME"
+          fi
+
+          echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
 
       - name: Bump Version
         run: npm version ${{ inputs.targetVersion }}
@@ -92,15 +130,13 @@ jobs:
           PROJECT: '${{ inputs.project }}'
           TAG_NAME: '${{ inputs.project }}/v${{ inputs.targetVersion }}'
         run: |
-          git config user.name "${{ github.actor }}"
-          git config user.email "${{ github.actor }}@users.noreply.github.com"
           git add .
-          git commit -m "bump: update $PROJECT to $VERSION"
+          git commit -m "release: bump $PROJECT to $VERSION"
           COMMIT_SHA=$(git rev-parse HEAD)
           echo "COMMIT_SHA=$COMMIT_SHA" >> $GITHUB_ENV
           echo "Created commit: $COMMIT_SHA"
           git tag -a "$TAG_NAME" -m "$TAG_NAME"
-          git push
+          git push origin "${{ env.BRANCH_NAME }}"
           git push --tags
 
       - name: (Dry Run) Create the release

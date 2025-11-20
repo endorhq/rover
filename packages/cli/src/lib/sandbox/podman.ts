@@ -18,7 +18,6 @@ import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir, userInfo } from 'node:os';
 import { generateRandomId } from '../../utils/branch-name.js';
 import {
-  AGENT_IMAGE,
   ContainerBackend,
   etcPasswdWithUserInfo,
   etcGroupWithUserInfo,

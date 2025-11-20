@@ -10,7 +10,7 @@ There are two types of images: development and tagged images. In general, the de
 
 The base image is Alpine Linux as it is a good fit for Agents in the spirit of being developer friendly, using less disk space, and because it's built for simplicity. It also has a very rich [package offering](https://pkgs.alpinelinux.org/packages).
 
-The base image is built with the following [Dockerfile](../images/node/Dockerfile).
+The base image is built with the following [Dockerfile](../images/agent/Dockerfile).
 
 #### Agent installation
 
