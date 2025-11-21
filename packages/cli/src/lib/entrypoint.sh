@@ -121,6 +121,8 @@ echo "Task ID: $TASK_ID"
 echo "Task Iteration: $TASK_ITERATION"
 echo "======================================="
 
+{installAllPackages}
+
 # Agent-specific CLI installation and credential setup
 echo -e "\n📦 Installing Agent CLI and setting up credentials"
 # Pass the environment variables to ensure it loads the right credentials

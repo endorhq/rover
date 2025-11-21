@@ -1,24 +1,18 @@
-import { getAIAgentTool, getUserAIAgent } from '../agents/index.js';
+import { getAIAgentTool } from '../agents/index.js';
 import { join } from 'node:path';
 import { ProjectConfigManager } from 'rover-schemas';
 import { Sandbox } from './types.js';
 import { SetupBuilder } from '../setup.js';
 import { TaskDescriptionManager } from 'rover-schemas';
-import {
-  AI_AGENT,
-  findProjectRoot,
-  launch,
-  ProcessManager,
-} from 'rover-common';
+import { findProjectRoot, launch, ProcessManager } from 'rover-common';
 import {
   parseCustomEnvironmentVariables,
   loadEnvsFile,
 } from '../../utils/env-variables.js';
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { homedir, tmpdir, userInfo } from 'node:os';
+import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir, userInfo } from 'node:os';
 import { generateRandomId } from '../../utils/branch-name.js';
 import {
-  AGENT_IMAGE,
   ContainerBackend,
   etcPasswdWithUserInfo,
   etcGroupWithUserInfo,
@@ -66,7 +60,12 @@ export class DockerSandbox extends Sandbox {
     );
 
     // Generate setup script using SetupBuilder
-    const setupBuilder = new SetupBuilder(this.task, this.task.agent!);
+    const projectConfigForSetup = ProjectConfigManager.load();
+    const setupBuilder = new SetupBuilder(
+      this.task,
+      this.task.agent!,
+      projectConfigForSetup
+    );
     const entrypointScriptPath = setupBuilder.generateEntrypoint();
     const inputsPath = setupBuilder.generateInputs();
     const workflowPath = setupBuilder.saveWorkflow(this.task.workflowName);
