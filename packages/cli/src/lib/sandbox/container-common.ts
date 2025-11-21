@@ -31,7 +31,7 @@ export function resolveAgentImage(
 /**
  * Checks if a custom agent image is being used and prints a warning if so
  */
-export function warnIfCustomImage(projectConfig?: ProjectConfig): void {
+export function warnIfCustomImage(projectConfig?: ProjectConfigManager): void {
   const envImage = process.env.AGENT_IMAGE;
   const configImage = projectConfig?.agentImage;
 

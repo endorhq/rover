@@ -118,8 +118,8 @@ export function createProgram(
         const commandName = actionCommand.name();
         if (
           !['init', 'mcp'].includes(commandName) &&
-          ProjectConfig.exists() &&
-          !UserSettings.exists()
+          ProjectConfigManager.exists() &&
+          !UserSettingsManager.exists()
         ) {
           console.log(
             `Rover is not fully initialized in this directory. The command you requested (\`${commandName}\`) was not executed.`
