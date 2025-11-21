@@ -14,7 +14,7 @@ import {
   checkQwen,
   checkGit,
 } from '../utils/system.js';
-import { ProjectConfig, UserSettings } from '../lib/config.js';
+import { ProjectConfigManager, UserSettingsManager } from 'rover-schemas';
 import { showRoverChat, showTips, TIP_TITLES } from '../utils/display.js';
 import { AI_AGENT } from 'rover-common';
 import { getTelemetry } from '../lib/telemetry.js';
@@ -150,12 +150,12 @@ export const initCommand = async (
   }
 
   // Check if already initialized
-  if (ProjectConfig.exists() && UserSettings.exists()) {
+  if (ProjectConfigManager.exists() && UserSettingsManager.exists()) {
     console.log(
       colors.cyan('\n✓ Rover is already initialized in this directory')
     );
     return;
-  } else if (!UserSettings.exists()) {
+  } else if (!UserSettingsManager.exists()) {
     console.log(
       colors.green(
         '\n✓ Rover is initialized in this directory. User settings will be initialized now.'
@@ -274,10 +274,10 @@ export const initCommand = async (
 
     try {
       // Save Project Configuration (rover.json)
-      let projectConfig: ProjectConfig;
+      let projectConfig: ProjectConfigManager;
 
-      if (ProjectConfig.exists()) {
-        projectConfig = ProjectConfig.load();
+      if (ProjectConfigManager.exists()) {
+        projectConfig = ProjectConfigManager.load();
         // Update with detected values
         environment.languages.forEach(lang => projectConfig.addLanguage(lang));
         environment.packageManagers.forEach(pm =>
@@ -288,7 +288,7 @@ export const initCommand = async (
         );
         projectConfig.setAttribution(attribution);
       } else {
-        projectConfig = ProjectConfig.create();
+        projectConfig = ProjectConfigManager.create();
         projectConfig.setAttribution(attribution);
         // Set detected values
         environment.languages.forEach(lang => projectConfig.addLanguage(lang));
@@ -301,14 +301,14 @@ export const initCommand = async (
       }
 
       // Save User Settings (.rover/settings.json)
-      let userSettings: UserSettings;
-      if (UserSettings.exists()) {
-        userSettings = UserSettings.load();
+      let userSettings: UserSettingsManager;
+      if (UserSettingsManager.exists()) {
+        userSettings = UserSettingsManager.load();
         // Update AI agents
         availableAgents.forEach(agent => userSettings.addAiAgent(agent));
         userSettings.setDefaultAiAgent(defaultAIAgent);
       } else {
-        userSettings = UserSettings.createDefault();
+        userSettings = UserSettingsManager.createDefault();
         // Set available AI agents and default
         availableAgents.forEach(agent => userSettings.addAiAgent(agent));
         userSettings.setDefaultAiAgent(defaultAIAgent);

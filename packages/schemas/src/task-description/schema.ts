@@ -22,7 +22,7 @@ export const TaskStatusSchema = z.enum([
 export const TaskDescriptionSchema = z.object({
   // Core Identity
   id: z.number().int().positive(),
-  uuid: z.uuid(),
+  uuid: z.string().uuid(),
   title: z.string().min(1),
   description: z.string(),
 
@@ -31,12 +31,12 @@ export const TaskDescriptionSchema = z.object({
 
   // Status & Lifecycle
   status: TaskStatusSchema,
-  createdAt: z.iso.datetime(),
-  startedAt: z.iso.datetime().optional(),
-  completedAt: z.iso.datetime().optional(),
-  failedAt: z.iso.datetime().optional(),
-  lastIterationAt: z.iso.datetime().optional(),
-  lastStatusCheck: z.iso.datetime().optional(),
+  createdAt: z.string().datetime(),
+  startedAt: z.string().datetime().optional(),
+  completedAt: z.string().datetime().optional(),
+  failedAt: z.string().datetime().optional(),
+  lastIterationAt: z.string().datetime().optional(),
+  lastStatusCheck: z.string().datetime().optional(),
 
   // Execution Context
   iterations: z.number().int().min(1),
@@ -49,8 +49,8 @@ export const TaskDescriptionSchema = z.object({
   // Docker Execution
   containerId: z.string().optional(),
   executionStatus: z.string().optional(),
-  runningAt: z.iso.datetime().optional(),
-  errorAt: z.iso.datetime().optional(),
+  runningAt: z.string().datetime().optional(),
+  errorAt: z.string().datetime().optional(),
   exitCode: z.number().int().optional(),
 
   // Error Handling
@@ -58,7 +58,7 @@ export const TaskDescriptionSchema = z.object({
 
   // Restart Tracking
   restartCount: z.number().int().min(0).optional(),
-  lastRestartAt: z.iso.datetime().optional(),
+  lastRestartAt: z.string().datetime().optional(),
 
   // Metadata
   version: z.string(),

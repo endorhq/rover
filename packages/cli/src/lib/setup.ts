@@ -7,7 +7,7 @@ import techWriterWorkflow from './workflows/tech-writer.yml';
 import entrypointScript from './entrypoint.sh';
 import pupa from 'pupa';
 import { fileURLToPath } from 'node:url';
-import { ProjectConfig } from './config.js';
+import { ProjectConfigManager } from 'rover-schemas';
 
 /**
  * SetupBuilder class - Consolidates Docker setup script generation
@@ -60,7 +60,7 @@ export class SetupBuilder {
     }
 
     // Generate MCP configuration commands from rover.json
-    const projectConfig = ProjectConfig.load();
+    const projectConfig = ProjectConfigManager.load();
     const mcps = projectConfig.mcps;
     let configureAllMCPCommands: string[] = [];
 

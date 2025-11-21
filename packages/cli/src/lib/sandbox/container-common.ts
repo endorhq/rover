@@ -1,5 +1,5 @@
 import { launch } from 'rover-common';
-import { ProjectConfig } from '../config.js';
+import { ProjectConfigManager } from 'rover-schemas';
 import colors from 'ansi-colors';
 
 export const AGENT_IMAGE = 'ghcr.io/endorhq/rover/node:v1.3.4';
@@ -10,7 +10,9 @@ export const AGENT_IMAGE = 'ghcr.io/endorhq/rover/node:v1.3.4';
  * 2. agentImage from ProjectConfig
  * 3. AGENT_IMAGE constant (default)
  */
-export function resolveAgentImage(projectConfig?: ProjectConfig): string {
+export function resolveAgentImage(
+  projectConfig?: ProjectConfigManager
+): string {
   // Check environment variable first
   const envImage = process.env.AGENT_IMAGE;
   if (envImage) {

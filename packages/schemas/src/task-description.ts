@@ -30,7 +30,6 @@ import {
   CURRENT_TASK_DESCRIPTION_SCHEMA_VERSION,
   TaskDescriptionSchema as TaskDescriptionZodSchema,
 } from './task-description/schema.js';
-import { ZodError } from 'zod';
 import { IterationManager } from './iteration.js';
 
 /**

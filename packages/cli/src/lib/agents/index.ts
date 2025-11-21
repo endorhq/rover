@@ -4,7 +4,7 @@ import CursorAI from './cursor.js';
 import GeminiAI from './gemini.js';
 import QwenAI from './qwen.js';
 import type { IPromptTask } from '../prompts/index.js';
-import { UserSettings } from '../config.js';
+import { UserSettingsManager } from 'rover-schemas';
 import { AI_AGENT, launchSync } from 'rover-common';
 import type { WorkflowInput } from 'rover-schemas';
 
@@ -115,8 +115,8 @@ export const getAIAgentTool = (agent: string): AIAgentTool => {
  */
 export const getUserAIAgent = (): AI_AGENT => {
   try {
-    if (UserSettings.exists()) {
-      const userSettings = UserSettings.load();
+    if (UserSettingsManager.exists()) {
+      const userSettings = UserSettingsManager.load();
       return userSettings.defaultAiAgent || AI_AGENT.Claude;
     } else {
       return AI_AGENT.Claude;

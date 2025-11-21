@@ -1,4 +1,4 @@
-import { LANGUAGE, PACKAGE_MANAGER, TASK_MANAGER } from './lib/config.js';
+import type { Language, PackageManager, TaskManager } from 'rover-schemas';
 
 export interface ProjectInstructions {
   runDev: string;
@@ -52,9 +52,9 @@ export interface TaskExpansion {
 }
 
 export interface Environment {
-  languages: LANGUAGE[];
-  packageManagers: PACKAGE_MANAGER[];
-  taskManagers: TASK_MANAGER[];
+  languages: Language[];
+  packageManagers: PackageManager[];
+  taskManagers: TaskManager[];
 }
 
 export interface AIProvider {

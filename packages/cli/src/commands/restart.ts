@@ -5,7 +5,7 @@ import { generateBranchName } from '../utils/branch-name.js';
 import { TaskDescriptionManager, TaskNotFoundError } from 'rover-schemas';
 import { exitWithError, exitWithSuccess } from '../utils/exit.js';
 import { createSandbox } from '../lib/sandbox/index.js';
-import { UserSettings } from '../lib/config.js';
+import { UserSettingsManager } from 'rover-schemas';
 import { AI_AGENT, Git } from 'rover-common';
 import { CLIJsonOutput } from '../types.js';
 import { IterationManager } from 'rover-schemas';
@@ -79,8 +79,8 @@ export const restartCommand = async (
     let selectedAiAgent = AI_AGENT.Claude; // default
 
     try {
-      if (UserSettings.exists()) {
-        const userSettings = UserSettings.load();
+      if (UserSettingsManager.exists()) {
+        const userSettings = UserSettingsManager.load();
         selectedAiAgent = userSettings.defaultAiAgent || AI_AGENT.Claude;
       }
     } catch (error) {

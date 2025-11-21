@@ -1,6 +1,6 @@
 import { getAIAgentTool, getUserAIAgent } from '../agents/index.js';
 import { join } from 'node:path';
-import { ProjectConfig } from '../config.js';
+import { ProjectConfigManager } from 'rover-schemas';
 import { Sandbox } from './types.js';
 import { SetupBuilder } from '../setup.js';
 import { TaskDescriptionManager } from 'rover-schemas';
@@ -79,11 +79,11 @@ export class DockerSandbox extends Sandbox {
     // Load project config and merge custom environment variables
     const projectRoot = findProjectRoot();
     let customEnvVariables: string[] = [];
-    let projectConfig: ProjectConfig | undefined;
+    let projectConfig: ProjectConfigManager | undefined;
 
-    if (ProjectConfig.exists()) {
+    if (ProjectConfigManager.exists()) {
       try {
-        projectConfig = ProjectConfig.load();
+        projectConfig = ProjectConfigManager.load();
 
         // Parse custom envs array
         if (projectConfig.envs && projectConfig.envs.length > 0) {
