@@ -91,7 +91,7 @@ jobs:
         if: success()
         env:
           IMAGE_TAG: ${{ inputs.tag }}
-          IMAGE_URL: 'ghcr.io/${{ github.repository }}/agent:${{ inputs.tag }}'
+          IMAGE_URL: ${{ inputs.image-name || format('ghcr.io/{0}/agent', github.repository) }}:${{ inputs.tag }}
         run: |
           echo "✅ Successfully built and pushed Docker image"
           echo "Image: ${IMAGE_URL}"
