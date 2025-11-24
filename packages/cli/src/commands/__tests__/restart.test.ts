@@ -132,6 +132,37 @@ describe('restart command', async () => {
       const secondRestart = TaskDescriptionManager.load(taskId);
       expect(secondRestart.restartCount).toBe(2);
     });
+
+    it('should save container ID after restart', async () => {
+      // Create a failed task
+      const taskId = 888;
+      const taskDir = join(testDir, '.rover', 'tasks', taskId.toString());
+      mkdirSync(taskDir, { recursive: true });
+
+      const task = TaskDescriptionManager.create({
+        id: taskId,
+        title: 'Test Task',
+        description: 'A test task',
+        inputs: new Map(),
+        workflowName: 'swe',
+      });
+
+      // Manually set task to FAILED status
+      task.markFailed('This task failed');
+
+      // Verify no container ID before restart
+      expect(task.containerId).toBeUndefined();
+
+      // Run restart command
+      await restartCommand(taskId.toString(), { json: true });
+
+      // Verify container ID was saved after restart
+      // Note: The container ID may be an empty string in tests due to mocking,
+      // but we verify that setContainerInfo was called by checking it's defined
+      const reloadedTask = TaskDescriptionManager.load(taskId);
+      expect(reloadedTask.containerId).toBeDefined();
+      expect(reloadedTask.executionStatus).toBe('running');
+    });
   });
 
   describe('error handling', () => {
