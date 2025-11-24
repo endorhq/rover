@@ -1,4 +1,6 @@
+import { createReadStream } from 'node:fs';
 import { launchSync } from './os.js';
+import { join } from 'node:path';
 
 export class GitError extends Error {
   constructor(reason: string) {
@@ -13,6 +15,19 @@ export type GitDiffOptions = {
   onlyFiles?: boolean;
   branch?: string;
   includeUntracked?: boolean;
+};
+
+export type GitDiffStatsOptions = {
+  worktreePath?: string;
+  filePath?: string;
+  branch?: string;
+  includeUntracked?: boolean;
+};
+
+export type GitDiffStatsResult = {
+  files: Array<{ path: string; insertions: number; deletions: number }>;
+  totalInsertions: number;
+  totalDeletions: number;
 };
 
 export type GitWorktreeOptions = {
@@ -164,6 +179,77 @@ export class Git {
     }
 
     return diffResult;
+  }
+
+  async diffStats(options: GitDiffOptions = {}): Promise<GitDiffStatsResult> {
+    const args = ['diff', '--numstat'];
+
+    if (options.branch) {
+      args.push(options.branch);
+    }
+
+    if (options.filePath) {
+      args.push('--', options.filePath);
+    }
+
+    const files = [];
+
+    const diffResult = launchSync('git', args, {
+      cwd: options.worktreePath,
+    });
+
+    const output = diffResult.stdout?.toString() || '';
+    const lines = output.split('\n').filter(line => line.trim() !== '');
+
+    let totalInsertions = 0;
+    let totalDeletions = 0;
+
+    for (const line of lines) {
+      const [insertionsStr, deletionsStr, filePath] = line.split('\t');
+
+      const insertions =
+        insertionsStr === '-' ? 0 : parseInt(insertionsStr, 10);
+      const deletions = deletionsStr === '-' ? 0 : parseInt(deletionsStr, 10);
+
+      totalInsertions += insertions;
+      totalDeletions += deletions;
+
+      files.push({ path: filePath, insertions, deletions });
+    }
+
+    if (options.includeUntracked && !options.filePath) {
+      // Get untracked files
+      const lsFilesResult = launchSync(
+        'git',
+        ['ls-files', '--others', '--exclude-standard'],
+        {
+          cwd: options.worktreePath,
+          reject: false,
+        }
+      );
+
+      if (lsFilesResult.exitCode === 0) {
+        const untrackedFiles =
+          lsFilesResult?.stdout
+            ?.toString()
+            .split('\n')
+            .map(line => line.trim())
+            .filter(file => file.length > 0) || [];
+
+        for (const file of untrackedFiles) {
+          const fileLines = await this.countFileLines(
+            join(options.worktreePath || '', file)
+          );
+          files.push({ path: file, insertions: fileLines, deletions: 0 });
+        }
+      }
+    }
+
+    return {
+      totalInsertions,
+      totalDeletions,
+      files,
+    };
   }
 
   /**
@@ -532,5 +618,28 @@ export class Git {
 
       throw new GitError(errorMessage);
     }
+  }
+
+  /**
+   * Count file lines efficiently.
+   * @see https://stackoverflow.com/a/41439945
+   */
+  private async countFileLines(filePath: string): Promise<number> {
+    return new Promise((resolve, reject) => {
+      let lineCount = 0;
+      createReadStream(filePath)
+        .on('data', buffer => {
+          let idx = -1;
+          lineCount--; // Because the loop will run once for idx=-1
+          do {
+            idx = (buffer as Buffer<ArrayBufferLike>).indexOf(10, idx + 1);
+            lineCount++;
+          } while (idx !== -1);
+        })
+        .on('end', () => {
+          resolve(lineCount);
+        })
+        .on('error', reject);
+    });
   }
 }

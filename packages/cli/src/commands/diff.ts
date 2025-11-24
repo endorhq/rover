@@ -2,7 +2,7 @@ import colors from 'ansi-colors';
 import { existsSync } from 'node:fs';
 import { TaskDescriptionManager, TaskNotFoundError } from 'rover-schemas';
 import { getTelemetry } from '../lib/telemetry.js';
-import { Git } from 'rover-common';
+import { Git, showList, showTitle } from 'rover-common';
 import { showTips } from '../utils/display.js';
 
 export const diffCommand = async (
@@ -61,33 +61,60 @@ export const diffCommand = async (
     try {
       // Execute git diff command
       try {
-        const diffResult = git.diff({
-          worktreePath: task.worktreePath,
-          filePath: filePath,
-          onlyFiles: options.onlyFiles,
-          branch: options.branch,
-          includeUntracked: !options.branch, // Only include untracked when not comparing branches
-        });
+        if (options.onlyFiles) {
+          // Show only changed files with stats
+          const diffResult = await git.diffStats({
+            worktreePath: task.worktreePath,
+            filePath: filePath,
+            branch: options.branch,
+            includeUntracked: !options.branch,
+          });
 
-        const diffOutput = diffResult.stdout?.toString();
-
-        if (diffOutput?.trim() === '') {
-          if (filePath) {
-            console.log(
-              colors.yellow(`No changes found for file: ${filePath}`)
-            );
+          if (diffResult.files.length === 0) {
+            if (filePath) {
+              console.log(
+                colors.yellow(`No changes found for file: ${filePath}`)
+              );
+            } else {
+              console.log(colors.yellow('No changes found in workspace'));
+            }
           } else {
-            console.log(colors.yellow('No changes found in workspace'));
+            showTitle('Changed Files');
+            // Display file list with colors
+            const changedFiles: string[] = [];
+
+            diffResult.files.forEach(file => {
+              const insertions =
+                file.insertions > 0 ? colors.green(`+${file.insertions}`) : '0';
+              const deletions =
+                file.deletions > 0 ? colors.red(`-${file.deletions}`) : '0';
+              changedFiles.push(
+                `${insertions} ${deletions} ${colors.cyan(file.path)}`
+              );
+            });
+
+            showList(changedFiles);
           }
         } else {
-          if (options.onlyFiles) {
-            console.log(colors.bold('\nChanged Files'));
-            // Display file list with colors
-            const files = diffOutput?.trim().split('\n') || [];
+          // Regular diff
+          const diffResult = git.diff({
+            worktreePath: task.worktreePath,
+            filePath: filePath,
+            onlyFiles: options.onlyFiles,
+            branch: options.branch,
+            includeUntracked: !options.branch, // Only include untracked when not comparing branches
+          });
 
-            for (let i = 0; i < files.length; i++) {
-              const connector = i === files.length - 1 ? '└──' : '├──';
-              console.log(colors.gray(`${connector}`), colors.cyan(files[i]));
+          const diffOutput = diffResult.stdout?.toString();
+
+          if (diffOutput?.trim() === '') {
+            // No differences found
+            if (filePath) {
+              console.log(
+                colors.yellow(`No changes found for file: ${filePath}`)
+              );
+            } else {
+              console.log(colors.yellow('No changes found in workspace'));
             }
           } else {
             // Display full diff with syntax highlighting
