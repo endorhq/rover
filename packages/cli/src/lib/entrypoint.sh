@@ -21,9 +21,16 @@ export PATH=/root/local/.bin:$PATH
 # permissions to the minimal.
 sudo mkdir -p $HOME
 sudo mkdir -p $HOME/.config
+sudo mkdir -p $HOME/.local/bin
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> $HOME/.profile
 sudo chown -R $(id -u):$(id -g) $HOME
 sudo chown -R $(id -u):$(id -g) /workspace
 sudo chown -R $(id -u):$(id -g) /output
+
+source $HOME/.profile
+
+# Fail if node is not available
+check_command "node" || safe_exit 1
 
 # Function to shred secrets before exit
 shred_secrets() {
@@ -116,6 +123,8 @@ echo "Task Title: $TASK_TITLE"
 echo "Task ID: $TASK_ID"
 echo "Task Iteration: $TASK_ITERATION"
 echo "======================================="
+
+{installAllPackages}
 
 # Agent-specific CLI installation and credential setup
 echo -e "\n📦 Installing Agent CLI and setting up credentials"

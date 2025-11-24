@@ -1,5 +1,5 @@
 import { launch } from 'rover-common';
-import { ProjectConfig } from '../config.js';
+import { ProjectConfigManager } from 'rover-schemas';
 import colors from 'ansi-colors';
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -44,7 +44,9 @@ export function getDefaultAgentImage(): string {
  * 2. agentImage from ProjectConfig
  * 3. Default image based on CLI version
  */
-export function resolveAgentImage(projectConfig?: ProjectConfig): string {
+export function resolveAgentImage(
+  projectConfig?: ProjectConfigManager
+): string {
   // Check environment variable first
   const envImage = process.env.AGENT_IMAGE;
   if (envImage) {
@@ -63,7 +65,7 @@ export function resolveAgentImage(projectConfig?: ProjectConfig): string {
 /**
  * Checks if a custom agent image is being used and prints a warning if so
  */
-export function warnIfCustomImage(projectConfig?: ProjectConfig): void {
+export function warnIfCustomImage(projectConfig?: ProjectConfigManager): void {
   const envImage = process.env.AGENT_IMAGE;
   const configImage = projectConfig?.agentImage;
 

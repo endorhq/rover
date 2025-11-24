@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { clearProjectRootCache, launchSync } from 'rover-common';
 import { initCommand } from '../init.js';
-import { CURRENT_PROJECT_SCHEMA_VERSION } from '../../lib/config.js';
+import { CURRENT_PROJECT_SCHEMA_VERSION } from 'rover-schemas';
 
 // Mock only the external tool checks (except Git which should be available)
 vi.mock('../../utils/system.js', async () => {

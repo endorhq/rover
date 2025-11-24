@@ -438,7 +438,10 @@ export const iterateCommand = async (
 
     // Start sandbox container for task execution
     const sandbox = await createSandbox(task);
-    await sandbox.createAndStart();
+    const containerId = await sandbox.createAndStart();
+
+    // Update task metadata with new container ID for this iteration
+    task.setContainerInfo(containerId, 'running');
 
     result.success = true;
 

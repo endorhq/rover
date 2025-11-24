@@ -1,6 +1,6 @@
-import { getAIAgentTool, getUserAIAgent } from '../agents/index.js';
+import { getAIAgentTool } from '../agents/index.js';
 import { join } from 'node:path';
-import { ProjectConfig } from '../config.js';
+import { ProjectConfigManager } from 'rover-schemas';
 import { Sandbox } from './types.js';
 import { SetupBuilder } from '../setup.js';
 import { TaskDescriptionManager } from 'rover-schemas';
@@ -14,8 +14,8 @@ import {
   parseCustomEnvironmentVariables,
   loadEnvsFile,
 } from '../../utils/env-variables.js';
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { homedir, tmpdir, userInfo } from 'node:os';
+import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir, userInfo } from 'node:os';
 import { generateRandomId } from '../../utils/branch-name.js';
 import {
   ContainerBackend,
@@ -61,7 +61,12 @@ export class PodmanSandbox extends Sandbox {
     );
 
     // Generate setup script using SetupBuilder
-    const setupBuilder = new SetupBuilder(this.task, this.task.agent!);
+    const projectConfigForSetup = ProjectConfigManager.load();
+    const setupBuilder = new SetupBuilder(
+      this.task,
+      this.task.agent!,
+      projectConfigForSetup
+    );
     const entrypointScriptPath = setupBuilder.generateEntrypoint();
     const inputsPath = setupBuilder.generateInputs();
     const workflowPath = setupBuilder.saveWorkflow(this.task.workflowName);
@@ -74,11 +79,11 @@ export class PodmanSandbox extends Sandbox {
     // Load project config and merge custom environment variables
     const projectRoot = findProjectRoot();
     let customEnvVariables: string[] = [];
-    let projectConfig: ProjectConfig | undefined;
+    let projectConfig: ProjectConfigManager | undefined;
 
-    if (ProjectConfig.exists()) {
+    if (ProjectConfigManager.exists()) {
       try {
-        projectConfig = ProjectConfig.load();
+        projectConfig = ProjectConfigManager.load();
 
         // Parse custom envs array
         if (projectConfig.envs && projectConfig.envs.length > 0) {

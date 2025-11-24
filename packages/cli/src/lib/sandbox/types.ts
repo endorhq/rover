@@ -2,6 +2,13 @@ import { ProcessManager } from 'rover-common';
 
 import { TaskDescriptionManager } from 'rover-schemas';
 
+export abstract class SandboxPackage {
+  abstract name: string;
+
+  abstract installScript(): string;
+  abstract initScript(): string;
+}
+
 export abstract class Sandbox {
   abstract backend: string;
 

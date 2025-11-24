@@ -1,50 +1,50 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Environment } from '../types.js';
-import { LANGUAGE, PACKAGE_MANAGER, TASK_MANAGER } from '../lib/config.js';
+import type { Language, PackageManager, TaskManager } from 'rover-schemas';
 
 /**
  * Identify project types based on the given files
  */
-const LANGUAGE_FILES = {
-  [LANGUAGE.TypeScript]: ['tsconfig.json', 'tsconfig.node.json'],
-  [LANGUAGE.Javascript]: ['package.json', '.node-version'],
-  [LANGUAGE.PHP]: ['composer.json', 'index.php', 'phpunit.xml'],
-  [LANGUAGE.Rust]: ['Cargo.toml'],
-  [LANGUAGE.Go]: ['go.mod', 'go.sum'],
-  [LANGUAGE.Ruby]: [
+const LANGUAGE_FILES: Record<Language, string[]> = {
+  typescript: ['tsconfig.json', 'tsconfig.node.json'],
+  javascript: ['package.json', '.node-version'],
+  php: ['composer.json', 'index.php', 'phpunit.xml'],
+  rust: ['Cargo.toml'],
+  go: ['go.mod', 'go.sum'],
+  ruby: [
     '.ruby-version',
     'Procfile.dev',
     'Procfile.test',
     'Gemfile',
     'config.ru',
   ],
-  [LANGUAGE.Python]: ['pyproject.toml', 'uv.lock', 'setup.py', 'setup.cfg'],
+  python: ['pyproject.toml', 'uv.lock', 'setup.py', 'setup.cfg'],
 };
 
 /**
  * Identify package managers from files
  */
-const PACKAGE_MANAGER_FILES = {
-  [PACKAGE_MANAGER.NPM]: ['package-lock.json'],
-  [PACKAGE_MANAGER.PNPM]: ['pnpm-lock.yaml'],
-  [PACKAGE_MANAGER.Yarn]: ['yarn.lock'],
-  [PACKAGE_MANAGER.Composer]: ['composer.lock'],
-  [PACKAGE_MANAGER.Cargo]: ['Cargo.toml', 'Cargo.lock'],
-  [PACKAGE_MANAGER.Gomod]: ['go.mod', 'go.sum'],
-  [PACKAGE_MANAGER.PIP]: ['pyproject.toml', '!poetry.lock', '!uv.lock'],
-  [PACKAGE_MANAGER.Poetry]: ['poetry.lock'],
-  [PACKAGE_MANAGER.UV]: ['uv.lock'],
-  [PACKAGE_MANAGER.Rubygems]: ['Gemfile', 'Gemfile.lock'],
+const PACKAGE_MANAGER_FILES: Record<PackageManager, string[]> = {
+  npm: ['package-lock.json'],
+  pnpm: ['pnpm-lock.yaml'],
+  yarn: ['yarn.lock'],
+  composer: ['composer.lock'],
+  cargo: ['Cargo.toml', 'Cargo.lock'],
+  gomod: ['go.mod', 'go.sum'],
+  pip: ['pyproject.toml', '!poetry.lock', '!uv.lock'],
+  poetry: ['poetry.lock'],
+  uv: ['uv.lock'],
+  rubygems: ['Gemfile', 'Gemfile.lock'],
 };
 
 /**
  * Identify task managers from files
  */
-const TASK_MANAGER_FILES = {
-  [TASK_MANAGER.Just]: ['Justfile'],
-  [TASK_MANAGER.Make]: ['Makefile'],
-  [TASK_MANAGER.Task]: ['Taskfile.yml', 'Taskfile.yaml'],
+const TASK_MANAGER_FILES: Record<TaskManager, string[]> = {
+  just: ['Justfile'],
+  make: ['Makefile'],
+  task: ['Taskfile.yml', 'Taskfile.yaml'],
 };
 
 /**
@@ -81,12 +81,12 @@ function checkFilesMatch(projectPath: string, files: string[]): boolean {
 
 export async function detectLanguages(
   projectPath: string
-): Promise<LANGUAGE[]> {
-  const languages: LANGUAGE[] = [];
+): Promise<Language[]> {
+  const languages: Language[] = [];
 
   for (const [language, files] of Object.entries(LANGUAGE_FILES)) {
     if (checkFilesMatch(projectPath, files)) {
-      languages.push(language as LANGUAGE);
+      languages.push(language as Language);
     }
   }
 
@@ -95,12 +95,12 @@ export async function detectLanguages(
 
 export async function detectPackageManagers(
   projectPath: string
-): Promise<PACKAGE_MANAGER[]> {
-  const packageManagers: PACKAGE_MANAGER[] = [];
+): Promise<PackageManager[]> {
+  const packageManagers: PackageManager[] = [];
 
   for (const [manager, files] of Object.entries(PACKAGE_MANAGER_FILES)) {
     if (checkFilesMatch(projectPath, files)) {
-      packageManagers.push(manager as PACKAGE_MANAGER);
+      packageManagers.push(manager as PackageManager);
     }
   }
 
@@ -109,12 +109,12 @@ export async function detectPackageManagers(
 
 export async function detectTaskManagers(
   projectPath: string
-): Promise<TASK_MANAGER[]> {
-  const taskManagers: TASK_MANAGER[] = [];
+): Promise<TaskManager[]> {
+  const taskManagers: TaskManager[] = [];
 
   for (const [manager, files] of Object.entries(TASK_MANAGER_FILES)) {
     if (checkFilesMatch(projectPath, files)) {
-      taskManagers.push(manager as TASK_MANAGER);
+      taskManagers.push(manager as TaskManager);
     }
   }
 

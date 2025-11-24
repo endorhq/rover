@@ -9,9 +9,9 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { clearProjectRootCache, launchSync } from 'rover-common';
-import { ProjectConfig } from '../config.js';
+import { ProjectConfigManager } from '../project-config.js';
 
-describe('ProjectConfig - Environment Variable Configuration', () => {
+describe('ProjectConfigManager - Environment Variable Configuration', () => {
   let testDir: string;
   let originalCwd: string;
 
@@ -39,7 +39,7 @@ describe('ProjectConfig - Environment Variable Configuration', () => {
   });
 
   it('should create new config without envs and envsFile fields', () => {
-    const config = ProjectConfig.create();
+    const config = ProjectConfigManager.create();
 
     expect(existsSync('rover.json')).toBe(true);
     const jsonData = JSON.parse(readFileSync('rover.json', 'utf8'));
@@ -73,7 +73,7 @@ describe('ProjectConfig - Environment Variable Configuration', () => {
       )
     );
 
-    const config = ProjectConfig.load();
+    const config = ProjectConfigManager.load();
 
     expect(config.envs).toEqual(['NODE_ENV', 'API_KEY=test-key', 'DEBUG']);
     expect(config.envsFile).toBeUndefined();
@@ -96,7 +96,7 @@ describe('ProjectConfig - Environment Variable Configuration', () => {
       )
     );
 
-    const config = ProjectConfig.load();
+    const config = ProjectConfigManager.load();
 
     expect(config.envsFile).toBe('.env.rover');
     expect(config.envs).toBeUndefined();
@@ -120,7 +120,7 @@ describe('ProjectConfig - Environment Variable Configuration', () => {
       )
     );
 
-    const config = ProjectConfig.load();
+    const config = ProjectConfigManager.load();
 
     expect(config.envs).toEqual(['NODE_ENV', 'DEBUG=true']);
     expect(config.envsFile).toBe('.env.rover');
@@ -142,7 +142,7 @@ describe('ProjectConfig - Environment Variable Configuration', () => {
       )
     );
 
-    const config = ProjectConfig.load();
+    const config = ProjectConfigManager.load();
 
     // Should be migrated to 1.2
     expect(config.version).toBe('1.2');
@@ -176,7 +176,7 @@ describe('ProjectConfig - Environment Variable Configuration', () => {
       )
     );
 
-    const config = ProjectConfig.load();
+    const config = ProjectConfigManager.load();
 
     // Should be migrated to 1.2
     expect(config.version).toBe('1.2');
@@ -209,7 +209,7 @@ describe('ProjectConfig - Environment Variable Configuration', () => {
       )
     );
 
-    const config = ProjectConfig.load();
+    const config = ProjectConfigManager.load();
 
     expect(config.version).toBe('1.2');
 
@@ -235,7 +235,7 @@ describe('ProjectConfig - Environment Variable Configuration', () => {
       )
     );
 
-    const config = ProjectConfig.load();
+    const config = ProjectConfigManager.load();
 
     expect(config.version).toBe('1.2');
     expect(config.languages).toEqual(['typescript', 'python']);
@@ -261,7 +261,7 @@ describe('ProjectConfig - Environment Variable Configuration', () => {
       )
     );
 
-    const config = ProjectConfig.load();
+    const config = ProjectConfigManager.load();
 
     expect(config.envs).toEqual([]);
   });
@@ -288,7 +288,7 @@ describe('ProjectConfig - Environment Variable Configuration', () => {
       )
     );
 
-    const config = ProjectConfig.load();
+    const config = ProjectConfigManager.load();
 
     expect(config.envs).toEqual([
       'SIMPLE_VAR',
@@ -317,7 +317,7 @@ describe('ProjectConfig - Environment Variable Configuration', () => {
       )
     );
 
-    const config = ProjectConfig.load();
+    const config = ProjectConfigManager.load();
 
     // Should remain at version 1.2
     expect(config.version).toBe('1.2');
@@ -340,7 +340,7 @@ describe('ProjectConfig - Environment Variable Configuration', () => {
   });
 
   it('should create new config without agentImage and initScript fields', () => {
-    const config = ProjectConfig.create();
+    const config = ProjectConfigManager.create();
 
     expect(existsSync('rover.json')).toBe(true);
     const jsonData = JSON.parse(readFileSync('rover.json', 'utf8'));
@@ -374,7 +374,7 @@ describe('ProjectConfig - Environment Variable Configuration', () => {
       )
     );
 
-    const config = ProjectConfig.load();
+    const config = ProjectConfigManager.load();
 
     expect(config.agentImage).toBe('custom/agent:v2.0.0');
     expect(config.initScript).toBeUndefined();
@@ -400,7 +400,7 @@ describe('ProjectConfig - Environment Variable Configuration', () => {
       )
     );
 
-    const config = ProjectConfig.load();
+    const config = ProjectConfigManager.load();
 
     expect(config.initScript).toBe('scripts/init.sh');
     expect(config.agentImage).toBeUndefined();
@@ -427,7 +427,7 @@ describe('ProjectConfig - Environment Variable Configuration', () => {
       )
     );
 
-    const config = ProjectConfig.load();
+    const config = ProjectConfigManager.load();
 
     expect(config.agentImage).toBe('custom/agent:v2.0.0');
     expect(config.initScript).toBe('scripts/init.sh');
@@ -451,7 +451,7 @@ describe('ProjectConfig - Environment Variable Configuration', () => {
       )
     );
 
-    const config = ProjectConfig.load();
+    const config = ProjectConfigManager.load();
 
     // Should be migrated to 1.2
     expect(config.version).toBe('1.2');
@@ -484,7 +484,7 @@ describe('ProjectConfig - Environment Variable Configuration', () => {
       )
     );
 
-    const config = ProjectConfig.load();
+    const config = ProjectConfigManager.load();
 
     expect(config.version).toBe('1.2');
     expect(config.agentImage).toBe('ghcr.io/custom/rover:v1.0');
@@ -515,7 +515,7 @@ describe('ProjectConfig - Environment Variable Configuration', () => {
       )
     );
 
-    const config = ProjectConfig.load();
+    const config = ProjectConfigManager.load();
 
     expect(config.version).toBe('1.2');
     expect(config.languages).toEqual(['typescript', 'python']);

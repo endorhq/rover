@@ -1,5 +1,5 @@
 import { Command, Option } from 'commander';
-import { ProjectConfig, UserSettings } from './lib/config.js';
+import { ProjectConfigManager, UserSettingsManager } from 'rover-schemas';
 import { AI_AGENT } from 'rover-common';
 import { initCommand } from './commands/init.js';
 import { listCommand } from './commands/list.js';
@@ -46,7 +46,10 @@ export function createProgram(
       })
       .hook('preAction', (_thisCommand, actionCommand) => {
         const commandName = actionCommand.name();
-        if (!['init', 'mcp'].includes(commandName) && !ProjectConfig.exists()) {
+        if (
+          !['init', 'mcp'].includes(commandName) &&
+          !ProjectConfigManager.exists()
+        ) {
           console.log(
             `Rover is not initialized in this directory. The command you requested (\`${commandName}\`) was not executed.`
           );
@@ -115,8 +118,8 @@ export function createProgram(
         const commandName = actionCommand.name();
         if (
           !['init', 'mcp'].includes(commandName) &&
-          ProjectConfig.exists() &&
-          !UserSettings.exists()
+          ProjectConfigManager.exists() &&
+          !UserSettingsManager.exists()
         ) {
           console.log(
             `Rover is not fully initialized in this directory. The command you requested (\`${commandName}\`) was not executed.`

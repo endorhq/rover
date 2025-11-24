@@ -9,7 +9,7 @@ RUN cd ./packages/agent && npm pack && mv *.tgz /rover-agent.tgz
 FROM node:24-alpine
 ARG NIX_AI_TOOLS_REV
 ARG TARGETARCH
-ARG PACKAGE_MANAGER_MCP_SERVER_VERSION="v0.1.3"
+ARG PACKAGE_MANAGER_MCP_SERVER_VERSION="v0.2.0"
 ENV NIX_AI_TOOLS_REV=${NIX_AI_TOOLS_REV}
 RUN apk update && \
     apk add bash file jq nix python3 sudo uv && \

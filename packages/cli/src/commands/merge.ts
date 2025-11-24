@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import yoctoSpinner from 'yocto-spinner';
 import { getAIAgentTool, type AIAgentTool } from '../lib/agents/index.js';
 import { TaskDescriptionManager, TaskNotFoundError } from 'rover-schemas';
-import { UserSettings, ProjectConfig } from '../lib/config.js';
+import { UserSettingsManager, ProjectConfigManager } from 'rover-schemas';
 import { AI_AGENT } from 'rover-common';
 import { getTelemetry } from '../lib/telemetry.js';
 import { Git } from 'rover-common';
@@ -248,7 +248,7 @@ export const mergeCommand = async (
 
   // Load config
   try {
-    projectConfig = ProjectConfig.load();
+    projectConfig = ProjectConfigManager.load();
   } catch (err) {
     if (!isJsonMode()) {
       console.log(colors.yellow('⚠ Could not load project settings'));
@@ -257,8 +257,8 @@ export const mergeCommand = async (
 
   // Load user preferences
   try {
-    if (UserSettings.exists()) {
-      const userSettings = UserSettings.load();
+    if (UserSettingsManager.exists()) {
+      const userSettings = UserSettingsManager.load();
       selectedAiAgent = userSettings.defaultAiAgent || AI_AGENT.Claude;
     } else {
       if (!isJsonMode()) {

@@ -10,7 +10,7 @@ import { isJsonMode, setJsonMode } from '../lib/global-state.js';
 import { showRoverChat, TIP_TITLES } from '../utils/display.js';
 import { statusColor } from '../utils/task-status.js';
 import { Git } from 'rover-common';
-import { ProjectConfig } from '../lib/config.js';
+import { ProjectConfigManager } from 'rover-schemas';
 
 const { prompt } = enquirer;
 
@@ -89,7 +89,7 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
 
   // Load config
   try {
-    projectConfig = ProjectConfig.load();
+    projectConfig = ProjectConfigManager.load();
   } catch (err) {
     if (!isJsonMode()) {
       console.log(colors.yellow('⚠ Could not load project settings'));

@@ -74,3 +74,45 @@ export { TaskDescriptionManager } from './task-description.js';
 export { TaskDescriptionStore } from './task-description-store.js';
 
 export { CURRENT_TASK_DESCRIPTION_SCHEMA_VERSION } from './task-description/schema.js';
+
+// Project Config library
+export {
+  type Language,
+  type MCP,
+  type PackageManager,
+  type TaskManager,
+  type SandboxConfig,
+  type ProjectConfig,
+} from './project-config/types.js';
+
+export {
+  ProjectConfigLoadError,
+  ProjectConfigValidationError,
+} from './project-config/errors.js';
+
+export { ProjectConfigManager } from './project-config.js';
+
+export {
+  CURRENT_PROJECT_SCHEMA_VERSION,
+  PROJECT_CONFIG_FILENAME,
+} from './project-config/schema.js';
+
+// User Settings library
+export {
+  type AiAgent,
+  type UserDefaults,
+  type UserSettings,
+} from './user-settings/types.js';
+
+export {
+  UserSettingsLoadError,
+  UserSettingsValidationError,
+} from './user-settings/errors.js';
+
+export { UserSettingsManager } from './user-settings.js';
+
+export {
+  CURRENT_USER_SCHEMA_VERSION,
+  USER_SETTINGS_FILENAME,
+  USER_SETTINGS_DIR,
+} from './user-settings/schema.js';
