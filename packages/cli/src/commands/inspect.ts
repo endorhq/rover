@@ -134,8 +134,8 @@ export const inspectCommand = async (
       );
       showTips([
         colors.gray('Run the ') +
-          colors.cyan('rover inspect 1') +
-          colors.gray(' to get the task details'),
+        colors.cyan('rover inspect 1') +
+        colors.gray(' to get the task details'),
       ]);
     }
     return;
@@ -154,10 +154,10 @@ export const inspectCommand = async (
       );
       showTips([
         'Use ' +
-          colors.cyan('--file') +
-          ' for formatted output or ' +
-          colors.cyan('--raw-file') +
-          ' for raw output',
+        colors.cyan('--file') +
+        ' for formatted output or ' +
+        colors.cyan('--raw-file') +
+        ' for raw output',
       ]);
     }
     return;
@@ -308,16 +308,7 @@ export const inspectCommand = async (
         includeUntracked: true,
       });
 
-      let statFiles = [];
-      let files = stats.files;
-      let moreFiles = false;
-
-      if (stats.files.length > 10) {
-        files = stats.files.slice(0, 10);
-        moreFiles = true;
-      }
-
-      statFiles = files.map(fileStat => {
+      const statFiles = stats.files.map(fileStat => {
         const insertions =
           fileStat.insertions > 0
             ? colors.green(`+${fileStat.insertions}`)
@@ -326,26 +317,12 @@ export const inspectCommand = async (
           fileStat.deletions > 0 ? colors.red(`-${fileStat.deletions}`) : '';
         return `${insertions} ${deletions} ${colors.cyan(fileStat.path)}`;
       });
-
-      if (moreFiles) {
-        statFiles.push(
-          `\n${colors.gray(`...and ${stats.files.length - 10} more files`)}`
-        );
-      }
-
       // Breakline
       console.log();
 
       showList(statFiles, { title: 'Current Changes' });
 
-      if (moreFiles) {
-        console.log(
-          `\n${colors.gray('Use `rover diff --only-files` to see all changes.')}`
-        );
-      }
-
       // Workflow files
-
       const discoveredFiles = iteration.listMarkdownFiles();
 
       if (discoveredFiles.length > 0) {
@@ -386,18 +363,18 @@ export const inspectCommand = async (
       } else if (options.file == null && discoveredFiles.length > 0) {
         tips.push(
           'Use ' +
-            colors.cyan(
-              `rover inspect ${taskId} --file ${discoveredFiles[0]}`
-            ) +
-            ' to read its content'
+          colors.cyan(
+            `rover inspect ${taskId} --file ${discoveredFiles[0]}`
+          ) +
+          ' to read its content'
         );
       }
 
       showTips([
         ...tips,
         'Use ' +
-          colors.cyan(`rover iterate ${taskId}`) +
-          ' to start a new agent iteration on this task',
+        colors.cyan(`rover iterate ${taskId}`) +
+        ' to start a new agent iteration on this task',
       ]);
     }
 
