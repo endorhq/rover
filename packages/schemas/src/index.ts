@@ -24,6 +24,14 @@ export {
 export { WorkflowManager } from './workflow.js';
 export { WorkflowStore } from './workflow-store.js';
 
+// Workflow Context library
+export {
+  type PreContextData,
+  type PreviousIteration,
+  buildPreContextStep,
+  isPreContextStep,
+} from './workflow-context.js';
+
 // Iteration Status library
 export {
   type IterationStatus,

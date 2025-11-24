@@ -9,6 +9,7 @@ import {
   showDiagram,
   type DiagramStep,
 } from 'rover-common';
+import type { WorkflowOutput } from 'rover-schemas';
 import { readFileSync } from 'node:fs';
 import { getTelemetry } from '../../lib/telemetry.js';
 import { isJsonMode, setJsonMode } from '../../lib/global-state.js';
@@ -174,7 +175,7 @@ export const inspectWorkflowCommand = async (
 
         // Add outputs if present
         if (step.outputs && step.outputs.length > 0) {
-          step.outputs.forEach(output => {
+          step.outputs.forEach((output: WorkflowOutput) => {
             items.push(`${colors.cyan('→')} ${output.name}`);
           });
         }

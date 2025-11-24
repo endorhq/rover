@@ -1,6 +1,18 @@
-import { writeFileSync, chmodSync, mkdirSync, cpSync } from 'node:fs';
+import {
+  writeFileSync,
+  chmodSync,
+  mkdirSync,
+  cpSync,
+  existsSync,
+  readFileSync,
+} from 'node:fs';
 import { dirname, join } from 'node:path';
-import { TaskDescriptionManager } from 'rover-schemas';
+import {
+  TaskDescriptionManager,
+  IterationManager,
+  type PreContextData,
+  type PreviousIteration,
+} from 'rover-schemas';
 import { findProjectRoot, launchSync, VERBOSE } from 'rover-common';
 import sweWorkflow from './workflows/swe.yml';
 import techWriterWorkflow from './workflows/tech-writer.yml';
@@ -351,6 +363,113 @@ fi
     cpSync(workflowPath, workflowTaskPath);
 
     return workflowTaskPath;
+  }
+
+  /**
+   * Generate pre-context files with task and iteration information
+   * These files are used by the agent to inject context into the workflow
+   * Returns an array of file paths
+   */
+  generatePreContextFiles(): string[] {
+    const iterationsPath = this.task.iterationsPath();
+    const currentIteration = this.task.iterations;
+
+    // Get initial task info from iteration 1
+    let initialTask = {
+      title: this.task.title,
+      description: this.task.description,
+    };
+
+    const firstIterationPath = join(iterationsPath, '1');
+    if (existsSync(firstIterationPath)) {
+      try {
+        const firstIteration = IterationManager.load(firstIterationPath);
+        initialTask = {
+          title: firstIteration.title,
+          description: firstIteration.description,
+        };
+      } catch (error) {
+        // If we can't load iteration 1, use task description as fallback
+        if (VERBOSE) {
+          console.error('Failed to load iteration 1 for pre-context:', error);
+        }
+      }
+    }
+
+    // Gather previous iterations (all except current)
+    const previousIterations: PreviousIteration[] = [];
+    for (let i = 1; i < currentIteration; i++) {
+      const iterPath = join(iterationsPath, i.toString());
+      if (existsSync(iterPath)) {
+        try {
+          const iteration = IterationManager.load(iterPath);
+          const markdownFiles = iteration.getMarkdownFiles();
+
+          previousIterations.push({
+            number: i,
+            title: iteration.title,
+            description: iteration.description,
+            plan: markdownFiles.get('plan.md') || undefined,
+            changes: markdownFiles.get('changes.md') || undefined,
+          });
+        } catch (error) {
+          // Skip iterations that can't be loaded
+          if (VERBOSE) {
+            console.error(
+              `Failed to load iteration ${i} for pre-context:`,
+              error
+            );
+          }
+        }
+      }
+    }
+
+    // Load current iteration data
+    let currentIterationData: PreviousIteration | undefined = undefined;
+    const currentIterPath = join(iterationsPath, currentIteration.toString());
+    if (existsSync(currentIterPath)) {
+      try {
+        const iteration = IterationManager.load(currentIterPath);
+        const markdownFiles = iteration.getMarkdownFiles();
+
+        currentIterationData = {
+          number: currentIteration,
+          title: iteration.title,
+          description: iteration.description,
+          plan: markdownFiles.get('plan.md') || undefined,
+          changes: markdownFiles.get('changes.md') || undefined,
+        };
+      } catch (error) {
+        // If we can't load current iteration, continue without it
+        if (VERBOSE) {
+          console.error(
+            `Failed to load current iteration ${currentIteration} for pre-context:`,
+            error
+          );
+        }
+      }
+    }
+
+    // Build pre-context data
+    const preContextData: PreContextData = {
+      taskId: this.task.id.toString(),
+      initialTask,
+      previousIterations:
+        previousIterations.length > 0 ? previousIterations : undefined,
+      currentIteration: currentIterationData,
+    };
+
+    // Save to file
+    const preContextPath = join(this.taskDir, '__pre_context__.json');
+    writeFileSync(
+      preContextPath,
+      JSON.stringify(preContextData, null, 2),
+      'utf-8'
+    );
+
+    // Return array with the single pre-context file
+    // This allows for future expansion to support multiple files
+    return [preContextPath];
   }
 
   /**

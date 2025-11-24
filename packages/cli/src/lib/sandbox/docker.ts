@@ -69,6 +69,7 @@ export class DockerSandbox extends Sandbox {
     const entrypointScriptPath = setupBuilder.generateEntrypoint();
     const inputsPath = setupBuilder.generateInputs();
     const workflowPath = setupBuilder.saveWorkflow(this.task.workflowName);
+    const preContextPaths = setupBuilder.generatePreContextFiles();
 
     // Get agent-specific Docker mounts
     const agent = getAIAgentTool(this.task.agent!);
@@ -193,6 +194,14 @@ export class DockerSandbox extends Sandbox {
       `${iterationJsonPath}:/task/description.json:Z,ro`
     );
 
+    // Mount pre-context files
+    preContextPaths.forEach((preContextPath, index) => {
+      dockerArgs.push(
+        '-v',
+        `${preContextPath}:/__pre_context_${index}__.json:Z,ro`
+      );
+    });
+
     // Mount initScript if provided in project config
     if (projectConfig?.initScript) {
       const initScriptAbsPath = join(projectRoot, projectConfig.initScript);
@@ -228,6 +237,11 @@ export class DockerSandbox extends Sandbox {
       '--inputs-json',
       '/inputs.json'
     );
+
+    // Add pre-context file arguments
+    preContextPaths.forEach((_, index) => {
+      dockerArgs.push('--pre-context-file', `/__pre_context_${index}__.json`);
+    });
 
     return (
       (await launch('docker', dockerArgs)).stdout?.toString().trim() ||

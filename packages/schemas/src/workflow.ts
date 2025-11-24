@@ -34,6 +34,7 @@ const DEFAULT_STEP_TIMEOUT = 60 * 30; // 30 minutes
  */
 export class WorkflowManager {
   private data: Workflow;
+  private injectedSteps: WorkflowStep[] = [];
   filePath: string;
 
   constructor(data: unknown, filePath: string) {
@@ -178,7 +179,7 @@ export class WorkflowManager {
    * Only works with WorkflowAgentStep - other step types don't have tool property
    */
   getStepTool(stepId: string, defaultTool?: string): string | undefined {
-    const step = this.data.steps.find(s => s.id === stepId);
+    const step = this.steps.find(s => s.id === stepId);
     if (!step) {
       throw new Error(`Step not found: ${stepId}`);
     }
@@ -198,7 +199,7 @@ export class WorkflowManager {
    * Only works with WorkflowAgentStep - other step types don't have model property
    */
   getStepModel(stepId: string, defaultModel?: string): string | undefined {
-    const step = this.data.steps.find(s => s.id === stepId);
+    const step = this.steps.find(s => s.id === stepId);
     if (!step) {
       throw new Error(`Step not found: ${stepId}`);
     }
@@ -218,7 +219,7 @@ export class WorkflowManager {
    * Returns the generic WorkflowStep union type
    */
   getStep(stepId: string): WorkflowStep {
-    const step = this.data.steps.find(s => s.id === stepId);
+    const step = this.steps.find(s => s.id === stepId);
     if (!step) {
       throw new Error(`Step not found: ${stepId}`);
     }
@@ -270,6 +271,76 @@ export class WorkflowManager {
     return step.config?.retries || 0;
   }
 
+  /**
+   * Inject a step dynamically at runtime (not persisted to YAML)
+   * @param step - The step to inject
+   * @param position - Where to inject: 'before' (start) or 'after' (end)
+   * @param referenceStepId - Optional step ID to position relative to
+   */
+  injectStep(
+    step: WorkflowStep,
+    position: 'before' | 'after' = 'before',
+    referenceStepId?: string
+  ): void {
+    // Check if a step with this ID already exists
+    const existingStep = this.steps.find(s => s.id === step.id);
+    if (existingStep) {
+      throw new Error(
+        `Cannot inject step: a step with ID "${step.id}" already exists`
+      );
+    }
+
+    // If no reference step is provided, inject at start or end based on position
+    if (!referenceStepId) {
+      if (position === 'before') {
+        this.injectedSteps.unshift(step);
+      } else {
+        this.injectedSteps.push(step);
+      }
+      return;
+    }
+
+    // Find the reference step index in the combined steps array
+    const allSteps = this.steps;
+    const refIndex = allSteps.findIndex(s => s.id === referenceStepId);
+    if (refIndex === -1) {
+      throw new Error(`Reference step "${referenceStepId}" not found`);
+    }
+
+    // Calculate the insertion index in the injectedSteps array
+    // This is complex because we need to maintain order across two arrays
+    if (position === 'before') {
+      // If reference is in YAML steps, add to end of injected steps
+      if (refIndex >= this.injectedSteps.length) {
+        this.injectedSteps.push(step);
+      } else {
+        this.injectedSteps.splice(refIndex, 0, step);
+      }
+    } else {
+      // After: insert after the reference step
+      if (refIndex >= this.injectedSteps.length) {
+        // Reference is in YAML steps, insert at end of injected
+        this.injectedSteps.push(step);
+      } else {
+        this.injectedSteps.splice(refIndex + 1, 0, step);
+      }
+    }
+  }
+
+  /**
+   * Clear all injected steps
+   */
+  clearInjectedSteps(): void {
+    this.injectedSteps = [];
+  }
+
+  /**
+   * Get all injected steps (steps not from YAML)
+   */
+  getInjectedSteps(): WorkflowStep[] {
+    return [...this.injectedSteps];
+  }
+
   // Data Access (Getters)
   get version(): string {
     return this.data.version;
@@ -292,7 +363,8 @@ export class WorkflowManager {
   }
 
   get steps(): WorkflowStep[] {
-    return this.data.steps;
+    // Return injected steps first, then YAML-defined steps
+    return [...this.injectedSteps, ...this.data.steps];
   }
 
   get defaults(): WorkflowDefaults | undefined {

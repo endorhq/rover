@@ -50,7 +50,7 @@ export type WorkflowSequentialStep = z.infer<
 >;
 
 // Discriminated union of all step types
-export type WorkflowStep = z.infer<typeof WorkflowAgentStepSchema>;
+export type WorkflowStep = z.infer<typeof WorkflowStepSchema>;
 
 // Main workflow structure
 export type Workflow = z.infer<typeof WorkflowSchema>;

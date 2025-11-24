@@ -13,7 +13,11 @@ import {
   renameSync,
   rmSync,
 } from 'node:fs';
-import type { WorkflowAgentStep, WorkflowOutputType } from 'rover-schemas';
+import type {
+  WorkflowAgentStep,
+  WorkflowOutput,
+  WorkflowOutputType,
+} from 'rover-schemas';
 import { WorkflowManager, IterationStatusManager } from 'rover-schemas';
 import {
   parseAgentError,
@@ -762,7 +766,9 @@ export class Runner {
 
           // Find the step and output definition to check its type
           const stepDef = this.workflow.steps.find(s => s.id === stepId);
-          const outputDef = stepDef?.outputs?.find(o => o.name === outputName);
+          const outputDef = stepDef?.outputs?.find(
+            (o: WorkflowOutput) => o.name === outputName
+          );
 
           if (!outputDef) {
             warnings.push(
