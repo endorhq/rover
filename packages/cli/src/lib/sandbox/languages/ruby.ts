@@ -11,8 +11,8 @@ export class RubySandboxPackage extends SandboxPackage {
 
   initScript(): string {
     // Configure gem to avoid installing documentation and set user install path
-    return `echo "gem: --no-document --user-install" > ~/.gemrc
-echo 'export PATH="$(ruby -e "puts Gem.user_dir")/bin:$PATH"' >> ~/.profile
-source ~/.profile`;
+    return `echo "gem: --no-document --user-install" > $HOME/.gemrc
+echo 'export PATH="$(ruby -e "puts Gem.user_dir")/bin:$PATH"' >> $HOME/.profile
+source $HOME/.profile`;
   }
 }

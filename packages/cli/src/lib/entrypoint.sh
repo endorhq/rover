@@ -29,6 +29,9 @@ sudo chown -R $(id -u):$(id -g) /output
 
 source $HOME/.profile
 
+# Fail if node is not available
+check_command "node" || safe_exit 1
+
 # Function to shred secrets before exit
 shred_secrets() {
     # Remove credentials: on certain environments such as Darwin,

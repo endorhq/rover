@@ -11,9 +11,9 @@ export class GoSandboxPackage extends SandboxPackage {
 
   initScript(): string {
     // Add the go env to the profile
-    return `mkdir -p ~/go/bin
-echo 'export PATH="$HOME/go/bin:$PATH"' >> ~/.profile
-echo 'export GOPATH="$HOME/go"' >> ~/.profile
-source ~/.profile`;
+    return `mkdir -p $HOME/go/bin
+echo 'export PATH="$HOME/go/bin:$PATH"' >> $HOME/.profile
+echo 'export GOPATH="$HOME/go"' >> $HOME/.profile
+source $HOME/.profile`;
   }
 }

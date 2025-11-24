@@ -10,8 +10,6 @@ export class PoetrySandboxPackage extends SandboxPackage {
   }
 
   initScript(): string {
-    // Add Poetry to PATH
-    return `echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.profile;
-source ~/.profile`;
+    return ``;
   }
 }

@@ -12,7 +12,7 @@ rustup-init -y`;
 
   initScript(): string {
     // Add the cargo env to the profile
-    return `echo '. "$HOME/.cargo/env"' >> ~/.profile
-source ~/.profile`;
+    return `echo '. "$HOME/.cargo/env"' >> $HOME/.profile
+source $HOME/.profile`;
   }
 }

@@ -11,9 +11,9 @@ export class YarnSandboxPackage extends SandboxPackage {
 
   initScript(): string {
     // Configure yarn to install global binaries locally for the user
-    return `mkdir -p ~/.yarn/bin;
-yarn config set prefix ~/.yarn;
-echo 'export PATH="$HOME/.yarn/bin:$PATH"' >> ~/.profile;
-source ~/.profile`;
+    return `mkdir -p $HOME/.yarn/bin;
+yarn config set prefix $HOME/.yarn;
+echo 'export PATH="$HOME/.yarn/bin:$PATH"' >> $HOME/.profile;
+source $HOME/.profile`;
   }
 }

@@ -11,9 +11,9 @@ export class JavaScriptSandboxPackage extends SandboxPackage {
 
   initScript(): string {
     // Configure node to install global modules locally for the user
-    return `mkdir -p ~/.local/npm;
-echo "prefix=~/.local/npm" >> ~/.npmrc;
-echo 'export PATH="$HOME/.local/npm/bin:$PATH"' >> ~/.profile;
-source ~/.profile`;
+    return `mkdir -p $HOME/.local/npm;
+echo "prefix=$HOME/.local/npm" >> $HOME/.npmrc;
+echo 'export PATH="$HOME/.local/npm/bin:$PATH"' >> $HOME/.profile;
+source $HOME/.profile`;
   }
 }

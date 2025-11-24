@@ -17,8 +17,8 @@ if [ "$EXPECTED_CHECKSUM" != "$ACTUAL_CHECKSUM" ]; then
 fi
 php composer-setup.php --quiet
 rm composer-setup.php
-mkdir -p ~/.local/bin
-mv composer.phar ~/.local/bin/composer`;
+mkdir -p $HOME/.local/bin
+mv composer.phar $HOME/.local/bin/composer`;
   }
 
   initScript(): string {
