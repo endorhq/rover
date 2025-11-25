@@ -15,7 +15,7 @@ on:
           - cli
           - extension
       targetVersion:
-        description: 'Version to publish (e.g. 1.0.0)'
+        description: 'Version to release (e.g. 1.0.0)'
         type: string
         required: true
       publishRelease:
@@ -38,6 +38,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+    secrets: inherit
 
   release:
     needs: build-image
@@ -196,19 +197,15 @@ jobs:
           }
           EOF
 
-      - name: Trigger Publish Workflow
-        if: success() && inputs.publishRelease == true && inputs.dryRun == false
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          echo "⚠️  Manual action required: Please run the publish workflow manually"
-          echo "Navigate to Actions > Publish workflow and run with:"
-          echo "  - Project: ${{ inputs.project }}"
-          echo "  - Version: ${{ inputs.targetVersion }}"
-          echo "  - Dry Run: ${{ inputs.dryRun }}"
-          # gh workflow run publish.yml \
-          #   --repo ${{ github.repository }} \
-          #   --ref ${{ github.ref }} \
-          #   -f project=${{ inputs.project }} \
-          #   -f version=${{ inputs.targetVersion }} \
-          #   -f dryRun=${{ inputs.dryRun }}
+  publish:
+    needs: release
+    if: always() && needs.release.result == 'success' && inputs.publishRelease == true && inputs.dryRun == false
+    uses: ./.github/workflows/publish.yml
+    with:
+      project: ${{ inputs.project }}
+      version: ${{ inputs.targetVersion }}
+      dryRun: false
+    secrets:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      VSCODE_MARKETPLACE_TOKEN: ${{ secrets.VSCODE_MARKETPLACE_TOKEN }}
+      GOOGLE_CHAT_WEBHOOK: ${{ secrets.GOOGLE_CHAT_WEBHOOK }}

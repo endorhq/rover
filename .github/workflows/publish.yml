@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       project:
-        description: 'Select the project to release'
+        description: 'Select the project to publish'
         required: true
         type: choice
         default: cli
@@ -15,13 +15,34 @@ on:
           - cli
           - extension
       version:
-        description: 'The project version to release'
+        description: 'The project version to publish (e.g. 1.0.0)'
         required: true
       dryRun:
         description: 'Dry-run job to avoid publishing to NPM or the extension marketplaces'
         required: true
         type: boolean
         default: false
+  workflow_call:
+    inputs:
+      project:
+        description: 'Select the project to publish'
+        required: true
+        type: string
+      version:
+        description: 'The project version to publish (e.g. 1.0.0)'
+        required: true
+        type: string
+      dryRun:
+        description: 'Dry-run job to avoid publishing to NPM or the extension marketplaces'
+        required: true
+        type: boolean
+    secrets:
+      NPM_TOKEN:
+        required: true
+      VSCODE_MARKETPLACE_TOKEN:
+        required: true
+      GOOGLE_CHAT_WEBHOOK:
+        required: true
 
 env:
   TAG_NAME: ${{ inputs.project }}/v${{ inputs.version }}
