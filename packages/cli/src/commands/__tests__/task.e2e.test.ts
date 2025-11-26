@@ -258,6 +258,51 @@ describe('rover task (e2e)', () => {
       const output = (result.stdout || result.stderr).toLowerCase();
       expect(output).toMatch(/not initialized|rover init|configuration/);
     });
+
+    it('should reset task to NEW status when Docker container creation fails', async () => {
+      // Setup: Create a failing docker mock that succeeds for 'info' but fails for 'create'
+      const dockerScript = `#!/usr/bin/env bash
+if [[ "$1" == "info" ]]; then
+  echo '{"ServerVersion": "20.10.0"}'
+  exit 0
+elif [[ "$1" == "create" ]]; then
+  echo "Error: docker create failed" >&2
+  exit 1
+else
+  exit 0
+fi
+`;
+      const dockerPath = join(mockBinDir, 'docker');
+      writeFileSync(dockerPath, dockerScript);
+      chmodSync(dockerPath, 0o755);
+
+      // Execute: Run rover task
+      const result = await runRoverTask(
+        'Create a hello world bash script named hello.sh'
+      );
+
+      // Debug output if test fails
+      if (result.exitCode === 0) {
+        console.log('STDOUT:', result.stdout);
+        console.log('STDERR:', result.stderr);
+      }
+
+      // Verify: Command failed with appropriate error
+      expect(result.exitCode).toBe(1);
+      const output = result.stdout || result.stderr;
+      expect(output).toMatch(/reset to 'New'|error running the container/i);
+
+      // Verify: Task was created and reset to NEW status
+      const taskStatusFile = join(testDir, '.rover/tasks/1/description.json');
+      expect(existsSync(taskStatusFile)).toBe(true);
+
+      const taskStatus = JSON.parse(readFileSync(taskStatusFile, 'utf8'));
+      expect(taskStatus.status).toBe('NEW');
+      expect(taskStatus.id).toBe(1);
+
+      // Verify: Restart suggestion is provided
+      expect(output).toMatch(/rover restart/);
+    });
   });
 
   describe('task isolation', () => {

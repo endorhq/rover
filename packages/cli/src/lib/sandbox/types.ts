@@ -46,11 +46,12 @@ export abstract class Sandbox {
       );
       await this.start();
       this.processManager?.completeLastItem();
-    } catch (_err) {
+    } catch (err) {
       this.processManager?.failLastItem();
-    } finally {
       this.processManager?.finish();
+      throw err;
     }
+    this.processManager?.finish();
     return sandboxId;
   }
 

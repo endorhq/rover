@@ -27,6 +27,13 @@ vi.mock('../../utils/exit.js', () => ({
   exitWithWarn: vi.fn().mockImplementation(() => {}),
 }));
 
+// Mock sandbox to prevent actual Docker/Podman calls
+vi.mock('../../lib/sandbox/index.js', () => ({
+  createSandbox: vi.fn().mockResolvedValue({
+    createAndStart: vi.fn().mockResolvedValue('mock-container-id'),
+  }),
+}));
+
 describe('restart command', async () => {
   let testDir: string;
   let originalCwd: string;
