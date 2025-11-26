@@ -72,8 +72,9 @@ export const stopCommand = async (
 
     processManager?.completeLastItem();
 
-    // Update task status to cancelled
-    task.updateExecutionStatus('cancelled');
+    // Reset task status to NEW and clear container info
+    task.resetToNew();
+    task.setContainerInfo('', '');
 
     // Clean up Git worktree and branch
     try {
