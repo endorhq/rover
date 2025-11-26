@@ -134,8 +134,8 @@ export const inspectCommand = async (
       );
       showTips([
         colors.gray('Run the ') +
-        colors.cyan('rover inspect 1') +
-        colors.gray(' to get the task details'),
+          colors.cyan('rover inspect 1') +
+          colors.gray(' to get the task details'),
       ]);
     }
     return;
@@ -154,10 +154,10 @@ export const inspectCommand = async (
       );
       showTips([
         'Use ' +
-        colors.cyan('--file') +
-        ' for formatted output or ' +
-        colors.cyan('--raw-file') +
-        ' for raw output',
+          colors.cyan('--file') +
+          ' for formatted output or ' +
+          colors.cyan('--raw-file') +
+          ' for raw output',
       ]);
     }
     return;
@@ -301,33 +301,12 @@ export const inspectCommand = async (
 
       showProperties(workspaceProps);
 
-      // Show file changes
-      const git = new Git();
-      const stats = await git.diffStats({
-        worktreePath: task.worktreePath,
-        includeUntracked: true,
-      });
-
-      const statFiles = stats.files.map(fileStat => {
-        const insertions =
-          fileStat.insertions > 0
-            ? colors.green(`+${fileStat.insertions}`)
-            : '';
-        const deletions =
-          fileStat.deletions > 0 ? colors.red(`-${fileStat.deletions}`) : '';
-        return `${insertions} ${deletions} ${colors.cyan(fileStat.path)}`;
-      });
-      // Breakline
-      console.log();
-
-      showList(statFiles, { title: 'Current Changes' });
-
       // Workflow files
       const discoveredFiles = iteration.listMarkdownFiles();
 
       if (discoveredFiles.length > 0) {
         showTitle(
-          `Generated Workflow Files ${colors.gray(`| Iteration ${iterationNumber}/${task.iterations}`)}`
+          `Workflow Output ${colors.gray(`| Iteration ${iterationNumber}/${task.iterations}`)}`
         );
         showList(discoveredFiles);
 
@@ -349,10 +328,30 @@ export const inspectCommand = async (
         } else {
           console.log();
           iterationFileContents.forEach((contents, file) => {
-            showFile(file, contents);
+            showFile(file, contents.trim());
           });
         }
       }
+
+      // Show file changes
+      const git = new Git();
+      const stats = await git.diffStats({
+        worktreePath: task.worktreePath,
+        includeUntracked: true,
+      });
+
+      const statFiles = stats.files.map(fileStat => {
+        const insertions =
+          fileStat.insertions > 0
+            ? colors.green(`+${fileStat.insertions}`)
+            : '';
+        const deletions =
+          fileStat.deletions > 0 ? colors.red(`-${fileStat.deletions}`) : '';
+        return `${insertions} ${deletions} ${colors.cyan(fileStat.path)}`;
+      });
+
+      showTitle('File Changes');
+      showList(statFiles);
 
       const tips = [];
 
@@ -363,18 +362,18 @@ export const inspectCommand = async (
       } else if (options.file == null && discoveredFiles.length > 0) {
         tips.push(
           'Use ' +
-          colors.cyan(
-            `rover inspect ${taskId} --file ${discoveredFiles[0]}`
-          ) +
-          ' to read its content'
+            colors.cyan(
+              `rover inspect ${taskId} --file ${discoveredFiles[0]}`
+            ) +
+            ' to read its content'
         );
       }
 
       showTips([
         ...tips,
         'Use ' +
-        colors.cyan(`rover iterate ${taskId}`) +
-        ' to start a new agent iteration on this task',
+          colors.cyan(`rover iterate ${taskId}`) +
+          ' to start a new agent iteration on this task',
       ]);
     }
 
