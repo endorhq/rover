@@ -409,8 +409,6 @@ fi
             number: i,
             title: iteration.title,
             description: iteration.description,
-            plan: markdownFiles.get('plan.md') || undefined,
-            changes: markdownFiles.get('changes.md') || undefined,
           });
         } catch (error) {
           // Skip iterations that can't be loaded
