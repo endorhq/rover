@@ -11,7 +11,6 @@ export interface PreviousIteration {
   number: number;
   title?: string;
   description?: string;
-  plan?: string;
   changes?: string;
 }
 
@@ -58,10 +57,6 @@ export function buildPreContextStep(data: PreContextData): WorkflowAgentStep {
           section += `**Description:** ${iter.description}\n\n`;
         }
 
-        if (iter.plan) {
-          section += '**Plan:**\n```\n' + iter.plan + '\n```\n\n';
-        }
-
         if (iter.changes) {
           section += '**Changes:**\n```\n' + iter.changes + '\n```\n\n';
         }
@@ -86,11 +81,6 @@ export function buildPreContextStep(data: PreContextData): WorkflowAgentStep {
 
     if (currentIteration.description) {
       currentIterationSection += `**Description:** ${currentIteration.description}\n\n`;
-    }
-
-    if (currentIteration.plan) {
-      currentIterationSection +=
-        '**Plan:**\n```\n' + currentIteration.plan + '\n```\n\n';
     }
 
     if (currentIteration.changes) {

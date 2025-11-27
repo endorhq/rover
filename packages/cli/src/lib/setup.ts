@@ -396,25 +396,56 @@ fi
       }
     }
 
-    // Gather previous iterations (all except current)
+    // Gather previous iterations (only first and last before current)
     const previousIterations: PreviousIteration[] = [];
-    for (let i = 1; i < currentIteration; i++) {
-      const iterPath = join(iterationsPath, i.toString());
-      if (existsSync(iterPath)) {
+
+    // Only include iterations if there are at least 2 iterations before current
+    if (currentIteration > 1) {
+      // Always include iteration 1 if it's not the current iteration
+      if (currentIteration > 2) {
+        const firstIterPath = join(iterationsPath, '1');
+        if (existsSync(firstIterPath)) {
+          try {
+            const iteration = IterationManager.load(firstIterPath);
+            const markdownFiles = iteration.getMarkdownFiles();
+
+            previousIterations.push({
+              number: 1,
+              title: iteration.title,
+              description: iteration.description,
+              changes: markdownFiles.get('changes.md') || undefined,
+            });
+          } catch (error) {
+            // Skip if can't be loaded
+            if (VERBOSE) {
+              console.error(
+                `Failed to load iteration 1 for pre-context:`,
+                error
+              );
+            }
+          }
+        }
+      }
+
+      // Always include the previous iteration (the one right before current)
+      const prevIterNum = currentIteration - 1;
+      const prevIterPath = join(iterationsPath, prevIterNum.toString());
+      if (existsSync(prevIterPath)) {
         try {
-          const iteration = IterationManager.load(iterPath);
+          const iteration = IterationManager.load(prevIterPath);
           const markdownFiles = iteration.getMarkdownFiles();
 
           previousIterations.push({
-            number: i,
+            number: prevIterNum,
             title: iteration.title,
             description: iteration.description,
+            changes: markdownFiles.get('changes.md') || undefined,
           });
         } catch (error) {
-          // Skip iterations that can't be loaded
+          // Skip if can't be loaded
           if (VERBOSE) {
             console.error(
-              `Failed to load iteration ${i} for pre-context:`,
+              `Failed to load iteration ${prevIterNum} for pre-context:`,
               error
             );
           }
@@ -434,7 +465,6 @@ fi
           number: currentIteration,
           title: iteration.title,
           description: iteration.description,
-          plan: markdownFiles.get('plan.md') || undefined,
           changes: markdownFiles.get('changes.md') || undefined,
         };
       } catch (error) {
