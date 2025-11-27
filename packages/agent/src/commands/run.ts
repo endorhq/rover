@@ -103,18 +103,8 @@ export const runCommand = async (
             const preContextJson = readFileSync(preContextFilePath, 'utf-8');
             const preContextData: PreContextData = JSON.parse(preContextJson);
 
-            // Build and inject the pre-context step
-            const preContextStep = buildPreContextStep(preContextData);
-            workflowManager.injectStep(preContextStep, 'before');
-
             // Track the file path for later use
             preContextFilePaths.push(preContextFilePath);
-
-            console.log(
-              colors.gray(
-                `✓ Pre-context step injected from ${preContextFilePath} (hidden step)\n`
-              )
-            );
           } catch (err) {
             console.log(
               colors.yellow(
@@ -137,10 +127,11 @@ export const runCommand = async (
 
       // Inject into all non-pre-context steps
       for (const step of workflowManager.steps) {
-        // Skip pre-context steps (injected by the system)
-        if (step.id.startsWith('__pre_context__')) {
-          continue;
-        }
+        console.log(
+          colors.gray(
+            `✓ Pre-context step information injected at step ${step.id}\n`
+          )
+        );
 
         // Prepend the pre-context file information and iteration.json location to each step's prompt
         step.prompt = preContextMessage + '\n\n---\n' + step.prompt;
