@@ -24,13 +24,28 @@ export {
 export { WorkflowManager } from './workflow.js';
 export { WorkflowStore } from './workflow-store.js';
 
-// Workflow Context library
+// Previous Iteration library
+export { type PreviousIteration } from './previous-iteration/types.js';
+
+export { PreviousIterationValidationError } from './previous-iteration/errors.js';
+
+// Pre-Context Data library
 export {
   type PreContextData,
-  type PreviousIteration,
-  buildPreContextStep,
-  isPreContextStep,
-} from './workflow-context.js';
+  type InitialTask,
+} from './pre-context-data/types.js';
+
+export {
+  PreContextDataLoadError,
+  PreContextDataValidationError,
+} from './pre-context-data/errors.js';
+
+export { PreContextDataManager } from './pre-context-data.js';
+
+export {
+  PRE_CONTEXT_DATA_FILENAME,
+  CURRENT_PRE_CONTEXT_DATA_SCHEMA_VERSION,
+} from './pre-context-data/schema.js';
 
 // Iteration Status library
 export {

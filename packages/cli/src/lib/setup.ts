@@ -10,7 +10,7 @@ import { dirname, join } from 'node:path';
 import {
   TaskDescriptionManager,
   IterationManager,
-  type PreContextData,
+  PreContextDataManager,
   type PreviousIteration,
 } from 'rover-schemas';
 import { findProjectRoot, launchSync, VERBOSE } from 'rover-common';
@@ -478,25 +478,18 @@ fi
       }
     }
 
-    // Build pre-context data
-    const preContextData: PreContextData = {
-      taskId: this.task.id.toString(),
+    // Build pre-context data using PreContextDataManager
+    const preContextManager = PreContextDataManager.create(
+      this.taskDir,
+      this.task.id.toString(),
       initialTask,
-      previousIterations:
-        previousIterations.length > 0 ? previousIterations : undefined,
-      currentIteration: currentIterationData,
-    };
-
-    // Save to file
-    const preContextPath = join(this.taskDir, '__pre_context__.json');
-    writeFileSync(
-      preContextPath,
-      JSON.stringify(preContextData, null, 2),
-      'utf-8'
+      previousIterations.length > 0 ? previousIterations : undefined,
+      currentIterationData
     );
 
     // Return array with the single pre-context file
     // This allows for future expansion to support multiple files
+    const preContextPath = join(this.taskDir, '__pre_context__.json');
     return [preContextPath];
   }
 

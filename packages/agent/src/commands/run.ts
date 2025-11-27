@@ -3,8 +3,7 @@ import colors from 'ansi-colors';
 import {
   WorkflowManager,
   IterationStatusManager,
-  buildPreContextStep,
-  type PreContextData,
+  PreContextDataManager,
 } from 'rover-schemas';
 import { parseCollectOptions } from '../lib/options.js';
 import { Runner } from '../lib/runner.js';
@@ -100,8 +99,13 @@ export const runCommand = async (
           );
         } else {
           try {
-            const preContextJson = readFileSync(preContextFilePath, 'utf-8');
-            const preContextData: PreContextData = JSON.parse(preContextJson);
+            // Load and validate pre-context data using PreContextDataManager
+            // Extract directory from file path
+            const taskDir = preContextFilePath.substring(
+              0,
+              preContextFilePath.lastIndexOf('/')
+            );
+            PreContextDataManager.load(taskDir);
 
             // Track the file path for later use
             preContextFilePaths.push(preContextFilePath);
@@ -116,8 +120,7 @@ export const runCommand = async (
       }
     }
 
-    // Inject pre-context file path information into all actual workflow steps
-    // (not the injected pre-context step)
+    // Add pre-context file location information to all workflow steps
     if (preContextFilePaths.length > 0 && workflowManager.steps.length > 0) {
       // Build the pre-context file paths message
       const preContextMessage =
@@ -125,15 +128,12 @@ export const runCommand = async (
           ? `\n\n**Note:** Pre-context information is available at: \`${preContextFilePaths[0]}\``
           : `\n\n**Note:** Pre-context information is available at the following locations:\n${preContextFilePaths.map(path => `- \`${path}\``).join('\n')}`;
 
-      // Inject into all non-pre-context steps
+      // Prepend pre-context file location to each step's prompt
       for (const step of workflowManager.steps) {
         console.log(
-          colors.gray(
-            `✓ Pre-context step information injected at step ${step.id}\n`
-          )
+          colors.gray(`✓ Pre-context file location added to step ${step.id}\n`)
         );
 
-        // Prepend the pre-context file information and iteration.json location to each step's prompt
         step.prompt = preContextMessage + '\n\n---\n' + step.prompt;
       }
     }
