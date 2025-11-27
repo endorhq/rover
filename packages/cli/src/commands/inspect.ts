@@ -272,7 +272,6 @@ export const inspectCommand = async (
         Title: task.title,
         Status: statusColorFunc(formattedStatus),
         Workflow: task.workflowName,
-        // 'Git Workspace': `${task.worktreePath} (${colors.gray(task.branchName)})`,
         'Created At': new Date(task.createdAt).toLocaleString(),
       };
 
