@@ -1,9 +1,8 @@
 import enquirer from 'enquirer';
 import colors from 'ansi-colors';
-import { existsSync, readFileSync, mkdirSync, readdirSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { findProjectRoot, launchSync } from 'rover-common';
-import yoctoSpinner from 'yocto-spinner';
+import { ProcessManager, showProperties, showTitle } from 'rover-common';
 import { createSandbox } from '../lib/sandbox/index.js';
 import {
   getAIAgentTool,
@@ -15,11 +14,10 @@ import { TaskDescriptionManager, TaskNotFoundError } from 'rover-schemas';
 import { AI_AGENT } from 'rover-common';
 import { IterationManager } from 'rover-schemas';
 import { getTelemetry } from '../lib/telemetry.js';
-import { showRoverChat } from '../utils/display.js';
 import { readFromStdin, stdinIsAvailable } from '../utils/stdin.js';
 import { CLIJsonOutput } from '../types.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
-import { isJsonMode, setJsonMode } from '../lib/global-state.js';
+import { isJsonMode } from '../lib/global-state.js';
 
 const { prompt } = enquirer;
 
@@ -41,72 +39,12 @@ type IterationContext = {
 };
 
 /**
- * Get the latest iteration context from previous executions
+ * Command options
  */
-const getLatestIterationContext = (
-  taskPath: string,
-  jsonMode: boolean
-): IterationContext => {
-  const iterationsPath = join(taskPath, 'iterations');
-
-  if (!existsSync(iterationsPath)) {
-    return {};
-  }
-
-  try {
-    // Find the latest iteration directory
-    const iterations = readdirSync(iterationsPath, { withFileTypes: true })
-      .filter(dirent => dirent.isDirectory())
-      .map(dirent => parseInt(dirent.name, 10))
-      .filter(num => !isNaN(num))
-      .sort((a, b) => b - a); // Sort descending to get latest first
-
-    if (iterations.length === 0) {
-      return {};
-    }
-
-    const latestIteration = iterations[0];
-    const latestIterationPath = join(
-      iterationsPath,
-      latestIteration.toString()
-    );
-
-    let plan, changes;
-
-    // Try to read plan.md
-    const planPath = join(latestIterationPath, 'plan.md');
-    if (existsSync(planPath)) {
-      try {
-        plan = readFileSync(planPath, 'utf8');
-      } catch (error) {
-        if (!jsonMode) {
-          console.warn(colors.yellow('Warning: Could not read previous plan'));
-        }
-      }
-    }
-
-    // Try to read changes.md
-    const changesPath = join(latestIterationPath, 'changes.md');
-    if (existsSync(changesPath)) {
-      try {
-        changes = readFileSync(changesPath, 'utf8');
-      } catch (error) {
-        if (!jsonMode) {
-          console.warn(
-            colors.yellow('Warning: Could not read previous changes')
-          );
-        }
-      }
-    }
-
-    return { plan, changes, iterationNumber: latestIteration };
-  } catch (error) {
-    if (!jsonMode) {
-      console.warn(colors.yellow('Warning: Could not read iteration context'));
-    }
-    return {};
-  }
-};
+interface IterateOptions {
+  json?: boolean;
+  interactive?: boolean;
+}
 
 /**
  * Expand iteration instructions using AI
@@ -135,17 +73,15 @@ const expandIterationInstructions = async (
   }
 };
 
+/**
+ * Command to iterate over a existing task.
+ */
 export const iterateCommand = async (
   taskId: string,
   instructions?: string,
-  options: { json?: boolean } = {}
+  options: IterateOptions = {}
 ): Promise<void> => {
-  if (options.json !== undefined) {
-    setJsonMode(options.json);
-  }
-
   const telemetry = getTelemetry();
-  const json = options.json === true;
   const result: IterateResult = {
     success: false,
     taskId: 0,
@@ -154,7 +90,7 @@ export const iterateCommand = async (
     instructions: instructions || '',
   };
 
-  // Convert string taskId to number
+  // Convert string taskId to number or fail
   const numericTaskId = parseInt(taskId, 10);
   if (isNaN(numericTaskId)) {
     result.error = `Invalid task ID '${taskId}' - must be a number`;
@@ -168,8 +104,58 @@ export const iterateCommand = async (
 
   result.taskId = numericTaskId;
 
+  // Load the task first.
+  let task: TaskDescriptionManager;
+
+  try {
+    task = TaskDescriptionManager.load(numericTaskId);
+  } catch (error) {
+    if (error instanceof TaskNotFoundError) {
+      result.error = error.message;
+    } else {
+      result.error = `Error loading task: ${error}`;
+    }
+
+    exitWithError(result, { telemetry });
+    return;
+  }
+
+  // Ensure workspace exists
+  if (!task.worktreePath || !existsSync(task.worktreePath)) {
+    result.error = 'No workspace found for this task';
+    if (isJsonMode()) {
+      console.log(JSON.stringify(result, null, 2));
+    } else {
+      console.log(colors.red('✗ No workspace found for this task'));
+      console.log(
+        colors.gray('  Run ') +
+          colors.cyan(`rover task ${taskId}`) +
+          colors.gray(' first')
+      );
+    }
+    return;
+  }
+
+  if (!isJsonMode()) {
+    showTitle('Task to iterate');
+
+    const props: Record<string, string> = {
+      ID: numericTaskId.toString(),
+      Title: task.title,
+      Status: task.status,
+      Iterations: task.iterations.toString(),
+      Description: task.description,
+    };
+
+    showProperties(props);
+  }
+
   // Handle missing instructions - try stdin first, then prompt
   let finalInstructions = instructions?.trim() || '';
+
+  if (!isJsonMode()) {
+    showTitle('New instructions for iteration');
+  }
 
   if (!finalInstructions) {
     // Try to read from stdin first
@@ -178,16 +164,7 @@ export const iterateCommand = async (
       if (stdinInput) {
         finalInstructions = stdinInput;
         if (!isJsonMode()) {
-          showRoverChat(
-            [
-              "hey human! Let's iterate on this task.",
-              'I got your instructions and I will start an agent to implement them.',
-            ],
-            {
-              breaklineBefore: false,
-            }
-          );
-          console.log(colors.gray('✓ Read instructions from stdin'));
+          console.log(colors.gray('(From stdin)'), finalInstructions);
         }
       }
     }
@@ -198,16 +175,6 @@ export const iterateCommand = async (
         result.error = 'Instructions are required in JSON mode';
         await exitWithError(result, { telemetry });
         return;
-      } else {
-        showRoverChat(
-          [
-            "hey human! Let's iterate on this task.",
-            'Tell me your new instructions and I will start an agent to implement them.',
-          ],
-          {
-            breaklineBefore: false,
-          }
-        );
       }
 
       // Interactive prompt for instructions
@@ -215,7 +182,7 @@ export const iterateCommand = async (
         const { input } = await prompt<{ input: string }>({
           type: 'input',
           name: 'input',
-          message: 'Describe the new instructions or requirements:',
+          message: 'Describe the changes you want to apply to this task:',
           validate: value =>
             value.trim().length > 0 || 'Please provide refinement instructions',
         });
@@ -229,25 +196,14 @@ export const iterateCommand = async (
     }
   } else {
     if (!isJsonMode()) {
-      showRoverChat(
-        [
-          "hey human! Let's iterate on this task.",
-          'I got your instructions and I will start an agent to implement them.',
-        ],
-        {
-          breaklineBefore: false,
-        }
-      );
+      console.log(finalInstructions);
     }
   }
 
   result.instructions = finalInstructions;
 
   try {
-    // Load task using TaskDescription first to get agent preference
-    const task = TaskDescriptionManager.load(numericTaskId);
-
-    // Load AI agent selection - prefer task's agent, fall back to user settings
+    // Load AI agent selection - prefer task's agent or fall back to user settings
     let selectedAiAgent = task.agent || AI_AGENT.Claude; // Use task agent if available
 
     if (!task.agent) {
@@ -263,48 +219,40 @@ export const iterateCommand = async (
           );
         }
       }
-    } else {
-      if (!isJsonMode()) {
-        console.log(colors.gray(`Using agent from task: ${selectedAiAgent}`));
-      }
     }
 
     // Create AI agent instance
     const aiAgent = getAIAgentTool(selectedAiAgent);
-    const taskPath = join(
-      findProjectRoot(),
-      '.rover',
-      'tasks',
-      numericTaskId.toString()
-    );
-    result.taskTitle = task.title;
 
-    if (!isJsonMode()) {
-      console.log(colors.bold('Task Details'));
-      console.log(colors.gray('├── ID: ') + colors.cyan(task.id.toString()));
-      console.log(colors.gray('├── Task Title: ') + task.title);
-      console.log(colors.gray('├── Current Status: ') + task.status);
-      console.log(
-        colors.gray('└── Instructions: ') + colors.green(finalInstructions)
-      );
-    }
+    // Show the process
+    const processManager = isJsonMode()
+      ? undefined
+      : new ProcessManager({ title: 'Create a new iteration for this task' });
+    processManager?.start();
+
+    processManager?.addItem('Retrieving context from previous iterations');
 
     // Get previous iteration context
-    const previousContext = getLatestIterationContext(
-      taskPath,
-      options.json === true
-    );
+    const lastIteration = task.getLastIteration();
+    const previousContext: IterationContext = {};
 
-    // Expand task with AI
-    if (!isJsonMode()) {
-      console.log('');
+    if (lastIteration) {
+      const files = lastIteration.getMarkdownFiles(['plan.md', 'changes.md']);
+
+      previousContext.iterationNumber = lastIteration.iteration;
+
+      if (files.has('plan.md')) {
+        previousContext.plan = files.get('plan.md');
+      }
+
+      if (files.has('changes.md')) {
+        previousContext.changes = files.get('changes.md');
+      }
     }
 
-    const spinner = !options.json
-      ? yoctoSpinner({
-          text: `Expanding task instructions with ${selectedAiAgent.charAt(0).toUpperCase() + selectedAiAgent.slice(1)}...`,
-        }).start()
-      : null;
+    processManager?.completeLastItem();
+
+    processManager?.addItem('Expanding new instructions with AI agent');
 
     let expandedTask: IPromptTask | null = null;
 
@@ -317,29 +265,15 @@ export const iterateCommand = async (
       );
 
       if (expandedTask) {
-        if (spinner) spinner.success('Task iteration expanded!');
+        processManager?.completeLastItem();
       } else {
-        if (spinner) spinner.error('Failed to expand task iteration');
-        if (!isJsonMode()) {
-          console.log(
-            colors.yellow(
-              '\n⚠ AI expansion failed. Using manual iteration approach.'
-            )
-          );
-        }
-
-        // Fallback: create simple iteration based on instructions
-        expandedTask = {
-          title: `${task.title} - Iteration refinement instructions`,
-          description: `${task.description}\n\nAdditional requirements:\n${finalInstructions}`,
-        };
+        processManager?.failLastItem();
       }
     } catch (error) {
-      if (spinner)
-        spinner.error(
-          'Failed to expand iteration instructions. Continuing with original values'
-        );
+      processManager?.failLastItem();
+    }
 
+    if (expandedTask == null) {
       // Fallback approach
       expandedTask = {
         title: `${task.title} - Iteration refinement instructinos`,
@@ -347,64 +281,13 @@ export const iterateCommand = async (
       };
     }
 
-    if (!isJsonMode()) {
-      console.log('');
-    }
-
-    if (!expandedTask) {
-      result.error = 'Could not create iteration';
-      if (isJsonMode()) {
-        console.log(JSON.stringify(result, null, 2));
-      } else {
-        console.log(colors.red('✗ Could not create iteration'));
-      }
-      return;
-    }
-
+    // TODO(angel): Is this required?
     result.expandedTitle = expandedTask.title;
     result.expandedDescription = expandedTask.description;
 
-    // Skip confirmation and refinement instructions if --json flag is passed
-    if (!isJsonMode()) {
-      // Display the expanded iteration
-      console.log(colors.bold('Iteration:'));
-      console.log(
-        colors.gray('├── Instructions: ') + colors.cyan(expandedTask.title)
-      );
-      console.log(colors.gray('└── Details: ') + expandedTask.description);
-    }
-
-    // Check if we're in a git repository and setup worktree
-    try {
-      launchSync('git', ['rev-parse', '--is-inside-work-tree']);
-    } catch (error) {
-      result.error = 'Not in a git repository';
-      if (isJsonMode()) {
-        console.log(JSON.stringify(result, null, 2));
-      } else {
-        console.log(colors.red('✗ Not in a git repository'));
-        console.log(colors.gray('  Git worktree required for task iteration'));
-      }
-      return;
-    }
-
-    // Ensure workspace exists
-    if (!task.worktreePath || !existsSync(task.worktreePath)) {
-      result.error = 'No workspace found for this task';
-      if (isJsonMode()) {
-        console.log(JSON.stringify(result, null, 2));
-      } else {
-        console.log(colors.red('✗ No workspace found for this task'));
-        console.log(
-          colors.gray('  Run ') +
-            colors.cyan(`rover task ${taskId}`) +
-            colors.gray(' first')
-        );
-      }
-      return;
-    }
-
     result.worktreePath = task.worktreePath;
+
+    processManager?.addItem('Creating the new iteration for the task');
 
     // Increment iteration counter and update task
     const newIterationNumber = task.iterations + 1;
@@ -415,8 +298,7 @@ export const iterateCommand = async (
 
     // Create iteration directory for the NEW iteration
     const iterationPath = join(
-      taskPath,
-      'iterations',
+      task.iterationsPath(),
       newIterationNumber.toString()
     );
     mkdirSync(iterationPath, { recursive: true });
@@ -436,8 +318,10 @@ export const iterateCommand = async (
       previousContext
     );
 
+    processManager?.completeLastItem();
+
     // Start sandbox container for task execution
-    const sandbox = await createSandbox(task);
+    const sandbox = await createSandbox(task, processManager);
     const containerId = await sandbox.createAndStart();
 
     // Update task metadata with new container ID for this iteration
@@ -445,14 +329,17 @@ export const iterateCommand = async (
 
     result.success = true;
 
+    processManager?.addItem('New iteration started in background');
+    processManager?.completeLastItem();
+    processManager?.finish();
+
     await exitWithSuccess('Iteration started successfully', result, {
       tips: [
-        'Use ' + colors.cyan('rover list') + ' to check the list of tasks',
         'Use ' +
-          colors.cyan(`rover logs -f ${task.id}`) +
+          colors.cyan(`rover logs -f ${task.id} ${task.iterations}`) +
           ' to watch the task logs',
         'Use ' +
-          colors.cyan(`rover inspect ${task.id}`) +
+          colors.cyan(`rover inspect ${task.id} ${task.iterations}`) +
           ' to check the task status',
       ],
       telemetry,
