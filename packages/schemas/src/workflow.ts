@@ -34,7 +34,8 @@ const DEFAULT_STEP_TIMEOUT = 60 * 30; // 30 minutes
  */
 export class WorkflowManager {
   private data: Workflow;
-  private injectedSteps: WorkflowStep[] = [];
+  private originalSteps: WorkflowStep[] = [];
+  private _steps: WorkflowStep[] = [];
   filePath: string;
 
   constructor(data: unknown, filePath: string) {
@@ -42,6 +43,9 @@ export class WorkflowManager {
       // Validate data with Zod schema
       this.data = WorkflowSchema.parse(data);
       this.filePath = filePath;
+      // Store original steps and initialize working steps array
+      this.originalSteps = [...this.data.steps];
+      this._steps = [...this.data.steps];
     } catch (error) {
       if (error instanceof ZodError) {
         const errorMessages = error.issues
@@ -283,7 +287,7 @@ export class WorkflowManager {
     referenceStepId?: string
   ): void {
     // Check if a step with this ID already exists
-    const existingStep = this.steps.find(s => s.id === step.id);
+    const existingStep = this._steps.find(s => s.id === step.id);
     if (existingStep) {
       throw new Error(
         `Cannot inject step: a step with ID "${step.id}" already exists`
@@ -293,52 +297,40 @@ export class WorkflowManager {
     // If no reference step is provided, inject at start or end based on position
     if (!referenceStepId) {
       if (position === 'before') {
-        this.injectedSteps.unshift(step);
+        this._steps.unshift(step);
       } else {
-        this.injectedSteps.push(step);
+        this._steps.push(step);
       }
       return;
     }
 
-    // Find the reference step index in the combined steps array
-    const allSteps = this.steps;
-    const refIndex = allSteps.findIndex(s => s.id === referenceStepId);
+    // Find the reference step index
+    const refIndex = this._steps.findIndex(s => s.id === referenceStepId);
     if (refIndex === -1) {
       throw new Error(`Reference step "${referenceStepId}" not found`);
     }
 
-    // Calculate the insertion index in the injectedSteps array
-    // This is complex because we need to maintain order across two arrays
+    // Insert at the appropriate position
     if (position === 'before') {
-      // If reference is in YAML steps, add to end of injected steps
-      if (refIndex >= this.injectedSteps.length) {
-        this.injectedSteps.push(step);
-      } else {
-        this.injectedSteps.splice(refIndex, 0, step);
-      }
+      this._steps.splice(refIndex, 0, step);
     } else {
-      // After: insert after the reference step
-      if (refIndex >= this.injectedSteps.length) {
-        // Reference is in YAML steps, insert at end of injected
-        this.injectedSteps.push(step);
-      } else {
-        this.injectedSteps.splice(refIndex + 1, 0, step);
-      }
+      this._steps.splice(refIndex + 1, 0, step);
     }
   }
 
   /**
-   * Clear all injected steps
+   * Clear all injected steps (reset to original YAML steps)
    */
   clearInjectedSteps(): void {
-    this.injectedSteps = [];
+    this._steps = [...this.originalSteps];
   }
 
   /**
    * Get all injected steps (steps not from YAML)
    */
   getInjectedSteps(): WorkflowStep[] {
-    return [...this.injectedSteps];
+    const originalStepIds = new Set(this.originalSteps.map(s => s.id));
+    return this._steps.filter(s => !originalStepIds.has(s.id));
   }
 
   // Data Access (Getters)
@@ -363,8 +355,7 @@ export class WorkflowManager {
   }
 
   get steps(): WorkflowStep[] {
-    // Return injected steps first, then YAML-defined steps
-    return [...this.injectedSteps, ...this.data.steps];
+    return this._steps;
   }
 
   get defaults(): WorkflowDefaults | undefined {
