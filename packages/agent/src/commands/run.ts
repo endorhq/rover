@@ -100,12 +100,10 @@ export const runCommand = async (
         } else {
           try {
             // Load and validate pre-context data using PreContextDataManager
-            // Extract directory from file path
-            const taskDir = preContextFilePath.substring(
-              0,
-              preContextFilePath.lastIndexOf('/')
-            );
-            PreContextDataManager.load(taskDir);
+            const rawData = readFileSync(preContextFilePath, 'utf-8');
+            const parsedData = JSON.parse(rawData);
+            // Validate by creating a PreContextDataManager instance
+            new PreContextDataManager(parsedData, preContextFilePath);
 
             // Track the file path for later use
             preContextFilePaths.push(preContextFilePath);
