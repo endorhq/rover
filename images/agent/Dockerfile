@@ -2,6 +2,7 @@ ARG NIX_AI_TOOLS_REV=ea213e13fde802090a4cdec57631e3374d67d78f
 FROM node:24-alpine AS agent-builder
 COPY . /app
 WORKDIR /app
+
 # Build the agent
 RUN npm install && npm run build:agent
 RUN cd ./packages/agent && npm pack && mv *.tgz /rover-agent.tgz
@@ -12,7 +13,7 @@ ARG TARGETARCH
 ARG PACKAGE_MANAGER_MCP_SERVER_VERSION="v0.2.0"
 ENV NIX_AI_TOOLS_REV=${NIX_AI_TOOLS_REV}
 RUN apk update && \
-    apk add bash file jq nix python3 sudo uv && \
+    apk add bash file g++ jq make nix python3 sudo uv && \
     case ${TARGETARCH} in \
       amd64) ARCH_SUFFIX="x86_64-unknown-linux-musl" ;; \
       arm64) ARCH_SUFFIX="aarch64-unknown-linux-musl" ;; \
