@@ -212,8 +212,7 @@ const createTaskForAgent = async (
   workflowName: string,
   baseBranch: string,
   git: Git,
-  jsonMode: boolean,
-  telemetry: any
+  jsonMode: boolean
 ): Promise<{
   taskId: number;
   title: string;
@@ -322,12 +321,6 @@ const createTaskForAgent = async (
   // Update task with workspace information
   task.setWorkspace(worktreePath, branchName);
   task.markInProgress();
-
-  // Track new task event
-  telemetry?.eventNewTask(
-    fromGithub != null ? NewTaskProvider.GITHUB : NewTaskProvider.INPUT,
-    workflowName
-  );
 
   processManager?.completeLastItem();
 
@@ -805,8 +798,7 @@ export const taskCommand = async (
         workflowName,
         baseBranch!,
         git,
-        json || false,
-        telemetry
+        json || false
       );
 
       if (taskResult) {
@@ -815,6 +807,15 @@ export const taskCommand = async (
         failedAgents.push(selectedAiAgent);
       }
     }
+
+    // Track new task event (send only once for all agents)
+    const isMultiAgent = selectedAiAgents.length > 1;
+    telemetry?.eventNewTask(
+      fromGithub != null ? NewTaskProvider.GITHUB : NewTaskProvider.INPUT,
+      workflowName,
+      isMultiAgent,
+      selectedAiAgents
+    );
 
     // Handle results
     if (createdTasks.length === 0) {

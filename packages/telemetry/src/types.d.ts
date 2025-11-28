@@ -1,6 +1,8 @@
 export type NewTaskMetadata = {
   provider: NewTaskProvider;
   workflow?: string;
+  isMultiAgent?: boolean;
+  agents?: string[];
 };
 
 export type IterateMetadata = {
