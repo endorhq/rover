@@ -31,6 +31,103 @@ interface RunCommandOptions {
 interface RunCommandOutput extends CommandOutput {}
 
 /**
+ * Handles pre-context file loading, validation, and injection into workflow steps.
+ * Skips injection on the first iteration.
+ *
+ * @param options - Run command options containing pre-context file paths
+ * @param workflowManager - Workflow manager to inject pre-context into
+ * @returns Array of validated pre-context file paths
+ */
+const handlePreContextInjection = (
+  options: RunCommandOptions,
+  workflowManager: WorkflowManager
+): string[] => {
+  const preContextFilePaths: string[] = [];
+
+  // Load and validate pre-context files
+  if (options.preContextFile && options.preContextFile.length > 0) {
+    for (const preContextFilePath of options.preContextFile) {
+      if (!existsSync(preContextFilePath)) {
+        console.log(
+          colors.yellow(
+            `\n⚠ Pre-context file not found at ${preContextFilePath}. Skipping this file.`
+          )
+        );
+      } else {
+        try {
+          // Load and validate pre-context data using PreContextDataManager
+          const rawData = readFileSync(preContextFilePath, 'utf-8');
+          const parsedData = JSON.parse(rawData);
+          // Validate by creating a PreContextDataManager instance
+          new PreContextDataManager(parsedData, preContextFilePath);
+
+          // Track the file path for later use
+          preContextFilePaths.push(preContextFilePath);
+        } catch (err) {
+          console.log(
+            colors.yellow(
+              `\n⚠ Failed to load pre-context file ${preContextFilePath}: ${err instanceof Error ? err.message : String(err)}. Skipping this file.`
+            )
+          );
+        }
+      }
+    }
+  }
+
+  // Add pre-context file location information to all workflow steps
+  // Only inject if this is not the first iteration
+  if (preContextFilePaths.length > 0 && workflowManager.steps.length > 0) {
+    let shouldInjectPreContext = true;
+
+    // Check if this is the first iteration
+    const iterationFilePath = options.output
+      ? `${options.output}/iteration.json`
+      : '/output/iteration.json';
+
+    if (existsSync(iterationFilePath)) {
+      try {
+        const iterationData = JSON.parse(
+          readFileSync(iterationFilePath, 'utf-8')
+        );
+        if (iterationData.iteration === 1) {
+          shouldInjectPreContext = false;
+          console.log(
+            colors.gray(
+              '⚠ Skipping pre-context injection for first iteration\n'
+            )
+          );
+        }
+      } catch (err) {
+        console.log(
+          colors.yellow(
+            `\n⚠ Failed to read iteration file ${iterationFilePath}: ${err instanceof Error ? err.message : String(err)}. Proceeding with pre-context injection.`
+          )
+        );
+      }
+    }
+
+    if (shouldInjectPreContext) {
+      // Build the pre-context file paths message
+      const preContextMessage =
+        preContextFilePaths.length === 1
+          ? `\n\n**Note:** Pre-context information is available at: \`${preContextFilePaths[0]}\``
+          : `\n\n**Note:** Pre-context information is available at the following locations:\n${preContextFilePaths.map(path => `- \`${path}\``).join('\n')}`;
+
+      // Prepend pre-context file location to each step's prompt
+      for (const step of workflowManager.steps) {
+        console.log(
+          colors.gray(`✓ Pre-context file location added to step ${step.id}\n`)
+        );
+
+        step.prompt = preContextMessage + '\n\n---\n' + step.prompt;
+      }
+    }
+  }
+
+  return preContextFilePaths;
+};
+
+/**
  * Run a specific agent workflow file definition. It performs a set of validations
  * to confirm everything is ready and goes through the different steps.
  */
@@ -87,54 +184,8 @@ export const runCommand = async (
     // Load the agent workflow
     const workflowManager = WorkflowManager.load(workflowPath);
 
-    // Inject pre-context steps if pre-context files are provided
-    const preContextFilePaths: string[] = [];
-    if (options.preContextFile && options.preContextFile.length > 0) {
-      for (const preContextFilePath of options.preContextFile) {
-        if (!existsSync(preContextFilePath)) {
-          console.log(
-            colors.yellow(
-              `\n⚠ Pre-context file not found at ${preContextFilePath}. Skipping this file.`
-            )
-          );
-        } else {
-          try {
-            // Load and validate pre-context data using PreContextDataManager
-            const rawData = readFileSync(preContextFilePath, 'utf-8');
-            const parsedData = JSON.parse(rawData);
-            // Validate by creating a PreContextDataManager instance
-            new PreContextDataManager(parsedData, preContextFilePath);
-
-            // Track the file path for later use
-            preContextFilePaths.push(preContextFilePath);
-          } catch (err) {
-            console.log(
-              colors.yellow(
-                `\n⚠ Failed to load pre-context file ${preContextFilePath}: ${err instanceof Error ? err.message : String(err)}. Skipping this file.`
-              )
-            );
-          }
-        }
-      }
-    }
-
-    // Add pre-context file location information to all workflow steps
-    if (preContextFilePaths.length > 0 && workflowManager.steps.length > 0) {
-      // Build the pre-context file paths message
-      const preContextMessage =
-        preContextFilePaths.length === 1
-          ? `\n\n**Note:** Pre-context information is available at: \`${preContextFilePaths[0]}\``
-          : `\n\n**Note:** Pre-context information is available at the following locations:\n${preContextFilePaths.map(path => `- \`${path}\``).join('\n')}`;
-
-      // Prepend pre-context file location to each step's prompt
-      for (const step of workflowManager.steps) {
-        console.log(
-          colors.gray(`✓ Pre-context file location added to step ${step.id}\n`)
-        );
-
-        step.prompt = preContextMessage + '\n\n---\n' + step.prompt;
-      }
-    }
+    // Handle pre-context injection
+    handlePreContextInjection(options, workflowManager);
 
     let providedInputs = new Map();
 
