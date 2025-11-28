@@ -225,6 +225,57 @@ describe('rover task (e2e)', () => {
         .filter(line => line.trim());
       expect(worktreeLines.length).toBeGreaterThanOrEqual(2);
     });
+
+    it('should create separate tasks when multiple --agent flags are provided', async () => {
+      // Execute: Run rover task with multiple agents
+      const result = await runRoverTask(
+        'Create a hello world bash script named hello.sh',
+        ['--agent', 'claude', '--agent', 'gemini']
+      );
+
+      // Debug output if test fails
+      if (result.exitCode !== 0) {
+        console.log('STDOUT:', result.stdout);
+        console.log('STDERR:', result.stderr);
+      }
+
+      // Verify: Command succeeded
+      expect(result.exitCode).toBe(0);
+
+      // Wait for both tasks to reach IN_PROGRESS status in parallel
+      await Promise.all([
+        waitForTaskStatus(1, 'IN_PROGRESS', 600000),
+        waitForTaskStatus(2, 'IN_PROGRESS', 600000),
+      ]);
+
+      // Verify: Task 1 description file exists
+      const task1Path = join(testDir, '.rover/tasks/1/description.json');
+      expect(existsSync(task1Path)).toBe(true);
+      const task1Data = JSON.parse(readFileSync(task1Path, 'utf8'));
+      expect(task1Data.id).toBe(1);
+      expect(task1Data.agent).toBe('claude');
+
+      // Verify: Task 2 description file exists
+      const task2Path = join(testDir, '.rover/tasks/2/description.json');
+      expect(existsSync(task2Path)).toBe(true);
+      const task2Data = JSON.parse(readFileSync(task2Path, 'utf8'));
+      expect(task2Data.id).toBe(2);
+      expect(task2Data.agent).toBe('gemini');
+
+      // Verify: Both tasks have separate workspaces
+      expect(existsSync(join(testDir, '.rover/tasks/1/workspace'))).toBe(true);
+      expect(existsSync(join(testDir, '.rover/tasks/2/workspace'))).toBe(true);
+
+      // Verify: Both tasks have separate git branches
+      const worktreeResult = await execa('git', ['worktree', 'list'], {
+        cwd: testDir,
+      });
+      const worktreeLines = worktreeResult.stdout
+        .split('\n')
+        .filter(line => line.trim());
+      // Should have at least 3 worktrees (main + task1 + task2)
+      expect(worktreeLines.length).toBeGreaterThanOrEqual(3);
+    });
   });
 
   describe('error handling', () => {
