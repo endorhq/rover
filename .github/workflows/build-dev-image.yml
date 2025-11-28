@@ -1,0 +1,15 @@
+name: Build Dev Image
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build-dev-image:
+    uses: ./.github/workflows/build-image.yml
+    permissions:
+      contents: read
+      packages: write
+    with:
+      tag: latest
+      image-name: ghcr.io/${{ github.repository }}/agent-dev
