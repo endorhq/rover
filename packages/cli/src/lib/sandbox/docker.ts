@@ -4,7 +4,7 @@ import { ProjectConfigManager } from 'rover-schemas';
 import { Sandbox } from './types.js';
 import { SetupBuilder } from '../setup.js';
 import { TaskDescriptionManager } from 'rover-schemas';
-import { findProjectRoot, launch, ProcessManager } from 'rover-common';
+import { findProjectRoot, launch, ProcessManager, VERBOSE } from 'rover-common';
 import {
   parseCustomEnvironmentVariables,
   loadEnvsFile,
@@ -237,6 +237,11 @@ export class DockerSandbox extends Sandbox {
       '--inputs-json',
       '/inputs.json'
     );
+
+    // Forward verbose flag to rover-agent if enabled
+    if (VERBOSE) {
+      dockerArgs.push('-v');
+    }
 
     // Add pre-context file arguments
     preContextPaths.forEach((_, index) => {

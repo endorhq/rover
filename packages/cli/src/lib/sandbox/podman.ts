@@ -9,6 +9,7 @@ import {
   findProjectRoot,
   launch,
   ProcessManager,
+  VERBOSE,
 } from 'rover-common';
 import {
   parseCustomEnvironmentVariables,
@@ -212,6 +213,11 @@ export class PodmanSandbox extends Sandbox {
       '--inputs-json',
       '/inputs.json'
     );
+
+    // Forward verbose flag to rover-agent if enabled
+    if (VERBOSE) {
+      podmanArgs.push('-v');
+    }
 
     // Add pre-context file arguments
     preContextPaths.forEach((_, index) => {
