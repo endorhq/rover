@@ -57,6 +57,10 @@ export class CreateForm extends LitElement {
   private isVersionAtLeast(version: string, minVersion: string): boolean {
     if (!version) return false;
 
+    if (version === '0.0.0-dev') {
+      return true;
+    }
+
     const parseVersion = (v: string): number[] => {
       const match = v.match(/(\d+)\.(\d+)\.(\d+)/);
       if (!match) return [0, 0, 0];
