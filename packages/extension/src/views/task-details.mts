@@ -313,6 +313,31 @@ export class TaskDetailsView extends LitElement {
       return '';
     }
 
+    // Check if the latest iteration is in-progress
+    const isIterationInProgress =
+      latestIteration.status?.toLowerCase() !== 'completed';
+
+    // If iteration is in progress, show a message instead of stale files
+    if (isIterationInProgress) {
+      return html`
+        <div class="section">
+          <div class="section-header">
+            <span class="codicon codicon-book"></span>
+            <span>Latest Iteration Files</span>
+          </div>
+          <div class="section-content">
+            <div class="iteration-in-progress">
+              <span class="codicon codicon-sync~spin"></span>
+              <span
+                >Iteration ${latestIteration.number} is currently in progress.
+                Files will be available once the iteration completes.</span
+              >
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
     // Create tabs array with summary and files
     const tabs: { id: string; label: string; icon: string; content: string }[] =
       [];
