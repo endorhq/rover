@@ -3,40 +3,56 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 
-let cachedVersion: string | null = null;
+export interface GetVersionOptions {
+  packageJsonPath?: string;
+  packageRootRelativePath?: string;
+  moduleUrl?: string;
+}
 
-export function getVersion(): string {
-  if (cachedVersion) {
-    return cachedVersion;
-  }
+/**
+ * Build a version getter with its own cache so multiple packages can reuse
+ * the same logic without sharing state.
+ */
+export function createGetVersion(
+  options: GetVersionOptions = {}
+): () => string {
+  const {
+    packageJsonPath = '../../package.json',
+    packageRootRelativePath = '..',
+    moduleUrl = import.meta.url,
+  } = options;
 
-  try {
-    // First, try to use createRequire to import package.json
-    // This approach works better with bundlers
-    const require = createRequire(import.meta.url);
-    const packageJson = require('../../package.json');
-    cachedVersion = packageJson.version || '0.0.0';
-    return cachedVersion as string;
-  } catch (error) {
-    // Fallback: try to read from file system
-    try {
-      // Get the directory of the current module
-      const currentDir = dirname(fileURLToPath(import.meta.url));
+  let cachedVersion: string | null = null;
 
-      // Navigate from dist/ back to the project root
-      // The built file will be at dist/index.mjs, so we need to go up one level
-      const projectRoot = join(currentDir, '..');
-      const packageJsonPath = join(projectRoot, 'package.json');
-
-      const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
-      cachedVersion = packageJson.version || '0.0.0';
-
-      return cachedVersion as string;
-    } catch (fsError) {
-      console.warn('Failed to read version from package.json:', fsError);
-      // Fallback version if package.json cannot be read
-      cachedVersion = '0.0.0';
+  return function getVersion(): string {
+    if (cachedVersion) {
       return cachedVersion;
     }
-  }
+
+    try {
+      const require = createRequire(moduleUrl);
+      const packageJson = require(packageJsonPath);
+      cachedVersion = packageJson.version || '0.0.0';
+      return cachedVersion as string;
+    } catch {
+      try {
+        const currentDir = dirname(fileURLToPath(moduleUrl));
+        const projectRoot = join(currentDir, packageRootRelativePath);
+        const packageJsonPathFromFs = join(projectRoot, 'package.json');
+
+        const packageJson = JSON.parse(
+          readFileSync(packageJsonPathFromFs, 'utf-8')
+        );
+        cachedVersion = packageJson.version || '0.0.0';
+
+        return cachedVersion as string;
+      } catch (fsError) {
+        console.warn('Failed to read version from package.json:', fsError);
+        cachedVersion = '0.0.0';
+        return cachedVersion;
+      }
+    }
+  };
 }
+
+export const getVersion = createGetVersion();

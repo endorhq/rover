@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { Command, Argument } from 'commander';
-import { AI_AGENT, setVerbose, getVersion } from 'rover-common';
+import { AI_AGENT, setVerbose } from 'rover-common';
 import { runCommand } from './commands/run.js';
 import {
   DEFAULT_INSTALL_DIRECTORY,
@@ -9,6 +9,7 @@ import {
   installCommand,
 } from './commands/install.js';
 import { addConfigCommands } from './commands/config/index.js';
+import { getAgentVersion } from './version.js';
 
 // Common types
 export interface CommandOutput {
@@ -27,7 +28,7 @@ const program = new Command();
 program
   .name('rover-agent')
   .description('Run workflows using AI Coding Agents')
-  .version(getVersion());
+  .version(getAgentVersion());
 
 // Verbose option
 program
