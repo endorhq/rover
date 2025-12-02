@@ -6,6 +6,20 @@ import {
   parseCustomEnvironmentVariables,
   loadEnvsFile,
 } from '../env-variables.js';
+import type { ProjectConfigManager } from 'rover-schemas';
+
+/**
+ * Create a mock ProjectConfigManager with the specified properties
+ */
+function createMockProjectConfig(
+  projectRoot: string,
+  envsFile: string
+): ProjectConfigManager {
+  return {
+    projectRoot,
+    envsFile,
+  } as ProjectConfigManager;
+}
 
 describe('parseCustomEnvironmentVariables', () => {
   let originalEnv: NodeJS.ProcessEnv;
@@ -193,7 +207,7 @@ VAR3=value3
     `.trim()
     );
 
-    const result = loadEnvsFile('.env', testDir);
+    const result = loadEnvsFile(createMockProjectConfig(testDir, '.env'));
 
     expect(result).toEqual([
       '-e',
@@ -206,7 +220,9 @@ VAR3=value3
   });
 
   it('should handle missing file gracefully', () => {
-    const result = loadEnvsFile('.env.missing', testDir);
+    const result = loadEnvsFile(
+      createMockProjectConfig(testDir, '.env.missing')
+    );
 
     expect(result).toEqual([]);
   });
@@ -215,7 +231,7 @@ VAR3=value3
     const envFile = join(testDir, '.env');
     writeFileSync(envFile, '');
 
-    const result = loadEnvsFile('.env', testDir);
+    const result = loadEnvsFile(createMockProjectConfig(testDir, '.env'));
 
     expect(result).toEqual([]);
   });
@@ -232,7 +248,7 @@ VAR2=value2
     `.trim()
     );
 
-    const result = loadEnvsFile('.env', testDir);
+    const result = loadEnvsFile(createMockProjectConfig(testDir, '.env'));
 
     expect(result).toEqual(['-e', 'VAR1=value1', '-e', 'VAR2=value2']);
   });
@@ -247,7 +263,7 @@ VAR2='single quoted'
     `.trim()
     );
 
-    const result = loadEnvsFile('.env', testDir);
+    const result = loadEnvsFile(createMockProjectConfig(testDir, '.env'));
 
     // dotenv library handles quotes
     expect(result).toEqual([
@@ -267,7 +283,7 @@ DATABASE_URL=postgres://user:pass@host:5432/db?sslmode=require
     `.trim()
     );
 
-    const result = loadEnvsFile('.env', testDir);
+    const result = loadEnvsFile(createMockProjectConfig(testDir, '.env'));
 
     expect(result).toEqual([
       '-e',
@@ -277,7 +293,9 @@ DATABASE_URL=postgres://user:pass@host:5432/db?sslmode=require
 
   it('should prevent path traversal attacks', () => {
     // Try to access parent directory
-    const result = loadEnvsFile('../../etc/passwd', testDir);
+    const result = loadEnvsFile(
+      createMockProjectConfig(testDir, '../../etc/passwd')
+    );
 
     // Should return empty array due to security check
     expect(result).toEqual([]);
@@ -285,7 +303,9 @@ DATABASE_URL=postgres://user:pass@host:5432/db?sslmode=require
 
   it('should prevent absolute path attacks', () => {
     // Try to use absolute path outside project root
-    const result = loadEnvsFile('/etc/passwd', testDir);
+    const result = loadEnvsFile(
+      createMockProjectConfig(testDir, '/etc/passwd')
+    );
 
     // Should return empty array due to security check
     expect(result).toEqual([]);
@@ -297,7 +317,9 @@ DATABASE_URL=postgres://user:pass@host:5432/db?sslmode=require
     const envFile = join(nestedDir, '.env.local');
     writeFileSync(envFile, 'NESTED_VAR=nested-value');
 
-    const result = loadEnvsFile('config/.env.local', testDir);
+    const result = loadEnvsFile(
+      createMockProjectConfig(testDir, 'config/.env.local')
+    );
 
     expect(result).toEqual(['-e', 'NESTED_VAR=nested-value']);
   });
@@ -307,7 +329,7 @@ DATABASE_URL=postgres://user:pass@host:5432/db?sslmode=require
     // Create a file that might cause parsing issues
     writeFileSync(envFile, '\x00\x01\x02 invalid binary data');
 
-    const result = loadEnvsFile('.env', testDir);
+    const result = loadEnvsFile(createMockProjectConfig(testDir, '.env'));
 
     // Should return empty array on parse error
     expect(result).toEqual([]);
@@ -324,7 +346,7 @@ MIIEpAIBAAKCAQEA
     `.trim()
     );
 
-    const result = loadEnvsFile('.env', testDir);
+    const result = loadEnvsFile(createMockProjectConfig(testDir, '.env'));
 
     // dotenv library should handle multiline values
     expect(result.length).toBeGreaterThan(0);
@@ -343,7 +365,7 @@ VAR3=
     `.trim()
     );
 
-    const result = loadEnvsFile('.env', testDir);
+    const result = loadEnvsFile(createMockProjectConfig(testDir, '.env'));
 
     expect(result).toEqual(['-e', 'VAR1=', '-e', 'VAR2=value2', '-e', 'VAR3=']);
   });
@@ -352,7 +374,7 @@ VAR3=
     const envFile = join(testDir, '.env.rover');
     writeFileSync(envFile, 'ROVER_VAR=rover-value');
 
-    const result = loadEnvsFile('.env.rover', testDir);
+    const result = loadEnvsFile(createMockProjectConfig(testDir, '.env.rover'));
 
     expect(result).toEqual(['-e', 'ROVER_VAR=rover-value']);
   });
@@ -363,7 +385,9 @@ VAR3=
     const envFile = join(subdir, '.env');
     writeFileSync(envFile, 'SUB_VAR=sub-value');
 
-    const result = loadEnvsFile('subdir/.env', testDir);
+    const result = loadEnvsFile(
+      createMockProjectConfig(testDir, 'subdir/.env')
+    );
 
     expect(result).toEqual(['-e', 'SUB_VAR=sub-value']);
   });
