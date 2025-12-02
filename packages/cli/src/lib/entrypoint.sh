@@ -50,8 +50,17 @@ recover_permissions() {
     echo "✅ Permissions recovered"
 }
 
+# Guard to prevent double cleanup when signals trigger EXIT trap
+_EXITING=0
+
 # Function to handle script exit
 safe_exit() {
+    # Prevent re-entry (signals like INT/TERM will trigger EXIT on exit)
+    if [[ $_EXITING -eq 1 ]]; then
+        return
+    fi
+    _EXITING=1
+
     local exit_code="$1"
 
     shred_secrets
@@ -69,23 +78,13 @@ check_command() {
     fi
     return 0
 }
-
-# Function to validate task description file
-validate_task_file() {
-    if [ ! -f "/task/description.json" ]; then
-        echo "❌ Task description file not found at /task/description.json"
-        safe_exit 1
-    fi
-}
-
+{validateTaskFileFunction}
 # Fail if node is not available
 check_command "node" || safe_exit 1
 
 # Set start time
 START_TIME=$(date -u +%Y-%m-%dT%H:%M:%S%z)
-
-# Validate task description file
-validate_task_file
+{validateTaskFileCall}
 
 # Setup the agent
 AGENT={agent}
@@ -109,21 +108,7 @@ while ! nc -w 0 127.0.0.1 "$PACKAGE_MANAGER_MCP_PORT" < /dev/null; do
 done
 
 echo "✅ Package manager MCP is ready"
-
-# Read task data from mounted JSON file
-TASK_ID=$(jq -r '.id' /task/description.json)
-TASK_ITERATION=$(jq -r '.iteration' /task/description.json)
-TASK_TITLE=$(jq -r '.title' /task/description.json)
-TASK_DESCRIPTION=$(jq -r '.description' /task/description.json)
-
-echo -e "\n======================================="
-echo "🚀 Rover Task Execution Setup"
-echo "======================================="
-echo "Task Title: $TASK_TITLE"
-echo "Task ID: $TASK_ID"
-echo "Task Iteration: $TASK_ITERATION"
-echo "======================================="
-
+{taskDataSection}
 {installAllPackages}
 
 # Agent-specific CLI installation and credential setup
@@ -172,22 +157,14 @@ warn_mcp_configuration_failed() {
 configure_all_mcps
 
 echo -e "\n📦 Done installing MCP servers"
-
-# Export variables for agent execution
-export TASK_ID TASK_TITLE TASK_DESCRIPTION
-
+{exportTaskVariables}
 # Remove ourselves from sudoers
 echo -e "\n👤 Removing privileges after completing the setup!"
 sudo rm /etc/sudoers.d/1-agent-setup
 
 {initScriptExecution}
-
-# Execute the complete task workflow
-echo -e "\n======================================="
-echo "🚀 Running Workflow"
-echo "======================================="
-
+{workflowExecutionSection}
 # Capture the CMD exit and ensure we recover the result!
-trap 'safe_exit $?' EXIT
+trap 'safe_exit $?' EXIT HUP INT QUIT TERM
 
 "$@"
