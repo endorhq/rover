@@ -2,7 +2,7 @@ import { getAIAgentTool } from '../agents/index.js';
 import { join } from 'node:path';
 import { ProjectConfigManager } from 'rover-schemas';
 import { Sandbox } from './types.js';
-import { ENTRYPOINTS, SetupBuilder } from '../setup.js';
+import { SetupBuilder } from '../setup.js';
 import { TaskDescriptionManager } from 'rover-schemas';
 import { launch, ProcessManager, VERBOSE } from 'rover-common';
 import { existsSync } from 'node:fs';
@@ -238,7 +238,7 @@ export class DockerSandbox extends Sandbox {
       projectConfig
     );
     const entrypointScriptPath = setupBuilder.generateEntrypoint(
-      ENTRYPOINTS.ITERATE,
+      false,
       'entrypoint-iterate.sh'
     );
     const preContextPaths = setupBuilder.generatePreContextFiles();

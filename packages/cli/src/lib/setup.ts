@@ -17,7 +17,6 @@ import { findProjectRoot, launchSync, VERBOSE } from 'rover-common';
 import sweWorkflow from './workflows/swe.yml';
 import techWriterWorkflow from './workflows/tech-writer.yml';
 import entrypointScript from './entrypoint.sh';
-import iterateEntrypointScript from './entrypoint-iterate.sh';
 import pupa from 'pupa';
 import { fileURLToPath } from 'node:url';
 import { ProjectConfigManager } from 'rover-schemas';
@@ -48,11 +47,6 @@ import { RubygemsSandboxPackage } from './sandbox/package-managers/rubygems.js';
 import { JustSandboxPackage } from './sandbox/task-managers/just.js';
 import { MakeSandboxPackage } from './sandbox/task-managers/make.js';
 import { TaskSandboxPackage } from './sandbox/task-managers/task.js';
-
-export enum ENTRYPOINTS {
-  DEFAULT = 'DEFAULT',
-  ITERATE = 'ITERATE',
-}
 
 /**
  * SetupBuilder class - Consolidates Docker setup script generation
@@ -204,18 +198,10 @@ export class SetupBuilder {
    * Generate and save the setup script to the appropriate task directory
    */
   generateEntrypoint(
-    entrypoint: ENTRYPOINTS = ENTRYPOINTS.DEFAULT,
+    includeTaskSetup: boolean = true,
     entrypointFilename: string = 'entrypoint.sh'
   ): string {
     let recoverPermissions = '';
-    let entrypointContent;
-
-    if (entrypoint === ENTRYPOINTS.ITERATE) {
-      entrypointContent = iterateEntrypointScript;
-    } else {
-      // Default to the standard entrypoint
-      entrypointContent = entrypointScript;
-    }
 
     // For Docker rootless, force it to return the permissions to the right users.
     if (this.isDockerRootless) {
@@ -324,13 +310,71 @@ fi
 `;
     }
 
+    // Generate template variables for task-related sections
+    const validateTaskFileFunction = includeTaskSetup
+      ? `
+# Function to validate task description file
+validate_task_file() {
+    if [ ! -f "/task/description.json" ]; then
+        echo "❌ Task description file not found at /task/description.json"
+        safe_exit 1
+    fi
+}
+`
+      : '';
+
+    const validateTaskFileCall = includeTaskSetup
+      ? `
+# Validate task description file
+validate_task_file`
+      : '';
+
+    const taskDataSection = includeTaskSetup
+      ? `
+# Read task data from mounted JSON file
+TASK_ID=$(jq -r '.id' /task/description.json)
+TASK_ITERATION=$(jq -r '.iteration' /task/description.json)
+TASK_TITLE=$(jq -r '.title' /task/description.json)
+TASK_DESCRIPTION=$(jq -r '.description' /task/description.json)
+
+echo -e "\\n======================================="
+echo "🚀 Rover Task Execution Setup"
+echo "======================================="
+echo "Task Title: $TASK_TITLE"
+echo "Task ID: $TASK_ID"
+echo "Task Iteration: $TASK_ITERATION"
+echo "======================================="
+`
+      : '';
+
+    const exportTaskVariables = includeTaskSetup
+      ? `
+# Export variables for agent execution
+export TASK_ID TASK_TITLE TASK_DESCRIPTION
+`
+      : '';
+
+    const workflowExecutionSection = includeTaskSetup
+      ? `
+# Execute the complete task workflow
+echo -e "\\n======================================="
+echo "🚀 Running Workflow"
+echo "======================================="
+`
+      : '';
+
     // Generate script content
-    const scriptContent = pupa(entrypointContent, {
+    const scriptContent = pupa(entrypointScript, {
       agent: this.agent,
       configureAllMCPCommands: configureAllMCPCommands.join('\n  '),
       recoverPermissions,
       installAllPackages,
       initScriptExecution,
+      validateTaskFileFunction,
+      validateTaskFileCall,
+      taskDataSection,
+      exportTaskVariables,
+      workflowExecutionSection,
     });
 
     // Write script to file
