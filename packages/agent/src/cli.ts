@@ -9,6 +9,7 @@ import {
   installCommand,
 } from './commands/install.js';
 import { addConfigCommands } from './commands/config/index.js';
+import { sessionCommand } from './commands/session.js';
 
 // Common types
 export interface CommandOutput {
@@ -75,6 +76,26 @@ program
     []
   )
   .action(runCommand);
+
+program
+  .command('session')
+  .description('Start an interactive session with an AI Coding Agent')
+  .argument('<agent>', 'Ai Coding Agent to use', value => {
+    if (!Object.values(AI_AGENT).includes(value as AI_AGENT)) {
+      throw new Error(
+        `Invalid agent '${value}'. Valid agents are: ${Object.values(AI_AGENT).join(', ')}`
+      );
+    }
+    return value as AI_AGENT;
+  })
+  .argument('[initialPrompt]', 'Initial prompt to start the session with')
+  .option(
+    '--pre-context-file <path>',
+    'Path to JSON file containing pre-context data to inject into the workflow (can be specified multiple times)',
+    collect,
+    []
+  )
+  .action(sessionCommand);
 
 // Install workflow dependencies
 program

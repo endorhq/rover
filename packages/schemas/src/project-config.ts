@@ -28,7 +28,10 @@ import type {
  * Manager class for project configuration (rover.json)
  */
 export class ProjectConfigManager {
-  constructor(private data: ProjectConfig) {}
+  constructor(
+    private data: ProjectConfig,
+    public projectRoot: string
+  ) {}
 
   /**
    * Load an existing configuration from disk
@@ -46,7 +49,7 @@ export class ProjectConfigManager {
 
       // Validate with Zod
       const validatedData = ProjectConfigSchema.parse(migratedData);
-      const instance = new ProjectConfigManager(validatedData);
+      const instance = new ProjectConfigManager(validatedData, projectRoot);
 
       // If migration occurred, save the updated data
       if (migratedData.version !== parsedData.version) {
@@ -86,8 +89,9 @@ export class ProjectConfigManager {
       taskManagers: [],
       attribution: true,
     };
+    const projectRoot = findProjectRoot();
 
-    const instance = new ProjectConfigManager(schema);
+    const instance = new ProjectConfigManager(schema, projectRoot);
     instance.save();
     return instance;
   }
@@ -148,8 +152,7 @@ export class ProjectConfigManager {
    * Save current configuration to disk
    */
   save(): void {
-    const projectRoot = findProjectRoot();
-    const filePath = join(projectRoot, PROJECT_CONFIG_FILENAME);
+    const filePath = join(this.projectRoot, PROJECT_CONFIG_FILENAME);
     try {
       const json = JSON.stringify(this.data, null, 2);
       writeFileSync(filePath, json, 'utf8');

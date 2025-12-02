@@ -27,7 +27,7 @@ import {
   TimeoutError,
 } from './errors.js';
 import { basename, join } from 'node:path';
-import { createAgent } from './agents/index.js';
+import { createAgent, Agent } from './agents/index.js';
 
 export interface RunnerStepResult {
   // Step ID
@@ -51,6 +51,8 @@ export class Runner {
   private step: WorkflowAgentStep;
   // Final tool to run the step
   tool: string;
+  // The agent instance
+  private agent: Agent;
 
   /**
    * Get the actual binary name for a given tool name
@@ -116,6 +118,7 @@ export class Runner {
 
     if (availableTool) {
       this.tool = availableTool;
+      this.agent = createAgent(availableTool);
     } else {
       throw new Error(`Could not find any tool to run the '${stepId}' step`);
     }
@@ -514,96 +517,7 @@ export class Runner {
    * Get the command line arguments for the specific AI tool
    */
   private toolArguments(): string[] {
-    const model = this.workflow.getStepModel(this.step.id);
-
-    switch (this.tool) {
-      case 'claude': {
-        const args = [
-          '--dangerously-skip-permissions',
-          '--output-format',
-          'json',
-        ];
-
-        // Add model if specified
-        // TODO: Enable selecting the model
-        // if (model) {
-        //   args.push('--model', model);
-        // }
-
-        args.push('-p');
-
-        return args;
-      }
-      case 'codex': {
-        const args = [
-          'exec',
-          '--dangerously-bypass-approvals-and-sandbox',
-          '--skip-git-repo-check',
-        ];
-
-        // Add model if specified
-        // TODO: Enable selecting the model
-        // if (model) {
-        //   args.push('--model', model);
-        // }
-
-        // Read the input from stdin
-        args.push('-');
-
-        return args;
-      }
-      case 'cursor': {
-        const args = [
-          'agent',
-          '--approve-mcps',
-          '--browser',
-          '--force',
-          '--print',
-          '--output-format',
-          'json',
-        ];
-
-        // Add model if specified
-        // TODO: Enable selecting the model
-        // if (model) {
-        //   args.push('--model', model);
-        // }
-
-        return args;
-      }
-      case 'gemini': {
-        const args = ['--yolo', '--output-format', 'json'];
-
-        // Add model if specified
-        // TODO: Enable selecting the model
-        // if (model) {
-        //   args.push('--model', model);
-        // }
-
-        // Do not add -p as it's deprecated
-
-        return args;
-      }
-      case 'qwen': {
-        // JSON Mode is not supported on qwen yet.
-        const args = ['--yolo'];
-
-        // Add model if specified
-        // TODO: Enable selecting the model
-        // if (model) {
-        //   args.push('--model', model);
-        // }
-
-        // For now, this is not deprecated in Qwen
-        args.push('-p');
-
-        return args;
-      }
-      default: {
-        // TODO(angel): Shall we halt at this point and raise an exception?
-        return ['--dangerously-skip-permissions', '-p'];
-      }
-    }
+    return this.agent.toolArguments();
   }
 
   /**

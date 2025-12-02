@@ -17,6 +17,7 @@ import { findProjectRoot, launchSync, VERBOSE } from 'rover-common';
 import sweWorkflow from './workflows/swe.yml';
 import techWriterWorkflow from './workflows/tech-writer.yml';
 import entrypointScript from './entrypoint.sh';
+import iterateEntrypointScript from './entrypoint-iterate.sh';
 import pupa from 'pupa';
 import { fileURLToPath } from 'node:url';
 import { ProjectConfigManager } from 'rover-schemas';
@@ -47,6 +48,11 @@ import { RubygemsSandboxPackage } from './sandbox/package-managers/rubygems.js';
 import { JustSandboxPackage } from './sandbox/task-managers/just.js';
 import { MakeSandboxPackage } from './sandbox/task-managers/make.js';
 import { TaskSandboxPackage } from './sandbox/task-managers/task.js';
+
+export enum ENTRYPOINTS {
+  DEFAULT = 'DEFAULT',
+  ITERATE = 'ITERATE',
+}
 
 /**
  * SetupBuilder class - Consolidates Docker setup script generation
@@ -197,8 +203,19 @@ export class SetupBuilder {
   /**
    * Generate and save the setup script to the appropriate task directory
    */
-  generateEntrypoint(): string {
+  generateEntrypoint(
+    entrypoint: ENTRYPOINTS = ENTRYPOINTS.DEFAULT,
+    entrypointFilename: string = 'entrypoint.sh'
+  ): string {
     let recoverPermissions = '';
+    let entrypointContent;
+
+    if (entrypoint === ENTRYPOINTS.ITERATE) {
+      entrypointContent = iterateEntrypointScript;
+    } else {
+      // Default to the standard entrypoint
+      entrypointContent = entrypointScript;
+    }
 
     // For Docker rootless, force it to return the permissions to the right users.
     if (this.isDockerRootless) {
@@ -308,7 +325,7 @@ fi
     }
 
     // Generate script content
-    const scriptContent = pupa(entrypointScript, {
+    const scriptContent = pupa(entrypointContent, {
       agent: this.agent,
       configureAllMCPCommands: configureAllMCPCommands.join('\n  '),
       recoverPermissions,
@@ -317,7 +334,7 @@ fi
     });
 
     // Write script to file
-    const scriptPath = join(this.taskDir, 'entrypoint.sh');
+    const scriptPath = join(this.taskDir, entrypointFilename);
     writeFileSync(scriptPath, scriptContent.replace(/\r\n/g, '\n'), 'utf8');
 
     // Make script executable

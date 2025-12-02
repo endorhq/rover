@@ -2,22 +2,17 @@ import { getAIAgentTool } from '../agents/index.js';
 import { join } from 'node:path';
 import { ProjectConfigManager } from 'rover-schemas';
 import { Sandbox } from './types.js';
-import { SetupBuilder } from '../setup.js';
+import { ENTRYPOINTS, SetupBuilder } from '../setup.js';
 import { TaskDescriptionManager } from 'rover-schemas';
-import { findProjectRoot, launch, ProcessManager, VERBOSE } from 'rover-common';
-import {
-  parseCustomEnvironmentVariables,
-  loadEnvsFile,
-} from '../../utils/env-variables.js';
-import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir, userInfo } from 'node:os';
+import { launch, ProcessManager, VERBOSE } from 'rover-common';
+import { existsSync } from 'node:fs';
+import { userInfo } from 'node:os';
 import { generateRandomId } from '../../utils/branch-name.js';
 import {
   ContainerBackend,
-  etcPasswdWithUserInfo,
-  etcGroupWithUserInfo,
   resolveAgentImage,
   warnIfCustomImage,
+  tmpUserGroupFiles,
 } from './container-common.js';
 import { isJsonMode } from '../global-state.js';
 import colors from 'ansi-colors';
@@ -43,90 +38,49 @@ export class DockerSandbox extends Sandbox {
   }
 
   protected async create(): Promise<string> {
-    // Load task description
-    const roverPath = join(findProjectRoot(), '.rover');
-    const tasksPath = join(roverPath, 'tasks');
-    const taskPath = join(tasksPath, this.task.id.toString());
-    const worktreePath = join(taskPath, 'workspace');
-    const iterationPath = join(
-      taskPath,
-      'iterations',
-      this.task.iterations.toString()
-    );
-    const iterationJsonPath = join(
-      this.task.iterationsPath(),
-      this.task.iterations.toString(),
-      'iteration.json'
-    );
+    const iteration = this.task.getLastIteration();
+
+    if (!iteration) {
+      throw new Error('No iteration data found for this task');
+    }
+
+    // Load project configuration
+    const projectConfig = ProjectConfigManager.load();
+    const worktreePath = this.task.worktreePath;
+
+    if (
+      worktreePath.length === 0 ||
+      !worktreePath.startsWith(projectConfig.projectRoot)
+    ) {
+      throw new Error(
+        `Invalid worktree path for this project (${worktreePath})`
+      );
+    }
 
     // Generate setup script using SetupBuilder
-    const projectConfigForSetup = ProjectConfigManager.load();
     const setupBuilder = new SetupBuilder(
       this.task,
       this.task.agent!,
-      projectConfigForSetup
+      projectConfig
     );
     const entrypointScriptPath = setupBuilder.generateEntrypoint();
     const inputsPath = setupBuilder.generateInputs();
     const workflowPath = setupBuilder.saveWorkflow(this.task.workflowName);
     const preContextPaths = setupBuilder.generatePreContextFiles();
 
-    // Get agent-specific Docker mounts
+    // Get agent-specific Docker mounts and environment variables
     const agent = getAIAgentTool(this.task.agent!);
     const dockerMounts: string[] = agent.getContainerMounts();
-    const envVariables: string[] = agent.getEnvironmentVariables();
-
-    // Load project config and merge custom environment variables
-    const projectRoot = findProjectRoot();
-    let customEnvVariables: string[] = [];
-    let projectConfig: ProjectConfigManager | undefined;
-
-    if (ProjectConfigManager.exists()) {
-      try {
-        projectConfig = ProjectConfigManager.load();
-
-        // Parse custom envs array
-        if (projectConfig.envs && projectConfig.envs.length > 0) {
-          customEnvVariables = parseCustomEnvironmentVariables(
-            projectConfig.envs
-          );
-        }
-
-        // Load envs from file
-        if (projectConfig.envsFile) {
-          const fileEnvVariables = loadEnvsFile(
-            projectConfig.envsFile,
-            projectRoot
-          );
-          customEnvVariables = [...customEnvVariables, ...fileEnvVariables];
-        }
-      } catch (error) {
-        // Silently skip if there's an error loading project config
-      }
-    }
-
-    // Merge agent environment variables with custom environment variables
-    // IMPORTANT: Custom environment variables are appended after agent defaults.
-    // In Docker, when the same environment variable appears multiple times, the last
-    // occurrence takes precedence. This means custom environment variables will
-    // override agent defaults if there are conflicts, which is the desired behavior.
-    const allEnvVariables = [...envVariables, ...customEnvVariables];
+    const envVariables: string[] = this.getSandboxEnvironmentVariables(
+      agent,
+      projectConfig
+    );
 
     // Clean up any existing container with same name
     try {
       await launch('docker', ['rm', '-f', this.sandboxName]);
     } catch (error) {
       // Container doesn't exist, which is fine
-    }
-
-    let isDockerRootless = false;
-
-    const dockerInfo = (await launch('docker', ['info', '-f', 'json'])).stdout;
-    if (dockerInfo) {
-      const info = JSON.parse(dockerInfo.toString());
-      isDockerRootless = (info?.SecurityOptions || []).some((value: string) =>
-        value.includes('rootless')
-      );
     }
 
     const dockerArgs = ['create', '--name', this.sandboxName];
@@ -155,22 +109,11 @@ export class DockerSandbox extends Sandbox {
     // Warn if using a custom agent image
     warnIfCustomImage(projectConfig);
 
-    const userCredentialsTempPath = mkdtempSync(join(tmpdir(), 'rover-'));
-    const etcPasswd = join(userCredentialsTempPath, 'passwd');
-    const [etcPasswdContents, username] = await etcPasswdWithUserInfo(
+    const [etcPasswd, etcGroup] = await tmpUserGroupFiles(
       ContainerBackend.Docker,
       agentImage,
       userInfo_
     );
-    writeFileSync(etcPasswd, etcPasswdContents);
-
-    const etcGroup = join(userCredentialsTempPath, 'group');
-    const [etcGroupContents, group] = await etcGroupWithUserInfo(
-      ContainerBackend.Docker,
-      agentImage,
-      userInfo_
-    );
-    writeFileSync(etcGroup, etcGroupContents);
 
     dockerArgs.push(
       '-v',
@@ -182,7 +125,7 @@ export class DockerSandbox extends Sandbox {
       '-v',
       `${worktreePath}:/workspace:Z,rw`,
       '-v',
-      `${iterationPath}:/output:Z,rw`,
+      `${iteration.iterationPath}:/output:Z,rw`,
       ...dockerMounts,
       '-v',
       `${entrypointScriptPath}:/entrypoint.sh:Z,ro`,
@@ -191,7 +134,7 @@ export class DockerSandbox extends Sandbox {
       '-v',
       `${inputsPath}:/inputs.json:Z,ro`,
       '-v',
-      `${iterationJsonPath}:/task/description.json:Z,ro`
+      `${iteration.fileDescriptionPath}:/task/description.json:Z,ro`
     );
 
     // Mount pre-context files
@@ -204,7 +147,10 @@ export class DockerSandbox extends Sandbox {
 
     // Mount initScript if provided in project config
     if (projectConfig?.initScript) {
-      const initScriptAbsPath = join(projectRoot, projectConfig.initScript);
+      const initScriptAbsPath = join(
+        projectConfig.projectRoot,
+        projectConfig.initScript
+      );
       if (existsSync(initScriptAbsPath)) {
         dockerArgs.push('-v', `${initScriptAbsPath}:/init-script.sh:Z,ro`);
       } else if (!isJsonMode()) {
@@ -217,7 +163,7 @@ export class DockerSandbox extends Sandbox {
     }
 
     dockerArgs.push(
-      ...allEnvVariables,
+      ...envVariables,
       '-w',
       '/workspace',
       '--entrypoint',
@@ -260,6 +206,135 @@ export class DockerSandbox extends Sandbox {
         ?.toString()
         .trim() || this.sandboxName
     );
+  }
+
+  async runInteractive(
+    initialPrompt?: string
+  ): Promise<ReturnType<typeof launch>> {
+    // Start Docker container with direct stdio inheritance
+    const iteration = this.task.getLastIteration();
+
+    if (!iteration) {
+      throw new Error('No iteration data found for this task');
+    }
+
+    // Load project configuration
+    const projectConfig = ProjectConfigManager.load();
+    const worktreePath = this.task.worktreePath;
+
+    if (
+      worktreePath.length === 0 ||
+      !worktreePath.startsWith(projectConfig.projectRoot)
+    ) {
+      throw new Error(
+        `Invalid worktree path for this project (${worktreePath})`
+      );
+    }
+
+    // Generate setup script using SetupBuilder
+    const setupBuilder = new SetupBuilder(
+      this.task,
+      this.task.agent!,
+      projectConfig
+    );
+    const entrypointScriptPath = setupBuilder.generateEntrypoint(
+      ENTRYPOINTS.ITERATE,
+      'entrypoint-iterate.sh'
+    );
+    const preContextPaths = setupBuilder.generatePreContextFiles();
+
+    // Get agent-specific Docker mounts and environment variables
+    const agent = getAIAgentTool(this.task.agent!);
+    const dockerMounts: string[] = agent.getContainerMounts();
+    const envVariables: string[] = this.getSandboxEnvironmentVariables(
+      agent,
+      projectConfig
+    );
+
+    const interactiveName = `${this.sandboxName}-i`;
+    const dockerArgs = ['run', '--name', interactiveName, '-it', '--rm'];
+
+    const userInfo_ = userInfo();
+
+    // If we cannot retrieve the UID in the current environment,
+    // set it to 1000, so that the Rover agent container will be
+    // using this unprivileged UID. This happens typically on
+    // environments such as Windows.
+    if (userInfo_.uid === -1) {
+      userInfo_.uid = 1000;
+    }
+
+    // If we cannot retrieve the GID in the current environment,
+    // set it to 1000, so that the Rover agent container will be
+    // using this unprivileged GID. This happens typically on
+    // environments such as Windows.
+    if (userInfo_.gid === -1) {
+      userInfo_.gid = 1000;
+    }
+
+    // Resolve the agent image from env var, config, or default
+    const agentImage = resolveAgentImage(projectConfig);
+
+    // Warn if using a custom agent image
+    warnIfCustomImage(projectConfig);
+
+    const [etcPasswd, etcGroup] = await tmpUserGroupFiles(
+      ContainerBackend.Docker,
+      agentImage,
+      userInfo_
+    );
+
+    dockerArgs.push(
+      '-v',
+      `${etcPasswd}:/etc/passwd:Z,ro`,
+      '-v',
+      `${etcGroup}:/etc/group:Z,ro`,
+      '--user',
+      `${userInfo_.uid}:${userInfo_.gid}`,
+      '-v',
+      `${worktreePath}:/workspace:Z,rw`,
+      '-v',
+      `${iteration.iterationPath}:/output:Z,rw`,
+      ...dockerMounts,
+      '-v',
+      `${entrypointScriptPath}:/entrypoint.sh:Z,ro`
+    );
+
+    // Mount pre-context files
+    preContextPaths.forEach((preContextPath, index) => {
+      dockerArgs.push(
+        '-v',
+        `${preContextPath}:/__pre_context_${index}__.json:Z,ro`
+      );
+    });
+
+    dockerArgs.push(
+      ...envVariables,
+      '-w',
+      '/workspace',
+      '--entrypoint',
+      '/entrypoint.sh',
+      agentImage,
+      'rover-agent',
+      'session',
+      this.task.agent!
+    );
+
+    if (initialPrompt) {
+      dockerArgs.push(initialPrompt);
+    }
+
+    // Forward verbose flag to rover-agent if enabled
+    if (VERBOSE) {
+      dockerArgs.push('-v');
+    }
+
+    // Add pre-context file arguments
+    preContextPaths.forEach((_, index) => {
+      dockerArgs.push('--pre-context-file', `/__pre_context_${index}__.json`);
+    });
+
+    return launch('docker', dockerArgs, { stdio: 'inherit', reject: false });
   }
 
   protected async remove(): Promise<string> {

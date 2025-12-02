@@ -5,6 +5,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { parse as parseDotenv } from 'dotenv';
+import { ProjectConfigManager } from 'rover-schemas';
 
 /**
  * Parse custom environment variables from project config.
@@ -58,19 +59,17 @@ export function parseCustomEnvironmentVariables(envs: string[]): string[] {
  * Warning: Environment variables may contain sensitive credentials. Ensure .env files are not
  * committed to version control and use Docker secrets for production deployments.
  *
- * @param envsFilePath - Relative path to the dotenv file from project root
- * @param projectRoot - Absolute path to the project root directory
+ * @param projectConfig - Project configuration manager instance
  * @returns Array of Docker CLI arguments for environment variables
  */
-export function loadEnvsFile(
-  envsFilePath: string,
-  projectRoot: string
-): string[] {
+export function loadEnvsFile(projectConfig: ProjectConfigManager): string[] {
   const envArgs: string[] = [];
-  const absolutePath = resolve(join(projectRoot, envsFilePath));
+  const absolutePath = resolve(
+    join(projectConfig.projectRoot, projectConfig.envsFile!)
+  );
 
   // Security: Validate path to prevent path traversal
-  if (!absolutePath.startsWith(projectRoot)) {
+  if (!absolutePath.startsWith(projectConfig.projectRoot)) {
     // Silently skip path traversal attempts
     return envArgs;
   }

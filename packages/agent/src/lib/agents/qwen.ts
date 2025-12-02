@@ -109,4 +109,21 @@ export class QwenAgent extends BaseAgent {
       );
     }
   }
+
+  toolArguments(): string[] {
+    return ['--yolo', '-p'];
+  }
+
+  toolInteractiveArguments(
+    precontext: string,
+    initialPrompt?: string
+  ): string[] {
+    let prompt = precontext;
+
+    if (initialPrompt) {
+      prompt += `\n\nInitial User Prompt:\n\n${initialPrompt}`;
+    }
+
+    return ['-i', prompt];
+  }
 }

@@ -1,6 +1,10 @@
-import { ProcessManager } from 'rover-common';
-
-import { TaskDescriptionManager } from 'rover-schemas';
+import { launch, ProcessManager } from 'rover-common';
+import { ProjectConfigManager, TaskDescriptionManager } from 'rover-schemas';
+import { AIAgentTool } from '../agents/index.js';
+import {
+  loadEnvsFile,
+  parseCustomEnvironmentVariables,
+} from '../../utils/env-variables.js';
 
 export abstract class SandboxPackage {
   abstract name: string;
@@ -22,12 +26,17 @@ export abstract class Sandbox {
 
   abstract isBackendAvailable(): Promise<boolean>;
   abstract openShellAtWorktree(): Promise<void>;
+
   protected abstract create(): Promise<string>;
   protected abstract start(): Promise<string>;
   protected abstract remove(): Promise<string>;
   protected abstract stop(): Promise<string>;
   protected abstract logs(): Promise<string>;
   protected abstract followLogs(): AsyncIterable<string>;
+
+  abstract runInteractive(
+    initialPrompt?: string
+  ): Promise<ReturnType<typeof launch>>;
 
   protected get sandboxName(): string {
     return `rover-task-${this.task.id}-${this.task.iterations}`;
@@ -83,5 +92,45 @@ export abstract class Sandbox {
     }
 
     return sandboxId;
+  }
+
+  /**
+   * Load the sandbox environment variables from the project configuration
+   * and the AI agent default environment vars.
+   */
+  getSandboxEnvironmentVariables(
+    agent: AIAgentTool,
+    projectConfig: ProjectConfigManager | undefined
+  ): string[] {
+    const envVariables: string[] = agent.getEnvironmentVariables();
+
+    // Load project config and merge custom environment variables
+    let customEnvVariables: string[] = [];
+
+    if (projectConfig) {
+      try {
+        // Parse custom envs array
+        if (projectConfig.envs && projectConfig.envs.length > 0) {
+          customEnvVariables = parseCustomEnvironmentVariables(
+            projectConfig.envs
+          );
+        }
+
+        // Load envs from file
+        if (projectConfig.envsFile) {
+          const fileEnvVariables = loadEnvsFile(projectConfig);
+          customEnvVariables = [...customEnvVariables, ...fileEnvVariables];
+        }
+      } catch (error) {
+        // Silently skip if there's an error loading project config
+      }
+    }
+
+    // Merge agent environment variables with custom environment variables
+    // IMPORTANT: Custom environment variables are appended after agent defaults.
+    // In Podman, when the same environment variable appears multiple times, the last
+    // occurrence takes precedence. This means custom environment variables will
+    // override agent defaults if there are conflicts, which is the desired behavior.
+    return [...envVariables, ...customEnvVariables];
   }
 }

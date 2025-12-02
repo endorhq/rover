@@ -119,4 +119,26 @@ export class CodexAgent extends BaseAgent {
       );
     }
   }
+
+  toolArguments(): string[] {
+    return [
+      'exec',
+      '--dangerously-bypass-approvals-and-sandbox',
+      '--skip-git-repo-check',
+      '-',
+    ];
+  }
+
+  toolInteractiveArguments(
+    precontext: string,
+    initialPrompt?: string
+  ): string[] {
+    let prompt = precontext;
+
+    if (initialPrompt) {
+      prompt += `\n\nInitial User Prompt:\n\n${initialPrompt}`;
+    }
+
+    return [prompt];
+  }
 }

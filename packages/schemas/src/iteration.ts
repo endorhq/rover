@@ -26,7 +26,7 @@ import {
 export class IterationManager {
   private data: Iteration;
   private filePath: string;
-  private iterationPath: string;
+  public iterationPath: string;
   private statusCache: IterationStatusManager | undefined;
 
   constructor(data: Iteration, iterationPath: string, filePath: string) {
@@ -233,6 +233,9 @@ export class IterationManager {
   }
   get previousContext(): IterationPreviousContext {
     return this.data.previousContext;
+  }
+  get fileDescriptionPath(): string {
+    return this.filePath;
   }
 
   /**

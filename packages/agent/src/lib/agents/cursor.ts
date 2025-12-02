@@ -145,4 +145,29 @@ export class CursorAgent extends BaseAgent {
       colors.green(`✓ MCP server "${name}" configured for ${this.name}`)
     );
   }
+
+  toolArguments(): string[] {
+    return [
+      'agent',
+      '--approve-mcps',
+      '--browser',
+      '--force',
+      '--print',
+      '--output-format',
+      'json',
+    ];
+  }
+
+  toolInteractiveArguments(
+    precontext: string,
+    initialPrompt?: string
+  ): string[] {
+    let prompt = precontext;
+
+    if (initialPrompt) {
+      prompt += `\n\nInitial User Prompt:\n\n${initialPrompt}`;
+    }
+
+    return ['--approve-mcps', prompt];
+  }
 }

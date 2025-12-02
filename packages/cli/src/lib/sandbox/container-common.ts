@@ -1,9 +1,10 @@
 import { launch } from 'rover-common';
 import { ProjectConfigManager } from 'rover-schemas';
 import colors from 'ansi-colors';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { tmpdir, UserInfo } from 'node:os';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -213,4 +214,37 @@ export async function etcGroupWithUserInfo(
   const groupEntry = `agent:x:${userInfo.gid}:agent`;
 
   return [originalGroup + '\n' + groupEntry + '\n', 'agent'];
+}
+
+/**
+ * Generate the user and group files to mount on the image. It contains
+ * the user and group id from the host user to ensure a correct permission
+ * handling when possible.
+ *
+ * The Docker rootless mode does not support user namespaces, so the permissions
+ * will still be different from the host user.
+ */
+export async function tmpUserGroupFiles(
+  containerBackend: ContainerBackend,
+  agentImage: string,
+  userInfo: UserInfo<string>
+): Promise<[string, string]> {
+  const userCredentialsTempPath = mkdtempSync(join(tmpdir(), 'rover-'));
+  const etcPasswd = join(userCredentialsTempPath, 'passwd');
+  const [etcPasswdContents, _username] = await etcPasswdWithUserInfo(
+    containerBackend,
+    agentImage,
+    userInfo
+  );
+  writeFileSync(etcPasswd, etcPasswdContents);
+
+  const etcGroup = join(userCredentialsTempPath, 'group');
+  const [etcGroupContents, _group] = await etcGroupWithUserInfo(
+    containerBackend,
+    agentImage,
+    userInfo
+  );
+  writeFileSync(etcGroup, etcGroupContents);
+
+  return [etcPasswd, etcGroup];
 }

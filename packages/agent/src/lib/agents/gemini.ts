@@ -110,4 +110,21 @@ export class GeminiAgent extends BaseAgent {
       );
     }
   }
+
+  toolArguments(): string[] {
+    return ['--yolo', '--output-format', 'json'];
+  }
+
+  toolInteractiveArguments(
+    precontext: string,
+    initialPrompt?: string
+  ): string[] {
+    let prompt = precontext;
+
+    if (initialPrompt) {
+      prompt += `\n\nInitial User Prompt:\n\n${initialPrompt}`;
+    }
+
+    return ['-i', prompt];
+  }
 }

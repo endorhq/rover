@@ -312,10 +312,10 @@ export function createProgram(
       '[instructions]',
       'New requirements or refinement instructions to apply (will prompt if not provided)'
     )
-    // .option(
-    //   '-i, --interactive',
-    //   'Open an interactive command session to iterate on the task'
-    // )
+    .option(
+      '-i, --interactive',
+      'Open an interactive command session to iterate on the task'
+    )
     .option('--json', 'Output JSON and skip confirmation prompts')
     .action(iterateCommand);
 

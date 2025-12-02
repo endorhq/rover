@@ -27,4 +27,9 @@ export interface Agent {
   ): Promise<void>;
   copyCredentials(targetDir: string): Promise<void>;
   isInstalled(): Promise<boolean>;
+  toolArguments(): string[];
+  toolInteractiveArguments(
+    precontext: string,
+    initialPrompt?: string
+  ): string[];
 }

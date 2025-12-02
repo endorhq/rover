@@ -22,6 +22,11 @@ export abstract class BaseAgent implements Agent {
     envs: string[],
     headers: string[]
   ): Promise<void>;
+  abstract toolArguments(): string[];
+  abstract toolInteractiveArguments(
+    precontext: string,
+    initialPrompt?: string
+  ): string[];
 
   protected ensureDirectory(dirPath: string): void {
     try {

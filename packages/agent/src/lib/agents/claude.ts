@@ -158,4 +158,25 @@ export class ClaudeAgent extends BaseAgent {
       );
     }
   }
+
+  toolArguments(): string[] {
+    return ['--dangerously-skip-permissions', '--output-format', 'json', '-p'];
+  }
+
+  toolInteractiveArguments(
+    precontext: string,
+    initialPrompt?: string
+  ): string[] {
+    const args = [
+      // In this case, let's use the "default approach" and allow agent asking for permissionsk
+      '--append-system-prompt',
+      precontext,
+    ];
+
+    if (initialPrompt) {
+      args.push(initialPrompt);
+    }
+
+    return args;
+  }
 }
