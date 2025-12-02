@@ -92,6 +92,11 @@ jobs:
         run: npm version ${{ inputs.targetVersion }}
         working-directory: ./packages/${{ inputs.project }}
 
+      - name: Bump Agent Version (when releasing CLI)
+        if: inputs.project == 'cli'
+        run: npm version ${{ inputs.targetVersion }}
+        working-directory: ./packages/agent
+
       - name: Install dependencies
         run: npm ci
 
@@ -123,7 +128,11 @@ jobs:
           TAG_NAME: '${{ inputs.project }}/v${{ inputs.targetVersion }}'
         run: |
           git add .
-          git commit -m "release: bump $PROJECT to $VERSION"
+          if [ "$PROJECT" == "cli" ]; then
+            git commit -m "release: bump cli and agent to $VERSION"
+          else
+            git commit -m "release: bump $PROJECT to $VERSION"
+          fi
           COMMIT_SHA=$(git rev-parse HEAD)
           echo "COMMIT_SHA=$COMMIT_SHA" >> $GITHUB_ENV
           echo "Created commit: $COMMIT_SHA"
