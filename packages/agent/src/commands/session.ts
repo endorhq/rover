@@ -133,10 +133,10 @@ export const sessionCommand = async (
   - ${targetPath}`;
   });
 
-  const preContextInstructions = `You are helping the user iterate over the existing changes in this project. There are already changes in the project, so it's critical you get familiar with the current changes before continuing. Do not use git, as it's not available. Instead, read the following files for context: 
+  const preContextInstructions = `You are helping the user iterate over the existing changes in this project. There are already changes in the project, so it's critical you get familiar with the current changes before continuing. Do not use git, as it's not available. Instead, read the following files for context. Just read them, do not apply any new change until the user asks explicitly. The context files are: 
   ${projectContextPaths}
   
-  After reading the context files (it's mandatory), follow the new instructions you get rigorously and ask for any clarification when required.`;
+  After reading the context files (it's mandatory), ask the user for the new changes and follow the new instructions you get rigorously.`;
 
   processManager.completeLastItem();
   processManager.finish();

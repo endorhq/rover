@@ -63,6 +63,11 @@ safe_exit() {
 
     local exit_code="$1"
 
+    # Clean up any pre-context file
+    if [[ -d "/workspace/.rover-context" ]]; then
+        rm -r /workspace/.rover-context &> /dev/null
+    fi
+
     shred_secrets
     recover_permissions
 
