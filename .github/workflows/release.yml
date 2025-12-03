@@ -30,24 +30,15 @@ on:
         default: false
 
 jobs:
-  build-image:
-    if: inputs.project == 'cli' && inputs.dryRun == false
-    uses: ./.github/workflows/build-image.yml
-    with:
-      tag: v${{ inputs.targetVersion }}
-    permissions:
-      contents: read
-      packages: write
-    secrets: inherit
-
   release:
-    needs: build-image
-    if: always() && (needs.build-image.result == 'success' || needs.build-image.result == 'skipped')
     timeout-minutes: 15
     environment: production
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    outputs:
+      git_tag: ${{ steps.commit.outputs.git_tag }}
+      commit_sha: ${{ steps.commit.outputs.commit_sha }}
 
     steps:
       - name: Echo inputs
@@ -101,6 +92,11 @@ jobs:
         run: npm version ${{ inputs.targetVersion }}
         working-directory: ./packages/${{ inputs.project }}
 
+      - name: Bump Agent Version (when releasing CLI)
+        if: inputs.project == 'cli'
+        run: npm version ${{ inputs.targetVersion }}
+        working-directory: ./packages/agent
+
       - name: Install dependencies
         run: npm ci
 
@@ -132,13 +128,19 @@ jobs:
           TAG_NAME: '${{ inputs.project }}/v${{ inputs.targetVersion }}'
         run: |
           git add .
-          git commit -m "release: bump $PROJECT to $VERSION"
+          if [ "$PROJECT" == "cli" ]; then
+            git commit -m "release: bump cli and agent to $VERSION"
+          else
+            git commit -m "release: bump $PROJECT to $VERSION"
+          fi
           COMMIT_SHA=$(git rev-parse HEAD)
           echo "COMMIT_SHA=$COMMIT_SHA" >> $GITHUB_ENV
           echo "Created commit: $COMMIT_SHA"
           git tag -a "$TAG_NAME" -m "$TAG_NAME"
           git push origin "${{ env.BRANCH_NAME }}"
           git push --tags
+          echo "git_tag=$TAG_NAME" >> "$GITHUB_OUTPUT"
+          echo "commit_sha=$COMMIT_SHA" >> "$GITHUB_OUTPUT"
 
       - name: (Dry Run) Create the release
         if: inputs.dryRun == true
@@ -197,9 +199,21 @@ jobs:
           }
           EOF
 
-  publish:
+  build-image:
     needs: release
-    if: always() && needs.release.result == 'success' && inputs.publishRelease == true && inputs.dryRun == false
+    if: inputs.project == 'cli' && inputs.dryRun == false && needs.release.result == 'success'
+    uses: ./.github/workflows/build-image.yml
+    with:
+      tag: v${{ inputs.targetVersion }}
+      ref: ${{ needs.release.outputs.git_tag }}
+    permissions:
+      contents: read
+      packages: write
+    secrets: inherit
+
+  publish:
+    needs: [release, build-image]
+    if: always() && needs.release.result == 'success' && (needs.build-image.result == 'success' || needs.build-image.result == 'skipped') && inputs.publishRelease == true && inputs.dryRun == false
     uses: ./.github/workflows/publish.yml
     with:
       project: ${{ inputs.project }}

@@ -173,6 +173,18 @@ interface TaskTaskOutput extends CLIJsonOutput {
   workspace?: string;
   branch?: string;
   savedTo?: string;
+  tasks?: Array<{
+    taskId: number;
+    agent: string;
+    title: string;
+    description: string;
+    status: string;
+    createdAt: string;
+    startedAt: string;
+    workspace: string;
+    branch: string;
+    savedTo: string;
+  }>;
 }
 
 /**
@@ -184,10 +196,184 @@ interface TaskOptions {
   yes?: boolean;
   sourceBranch?: string;
   targetBranch?: string;
-  agent?: string;
+  agent?: string[];
   json?: boolean;
   debug?: boolean;
 }
+
+/**
+ * Create a task for a specific agent
+ */
+const createTaskForAgent = async (
+  selectedAiAgent: string,
+  options: TaskOptions,
+  description: string,
+  inputsData: Map<string, string>,
+  workflowName: string,
+  baseBranch: string,
+  git: Git,
+  jsonMode: boolean
+): Promise<{
+  taskId: number;
+  title: string;
+  description: string;
+  status: string;
+  createdAt: string;
+  startedAt: string;
+  workspace: string;
+  branch: string;
+  savedTo: string;
+} | null> => {
+  const { sourceBranch, targetBranch, fromGithub } = options;
+
+  const processManager = jsonMode
+    ? undefined
+    : new ProcessManager({ title: `Create new task for ${selectedAiAgent}` });
+  processManager?.start();
+
+  processManager?.addItem(`Expand task information using ${selectedAiAgent}`);
+
+  // Extract the title and description based on current data.
+  const agentTool = getAIAgentTool(selectedAiAgent);
+  await agentTool.checkAgent();
+  const expandedTask = await agentTool.expandTask(
+    description,
+    findProjectRoot()
+  );
+
+  if (!expandedTask) {
+    processManager?.failLastItem();
+    console.error(
+      colors.red(`Failed to expand task description using ${selectedAiAgent}`)
+    );
+    return null;
+  } else {
+    processManager?.completeLastItem();
+  }
+
+  processManager?.addItem('Create the task workspace');
+
+  // Generate auto-increment ID for the task
+  const taskId = getNextTaskId();
+
+  // Create .rover/tasks directory structure
+  const roverPath = join(findProjectRoot(), '.rover');
+  const tasksPath = join(roverPath, 'tasks');
+  const taskPath = join(tasksPath, taskId.toString());
+
+  // Ensure directories exist
+  if (!existsSync(roverPath)) {
+    mkdirSync(roverPath, { recursive: true });
+  }
+  if (!existsSync(tasksPath)) {
+    mkdirSync(tasksPath, { recursive: true });
+  }
+  mkdirSync(taskPath, { recursive: true });
+
+  // Create task using TaskDescription class
+  const task = TaskDescriptionManager.create({
+    id: taskId,
+    title: expandedTask!.title,
+    description: expandedTask!.description,
+    inputs: inputsData,
+    workflowName: workflowName,
+    agent: selectedAiAgent,
+    sourceBranch: sourceBranch,
+  });
+
+  // Setup git worktree and branch
+  const worktreePath = join(taskPath, 'workspace');
+  const branchName = targetBranch || generateBranchName(taskId);
+
+  try {
+    git.createWorktree(worktreePath, branchName, baseBranch);
+
+    // Copy user .env development files
+    copyEnvironmentFiles(findProjectRoot(), worktreePath);
+  } catch (error) {
+    processManager?.failLastItem();
+    console.error(colors.red('Error creating git workspace: ' + error));
+    return null;
+  }
+
+  processManager?.updateLastItem(
+    `Create the task workspace | Branch: ${branchName}`
+  );
+  processManager?.completeLastItem();
+
+  processManager?.addItem('Complete task creation');
+
+  const iterationPath = join(
+    taskPath,
+    'iterations',
+    task.iterations.toString()
+  );
+  mkdirSync(iterationPath, { recursive: true });
+
+  // Create initial iteration.json for the first iteration
+  IterationManager.createInitial(
+    iterationPath,
+    task.id,
+    task.title,
+    task.description
+  );
+
+  // Update task with workspace information
+  task.setWorkspace(worktreePath, branchName);
+  task.markInProgress();
+
+  processManager?.completeLastItem();
+
+  // Start sandbox container for task execution
+  try {
+    const sandbox = await createSandbox(task, processManager);
+    const containerId = await sandbox.createAndStart();
+
+    updateTaskMetadata(
+      task.id,
+      {
+        containerId,
+        executionStatus: 'running',
+        runningAt: new Date().toISOString(),
+      },
+      jsonMode
+    );
+
+    processManager?.addItem('Task started in background');
+    processManager?.completeLastItem();
+    processManager?.finish();
+  } catch (_err) {
+    // If Docker execution fails to start, reset task to NEW status
+    task.resetToNew();
+
+    processManager?.addItem('Task started in background');
+    processManager?.failLastItem();
+    processManager?.finish();
+
+    console.warn(
+      colors.yellow(
+        `Task ${taskId} was created, but reset to 'New' due to an error running the container`
+      )
+    );
+    console.log(
+      colors.gray(
+        'Use ' + colors.cyan(`rover restart ${taskId}`) + ' to retry it'
+      )
+    );
+  }
+
+  return {
+    taskId: task.id,
+    title: task.title,
+    description: task.description,
+    status: task.status,
+    createdAt: task.createdAt,
+    startedAt: task.startedAt || '',
+    workspace: task.worktreePath,
+    branch: task.branchName,
+    savedTo: `.rover/tasks/${taskId}/description.json`,
+  };
+};
 
 /**
  * Task commands
@@ -223,48 +409,60 @@ export const taskCommand = async (
     return;
   }
 
-  let selectedAiAgent = AI_AGENT.Claude;
+  // Convert agent option to array and normalize to lowercase
+  let selectedAiAgents: string[] = [];
 
   // Check if --agent option is provided and validate it
-  if (agent) {
-    const agentLower = agent.toLowerCase();
-    if (agentLower === 'claude') {
-      selectedAiAgent = AI_AGENT.Claude;
-    } else if (agentLower === 'codex') {
-      selectedAiAgent = AI_AGENT.Codex;
-    } else if (agentLower === 'cursor') {
-      selectedAiAgent = AI_AGENT.Cursor;
-    } else if (agentLower === 'gemini') {
-      selectedAiAgent = AI_AGENT.Gemini;
-    } else if (agentLower === 'qwen') {
-      selectedAiAgent = AI_AGENT.Qwen;
-    } else {
-      jsonOutput.error = `Invalid agent: ${agent}. Valid options are: ${Object.values(AI_AGENT).join(', ')}`;
-      await exitWithError(jsonOutput, { telemetry });
-      return;
+  if (agent && agent.length > 0) {
+    // Normalize and validate all agents
+    for (const agentName of agent) {
+      const agentLower = agentName.toLowerCase();
+      let normalizedAgent: string;
+
+      if (agentLower === 'claude') {
+        normalizedAgent = AI_AGENT.Claude;
+      } else if (agentLower === 'codex') {
+        normalizedAgent = AI_AGENT.Codex;
+      } else if (agentLower === 'cursor') {
+        normalizedAgent = AI_AGENT.Cursor;
+      } else if (agentLower === 'gemini') {
+        normalizedAgent = AI_AGENT.Gemini;
+      } else if (agentLower === 'qwen') {
+        normalizedAgent = AI_AGENT.Qwen;
+      } else {
+        jsonOutput.error = `Invalid agent: ${agentName}. Valid options are: ${Object.values(AI_AGENT).join(', ')}`;
+        await exitWithError(jsonOutput, { telemetry });
+        return;
+      }
+
+      selectedAiAgents.push(normalizedAgent);
     }
   } else {
     // Fall back to user settings if no agent specified
     try {
-      selectedAiAgent = getUserAIAgent();
+      selectedAiAgents = [getUserAIAgent()];
     } catch (_err) {
       if (!json) {
         console.log(
           colors.yellow('⚠ Could not load user settings, defaulting to Claude')
         );
       }
+      selectedAiAgents = [AI_AGENT.Claude];
     }
   }
 
-  const valid = validations(selectedAiAgent);
+  // Validate all agents before proceeding
+  for (const selectedAiAgent of selectedAiAgents) {
+    const valid = validations(selectedAiAgent);
 
-  if (valid != null) {
-    jsonOutput.error = valid.error;
-    await exitWithError(jsonOutput, {
-      tips: valid.tips,
-      telemetry,
-    });
-    return;
+    if (valid != null) {
+      jsonOutput.error = `${selectedAiAgent}: ${valid.error}`;
+      await exitWithError(jsonOutput, {
+        tips: valid.tips,
+        telemetry,
+      });
+      return;
+    }
   }
 
   // Load the workflow
@@ -432,7 +630,7 @@ export const taskCommand = async (
                 );
               }
 
-              const agentTool = getAIAgentTool(selectedAiAgent);
+              const agentTool = getAIAgentTool(selectedAiAgents[0]);
               const extractedInputs = await agentTool.extractGithubInputs(
                 issueData.body,
                 inputs.filter(el => el.name !== 'description')
@@ -565,176 +763,147 @@ export const taskCommand = async (
   }
 
   if (description.length > 0) {
-    const processManager = json
-      ? undefined
-      : new ProcessManager({ title: 'Create new task in the background' });
-    processManager?.start();
+    // Create tasks for each selected agent
+    const createdTasks: Array<{
+      taskId: number;
+      agent: string;
+      title: string;
+      description: string;
+      status: string;
+      createdAt: string;
+      startedAt: string;
+      workspace: string;
+      branch: string;
+      savedTo: string;
+    }> = [];
+    const failedAgents: string[] = [];
 
-    processManager?.addItem(`Expand task information using ${selectedAiAgent}`);
+    for (let i = 0; i < selectedAiAgents.length; i++) {
+      const selectedAiAgent = selectedAiAgents[i];
 
-    // Extract the title and description based on current data.
-    const agentTool = getAIAgentTool(selectedAiAgent);
-    await agentTool.checkAgent();
-    const expandedTask = await agentTool.expandTask(
-      description,
-      findProjectRoot()
-    );
+      // Add progress indication for multiple agents in non-JSON mode
+      if (!json && selectedAiAgents.length > 1) {
+        console.log(
+          colors.gray(
+            `\nCreating task ${i + 1} of ${selectedAiAgents.length} (${selectedAiAgent})...`
+          )
+        );
+      }
 
-    if (!expandedTask) {
-      jsonOutput.error = `Failed to expand task description using ${selectedAiAgent}`;
-      await exitWithError(jsonOutput, {
-        tips: ['Check your agent configuration and try again'],
-        telemetry,
-      });
-      processManager?.failLastItem();
-      return;
-    } else {
-      processManager?.completeLastItem();
-    }
-
-    inputsData.set('description', expandedTask.description);
-    inputsData.set('title', expandedTask.title);
-
-    processManager?.addItem('Create the task workspace');
-
-    // Generate auto-increment ID for the task
-    const taskId = getNextTaskId();
-
-    // Create .rover/tasks directory structure
-    const roverPath = join(findProjectRoot(), '.rover');
-    const tasksPath = join(roverPath, 'tasks');
-    const taskPath = join(tasksPath, taskId.toString());
-
-    // Ensure directories exist
-    if (!existsSync(roverPath)) {
-      mkdirSync(roverPath, { recursive: true });
-    }
-    if (!existsSync(tasksPath)) {
-      mkdirSync(tasksPath, { recursive: true });
-    }
-    mkdirSync(taskPath, { recursive: true });
-
-    // Create task using TaskDescription class
-    const task = TaskDescriptionManager.create({
-      id: taskId,
-      title: expandedTask!.title,
-      description: expandedTask!.description,
-      inputs: inputsData,
-      workflowName: workflowName,
-      agent: selectedAiAgent,
-      sourceBranch: sourceBranch,
-    });
-
-    // Setup git worktree and branch
-    const worktreePath = join(taskPath, 'workspace');
-    const branchName = targetBranch || generateBranchName(taskId);
-
-    try {
-      git.createWorktree(worktreePath, branchName, baseBranch);
-
-      // Copy user .env development files
-      copyEnvironmentFiles(findProjectRoot(), worktreePath);
-    } catch (error) {
-      jsonOutput.error = 'Error creating git workspace: ' + error;
-      await exitWithError(jsonOutput, { telemetry });
-      return;
-    }
-
-    processManager?.updateLastItem(
-      `Create the task workspace | Branch: ${branchName}`
-    );
-    processManager?.completeLastItem();
-
-    processManager?.addItem('Complete task creation');
-
-    const iterationPath = join(
-      taskPath,
-      'iterations',
-      task.iterations.toString()
-    );
-    mkdirSync(iterationPath, { recursive: true });
-
-    // Create initial iteration.json for the first iteration
-    IterationManager.createInitial(
-      iterationPath,
-      task.id,
-      task.title,
-      task.description
-    );
-
-    // Update task with workspace information
-    task.setWorkspace(worktreePath, branchName);
-    task.markInProgress();
-
-    // Track new task event
-    telemetry?.eventNewTask(
-      options.fromGithub != null
-        ? NewTaskProvider.GITHUB
-        : NewTaskProvider.INPUT,
-      workflowName
-    );
-
-    // Complete JSON information
-    jsonOutput.taskId = task.id;
-    jsonOutput.title = task.title;
-    jsonOutput.description = task.description;
-    jsonOutput.status = task.status;
-    jsonOutput.createdAt = task.createdAt;
-    jsonOutput.startedAt = task.startedAt;
-    jsonOutput.workspace = task.worktreePath;
-    jsonOutput.branch = task.branchName;
-    jsonOutput.savedTo = `.rover/tasks/${taskId}/description.json`;
-
-    processManager?.completeLastItem();
-
-    // Start sandbox container for task execution
-    try {
-      const sandbox = await createSandbox(task, processManager);
-      const containerId = await sandbox.createAndStart();
-
-      updateTaskMetadata(
-        task.id,
-        {
-          containerId,
-          executionStatus: 'running',
-          runningAt: new Date().toISOString(),
-        },
-        json
+      const taskResult = await createTaskForAgent(
+        selectedAiAgent,
+        options,
+        description,
+        inputsData,
+        workflowName,
+        baseBranch!,
+        git,
+        json || false
       );
 
-      processManager?.addItem('Task started in background');
-      processManager?.completeLastItem();
-      processManager?.finish();
-    } catch (_err) {
-      // If Docker execution fails to start, reset task to NEW status
-      task.resetToNew();
+      if (taskResult) {
+        createdTasks.push({ agent: selectedAiAgent, ...taskResult });
+      } else {
+        failedAgents.push(selectedAiAgent);
+      }
+    }
 
-      processManager?.addItem('Task started in background');
-      processManager?.failLastItem();
-      processManager?.finish();
+    // Track new task event (send only once for all agents)
+    const isMultiAgent = selectedAiAgents.length > 1;
+    telemetry?.eventNewTask(
+      fromGithub != null ? NewTaskProvider.GITHUB : NewTaskProvider.INPUT,
+      workflowName,
+      isMultiAgent,
+      selectedAiAgents
+    );
 
-      jsonOutput.status = task.status;
-      jsonOutput.error =
-        "Task was created, but reset to 'New' due to an error running the container";
-      await exitWithWarn(jsonOutput.error, jsonOutput, {
-        exitCode: 1,
-        tips: [
-          'Use ' + colors.cyan(`rover restart ${taskId}`) + ' to retry it',
-        ],
+    // Handle results
+    if (createdTasks.length === 0) {
+      jsonOutput.error = `Failed to create tasks for all agents: ${failedAgents.join(', ')}`;
+      await exitWithError(jsonOutput, {
+        tips: ['Check your agent configurations and try again'],
         telemetry,
       });
       return;
     }
 
+    // Set jsonOutput to the first created task
+    const firstTask = createdTasks[0];
+    jsonOutput.taskId = firstTask.taskId;
+    jsonOutput.title = firstTask.title;
+    jsonOutput.description = firstTask.description;
+    jsonOutput.status = firstTask.status;
+    jsonOutput.createdAt = firstTask.createdAt;
+    jsonOutput.startedAt = firstTask.startedAt;
+    jsonOutput.workspace = firstTask.workspace;
+    jsonOutput.branch = firstTask.branch;
+    jsonOutput.savedTo = firstTask.savedTo;
     jsonOutput.success = true;
 
-    await exitWithSuccess('Task was created successfully', jsonOutput, {
-      tips: [
-        'Use ' + colors.cyan('rover list') + ' to check the list of tasks',
+    // For multiple agents, include all task information in an array
+    if (createdTasks.length > 1) {
+      jsonOutput.tasks = createdTasks.map(t => ({
+        taskId: t.taskId,
+        agent: t.agent,
+        title: t.title,
+        description: t.description,
+        status: t.status,
+        createdAt: t.createdAt,
+        startedAt: t.startedAt,
+        workspace: t.workspace,
+        branch: t.branch,
+        savedTo: t.savedTo,
+      }));
+    }
+
+    // Build success message
+    let successMessage: string;
+    const tips: string[] = [];
+
+    if (createdTasks.length === 1) {
+      successMessage = 'Task was created successfully';
+      tips.push(
+        'Use ' + colors.cyan('rover list') + ' to check the list of tasks'
+      );
+      tips.push(
         'Use ' +
-          colors.cyan(`rover logs -f ${task.id}`) +
-          ' to watch the task logs',
-      ],
+          colors.cyan(`rover logs -f ${firstTask.taskId}`) +
+          ' to watch the task logs'
+      );
+    } else {
+      const taskIds = createdTasks.map(t => t.taskId).join(', ');
+      successMessage = `Created ${createdTasks.length} tasks (IDs: ${taskIds})`;
+
+      if (!json) {
+        console.log('\n' + colors.bold('Created tasks:'));
+        for (const task of createdTasks) {
+          console.log(
+            `  ${colors.cyan(`Task ${task.taskId}`)} - ${task.agent} - ${task.title}`
+          );
+        }
+      }
+
+      tips.push('Use ' + colors.cyan('rover list') + ' to check all tasks');
+      tips.push(
+        'Use ' +
+          colors.cyan(`rover logs -f <task-id>`) +
+          ' to watch a specific task'
+      );
+    }
+
+    // Report failed agents separately if any
+    if (failedAgents.length > 0) {
+      if (!json) {
+        console.warn(
+          colors.yellow(
+            `\n⚠ Warning: Failed to create tasks for the following agents: ${failedAgents.join(', ')}`
+          )
+        );
+      }
+    }
+
+    await exitWithSuccess(successMessage, jsonOutput, {
+      tips,
       telemetry,
     });
   } else {

@@ -115,10 +115,17 @@ class Telemetry {
 
   // Event definition
 
-  eventNewTask(provider: NewTaskProvider, workflow?: string) {
+  eventNewTask(
+    provider: NewTaskProvider,
+    workflow?: string,
+    isMultiAgent?: boolean,
+    agents?: string[]
+  ) {
     const metadata: NewTaskMetadata = {
       provider,
       workflow,
+      isMultiAgent,
+      agents,
     };
 
     this.capture(EVENT_IDS.NEW_TASK, metadata);

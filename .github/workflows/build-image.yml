@@ -9,6 +9,10 @@ on:
         type: string
         required: true
         default: 'latest'
+      ref:
+        description: 'Git ref (branch, tag, or SHA) to build from'
+        type: string
+        required: false
       platforms:
         description: 'Target platforms'
         type: string
@@ -25,6 +29,10 @@ on:
         description: 'Image tag (e.g., v1.0.0, latest)'
         type: string
         required: true
+      ref:
+        description: 'Git ref (branch, tag, or SHA) to build from'
+        type: string
+        required: false
       platforms:
         description: 'Target platforms'
         type: string
@@ -53,6 +61,8 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3

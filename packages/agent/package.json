@@ -1,7 +1,7 @@
 {
   "name": "@endorhq/agent",
   "private": true,
-  "version": "1.0.0",
+  "version": "0.0.0-dev",
   "description": "Provide a library to define and manage AI agent workflows for Rover",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

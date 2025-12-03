@@ -684,6 +684,23 @@ const styles = css`
     );
   }
 
+  .iteration-in-progress {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 16px;
+    color: var(--vscode-foreground);
+    background: var(--vscode-editor-inactiveSelectionBackground);
+    border: 1px solid var(--vscode-widget-border);
+    border-radius: 3px;
+    font-size: 12px;
+  }
+
+  .iteration-in-progress .codicon {
+    font-size: 16px;
+    color: var(--vscode-testing-iconQueued);
+  }
+
   /* Responsive tabs */
   @media (max-width: 600px) {
     .tab {
