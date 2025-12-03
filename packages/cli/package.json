@@ -1,6 +1,6 @@
 {
   "name": "@endorhq/rover",
-  "version": "0.0.0-dev",
+  "version": "1.7.0",
   "description": "A manager for AI coding agents that works with Claude Code, Gemini, and Qwen.",
   "main": "index.js",
   "type": "module",
