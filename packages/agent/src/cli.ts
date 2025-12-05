@@ -11,6 +11,7 @@ import {
 import { addConfigCommands } from './commands/config/index.js';
 import { sessionCommand } from './commands/session.js';
 import { getAgentVersion } from './version.js';
+import { acpCommand } from './commands/acp.js';
 
 // Common types
 export interface CommandOutput {
@@ -97,6 +98,11 @@ program
     []
   )
   .action(sessionCommand);
+
+program
+  .command('acp')
+  .description('ACP experimental integration')
+  .action(acpCommand);
 
 // Install workflow dependencies
 program

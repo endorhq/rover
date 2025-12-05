@@ -88,7 +88,7 @@ export class ClaudeAgent extends BaseAgent {
           );
           console.log(
             colors.gray('├── Copied: ') +
-              colors.cyan('.claude.json (projects cleared)')
+            colors.cyan('.claude.json (projects cleared)')
           );
         } else if (cred.path.includes('gcloud')) {
           // Copy the entire folder
