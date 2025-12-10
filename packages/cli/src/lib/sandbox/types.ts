@@ -1,4 +1,4 @@
-import { launch, ProcessManager } from 'rover-common';
+import { launch, ProcessManager } from 'rover-core';
 import { ProjectConfigManager, TaskDescriptionManager } from 'rover-schemas';
 import { AIAgentTool } from '../agents/index.js';
 import {

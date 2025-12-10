@@ -6,14 +6,14 @@ import yoctoSpinner from 'yocto-spinner';
 import { getAIAgentTool, type AIAgentTool } from '../lib/agents/index.js';
 import { TaskDescriptionManager, TaskNotFoundError } from 'rover-schemas';
 import { UserSettingsManager, ProjectConfigManager } from 'rover-schemas';
-import { AI_AGENT } from 'rover-common';
+import { AI_AGENT } from 'rover-core';
 import { getTelemetry } from '../lib/telemetry.js';
-import { Git } from 'rover-common';
+import { Git } from 'rover-core';
 import { showRoverChat, showTips } from '../utils/display.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
 import { CLIJsonOutput } from '../types.js';
 import { isJsonMode, setJsonMode } from '../lib/global-state.js';
-import { findProjectRoot } from 'rover-common';
+import { findProjectRoot } from 'rover-core';
 
 const { prompt } = enquirer;
 

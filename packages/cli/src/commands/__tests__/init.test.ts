@@ -8,7 +8,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { clearProjectRootCache, launchSync } from 'rover-common';
+import { clearProjectRootCache, launchSync } from 'rover-core';
 import { initCommand } from '../init.js';
 import { CURRENT_PROJECT_SCHEMA_VERSION } from 'rover-schemas';
 

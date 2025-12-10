@@ -16,7 +16,7 @@ import { iterateCommand } from '../commands/iterate.js';
 import { restartCommand } from '../commands/restart.js';
 import { resetCommand } from '../commands/reset.js';
 import { stopCommand } from '../commands/stop.js';
-import { AI_AGENT } from 'rover-common';
+import { AI_AGENT } from 'rover-core';
 import { z } from 'zod';
 
 /**

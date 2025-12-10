@@ -5,7 +5,7 @@
 
 import { join } from 'node:path';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { findProjectRoot } from 'rover-common';
+import { findProjectRoot } from 'rover-core';
 import {
   ProjectConfigLoadError,
   ProjectConfigValidationError,

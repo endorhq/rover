@@ -8,7 +8,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { clearProjectRootCache, launchSync } from 'rover-common';
+import { clearProjectRootCache, launchSync } from 'rover-core';
 import { ProjectConfigManager } from '../project-config.js';
 
 describe('ProjectConfigManager - Environment Variable Configuration', () => {

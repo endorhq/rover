@@ -3,7 +3,7 @@
  */
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { findProjectRoot, VERBOSE } from 'rover-common';
+import { findProjectRoot, VERBOSE } from 'rover-core';
 import colors from 'ansi-colors';
 import { TaskDescriptionManager } from './task-description.js';
 

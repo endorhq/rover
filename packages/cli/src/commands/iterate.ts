@@ -2,7 +2,7 @@ import enquirer from 'enquirer';
 import colors from 'ansi-colors';
 import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { ProcessManager, showProperties, showTitle } from 'rover-common';
+import { ProcessManager, showProperties, showTitle } from 'rover-core';
 import { createSandbox } from '../lib/sandbox/index.js';
 import {
   getAIAgentTool,
@@ -11,7 +11,7 @@ import {
 } from '../lib/agents/index.js';
 import type { IPromptTask } from '../lib/prompts/index.js';
 import { TaskDescriptionManager, TaskNotFoundError } from 'rover-schemas';
-import { AI_AGENT } from 'rover-common';
+import { AI_AGENT } from 'rover-core';
 import { IterationManager } from 'rover-schemas';
 import { getTelemetry } from '../lib/telemetry.js';
 import { readFromStdin, stdinIsAvailable } from '../utils/stdin.js';

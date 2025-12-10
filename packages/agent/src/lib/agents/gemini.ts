@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import colors from 'ansi-colors';
 import { AgentCredentialFile } from './types.js';
 import { BaseAgent } from './base.js';
-import { launch } from 'rover-common';
+import { launch } from 'rover-core';
 import { L } from 'vitest/dist/chunks/reporters.nr4dxCkA.js';
 
 export class GeminiAgent extends BaseAgent {

@@ -13,7 +13,7 @@ import {
   PreContextDataManager,
   type PreviousIteration,
 } from 'rover-schemas';
-import { findProjectRoot, launchSync, VERBOSE } from 'rover-common';
+import { findProjectRoot, launchSync, VERBOSE } from 'rover-core';
 import sweWorkflow from './workflows/swe.yml';
 import techWriterWorkflow from './workflows/tech-writer.yml';
 import entrypointScript from './entrypoint.sh';

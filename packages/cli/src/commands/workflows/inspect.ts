@@ -8,7 +8,7 @@ import {
   showProperties,
   showDiagram,
   type DiagramStep,
-} from 'rover-common';
+} from 'rover-core';
 import type { WorkflowOutput } from 'rover-schemas';
 import { readFileSync } from 'node:fs';
 import { getTelemetry } from '../../lib/telemetry.js';

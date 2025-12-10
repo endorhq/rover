@@ -1,4 +1,4 @@
-import { launch } from 'rover-common';
+import { launch } from 'rover-core';
 import { ProjectConfigManager } from 'rover-schemas';
 import colors from 'ansi-colors';
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';

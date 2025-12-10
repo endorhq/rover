@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { findProjectRoot } from 'rover-common';
+import { findProjectRoot } from 'rover-core';
 
 /**
  * Get the next auto-increment task ID

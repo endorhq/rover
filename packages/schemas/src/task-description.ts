@@ -12,7 +12,7 @@ import {
 } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { findProjectRoot, VERBOSE } from 'rover-common';
+import { findProjectRoot, VERBOSE } from 'rover-core';
 import {
   TaskDescriptionSchema,
   CreateTaskData,

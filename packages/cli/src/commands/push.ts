@@ -9,7 +9,7 @@ import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
 import { isJsonMode, setJsonMode } from '../lib/global-state.js';
 import { showRoverChat, TIP_TITLES } from '../utils/display.js';
 import { statusColor } from '../utils/task-status.js';
-import { Git } from 'rover-common';
+import { Git } from 'rover-core';
 import { ProjectConfigManager } from 'rover-schemas';
 
 const { prompt } = enquirer;

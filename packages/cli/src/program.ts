@@ -1,6 +1,6 @@
 import { Command, Option } from 'commander';
 import { ProjectConfigManager, UserSettingsManager } from 'rover-schemas';
-import { AI_AGENT } from 'rover-common';
+import { AI_AGENT } from 'rover-core';
 import { initCommand } from './commands/init.js';
 import { listCommand } from './commands/list.js';
 import { exitWithError } from './utils/exit.js';
@@ -25,7 +25,7 @@ import {
   getVersion,
   showSplashHeader,
   showRegularHeader,
-} from 'rover-common';
+} from 'rover-core';
 import { addWorkflowCommands } from './commands/workflows/index.js';
 import { setJsonMode, isJsonMode } from './lib/global-state.js';
 

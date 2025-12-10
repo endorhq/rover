@@ -1,7 +1,7 @@
 import colors from 'ansi-colors';
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { findProjectRoot, launch, launchSync } from 'rover-common';
+import { findProjectRoot, launch, launchSync } from 'rover-core';
 import { TaskDescriptionManager, TaskNotFoundError } from 'rover-schemas';
 import { getTelemetry } from '../lib/telemetry.js';
 import { showTips } from '../utils/display.js';

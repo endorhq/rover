@@ -5,7 +5,7 @@
 import colors from 'ansi-colors';
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { VERBOSE } from 'rover-common';
+import { VERBOSE } from 'rover-core';
 import { IterationStatusManager } from './iteration-status.js';
 import {
   CURRENT_ITERATION_SCHEMA_VERSION,

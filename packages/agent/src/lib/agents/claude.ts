@@ -15,7 +15,7 @@ import {
   requiredClaudeCredentials,
   requiredBedrockCredentials,
   requiredVertexAiCredentials,
-} from 'rover-common';
+} from 'rover-core';
 
 export class ClaudeAgent extends BaseAgent {
   name = 'Claude';

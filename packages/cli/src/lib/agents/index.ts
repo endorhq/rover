@@ -5,7 +5,7 @@ import GeminiAI from './gemini.js';
 import QwenAI from './qwen.js';
 import type { IPromptTask } from '../prompts/index.js';
 import { UserSettingsManager } from 'rover-schemas';
-import { AI_AGENT, launchSync } from 'rover-common';
+import { AI_AGENT, launchSync } from 'rover-core';
 import type { WorkflowInput } from 'rover-schemas';
 
 export const findKeychainCredentials = (key: string): string => {

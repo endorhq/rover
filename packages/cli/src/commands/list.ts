@@ -2,7 +2,7 @@ import colors from 'ansi-colors';
 import { formatTaskStatus, statusColor } from '../utils/task-status.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { TaskDescriptionStore, TaskDescriptionSchema } from 'rover-schemas';
-import { VERBOSE, showTips, Table, TableColumn } from 'rover-common';
+import { VERBOSE, showTips, Table, TableColumn } from 'rover-core';
 import { IterationStatusManager } from 'rover-schemas';
 import { IterationManager } from 'rover-schemas';
 import { isJsonMode, setJsonMode } from '../lib/global-state.js';

@@ -8,7 +8,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { launchSync } from 'rover-common';
+import { launchSync } from 'rover-core';
 import { diffCommand } from '../diff.js';
 import { TaskDescriptionManager } from 'rover-schemas';
 

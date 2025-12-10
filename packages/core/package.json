@@ -1,5 +1,5 @@
 {
-  "name": "rover-common",
+  "name": "rover-core",
   "version": "1.0.0",
   "description": "Provide common logic for the CLI and the VSCode extension",
   "main": "dist/index.js",

@@ -6,7 +6,7 @@ import { DockerSandbox } from './docker.js';
 import { PodmanSandbox } from './podman.js';
 import { Sandbox } from './types.js';
 import { TaskDescriptionManager } from 'rover-schemas';
-import { ProcessManager } from 'rover-common';
+import { ProcessManager } from 'rover-core';
 
 /**
  * Get the available sandbox backend (docker or podman)

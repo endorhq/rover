@@ -5,7 +5,7 @@
 
 import { join } from 'node:path';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { findProjectRoot, AI_AGENT } from 'rover-common';
+import { findProjectRoot, AI_AGENT } from 'rover-core';
 import {
   UserSettingsLoadError,
   UserSettingsValidationError,

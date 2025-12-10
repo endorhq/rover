@@ -3,7 +3,7 @@
  */
 import colors from 'ansi-colors';
 import { initWorkflowStore } from '../../lib/workflow.js';
-import { Table, TableColumn } from 'rover-common';
+import { Table, TableColumn } from 'rover-core';
 import { CLIJsonOutput } from '../../types.js';
 import { exitWithError, exitWithSuccess } from '../../utils/exit.js';
 import { Workflow } from 'rover-schemas';

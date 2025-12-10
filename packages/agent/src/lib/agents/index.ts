@@ -4,7 +4,7 @@ import { CodexAgent } from './codex.js';
 import { CursorAgent } from './cursor.js';
 import { GeminiAgent } from './gemini.js';
 import { QwenAgent } from './qwen.js';
-import { AI_AGENT } from 'rover-common';
+import { AI_AGENT } from 'rover-core';
 
 export * from './types.js';
 export { ClaudeAgent } from './claude.js';

@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { rmSync } from 'node:fs';
 import { createSandbox } from '../lib/sandbox/index.js';
 import { TaskDescriptionManager, TaskNotFoundError } from 'rover-schemas';
-import { findProjectRoot, launch, ProcessManager } from 'rover-common';
+import { findProjectRoot, launch, ProcessManager } from 'rover-core';
 import { exitWithError, exitWithSuccess } from '../utils/exit.js';
 import { CLIJsonOutput } from '../types.js';
 import { getTelemetry } from '../lib/telemetry.js';

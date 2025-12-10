@@ -1,6 +1,6 @@
 import colors from 'ansi-colors';
 import { existsSync } from 'node:fs';
-import { launch, launchSync } from 'rover-common';
+import { launch, launchSync } from 'rover-core';
 import yoctoSpinner from 'yocto-spinner';
 import { statusColor } from '../utils/task-status.js';
 import { TaskDescriptionManager, TaskNotFoundError } from 'rover-schemas';

@@ -2,7 +2,7 @@ import colors from 'ansi-colors';
 import enquirer from 'enquirer';
 import { existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { findProjectRoot, launchSync } from 'rover-common';
+import { findProjectRoot, launchSync } from 'rover-core';
 import yoctoSpinner from 'yocto-spinner';
 import { TaskDescriptionManager, TaskNotFoundError } from 'rover-schemas';
 import { getTelemetry } from '../lib/telemetry.js';

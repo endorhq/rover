@@ -9,7 +9,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { clearProjectRootCache, launchSync, AI_AGENT } from 'rover-common';
+import { clearProjectRootCache, launchSync, AI_AGENT } from 'rover-core';
 import { UserSettingsManager } from '../user-settings.js';
 
 describe('UserSettingsManager', () => {

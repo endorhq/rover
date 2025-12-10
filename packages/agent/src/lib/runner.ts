@@ -4,7 +4,7 @@
  * by building the prompt and passing it.
  */
 
-import { launch, launchSync, VERBOSE } from 'rover-common';
+import { launch, launchSync, VERBOSE } from 'rover-core';
 import colors from 'ansi-colors';
 import {
   copyFileSync,

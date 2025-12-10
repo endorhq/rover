@@ -1,4 +1,4 @@
-import { launch, launchSync } from 'rover-common';
+import { launch, launchSync } from 'rover-core';
 
 export class GitHubError extends Error {
   constructor(reason: string) {

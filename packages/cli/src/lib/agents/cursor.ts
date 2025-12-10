@@ -1,4 +1,4 @@
-import { launch, launchSync } from 'rover-common';
+import { launch, launchSync } from 'rover-core';
 import {
   AIAgentTool,
   findKeychainCredentials,

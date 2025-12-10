@@ -2,7 +2,7 @@ import colors from 'ansi-colors';
 import { existsSync } from 'node:fs';
 import { TaskDescriptionManager, TaskNotFoundError } from 'rover-schemas';
 import { getTelemetry } from '../lib/telemetry.js';
-import { Git, showList, showTitle } from 'rover-common';
+import { Git, showList, showTitle } from 'rover-core';
 import { showTips } from '../utils/display.js';
 
 export const diffCommand = async (

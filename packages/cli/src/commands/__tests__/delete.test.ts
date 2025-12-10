@@ -8,7 +8,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { clearProjectRootCache, launchSync } from 'rover-common';
+import { clearProjectRootCache, launchSync } from 'rover-core';
 import { deleteCommand } from '../delete.js';
 import { TaskDescriptionManager } from 'rover-schemas';
 

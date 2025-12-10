@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { Command, Argument } from 'commander';
-import { AI_AGENT, setVerbose } from 'rover-common';
+import { AI_AGENT, setVerbose } from 'rover-core';
 import { runCommand } from './commands/run.js';
 import {
   DEFAULT_INSTALL_DIRECTORY,

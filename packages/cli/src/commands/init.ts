@@ -16,7 +16,7 @@ import {
 } from '../utils/system.js';
 import { ProjectConfigManager, UserSettingsManager } from 'rover-schemas';
 import { showRoverChat, showTips, TIP_TITLES } from '../utils/display.js';
-import { AI_AGENT } from 'rover-common';
+import { AI_AGENT } from 'rover-core';
 import { getTelemetry } from '../lib/telemetry.js';
 
 // Get the default prompt

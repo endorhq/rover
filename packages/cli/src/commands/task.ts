@@ -7,7 +7,7 @@ import { homedir, platform } from 'node:os';
 import { getAIAgentTool, getUserAIAgent } from '../lib/agents/index.js';
 import { TaskDescriptionManager } from 'rover-schemas';
 import { createSandbox } from '../lib/sandbox/index.js';
-import { AI_AGENT, launchSync } from 'rover-common';
+import { AI_AGENT, launchSync } from 'rover-core';
 import { IterationManager } from 'rover-schemas';
 import { generateBranchName } from '../utils/branch-name.js';
 import {
@@ -15,7 +15,7 @@ import {
   ProcessManager,
   showProperties,
   Git,
-} from 'rover-common';
+} from 'rover-core';
 import { getTelemetry } from '../lib/telemetry.js';
 import { NewTaskProvider } from 'rover-telemetry';
 import { readFromStdin, stdinIsAvailable } from '../utils/stdin.js';

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { clearProjectRootCache } from 'rover-common';
+import { clearProjectRootCache } from 'rover-core';
 import { logsCommand } from '../logs.js';
 import { TaskDescriptionManager } from 'rover-schemas';
 import { setJsonMode } from '../../lib/global-state.js';
@@ -37,8 +37,8 @@ vi.mock('../../utils/display.js', () => ({
 }));
 
 // Mock the OS utilities for Docker commands
-vi.mock('rover-common', async () => {
-  const actual = await vi.importActual('rover-common');
+vi.mock('rover-core', async () => {
+  const actual = await vi.importActual('rover-core');
   return {
     ...actual,
     launchSync: vi.fn(),
@@ -58,7 +58,7 @@ describe('logs command', () => {
 
     // Get the real launchSync for Git operations
     const { launchSync: realLaunchSync } = (await vi.importActual(
-      'rover-common'
+      'rover-core'
     )) as any;
 
     // Initialize git repo
@@ -104,7 +104,7 @@ describe('logs command', () => {
 
     // Get the real launchSync for Git operations
     const { launchSync: realLaunchSync } = (await vi.importActual(
-      'rover-common'
+      'rover-core'
     )) as any;
     realLaunchSync('git', ['worktree', 'add', worktreePath, '-b', branchName]);
     task.setWorkspace(join(testDir, worktreePath), branchName);
@@ -342,7 +342,7 @@ describe('logs command', () => {
       await createTestTaskWithContainer(7, 'Success Task', 'container123');
       createIterations(7, [1, 2]);
 
-      const { launchSync } = await import('rover-common');
+      const { launchSync } = await import('rover-core');
       vi.mocked(launchSync).mockReturnValue({
         stdout: 'Log line 1\nLog line 2\nLog line 3',
         stderr: '',
@@ -368,7 +368,7 @@ describe('logs command', () => {
       );
       createIterations(21, [1]);
 
-      const { launchSync } = await import('rover-common');
+      const { launchSync } = await import('rover-core');
 
       // Mock console.log to capture output
       const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -415,7 +415,7 @@ describe('logs command', () => {
       await createTestTaskWithContainer(22, 'Special Chars Task', 'special123');
       createIterations(22, [1]);
 
-      const { launchSync } = await import('rover-common');
+      const { launchSync } = await import('rover-core');
 
       // Mock console.log to capture output
       const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -448,7 +448,7 @@ describe('logs command', () => {
       await createTestTaskWithContainer(23, 'Multiline Task', 'multiline123');
       createIterations(23, [1]);
 
-      const { launchSync } = await import('rover-common');
+      const { launchSync } = await import('rover-core');
 
       // Mock console.log to capture output
       const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -495,7 +495,7 @@ Last line`;
       await createTestTaskWithContainer(8, 'JSON Task', 'container456');
       createIterations(8, [1]);
 
-      const { launchSync } = await import('rover-common');
+      const { launchSync } = await import('rover-core');
       vi.mocked(launchSync).mockReturnValue({
         stdout: 'JSON log output\nAnother line',
         stderr: '',
@@ -517,7 +517,7 @@ Last line`;
       await createTestTaskWithContainer(9, 'Empty Logs Task', 'container789');
       createIterations(9, [1]);
 
-      const { launchSync } = await import('rover-common');
+      const { launchSync } = await import('rover-core');
       const { exitWithWarn } = await import('../../utils/exit.js');
 
       vi.mocked(launchSync).mockReturnValue({
@@ -553,7 +553,7 @@ Last line`;
       );
       createIterations(10, [1]);
 
-      const { launchSync } = await import('rover-common');
+      const { launchSync } = await import('rover-core');
       const { exitWithWarn } = await import('../../utils/exit.js');
 
       vi.mocked(launchSync).mockImplementation(() => {
@@ -578,7 +578,7 @@ Last line`;
       await createTestTaskWithContainer(11, 'Docker Error Task', 'error123');
       createIterations(11, [1]);
 
-      const { launchSync } = await import('rover-common');
+      const { launchSync } = await import('rover-core');
       const { exitWithError } = await import('../../utils/exit.js');
 
       vi.mocked(launchSync).mockImplementation(() => {
@@ -601,7 +601,7 @@ Last line`;
       await createTestTaskWithContainer(12, 'Permission Error Task', 'perm123');
       createIterations(12, [1]);
 
-      const { launchSync } = await import('rover-common');
+      const { launchSync } = await import('rover-core');
       const { exitWithError } = await import('../../utils/exit.js');
 
       vi.mocked(launchSync).mockImplementation(() => {
@@ -629,7 +629,7 @@ Last line`;
       await createTestTaskWithContainer(13, 'Follow Task', 'follow123');
       createIterations(13, [1]);
 
-      const { launch } = await import('rover-common');
+      const { launch } = await import('rover-core');
       vi.mocked(launch).mockResolvedValue({
         exitCode: 0,
         stdout: '',
@@ -657,7 +657,7 @@ Last line`;
       await createTestTaskWithContainer(24, 'Stream Task', 'stream123');
       createIterations(24, [1]);
 
-      const { launch } = await import('rover-common');
+      const { launch } = await import('rover-core');
       vi.mocked(launch).mockResolvedValue({
         exitCode: 0,
         stdout: '',
@@ -692,7 +692,7 @@ Last line`;
 
       const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
-      const { launch } = await import('rover-common');
+      const { launch } = await import('rover-core');
 
       // Test successful completion
       vi.mocked(launch).mockResolvedValue({
@@ -724,7 +724,7 @@ Last line`;
 
       const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
-      const { launch } = await import('rover-common');
+      const { launch } = await import('rover-core');
 
       // Test non-zero exit code
       vi.mocked(launch).mockResolvedValue({
@@ -754,7 +754,7 @@ Last line`;
       );
       createIterations(14, [1, 2, 3]);
 
-      const { launch } = await import('rover-common');
+      const { launch } = await import('rover-core');
       vi.mocked(launch).mockResolvedValue({
         exitCode: 0,
         stdout: '',
@@ -786,7 +786,7 @@ Last line`;
       );
       createIterations(15, [1]);
 
-      const { launchSync, launch } = await import('rover-common');
+      const { launchSync, launch } = await import('rover-core');
 
       vi.mocked(launchSync).mockReturnValue({
         stdout: 'JSON follow logs',
@@ -817,7 +817,7 @@ Last line`;
       );
       createIterations(16, [1, 3, 2]); // Unsorted to test sorting
 
-      const { launchSync } = await import('rover-common');
+      const { launchSync } = await import('rover-core');
       vi.mocked(launchSync).mockReturnValue({
         stdout: 'Latest iteration logs',
         stderr: '',
@@ -840,7 +840,7 @@ Last line`;
       );
       createIterations(17, [1, 2, 3]);
 
-      const { launchSync } = await import('rover-common');
+      const { launchSync } = await import('rover-core');
       vi.mocked(launchSync).mockReturnValue({
         stdout: 'Specific iteration logs',
         stderr: '',
@@ -868,7 +868,7 @@ Last line`;
       );
       createIterations(18, [1]);
 
-      const { launchSync } = await import('rover-common');
+      const { launchSync } = await import('rover-core');
       vi.mocked(launchSync).mockReturnValue({
         stdout: 'Single iteration logs',
         stderr: '',
@@ -887,7 +887,7 @@ Last line`;
       await createTestTaskWithContainer(19, 'Many Iterations Task', 'many123');
       createIterations(19, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
 
-      const { launchSync } = await import('rover-common');
+      const { launchSync } = await import('rover-core');
       vi.mocked(launchSync).mockReturnValue({
         stdout: 'Many iterations logs',
         stderr: '',
@@ -909,7 +909,7 @@ Last line`;
       createIterations(20, [1]);
 
       const { getTelemetry } = await import('../../lib/telemetry.js');
-      const { launchSync } = await import('rover-common');
+      const { launchSync } = await import('rover-core');
 
       const mockTelemetry = getTelemetry();
       vi.mocked(launchSync).mockReturnValue({

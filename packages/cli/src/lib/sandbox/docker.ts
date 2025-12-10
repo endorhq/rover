@@ -4,7 +4,7 @@ import { ProjectConfigManager } from 'rover-schemas';
 import { Sandbox } from './types.js';
 import { SetupBuilder } from '../setup.js';
 import { TaskDescriptionManager } from 'rover-schemas';
-import { launch, ProcessManager, VERBOSE } from 'rover-common';
+import { launch, ProcessManager, VERBOSE } from 'rover-core';
 import { existsSync } from 'node:fs';
 import { userInfo } from 'node:os';
 import { generateRandomId } from '../../utils/branch-name.js';

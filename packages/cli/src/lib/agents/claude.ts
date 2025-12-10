@@ -4,7 +4,7 @@ import {
   requiredClaudeCredentials,
   requiredBedrockCredentials,
   requiredVertexAiCredentials,
-} from 'rover-common';
+} from 'rover-core';
 import {
   AIAgentTool,
   findKeychainCredentials,

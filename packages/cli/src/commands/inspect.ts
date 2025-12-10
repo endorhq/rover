@@ -15,7 +15,7 @@ import {
   showProperties,
   showTips,
   showTitle,
-} from 'rover-common';
+} from 'rover-core';
 import { IterationManager } from 'rover-schemas';
 import { isJsonMode, setJsonMode } from '../lib/global-state.js';
 

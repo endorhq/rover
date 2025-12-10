@@ -6,7 +6,7 @@ import { TaskItem } from './providers/TaskItem.mjs';
 import { TaskDetailsPanel } from './panels/TaskDetailsPanel.mjs';
 import { getTelemetry } from './lib/telemetry.mjs';
 import { NewTaskProvider } from 'rover-telemetry';
-import { findProjectRoot, launch, launchSync } from 'rover-common';
+import { findProjectRoot, launch, launchSync } from 'rover-core';
 
 let tasksWebviewProvider: TasksLitWebviewProvider;
 

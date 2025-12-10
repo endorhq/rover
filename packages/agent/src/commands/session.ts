@@ -7,7 +7,7 @@ import {
   ProcessManager,
   showRegularHeader,
   VERBOSE,
-} from 'rover-common';
+} from 'rover-core';
 import { createAgent } from '../lib/agents/index.js';
 import {
   copyFileSync,

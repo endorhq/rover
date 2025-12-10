@@ -3,7 +3,7 @@
  */
 
 import { z } from 'zod';
-import { AI_AGENT } from 'rover-common';
+import { AI_AGENT } from 'rover-core';
 
 // Current schema version
 export const CURRENT_USER_SCHEMA_VERSION = '1.0';

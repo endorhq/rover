@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync } from 'node:fs';
 import colors from 'ansi-colors';
-import { launch, launchSync } from 'rover-common';
+import { launch, launchSync } from 'rover-core';
 import { Agent, AgentCredentialFile, ValidationResult } from './types.js';
 
 export abstract class BaseAgent implements Agent {
