@@ -6,10 +6,6 @@ name: 'swe-acp'
 description: 'Complete software engineering workflow with ACP session-based execution'
 
 inputs:
-  - name: title
-    description: 'Task title'
-    type: string
-    required: true
   - name: description
     description: 'Detailed task description'
     type: string
@@ -48,8 +44,10 @@ steps:
     prompt: |
       You are preparing a technical context for this task implementation:
 
+      ------
       Task title: {{inputs.title}}
       Task description: {{inputs.description}}
+      ------
 
       Follow these steps to complete it. Do not move to the next phase until to complete the previous one.
 
@@ -117,17 +115,6 @@ steps:
       You are preparing an implementation plan for this task.
 
       Note: You already have the context from the previous step in your session memory.
-      Read the context.md file you created earlier for reference.
-
-      ---
-
-      Title: {{inputs.title}}
-      Description:
-      {{inputs.description}}
-
-      Context file: context.md (already created - read it if needed)
-
-      ---
 
       Provide a clear, concise and actionable plan that another engineer can follow to complete the task.
 
@@ -135,8 +122,7 @@ steps:
 
       ### Phase 1: Evaluate task requirements
 
-      - Read the context.md file you created
-      - Identify the complexity of the given task. Check the context.
+      - Identify the complexity of the given task. Check the context and task description.
       - Define a clear and concise objective for the plan
       - Specify the scope, focusing on the task objective
       - Identify files that will be affected by the changes
@@ -197,19 +183,6 @@ steps:
       Your task is to complete the implementation strictly according to the plan.
 
       Note: You have full context from previous steps in your session memory.
-      Reference context.md and plan.md files you created earlier.
-
-      ---
-
-      Task:
-      Title: {{inputs.title}}
-      Description:
-      {{inputs.description}}
-
-      Context file: context.md (already created - read it if needed)
-      Plan file: plan.md (already created - read it if needed)
-
-      ---
 
       ### Phase 1: Triage task complexity
 
@@ -281,19 +254,6 @@ steps:
       Note: You have full context from previous steps in your session memory.
       Reference the files you created earlier.
 
-      ---
-
-      Title: {{inputs.title}}
-      Description:
-      {{inputs.description}}
-
-      Files available (read them if needed):
-      - context.md - Task context and complexity
-      - plan.md - Implementation plan
-      - changes.md - Implementation changes
-
-      ---
-
       ### Phase 1: Confirm if review is required
 
       Read context.md to check the task complexity.
@@ -363,20 +323,7 @@ steps:
       You are in apply-review mode.
 
       Note: You have full context from previous steps in your session memory.
-
-      ---
-
-      Title: {{inputs.title}}
-      Description:
-      {{inputs.description}}
-      Issues Found: {{steps.review.outputs.issues_found}}
-
-      Files available (read them if needed):
-      - context.md - Task context
-      - review.md - Review issues (if created)
-
-      ---
-
+      
       ### Phase 1: Triage task complexity
 
       Check if issues were found: {{steps.review.outputs.issues_found}}
@@ -421,18 +368,6 @@ steps:
       You are in summary mode.
 
       Note: You have full context from previous steps in your session memory.
-
-      ---
-
-      Title: {{inputs.title}}
-      Description:
-      {{inputs.description}}
-
-      Files available (read them if needed):
-      - context.md - Task context and complexity
-      - changes.md - Implementation changes
-
-      ---
 
       ### Phase 1: Triage task complexity
 

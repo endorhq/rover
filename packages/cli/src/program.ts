@@ -60,8 +60,8 @@ export function createProgram(
           showTips(
             [
               'Run ' +
-                colors.cyan('rover init') +
-                ' in this directory to initialize project config and user settings',
+              colors.cyan('rover init') +
+              ' in this directory to initialize project config and user settings',
             ],
             {
               title: TIP_TITLES.NEXT_STEPS,
@@ -95,7 +95,7 @@ export function createProgram(
             {
               tips: [
                 'Rover requires the project to be in a git repository. You can initialize a git repository by running ' +
-                  colors.cyan('git init'),
+                colors.cyan('git init'),
               ],
             }
           );
@@ -134,8 +134,8 @@ export function createProgram(
           showTips(
             [
               'Run ' +
-                colors.cyan('rover init') +
-                ' in this directory to initialize user settings',
+              colors.cyan('rover init') +
+              ' in this directory to initialize user settings',
             ],
             {
               title: TIP_TITLES.NEXT_STEPS,
@@ -199,7 +199,7 @@ export function createProgram(
         '--workflow, -w <name>',
         'Use a specific workflow to complete this task'
       )
-        .choices(['swe', 'tech-writer'])
+        .choices(['swe', 'swe-acp', 'tech-writer'])
         .default('swe')
     )
     .option('-y, --yes', 'Skip all confirmations and run non-interactively')

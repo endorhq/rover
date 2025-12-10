@@ -1,6 +1,7 @@
 // Utilities to load and find workflows.
 import { WorkflowManager, WorkflowStore } from 'rover-schemas';
 import sweWorkflow from './workflows/swe.yml';
+import sweWorkflowACP from './workflows/swe-acp.yml';
 import techWriterWorkflow from './workflows/tech-writer.yml';
 import { dirname, isAbsolute, join } from 'path';
 import { fileURLToPath } from 'url';
@@ -28,6 +29,9 @@ export const initWorkflowStore = (): WorkflowStore => {
 
   const swe = loadBuiltInWorkflow(sweWorkflow);
   store.addWorkflow(swe);
+
+  const sweAcp = loadBuiltInWorkflow(sweWorkflowACP);
+  store.addWorkflow(sweAcp);
 
   const techWriter = loadBuiltInWorkflow(techWriterWorkflow);
   store.addWorkflow(techWriter);

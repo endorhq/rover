@@ -45,17 +45,17 @@ function getACPSpawnCommand(tool: string): { command: string; args: string[] } {
     case 'claude':
       return {
         command: 'npx',
-        args: ['-y', '@anthropic-ai/claude-code', '--acp'],
+        args: ['-y', '@zed-industries/claude-code-acp'],
       };
     case 'gemini':
       return {
         command: 'npx',
-        args: ['-y', '@google/gemini-cli', '--experimental-acp'],
+        args: ['-y', '@google/gemini-cli@0.17.1', '--experimental-acp'],
       };
     case 'qwen':
       return {
-        command: 'qwen',
-        args: ['--experimental-acp'],
+        command: 'npx',
+        args: ['-y', '@qwen-code/qwen-code@latest', '--experimental-acp'],
       };
     case 'codex':
       return {
@@ -66,7 +66,7 @@ function getACPSpawnCommand(tool: string): { command: string; args: string[] } {
       // Default to claude-code-acp as it's the most common
       return {
         command: 'npx',
-        args: ['-y', '@anthropic-ai/claude-code', '--acp'],
+        args: ['-y', '@zed-industries/claude-code-acp'],
       };
   }
 }
@@ -199,6 +199,10 @@ export class ACPRunner {
           `\n🤖 Running ${colors.blue.bold(step.name)} via ACP session`
         )
       );
+
+      console.log(colors.gray('\n--- Prompt Start ---\n'));
+      console.log(colors.gray(prompt));
+      console.log(colors.gray('\n--- Prompt End ---\n'));
 
       // Send the prompt via ACP session
       const promptResult = await this.connection.prompt({
@@ -384,7 +388,7 @@ export class ACPRunner {
     if (fileOutputs.length > 0) {
       instructions += '### File Creation\n\n';
       instructions +=
-        'You MUST create the following files with the exact content needed:\n\n';
+        'You MUST create the following files with the exact content needed and print their content in the current session:\n\n';
 
       fileOutputs.forEach((output) => {
         instructions += `- **${output.name}**: ${output.description}\n`;
@@ -393,7 +397,9 @@ export class ACPRunner {
       });
 
       instructions +=
-        'IMPORTANT: All files must be created with appropriate content. Do not create empty or placeholder files.\n\n';
+        'IMPORTANT: All files must be created with appropriate content. Do not create empty or placeholder files.\n';
+      instructions +=
+        'IMPORTANT: Print the content in the session so next steps have all the context.\n\n';
     }
 
     instructions += '**CRITICAL**: Follow these output requirements exactly. ';
@@ -604,7 +610,8 @@ export class ACPRunner {
           if (this.outputDir) {
             filePath = join(this.outputDir, basename(output.filename));
             copyFileSync(output.filename, filePath);
-            rmSync(output.filename);
+            // Do not delete for testing!
+            // rmSync(output.filename);
           }
 
           const fileContent = readFileSync(filePath, 'utf-8');
@@ -655,9 +662,6 @@ export class ACPRunner {
  * Utility function to detect if a workflow should use ACP mode
  * based on filename suffix (e.g., 'swe-acp.yml')
  */
-export function isACPWorkflow(workflowPath: string): boolean {
-  const filename = basename(workflowPath);
-  // Check if filename contains '-acp' before the extension
-  const nameWithoutExt = filename.replace(/\.(yml|yaml)$/i, '');
-  return nameWithoutExt.endsWith('-acp');
+export function isACPWorkflow(name: string): boolean {
+  return name.endsWith('-acp');
 }
