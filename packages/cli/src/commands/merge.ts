@@ -587,7 +587,9 @@ export const mergeCommand = async (
           } else {
             jsonOutput.error = 'AI failed to resolve merge conflicts';
             if (!isJsonMode()) {
-              console.log(colors.yellow('\n⚠ Merge aborted due to conflicts.'));
+              console.log(
+                colors.yellow('\n⚠ Merge aborted due to conflicts.')
+              );
               console.log(colors.gray('To resolve manually:'));
               console.log(
                 colors.gray('├──'),
