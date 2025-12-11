@@ -15,6 +15,7 @@ declare const __BUILD_CONFIG__: { apiKey: string; host: string };
 const config = __BUILD_CONFIG__;
 
 // Constants
+// @deprecated Use the GlobalConfigManager from schemas package instead
 const CONFIG_DIR = join(homedir(), '.config', 'rover');
 const USER_CONFIG_PATH = join(CONFIG_DIR, '.user');
 const DISABLE_TELEMETRY_PATH = join(CONFIG_DIR, '.no-telemetry');
@@ -69,7 +70,7 @@ class Telemetry {
   constructor(
     private userId: string,
     private telemetryFrom: TELEMETRY_FROM,
-    disableTelemetry: boolean
+    private disableTelemetry: boolean
   ) {
     this.client = new PostHog(config.apiKey, {
       host: config.host,
@@ -219,6 +220,10 @@ class Telemetry {
 
   getUserId(): string {
     return this.userId;
+  }
+
+  isDisabled(): boolean {
+    return this.disableTelemetry;
   }
 
   private static writeUserId(userId: string): void {

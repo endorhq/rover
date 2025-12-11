@@ -139,3 +139,23 @@ export {
   USER_SETTINGS_FILENAME,
   USER_SETTINGS_DIR,
 } from './user-settings/schema.js';
+
+// Global Config library
+export {
+  type TelemetryStatus,
+  type GlobalProject,
+  type GlobalConfig,
+} from './global-config/types.js';
+
+export {
+  GlobalConfigLoadError,
+  GlobalConfigValidationError,
+  GlobalConfigSaveError,
+} from './global-config/errors.js';
+
+export { GlobalConfigManager } from './global-config.js';
+
+export {
+  CURRENT_GLOBAL_CONFIG_VERSION,
+  GLOBAL_CONFIG_FILENAME,
+} from './global-config/schema.js';
