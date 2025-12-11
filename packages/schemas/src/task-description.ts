@@ -772,6 +772,13 @@ export class TaskDescriptionManager {
   }
 
   /**
+   * Check if task is in an active state (NEW, IN_PROGRESS, or ITERATING)
+   */
+  isActive(): boolean {
+    return this.isNew() || this.isInProgress() || this.isIterating();
+  }
+
+  /**
    * Get task duration in milliseconds
    */
   getDuration(): number | null {

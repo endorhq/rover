@@ -333,9 +333,7 @@ export const inspectCommand = async (
       }
 
       // Show file changes only if task is not in an active state
-      const isActive =
-        task.isNew() || task.isInProgress() || task.isIterating();
-      if (!isActive) {
+      if (!task.isActive()) {
         const git = new Git();
         const stats = await git.diffStats({
           worktreePath: task.worktreePath,
