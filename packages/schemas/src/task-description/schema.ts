@@ -5,7 +5,7 @@
 import { z } from 'zod';
 
 // Schema version for migrations
-export const CURRENT_TASK_DESCRIPTION_SCHEMA_VERSION = '1.1';
+export const CURRENT_TASK_DESCRIPTION_SCHEMA_VERSION = '1.2';
 
 // Task status schema
 export const TaskStatusSchema = z.enum([
