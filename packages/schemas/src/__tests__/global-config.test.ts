@@ -50,6 +50,11 @@ import {
   GLOBAL_CONFIG_FILENAME,
 } from '../global-config/schema.js';
 import { AI_AGENT } from 'rover-core';
+import type {
+  Language,
+  PackageManager,
+  TaskManager,
+} from '../project-config/types.js';
 
 describe('GlobalConfigManager', () => {
   let testDir: string;
@@ -499,9 +504,9 @@ describe('GlobalConfigManager', () => {
       id,
       path,
       repositoryName: `repo-${id}`,
-      languages: ['typescript'] as const,
-      packageManagers: ['npm'] as const,
-      taskManagers: [] as const,
+      languages: ['typescript'] as Language[],
+      packageManagers: ['npm'] as PackageManager[],
+      taskManagers: [] as TaskManager[],
     });
 
     it('should add a new project', () => {
@@ -563,9 +568,9 @@ describe('GlobalConfigManager', () => {
       id,
       path,
       repositoryName: `repo-${id}`,
-      languages: ['typescript'] as const,
-      packageManagers: ['npm'] as const,
-      taskManagers: [] as const,
+      languages: ['typescript'] as Language[],
+      packageManagers: ['npm'] as PackageManager[],
+      taskManagers: [] as TaskManager[],
     });
 
     it('should remove project by id', () => {
@@ -628,9 +633,9 @@ describe('GlobalConfigManager', () => {
       id,
       path,
       repositoryName: `repo-${id}`,
-      languages: ['typescript'] as const,
-      packageManagers: ['npm'] as const,
-      taskManagers: [] as const,
+      languages: ['typescript'] as Language[],
+      packageManagers: ['npm'] as PackageManager[],
+      taskManagers: [] as TaskManager[],
     });
 
     it('should find project by id', () => {
@@ -667,9 +672,9 @@ describe('GlobalConfigManager', () => {
       id,
       path,
       repositoryName: `repo-${id}`,
-      languages: ['typescript'] as const,
-      packageManagers: ['npm'] as const,
-      taskManagers: [] as const,
+      languages: ['typescript'] as Language[],
+      packageManagers: ['npm'] as PackageManager[],
+      taskManagers: [] as TaskManager[],
     });
 
     it('should find project by path', () => {
@@ -951,9 +956,9 @@ describe('GlobalConfigManager', () => {
         id: 'multi-lang',
         path: '/multi/lang/project',
         repositoryName: 'multi-lang-repo',
-        languages: ['typescript', 'python', 'rust', 'go', 'java'] as const,
-        packageManagers: ['npm', 'pip', 'cargo', 'maven'] as const,
-        taskManagers: ['make', 'just'] as const,
+        languages: ['typescript', 'python', 'rust', 'go'] as Language[],
+        packageManagers: ['npm', 'pip', 'cargo', 'maven'] as PackageManager[],
+        taskManagers: ['make', 'just'] as TaskManager[],
       };
 
       config.addProject(project);
