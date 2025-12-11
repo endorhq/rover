@@ -53,3 +53,10 @@ export {
 } from './display/index.js';
 
 export { AI_AGENT } from './agent.js';
+
+export {
+  getConfigDir,
+  getDataDir,
+  getCacheDir,
+  ensureDirectories,
+} from './paths.js';
