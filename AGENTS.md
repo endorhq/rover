@@ -136,7 +136,7 @@ Key architectural decisions:
 # All tests
 npm run test
 
-# TEst per package
+# Test per package
 npm run test:cli
 npm run test:agent
 npm run test:core
@@ -145,7 +145,7 @@ npm run test:schemas
 
 ### Formatting
 
-Any time to finish implementing changes, run the `npm run format` to ensure all files follow the correct format. You can focus on your changes by running `npx prettier --write PATH` to format specific files.
+When you have finished implementing changes, run the `npm run format` to ensure all files follow the correct format. You can focus on files that you have changed by running `npx prettier --write PATH` to format only those files.
 
 ## AI Agent Guidelines
 
