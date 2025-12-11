@@ -332,25 +332,29 @@ export const inspectCommand = async (
         }
       }
 
-      // Show file changes
-      const git = new Git();
-      const stats = await git.diffStats({
-        worktreePath: task.worktreePath,
-        includeUntracked: true,
-      });
+      // Show file changes only if task is not in an active state
+      const isActive =
+        task.isNew() || task.isInProgress() || task.isIterating();
+      if (!isActive) {
+        const git = new Git();
+        const stats = await git.diffStats({
+          worktreePath: task.worktreePath,
+          includeUntracked: true,
+        });
 
-      const statFiles = stats.files.map(fileStat => {
-        const insertions =
-          fileStat.insertions > 0
-            ? colors.green(`+${fileStat.insertions}`)
-            : '';
-        const deletions =
-          fileStat.deletions > 0 ? colors.red(`-${fileStat.deletions}`) : '';
-        return `${insertions} ${deletions} ${colors.cyan(fileStat.path)}`;
-      });
+        const statFiles = stats.files.map(fileStat => {
+          const insertions =
+            fileStat.insertions > 0
+              ? colors.green(`+${fileStat.insertions}`)
+              : '';
+          const deletions =
+            fileStat.deletions > 0 ? colors.red(`-${fileStat.deletions}`) : '';
+          return `${insertions} ${deletions} ${colors.cyan(fileStat.path)}`;
+        });
 
-      showTitle('File Changes');
-      showList(statFiles);
+        showTitle('File Changes');
+        showList(statFiles);
+      }
 
       const tips = [];
 
