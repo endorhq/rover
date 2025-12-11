@@ -103,8 +103,8 @@ export class DockerSandbox extends Sandbox {
       userInfo_.gid = 1000;
     }
 
-    // Resolve the agent image from env var, config, or default
-    const agentImage = resolveAgentImage(projectConfig);
+    // Resolve the agent image from env var, stored task image, config, or default
+    const agentImage = resolveAgentImage(projectConfig, this.task.agentImage);
 
     // Warn if using a custom agent image
     warnIfCustomImage(projectConfig);
@@ -272,8 +272,8 @@ export class DockerSandbox extends Sandbox {
       userInfo_.gid = 1000;
     }
 
-    // Resolve the agent image from env var, config, or default
-    const agentImage = resolveAgentImage(projectConfig);
+    // Resolve the agent image from env var, stored task image, config, or default
+    const agentImage = resolveAgentImage(projectConfig, this.task.agentImage);
 
     // Warn if using a custom agent image
     warnIfCustomImage(projectConfig);

@@ -42,16 +42,23 @@ export function getDefaultAgentImage(): string {
 /**
  * Resolves the agent image to use, with precedence:
  * 1. AGENT_IMAGE environment variable
- * 2. agentImage from ProjectConfig
- * 3. Default image based on CLI version
+ * 2. storedImage from task (if provided)
+ * 3. agentImage from ProjectConfig
+ * 4. Default image based on CLI version
  */
 export function resolveAgentImage(
-  projectConfig?: ProjectConfigManager
+  projectConfig?: ProjectConfigManager,
+  storedImage?: string
 ): string {
   // Check environment variable first
   const envImage = process.env.AGENT_IMAGE;
   if (envImage) {
     return envImage;
+  }
+
+  // Check stored image from task if available
+  if (storedImage) {
+    return storedImage;
   }
 
   // Check project config if available

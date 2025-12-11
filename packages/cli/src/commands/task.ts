@@ -5,9 +5,10 @@ import { join } from 'node:path';
 import { getNextTaskId } from '../utils/task-id.js';
 import { homedir, platform } from 'node:os';
 import { getAIAgentTool, getUserAIAgent } from '../lib/agents/index.js';
-import { TaskDescriptionManager } from 'rover-schemas';
+import { TaskDescriptionManager, ProjectConfigManager } from 'rover-schemas';
 import { createSandbox } from '../lib/sandbox/index.js';
 import { AI_AGENT, launchSync } from 'rover-core';
+import { resolveAgentImage } from '../lib/sandbox/container-common.js';
 import { IterationManager } from 'rover-schemas';
 import { generateBranchName } from '../utils/branch-name.js';
 import {
@@ -323,6 +324,11 @@ const createTaskForAgent = async (
   task.markInProgress();
 
   processManager?.completeLastItem();
+
+  // Resolve and store the agent image that will be used for this task
+  const projectConfig = ProjectConfigManager.load();
+  const agentImage = resolveAgentImage(projectConfig);
+  task.setAgentImage(agentImage);
 
   // Start sandbox container for task execution
   try {

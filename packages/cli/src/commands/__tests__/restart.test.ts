@@ -139,6 +139,37 @@ describe('restart command', async () => {
       const secondRestart = TaskDescriptionManager.load(taskId);
       expect(secondRestart.restartCount).toBe(2);
     });
+
+    it('should reuse stored agent image on restart', async () => {
+      // Create a task with a specific agent image
+      const taskId = 555;
+      const taskDir = join(testDir, '.rover', 'tasks', taskId.toString());
+      mkdirSync(taskDir, { recursive: true });
+
+      const task = TaskDescriptionManager.create({
+        id: taskId,
+        title: 'Test Task',
+        description: 'A test task',
+        inputs: new Map(),
+        workflowName: 'swe',
+      });
+
+      // Set a custom agent image
+      const customImage = 'ghcr.io/endorhq/rover/agent:v1.2.3';
+      task.setAgentImage(customImage);
+
+      // Verify it was stored
+      expect(task.agentImage).toBe(customImage);
+
+      // Mark task as failed and restart it
+      task.markFailed('This task failed');
+      await restartCommand(taskId.toString(), { json: true });
+
+      // Reload and verify the agent image is still stored
+      const reloadedTask = TaskDescriptionManager.load(taskId);
+      expect(reloadedTask.agentImage).toBe(customImage);
+      expect(reloadedTask.status).toBe('IN_PROGRESS');
+    });
   });
 
   describe('error handling', () => {

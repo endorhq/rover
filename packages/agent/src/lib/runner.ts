@@ -360,7 +360,7 @@ export class Runner {
       // Extract string outputs from the response
       const stepOutputs = this.step.outputs || [];
       const stringOutputs = stepOutputs.filter(
-        output => output.type === 'string'
+        (output: WorkflowOutput) => output.type === 'string'
       );
       if (stringOutputs.length > 0) {
         await this.extractStringOutputs(
@@ -371,7 +371,9 @@ export class Runner {
       }
 
       // Extract file outputs by reading created files
-      const fileOutputs = stepOutputs.filter(output => output.type === 'file');
+      const fileOutputs = stepOutputs.filter(
+        (output: WorkflowOutput) => output.type === 'file'
+      );
       if (fileOutputs.length > 0) {
         await this.extractFileOutputs(fileOutputs, outputs, outputDir);
       }
@@ -559,9 +561,11 @@ export class Runner {
     }
 
     const stringOutputs = stepOutputs.filter(
-      output => output.type === 'string'
+      (output: WorkflowOutput) => output.type === 'string'
     );
-    const fileOutputs = stepOutputs.filter(output => output.type === 'file');
+    const fileOutputs = stepOutputs.filter(
+      (output: WorkflowOutput) => output.type === 'file'
+    );
 
     let instructions = '\n\n## OUTPUT REQUIREMENTS\n\n';
     instructions +=
@@ -573,7 +577,7 @@ export class Runner {
       instructions += 'Return a JSON object with the following structure:\n\n';
       instructions += '```json\n{\n';
 
-      stringOutputs.forEach((output, index) => {
+      stringOutputs.forEach((output: WorkflowOutput, index: number) => {
         const comma = index < stringOutputs.length - 1 ? ',' : '';
         instructions += `  "${output.name}": "your_${output.name.toLowerCase()}_value_here"${comma}\n`;
       });
@@ -581,7 +585,7 @@ export class Runner {
       instructions += '}\n```\n\n';
 
       instructions += 'Where:\n';
-      stringOutputs.forEach(output => {
+      stringOutputs.forEach((output: WorkflowOutput) => {
         instructions += `- \`${output.name}\`: ${output.description}\n`;
       });
       instructions += '\n';
@@ -593,7 +597,7 @@ export class Runner {
       instructions +=
         'You MUST create the following files with the exact content needed:\n\n';
 
-      fileOutputs.forEach(output => {
+      fileOutputs.forEach((output: WorkflowOutput) => {
         instructions += `- **${output.name}**: ${output.description}\n`;
         instructions += `  - Create this file in the current working directory\n`;
 

@@ -60,6 +60,9 @@ export const TaskDescriptionSchema = z.object({
   restartCount: z.number().int().min(0).optional(),
   lastRestartAt: z.string().datetime().optional(),
 
+  // Agent Image
+  agentImage: z.string().optional(),
+
   // Metadata
   version: z.string(),
 });

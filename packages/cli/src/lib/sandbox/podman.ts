@@ -84,8 +84,8 @@ export class PodmanSandbox extends Sandbox {
 
     const userInfo_ = userInfo();
 
-    // Resolve the agent image from env var, config, or default
-    const agentImage = resolveAgentImage(projectConfig);
+    // Resolve the agent image from env var, stored task image, config, or default
+    const agentImage = resolveAgentImage(projectConfig, this.task.agentImage);
     // Warn if using a custom agent image
     warnIfCustomImage(projectConfig);
 
@@ -238,8 +238,8 @@ export class PodmanSandbox extends Sandbox {
 
     const userInfo_ = userInfo();
 
-    // Resolve the agent image from env var, config, or default
-    const agentImage = resolveAgentImage(projectConfig);
+    // Resolve the agent image from env var, stored task image, config, or default
+    const agentImage = resolveAgentImage(projectConfig, this.task.agentImage);
     // Warn if using a custom agent image
     warnIfCustomImage(projectConfig);
 

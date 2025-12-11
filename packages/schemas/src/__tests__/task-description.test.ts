@@ -57,6 +57,63 @@ describe('TaskDescriptionManager', () => {
     });
   });
 
+  describe('agentImage field', () => {
+    it('should store and retrieve agentImage', () => {
+      const task = TaskDescriptionManager.create({
+        id: 1,
+        title: 'Test Task',
+        description: 'Test description',
+        inputs: new Map(),
+        workflowName: 'swe',
+      });
+
+      // Initially should be undefined
+      expect(task.agentImage).toBeUndefined();
+
+      // Set agent image
+      const customImage = 'ghcr.io/endorhq/rover/agent:v1.2.3';
+      task.setAgentImage(customImage);
+      expect(task.agentImage).toBe(customImage);
+
+      // Verify persistence
+      const reloaded = TaskDescriptionManager.load(1);
+      expect(reloaded.agentImage).toBe(customImage);
+    });
+
+    it('should preserve agentImage during migration', () => {
+      const task = TaskDescriptionManager.create({
+        id: 2,
+        title: 'Test Task',
+        description: 'Test description',
+        inputs: new Map(),
+        workflowName: 'swe',
+      });
+
+      const customImage = 'ghcr.io/endorhq/rover/agent:v2.0.0';
+      task.setAgentImage(customImage);
+
+      // Reload to trigger migration path
+      const reloaded = TaskDescriptionManager.load(2);
+      expect(reloaded.agentImage).toBe(customImage);
+    });
+
+    it('should handle tasks without agentImage field', () => {
+      const task = TaskDescriptionManager.create({
+        id: 3,
+        title: 'Test Task',
+        description: 'Test description',
+        inputs: new Map(),
+        workflowName: 'swe',
+      });
+
+      expect(task.agentImage).toBeUndefined();
+
+      // Verify persistence of undefined value
+      const reloaded = TaskDescriptionManager.load(3);
+      expect(reloaded.agentImage).toBeUndefined();
+    });
+  });
+
   describe('new status types', () => {
     it('should support MERGED status', () => {
       const task = TaskDescriptionManager.create({

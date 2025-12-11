@@ -206,6 +206,9 @@ export class TaskDescriptionManager {
     migrated.agent = data.agent;
     migrated.sourceBranch = data.sourceBranch;
 
+    // Preserve agentImage field
+    migrated.agentImage = data.agentImage;
+
     return migrated as TaskDescriptionSchema;
   }
 
@@ -639,6 +642,9 @@ export class TaskDescriptionManager {
   get inputs(): Record<string, string> {
     return this.data.inputs;
   }
+  get agentImage(): string | undefined {
+    return this.data.agentImage;
+  }
 
   // Data Modification (Setters)
 
@@ -655,6 +661,14 @@ export class TaskDescriptionManager {
    */
   updateDescription(description: string): void {
     this.data.description = description;
+    this.save();
+  }
+
+  /**
+   * Set agent image
+   */
+  setAgentImage(agentImage: string): void {
+    this.data.agentImage = agentImage;
     this.save();
   }
 
