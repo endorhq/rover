@@ -22,10 +22,11 @@ import { getTelemetry } from '../lib/telemetry.js';
 // Get the default prompt
 const { prompt } = enquirer;
 
-// Ensure .rover/ is in .gitignore
+// Ensure .rover/tasks/ and .rover/settings.json are in .gitignore
 const ensureGitignore = async (projectPath: string): Promise<void> => {
   const gitignorePath = join(projectPath, '.gitignore');
-  const roverEntry = '.rover/';
+  const roverTasksEntry = '.rover/tasks/';
+  const roverSettingsEntry = '.rover/settings.json';
 
   try {
     let content = '';
@@ -34,28 +35,45 @@ const ensureGitignore = async (projectPath: string): Promise<void> => {
     if (existsSync(gitignorePath)) {
       content = readFileSync(gitignorePath, 'utf-8');
 
-      // Check if .rover/ is already in .gitignore
+      // Check if .rover/ patterns are already in .gitignore
       const lines = content.split('\n');
-      const hasRoverEntry = lines.some(
+
+      // Check for old pattern (entire .rover/ directory)
+      const hasOldRoverEntry = lines.some(
         line =>
-          line.trim() === roverEntry ||
+          line.trim() === '.rover/' ||
           line.trim() === '.rover' ||
           line.trim() === '.rover/*'
       );
 
-      if (hasRoverEntry) {
+      // Check for new granular patterns
+      const hasTasksEntry = lines.some(line => line.trim() === roverTasksEntry);
+      const hasSettingsEntry = lines.some(
+        line => line.trim() === roverSettingsEntry
+      );
+
+      // If old pattern exists or both new patterns exist, we're done
+      if (hasOldRoverEntry || (hasTasksEntry && hasSettingsEntry)) {
         return; // Already in .gitignore
       }
 
-      // Add .rover/ to existing .gitignore
-      const updatedContent = content.endsWith('\n')
-        ? content + roverEntry + '\n'
-        : content + '\n' + roverEntry + '\n';
+      // Add missing entries
+      let updatedContent = content.endsWith('\n') ? content : content + '\n';
+
+      if (!hasTasksEntry) {
+        updatedContent += roverTasksEntry + '\n';
+      }
+      if (!hasSettingsEntry) {
+        updatedContent += roverSettingsEntry + '\n';
+      }
 
       writeFileSync(gitignorePath, updatedContent);
     } else {
-      // Create new .gitignore with .rover/
-      writeFileSync(gitignorePath, roverEntry + '\n');
+      // Create new .gitignore with granular patterns
+      writeFileSync(
+        gitignorePath,
+        roverTasksEntry + '\n' + roverSettingsEntry + '\n'
+      );
     }
   } catch (error) {
     throw new Error(`Failed to update .gitignore: ${error}`);
