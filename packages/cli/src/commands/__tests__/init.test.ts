@@ -127,7 +127,7 @@ describe('init command', () => {
     });
   });
 
-  it('should add .rover/ to .gitignore if not present', async () => {
+  it('should add granular .rover patterns to .gitignore if not present', async () => {
     // Create a simple project file for environment detection
     writeFileSync('package.json', JSON.stringify({ name: 'test' }, null, 2));
 
@@ -136,9 +136,10 @@ describe('init command', () => {
     // Check .gitignore was created/updated
     expect(existsSync('.gitignore')).toBe(true);
 
-    // Verify .rover/ was added
+    // Verify granular patterns were added
     const gitignore = readFileSync('.gitignore', 'utf8');
-    expect(gitignore).toContain('.rover/');
+    expect(gitignore).toContain('.rover/tasks/');
+    expect(gitignore).toContain('.rover/settings.json');
   });
 
   it('should handle existing .gitignore with other entries', async () => {
@@ -154,15 +155,18 @@ describe('init command', () => {
     const gitignore = readFileSync('.gitignore', 'utf8');
     expect(gitignore).toContain('node_modules/');
     expect(gitignore).toContain('dist/');
-    expect(gitignore).toContain('.rover/');
+    expect(gitignore).toContain('.rover/tasks/');
+    expect(gitignore).toContain('.rover/settings.json');
 
-    // Ensure .rover/ was only added once
-    const roverMatches = gitignore.match(/\.rover\//g);
-    expect(roverMatches?.length).toBe(1);
+    // Ensure patterns were only added once
+    const tasksMatches = gitignore.match(/\.rover\/tasks\//g);
+    const settingsMatches = gitignore.match(/\.rover\/settings\.json/g);
+    expect(tasksMatches?.length).toBe(1);
+    expect(settingsMatches?.length).toBe(1);
   });
 
-  it('should not duplicate .rover/ entry in .gitignore', async () => {
-    // Create .gitignore already containing .rover/
+  it('should respect existing old .rover/ pattern in .gitignore', async () => {
+    // Create .gitignore already containing old .rover/ pattern
     writeFileSync('.gitignore', '.rover/\nnode_modules/\n');
 
     // Create a simple project file for environment detection
@@ -170,10 +174,34 @@ describe('init command', () => {
 
     await initCommand('.', { yes: true });
 
-    // Verify .rover/ wasn't duplicated
+    // Verify old pattern was kept and no new patterns were added
     const gitignore = readFileSync('.gitignore', 'utf8');
-    const roverMatches = gitignore.match(/\.rover\//g);
-    expect(roverMatches?.length).toBe(1);
+    expect(gitignore).toContain('.rover/');
+
+    // Should not add new granular patterns if old pattern exists
+    const lines = gitignore.split('\n');
+    const roverLines = lines.filter(line => line.trim().startsWith('.rover'));
+    expect(roverLines.length).toBe(1); // Only the original .rover/ line
+  });
+
+  it('should not duplicate granular patterns in .gitignore', async () => {
+    // Create .gitignore already containing granular patterns
+    writeFileSync(
+      '.gitignore',
+      '.rover/tasks/\n.rover/settings.json\nnode_modules/\n'
+    );
+
+    // Create a simple project file for environment detection
+    writeFileSync('package.json', JSON.stringify({ name: 'test' }, null, 2));
+
+    await initCommand('.', { yes: true });
+
+    // Verify patterns weren't duplicated
+    const gitignore = readFileSync('.gitignore', 'utf8');
+    const tasksMatches = gitignore.match(/\.rover\/tasks\//g);
+    const settingsMatches = gitignore.match(/\.rover\/settings\.json/g);
+    expect(tasksMatches?.length).toBe(1);
+    expect(settingsMatches?.length).toBe(1);
   });
 
   it('should skip initialization if already initialized', async () => {
