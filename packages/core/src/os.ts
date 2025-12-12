@@ -79,6 +79,29 @@ const logStdout = log('stdout');
 const logStderr = log('stderr');
 
 /**
+ * Expand the stdio option into individual stdin, stdout, stderr options.
+ * This prevents conflicts with execa when setting both stdio and individual streams.
+ *
+ * @param options The launch options that may contain a stdio property
+ * @returns New options with stdio expanded to stdin/stdout/stderr
+ */
+const expandStdioOption = <T extends Options | SyncOptions>(
+  options?: T
+): T | undefined => {
+  if (!options || !options.stdio) {
+    return options;
+  }
+
+  const { stdio, ...rest } = options;
+  return {
+    ...rest,
+    stdin: stdio,
+    stdout: stdio,
+    stderr: stdio,
+  } as T;
+};
+
+/**
  * Check if the given stream requires to print logging.
  * We skip logging for inherit streams
  */
@@ -137,6 +160,9 @@ export function launch(
   args?: ReadonlyArray<string>,
   options?: LaunchOptions
 ): ReturnType<typeof execa> {
+  // Expand stdio option to prevent conflicts with execa
+  const expandedOptions = expandStdioOption(options);
+
   const commandWithMaybeSpacing = command.replaceAll(' ', '\\ ');
   const argsWithMaybeSpacing = (args || [])
     .map(arg => {
@@ -157,22 +183,22 @@ export function launch(
 
     // Check first if we need to add logging
     let newOpts: Options = {
-      ...options,
+      ...expandedOptions,
     } as Options;
 
-    if (shouldAddLogging('stdout', options)) {
-      const stdout = options?.stdout
+    if (shouldAddLogging('stdout', expandedOptions)) {
+      const stdout = expandedOptions?.stdout
         ? [
             logStdout({
               mightLogSensitiveInformation:
-                options?.mightLogSensitiveInformation,
+                expandedOptions?.mightLogSensitiveInformation,
             }),
-            options.stdout,
+            expandedOptions.stdout,
           ].flat()
         : [
             logStdout({
               mightLogSensitiveInformation:
-                options?.mightLogSensitiveInformation,
+                expandedOptions?.mightLogSensitiveInformation,
             }),
           ];
 
@@ -182,19 +208,19 @@ export function launch(
       } as Options;
     }
 
-    if (shouldAddLogging('stderr', options)) {
-      const stderr = options?.stderr
+    if (shouldAddLogging('stderr', expandedOptions)) {
+      const stderr = expandedOptions?.stderr
         ? [
             logStderr({
               mightLogSensitiveInformation:
-                options?.mightLogSensitiveInformation,
+                expandedOptions?.mightLogSensitiveInformation,
             }),
-            options.stderr,
+            expandedOptions.stderr,
           ].flat()
         : [
             logStderr({
               mightLogSensitiveInformation:
-                options?.mightLogSensitiveInformation,
+                expandedOptions?.mightLogSensitiveInformation,
             }),
           ];
 
@@ -208,8 +234,8 @@ export function launch(
     return execa(newOpts)`${parsedCommand}`;
   }
 
-  if (options) {
-    return execa(options)`${parsedCommand}`;
+  if (expandedOptions) {
+    return execa(expandedOptions)`${parsedCommand}`;
   } else {
     return execa`${parsedCommand}`;
   }
@@ -247,6 +273,9 @@ export function launchSync(
   args?: ReadonlyArray<string>,
   options?: LaunchSyncOptions
 ): ReturnType<typeof execaSync> {
+  // Expand stdio option to prevent conflicts with execa
+  const expandedOptions = expandStdioOption(options);
+
   const commandWithMaybeSpacing = command.replaceAll(' ', '\\ ');
   const argsWithMaybeSpacing = (args || [])
     .map(arg => {
@@ -267,22 +296,22 @@ export function launchSync(
 
     // Check first if we need to add logging
     let newOpts: SyncOptions = {
-      ...options,
+      ...expandedOptions,
     } as SyncOptions;
 
-    if (shouldAddLogging('stdout', options)) {
-      const stdout = options?.stdout
+    if (shouldAddLogging('stdout', expandedOptions)) {
+      const stdout = expandedOptions?.stdout
         ? [
             logStdout({
               mightLogSensitiveInformation:
-                options?.mightLogSensitiveInformation,
+                expandedOptions?.mightLogSensitiveInformation,
             }),
-            options.stdout,
+            expandedOptions.stdout,
           ].flat()
         : [
             logStdout({
               mightLogSensitiveInformation:
-                options?.mightLogSensitiveInformation,
+                expandedOptions?.mightLogSensitiveInformation,
             }),
           ];
 
@@ -292,19 +321,19 @@ export function launchSync(
       } as SyncOptions;
     }
 
-    if (shouldAddLogging('stderr', options)) {
-      const stderr = options?.stderr
+    if (shouldAddLogging('stderr', expandedOptions)) {
+      const stderr = expandedOptions?.stderr
         ? [
             logStderr({
               mightLogSensitiveInformation:
-                options?.mightLogSensitiveInformation,
+                expandedOptions?.mightLogSensitiveInformation,
             }),
-            options.stderr,
+            expandedOptions.stderr,
           ].flat()
         : [
             logStderr({
               mightLogSensitiveInformation:
-                options?.mightLogSensitiveInformation,
+                expandedOptions?.mightLogSensitiveInformation,
             }),
           ];
 
@@ -318,8 +347,8 @@ export function launchSync(
     return execaSync(newOpts)`${parsedCommand}`;
   }
 
-  if (options) {
-    return execaSync(options)`${parsedCommand}`;
+  if (expandedOptions) {
+    return execaSync(expandedOptions)`${parsedCommand}`;
   } else {
     return execaSync`${parsedCommand}`;
   }
