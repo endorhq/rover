@@ -10,7 +10,16 @@ import {
   type DiagramStep,
 } from 'rover-core';
 import type { WorkflowOutput } from 'rover-schemas';
-import { readFileSync } from 'node:fs';
+import { WorkflowManager } from 'rover-schemas';
+import {
+  readFileSync,
+  existsSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, dirname } from 'node:path';
 import { getTelemetry } from '../../lib/telemetry.js';
 import { isJsonMode, setJsonMode } from '../../lib/global-state.js';
 
@@ -21,13 +30,117 @@ interface InspectWorkflowCommandOptions {
 }
 
 /**
+ * Determine the type of workflow source input
+ */
+function detectSourceType(source: string): 'http' | 'file' | 'name' {
+  // Check for HTTP/HTTPS URL
+  if (source.startsWith('http://') || source.startsWith('https://')) {
+    return 'http';
+  }
+
+  // Check for file path (absolute or relative with extension)
+  if (
+    source.includes('/') ||
+    source.includes('\\') ||
+    source.endsWith('.yml') ||
+    source.endsWith('.yaml')
+  ) {
+    return 'file';
+  }
+
+  // Default to workflow name
+  return 'name';
+}
+
+/**
+ * Fetch workflow content from HTTP URL
+ */
+async function fetchWorkflowFromUrl(url: string): Promise<string> {
+  // Validate URL
+  let urlObj: URL;
+  try {
+    urlObj = new URL(url);
+  } catch (error) {
+    throw new Error('Invalid URL format');
+  }
+
+  if (urlObj.protocol !== 'http:' && urlObj.protocol !== 'https:') {
+    throw new Error('Only HTTP and HTTPS URLs are supported');
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+    const response = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeout);
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    // Check content length
+    const contentLength = response.headers.get('content-length');
+    if (contentLength && parseInt(contentLength) > 10 * 1024 * 1024) {
+      throw new Error('Workflow file too large (max 10MB)');
+    }
+
+    const content = await response.text();
+
+    if (!content || content.trim().length === 0) {
+      throw new Error('Empty response from URL');
+    }
+
+    return content;
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.name === 'AbortError') {
+        throw new Error('Request timeout: Failed to fetch workflow from URL');
+      }
+      throw new Error(`Failed to fetch workflow from URL: ${error.message}`);
+    }
+    throw new Error(`Failed to fetch workflow from URL: ${error}`);
+  }
+}
+
+/**
+ * Create a temporary file with workflow content
+ */
+function createTempWorkflowFile(content: string): string {
+  try {
+    const tempDir = mkdtempSync(join(tmpdir(), 'rover-workflow-'));
+    const tempFile = join(tempDir, 'workflow.yml');
+    writeFileSync(tempFile, content, 'utf-8');
+    return tempFile;
+  } catch (error) {
+    if (error instanceof Error) {
+      throw new Error(`Failed to create temporary file: ${error.message}`);
+    }
+    throw new Error(`Failed to create temporary file: ${error}`);
+  }
+}
+
+/**
+ * Clean up temporary directory
+ */
+function cleanupTempFile(filePath: string): void {
+  try {
+    // Remove the parent directory (the temp directory)
+    const tempDir = dirname(filePath);
+    rmSync(tempDir, { recursive: true, force: true });
+  } catch (error) {
+    // Silently fail cleanup - not critical
+  }
+}
+
+/**
  * Inspect a specific workflow showing detailed information.
  *
- * @param workflowName Name of the workflow to inspect
+ * @param workflowSource Name, URL, or file path of the workflow to inspect
  * @param options Options to modify the output
  */
 export const inspectWorkflowCommand = async (
-  workflowName: string,
+  workflowSource: string,
   options: InspectWorkflowCommandOptions
 ) => {
   const telemetry = getTelemetry();
@@ -35,37 +148,109 @@ export const inspectWorkflowCommand = async (
     setJsonMode(options.json);
   }
 
+  let tempFile: string | null = null;
+
   try {
     // Track inspect workflow event
     telemetry?.eventInspectWorkflow();
 
-    // Load the workflow
-    const workflowStore = initWorkflowStore();
-    const workflow = workflowStore.getWorkflow(workflowName);
+    // Detect the type of source
+    const sourceType = detectSourceType(workflowSource);
+    let workflow: WorkflowManager | undefined;
+    let sourceOrigin: string;
 
-    if (!workflow) {
-      if (isJsonMode()) {
-        console.log(
-          JSON.stringify(
-            {
-              success: false,
-              error: `Workflow "${workflowName}" not found`,
-            },
-            null,
-            2
-          )
-        );
-      } else if (options.raw) {
-        console.error(`Error: Workflow "${workflowName}" not found`);
-      } else {
-        console.log(colors.red(`✗ Workflow "${workflowName}" not found`));
-        console.log(
-          colors.gray('\nUse ') +
-            colors.cyan('rover workflows list') +
-            colors.gray(' to see available workflows')
-        );
+    // Load workflow based on source type
+    if (sourceType === 'http') {
+      // Fetch from HTTP URL
+      try {
+        const content = await fetchWorkflowFromUrl(workflowSource);
+        tempFile = createTempWorkflowFile(content);
+        workflow = WorkflowManager.load(tempFile);
+        sourceOrigin = workflowSource;
+      } catch (error) {
+        if (isJsonMode()) {
+          console.log(
+            JSON.stringify(
+              {
+                success: false,
+                error: error instanceof Error ? error.message : String(error),
+              },
+              null,
+              2
+            )
+          );
+        } else if (options.raw) {
+          console.error(
+            `Error: ${error instanceof Error ? error.message : error}`
+          );
+        } else {
+          console.log(
+            colors.red(`✗ ${error instanceof Error ? error.message : error}`)
+          );
+        }
+        return;
       }
-      return;
+    } else if (sourceType === 'file') {
+      // Load from file path
+      try {
+        if (!existsSync(workflowSource)) {
+          throw new Error(`File not found: ${workflowSource}`);
+        }
+        workflow = WorkflowManager.load(workflowSource);
+        sourceOrigin = workflowSource;
+      } catch (error) {
+        if (isJsonMode()) {
+          console.log(
+            JSON.stringify(
+              {
+                success: false,
+                error: error instanceof Error ? error.message : String(error),
+              },
+              null,
+              2
+            )
+          );
+        } else if (options.raw) {
+          console.error(
+            `Error: ${error instanceof Error ? error.message : error}`
+          );
+        } else {
+          console.log(
+            colors.red(`✗ ${error instanceof Error ? error.message : error}`)
+          );
+        }
+        return;
+      }
+    } else {
+      // Load by workflow name
+      const workflowStore = initWorkflowStore();
+      workflow = workflowStore.getWorkflow(workflowSource);
+
+      if (!workflow) {
+        if (isJsonMode()) {
+          console.log(
+            JSON.stringify(
+              {
+                success: false,
+                error: `Workflow "${workflowSource}" not found`,
+              },
+              null,
+              2
+            )
+          );
+        } else if (options.raw) {
+          console.error(`Error: Workflow "${workflowSource}" not found`);
+        } else {
+          console.log(colors.red(`✗ Workflow "${workflowSource}" not found`));
+          console.log(
+            colors.gray('\nUse ') +
+              colors.cyan('rover workflows list') +
+              colors.gray(' to see available workflows')
+          );
+        }
+        return;
+      }
+      sourceOrigin = 'built-in';
     }
 
     // Handle --raw flag: output workflow as YAML
@@ -84,6 +269,7 @@ export const inspectWorkflowCommand = async (
           {
             success: true,
             workflow: workflow.toObject(),
+            source: sourceOrigin,
           },
           null,
           2
@@ -100,6 +286,7 @@ export const inspectWorkflowCommand = async (
       Name: workflow.name,
       Description: workflow.description || colors.gray('No description'),
       Version: workflow.version,
+      Source: sourceOrigin,
     };
 
     // Add defaults if present
@@ -206,6 +393,10 @@ export const inspectWorkflowCommand = async (
       console.error(colors.red('Error inspecting workflow:'), error);
     }
   } finally {
+    // Clean up temporary file if it was created
+    if (tempFile) {
+      cleanupTempFile(tempFile);
+    }
     await telemetry?.shutdown();
   }
 };
