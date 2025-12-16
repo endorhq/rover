@@ -1,8 +1,6 @@
 name: Release
 run-name: (${{ github.event.inputs.project }}) Release ${{ github.event.inputs.targetVersion }} from ${{ github.ref_name }}
 
-concurrency: production
-
 on:
   workflow_dispatch:
     inputs:
@@ -89,12 +87,28 @@ jobs:
           echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
 
       - name: Bump Version
-        run: npm version ${{ inputs.targetVersion }}
+        run: |
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          TARGET_VERSION="${{ inputs.targetVersion }}"
+
+          if [ "$CURRENT_VERSION" == "$TARGET_VERSION" ]; then
+            echo "Version already set to $TARGET_VERSION, skipping bump"
+          else
+            npm version "$TARGET_VERSION"
+          fi
         working-directory: ./packages/${{ inputs.project }}
 
       - name: Bump Agent Version (when releasing CLI)
         if: inputs.project == 'cli'
-        run: npm version ${{ inputs.targetVersion }}
+        run: |
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          TARGET_VERSION="${{ inputs.targetVersion }}"
+
+          if [ "$CURRENT_VERSION" == "$TARGET_VERSION" ]; then
+            echo "Version already set to $TARGET_VERSION, skipping bump"
+          else
+            npm version "$TARGET_VERSION"
+          fi
         working-directory: ./packages/agent
 
       - name: Install dependencies
@@ -128,17 +142,35 @@ jobs:
           TAG_NAME: '${{ inputs.project }}/v${{ inputs.targetVersion }}'
         run: |
           git add .
-          if [ "$PROJECT" == "cli" ]; then
-            git commit -m "release: bump cli and agent to $VERSION"
+
+          # Commit changes if there are any
+          if ! git diff --cached --quiet; then
+            if [ "$PROJECT" == "cli" ]; then
+              git commit -m "release: bump cli and agent to $VERSION"
+            else
+              git commit -m "release: bump $PROJECT to $VERSION"
+            fi
+            echo "Created commit"
           else
-            git commit -m "release: bump $PROJECT to $VERSION"
+            echo "No changes to commit, version already bumped"
           fi
+
           COMMIT_SHA=$(git rev-parse HEAD)
           echo "COMMIT_SHA=$COMMIT_SHA" >> $GITHUB_ENV
-          echo "Created commit: $COMMIT_SHA"
-          git tag -a "$TAG_NAME" -m "$TAG_NAME"
+          echo "Commit SHA: $COMMIT_SHA"
+
+          # Create tag if it doesn't exist
+          if ! git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
+            git tag -a "$TAG_NAME" -m "$TAG_NAME"
+            echo "Created tag: $TAG_NAME"
+          else
+            echo "Tag $TAG_NAME already exists"
+          fi
+
+          # Push branch and tags
           git push origin "${{ env.BRANCH_NAME }}"
           git push --tags
+
           echo "git_tag=$TAG_NAME" >> "$GITHUB_OUTPUT"
           echo "commit_sha=$COMMIT_SHA" >> "$GITHUB_OUTPUT"
 
@@ -159,7 +191,14 @@ jobs:
             ARTIFACT=$(find ./packages/extension -name "*.vsix" -type f | head -1)
           fi
 
+          # Check if release already exists and delete it to regenerate notes
+          if gh release view "$TAG_NAME" &>/dev/null; then
+            echo "Release $TAG_NAME already exists, deleting to regenerate notes..."
+            gh release delete "$TAG_NAME" --yes
+          fi
+
           # Create release with artifact
+          echo "Creating release $TAG_NAME..."
           gh release create "$TAG_NAME" \
             --title "${{ inputs.project }} v${{ inputs.targetVersion }}" \
             --generate-notes \
@@ -206,6 +245,7 @@ jobs:
     with:
       tag: v${{ inputs.targetVersion }}
       ref: ${{ needs.release.outputs.git_tag }}
+      image-name: ghcr.io/${{ github.repository_owner }}/rover-agent
     permissions:
       contents: read
       packages: write
