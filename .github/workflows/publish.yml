@@ -1,8 +1,6 @@
 name: Publish
 run-name: (${{ github.event.inputs.project }}) Publish ${{ github.event.inputs.tag_name }}
 
-concurrency: production
-
 on:
   workflow_dispatch:
     inputs:
