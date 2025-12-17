@@ -151,7 +151,15 @@ export const restartCommand = async (
       console.log(colors.gray('├── Status: ') + colors.red(task.status));
       console.log(colors.gray('├── Workspace: ') + colors.cyan(worktreePath));
       console.log(colors.gray('├── Branch: ') + colors.cyan(branchName));
-      console.log(colors.gray('└── Reset to: ') + colors.yellow('NEW'));
+      if (process.env.ROVER_AGENT_IMAGE) {
+        console.log(
+          colors.gray('├── Agent Image: ') +
+            colors.cyan(process.env.ROVER_AGENT_IMAGE)
+        );
+        console.log(colors.gray('└── Reset to: ') + colors.yellow('NEW'));
+      } else {
+        console.log(colors.gray('└── Reset to: ') + colors.yellow('NEW'));
+      }
       console.log(colors.green('\n✓ Task reset successfully'));
       console.log('');
     }
@@ -161,6 +169,11 @@ export const restartCommand = async (
 
     // Track restart event
     telemetry?.eventRestartTask();
+
+    // Check if user provided a custom agent image via environment variable
+    if (process.env.ROVER_AGENT_IMAGE) {
+      task.setAgentImage(process.env.ROVER_AGENT_IMAGE);
+    }
 
     // Start sandbox container for task execution
     try {
