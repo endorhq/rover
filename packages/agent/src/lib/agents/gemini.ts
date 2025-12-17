@@ -1,10 +1,14 @@
 import { existsSync, copyFileSync } from 'node:fs';
 import { join } from 'node:path';
 import colors from 'ansi-colors';
-import { AgentCredentialFile } from './types.js';
+import {
+  AgentCredentialFile,
+  AgentErrorRecoveryContext,
+  AgentRecoveryResult,
+} from './types.js';
 import { BaseAgent } from './base.js';
 import { launch } from 'rover-core';
-import { L } from 'vitest/dist/chunks/reporters.nr4dxCkA.js';
+import { containsGeminiYoloWarning } from '../utils/gemini.js';
 
 export class GeminiAgent extends BaseAgent {
   name = 'Gemini';
@@ -126,5 +130,42 @@ export class GeminiAgent extends BaseAgent {
     }
 
     return ['-i', prompt];
+  }
+
+  async recoverFromError({
+    error,
+  }: AgentErrorRecoveryContext): Promise<AgentRecoveryResult | null> {
+    if (!error || typeof error !== 'object') {
+      return null;
+    }
+
+    const stdout = GeminiAgent.normalizeProcessOutput((error as any)?.stdout);
+    const stderr = GeminiAgent.normalizeProcessOutput((error as any)?.stderr);
+    const messageParts = [
+      stderr,
+      stdout,
+      error instanceof Error ? error.message : '',
+    ].filter(Boolean);
+
+    if (!containsGeminiYoloWarning(messageParts.join('\n'))) {
+      return null;
+    }
+
+    return {
+      rawOutput: stdout,
+      notice: '⚠️  Gemini reported YOLO mode is enabled. Continuing execution.',
+    };
+  }
+
+  private static normalizeProcessOutput(output: unknown): string {
+    if (typeof output === 'string') {
+      return output;
+    }
+
+    if (Buffer.isBuffer(output)) {
+      return output.toString();
+    }
+
+    return '';
   }
 }

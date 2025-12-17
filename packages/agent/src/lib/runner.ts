@@ -140,85 +140,131 @@ export class Runner {
     const currentProgress = this.calculateProgress(this.currentStepIndex);
     const nextProgress = this.calculateProgress(this.currentStepIndex + 1);
 
-    try {
-      // Update status before executing step
-      this.statusManager?.update('running', this.step.name, currentProgress);
+    // Update status before executing step
+    this.statusManager?.update('running', this.step.name, currentProgress);
 
-      // Get the processed prompt
-      const finalPrompt = this.prompt();
+    // Get the processed prompt
+    const finalPrompt = this.prompt();
 
-      // Get the command arguments
-      const args = this.toolArguments();
+    // Get the command arguments
+    const args = this.toolArguments();
 
-      // Execute the AI tool with the prompt
+    // Execute the AI tool with the prompt
+    console.log(
+      colors.blue(
+        `\n🤖 Running ${colors.blue.bold(this.step.name)} ${colors.grey('>')} ${colors.cyan(this.tool)}`
+      )
+    );
+
+    if (VERBOSE) {
+      console.log(colors.gray('============== Input Prompt ============== '));
+      console.log(colors.gray(finalPrompt));
       console.log(
-        colors.blue(
-          `\n🤖 Running ${colors.blue.bold(this.step.name)} ${colors.grey('>')} ${colors.cyan(this.tool)}`
-        )
+        colors.gray('============== End Input Prompt ============== ')
       );
+    }
 
-      if (VERBOSE) {
-        console.log(colors.gray('============== Input Prompt ============== '));
-        console.log(colors.gray(finalPrompt));
+    // Create abort controller for killing process if auth detected
+    const abortController = new AbortController();
+    let authDetected = false;
+    let stderrBuffer = '';
+
+    /**
+     * Detects if the otuput includes a "Waiting for authentication" kind of message
+     * to abort the current execution without waiting for the timeout. Tools like
+     * Gemini and Qwen behaves this way
+     */
+    const authWaitingDetector = function* (chunk: unknown) {
+      const chunkStr = String(chunk);
+      stderrBuffer += chunkStr;
+
+      // Check for authentication prompts
+      if (isWaitingForAuthentication(stderrBuffer) && !authDetected) {
+        authDetected = true;
         console.log(
-          colors.gray('============== End Input Prompt ============== ')
+          colors.yellow(
+            '\n⚠ Authentication prompt detected, terminating process...'
+          )
         );
+        abortController.abort();
       }
 
-      // Create abort controller for killing process if auth detected
-      const abortController = new AbortController();
-      let authDetected = false;
-      let stderrBuffer = '';
+      // Always return the chunk. If not, the stderr will be empty.
+      yield chunk;
+    };
 
-      /**
-       * Detects if the otuput includes a "Waiting for authentication" kind of message
-       * to abort the current execution without waiting for the timeout. Tools like
-       * Gemini and Qwen behaves this way
-       */
-      const authWaitingDetector = function* (chunk: unknown) {
-        const chunkStr = String(chunk);
-        stderrBuffer += chunkStr;
+    // Launch the process with proper timeout and abort signal
+    const binary = Runner.getToolBinary(this.tool);
+    const result = await launch(binary, args, {
+      input: finalPrompt,
+      timeout: this.workflow.getStepTimeout(this.step.id) * 1000, // Convert to milliseconds
+      cancelSignal: abortController.signal,
+      reject: false,
+      buffer: true, // Buffer output for error parsing
+      // Capture stderr in real-time to detect auth prompts
+      stderr: ['pipe', authWaitingDetector],
+    });
 
-        // Check for authentication prompts
-        if (isWaitingForAuthentication(stderrBuffer) && !authDetected) {
-          authDetected = true;
-          console.log(
-            colors.yellow(
-              '\n⚠ Authentication prompt detected, terminating process...'
-            )
+    // Determine if we have a successful result (either direct success or after recovery)
+    let rawOutput: string | undefined;
+    let recoveryNotice: string | undefined;
+
+    // Check if authentication was detected
+    if (authDetected) {
+      agentError = new AuthenticationError(
+        'Agent requires authentication - process was terminated',
+        this.tool
+      );
+    } else if (result.exitCode === 0) {
+      // Success case - capture raw output
+      rawOutput = result.stdout ? result.stdout.toString() : '';
+    } else {
+      // Non-zero exit code - try to recover
+      const recoveryResult = await this.tryRecoverFromAgentError(
+        result,
+        finalPrompt
+      );
+
+      if (recoveryResult) {
+        rawOutput = recoveryResult.rawOutput;
+        recoveryNotice = recoveryResult.notice;
+      } else {
+        // Recovery failed - parse the error
+        const stderr = result.stderr ? result.stderr.toString() : '';
+        const stdout = result.stdout ? result.stdout.toString() : '';
+        const exitCode = result.exitCode;
+
+        // Check for timeout
+        if (result.timedOut) {
+          agentError = new TimeoutError(
+            `Step '${this.step.name}' exceeded timeout of ${this.workflow.getStepTimeout(this.step.id)}s`,
+            this.workflow.getStepTimeout(this.step.id) * 1000
           );
-          abortController.abort();
+        } else if (result.isCanceled) {
+          // Process was canceled (likely due to auth prompt)
+          agentError = new AuthenticationError(
+            'Agent requires authentication - process was terminated',
+            this.tool
+          );
+        } else {
+          // Parse the error from stderr/stdout
+          agentError = parseAgentError(
+            stderr,
+            stdout,
+            exitCode ?? null,
+            this.tool
+          );
         }
+      }
+    }
 
-        // Always return the chunk. If not, the stderr will be empty.
-        yield chunk;
-      };
-
-      // Launch the process with proper timeout and abort signal
-      const binary = Runner.getToolBinary(this.tool);
-      const launchPromise = launch(binary, args, {
-        input: finalPrompt,
-        timeout: this.workflow.getStepTimeout(this.step.id) * 1000, // Convert to milliseconds
-        cancelSignal: abortController.signal,
-        reject: true, // Reject on non-zero exit codes
-        buffer: true, // Buffer output for error parsing
-        // Capture stderr in real-time to detect auth prompts
-        stderr: ['pipe', authWaitingDetector],
-      });
-
-      const result = await launchPromise;
-
-      // Check if authentication was detected
-      if (authDetected) {
-        abortController.abort();
-        throw new AuthenticationError(
-          'Agent requires authentication - process was terminated',
-          this.tool
-        );
+    // Single finalization path for successful steps (either direct or recovered)
+    if (rawOutput !== undefined) {
+      if (recoveryNotice) {
+        console.log(colors.yellow(recoveryNotice));
       }
 
       // Store common outputs
-      const rawOutput = result.stdout ? result.stdout.toString() : '';
       outputs.set('raw_output', rawOutput);
       outputs.set('input_prompt', finalPrompt);
 
@@ -236,49 +282,10 @@ export class Runner {
 
       // Update status after successful completion
       this.statusManager?.update('running', this.step.name, nextProgress);
-    } catch (error) {
-      // Handle different error types
-      if (error instanceof AgentError) {
-        agentError = error;
-      } else if (error && typeof error === 'object' && 'exitCode' in error) {
-        // Execa error with exit code
-        const execaError = error as any;
-        const stderr = execaError.stderr || '';
-        const stdout = execaError.stdout || '';
-        const exitCode = execaError.exitCode;
+    }
 
-        // Check for timeout
-        if (execaError.timedOut) {
-          agentError = new TimeoutError(
-            `Step '${this.step.name}' exceeded timeout of ${this.workflow.getStepTimeout(this.step.id)}s`,
-            this.workflow.getStepTimeout(this.step.id) * 1000
-          );
-        } else if (execaError.isCanceled) {
-          // Process was canceled (likely due to auth prompt)
-          agentError = new AuthenticationError(
-            'Agent requires authentication - process was terminated',
-            this.tool
-          );
-        } else {
-          // Parse the error from stderr/stdout
-          agentError = parseAgentError(stderr, stdout, exitCode, this.tool);
-        }
-      } else if (error instanceof Error) {
-        // Generic error
-        const errorMessage = error.message;
-        if (errorMessage.includes('timeout')) {
-          agentError = new TimeoutError(
-            `Step '${this.step.name}' exceeded timeout`,
-            this.workflow.getStepTimeout(this.step.id) * 1000
-          );
-        } else {
-          agentError = parseAgentError(errorMessage, '', null, this.tool);
-        }
-      } else {
-        // Unknown error type
-        agentError = parseAgentError(String(error), '', null, this.tool);
-      }
-
+    // If there's an error, display and store it
+    if (agentError) {
       console.log(
         colors.red(`✗ Step '${this.step.name}' failed: ${agentError.message}`)
       );
@@ -303,7 +310,7 @@ export class Runner {
       outputs.set('error_retryable', String(agentError.isRetryable));
     }
 
-    const result: RunnerStepResult = {
+    const runnerResult: RunnerStepResult = {
       id: this.step.id,
       success: !outputs.has('error'), // Success if no error was stored
       error: outputs.get('error'),
@@ -311,7 +318,39 @@ export class Runner {
       outputs,
     };
 
-    return result;
+    return runnerResult;
+  }
+
+  private async tryRecoverFromAgentError(
+    error: unknown,
+    finalPrompt: string
+  ): Promise<{ rawOutput: string; notice?: string } | undefined> {
+    if (typeof this.agent.recoverFromError !== 'function') {
+      return undefined;
+    }
+
+    try {
+      const recoveryResult = await this.agent.recoverFromError({
+        error,
+        prompt: finalPrompt,
+      });
+
+      if (!recoveryResult) {
+        return undefined;
+      }
+
+      return {
+        rawOutput: recoveryResult.rawOutput,
+        notice: recoveryResult.notice,
+      };
+    } catch (recoveryError) {
+      console.log(
+        colors.gray(
+          `Recovery handler failed: ${recoveryError instanceof Error ? recoveryError.message : String(recoveryError)}`
+        )
+      );
+      return undefined;
+    }
   }
 
   /**

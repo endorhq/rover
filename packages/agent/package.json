@@ -20,7 +20,7 @@
     "start": "node dist/cli.js",
     "clean": "rm -rf dist",
     "check": "tsc --noEmit",
-    "test": "echo 'no testing yet'",
+    "test": "vitest run",
     "test:watch": "vitest watch",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage"
