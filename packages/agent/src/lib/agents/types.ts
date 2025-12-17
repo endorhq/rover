@@ -9,6 +9,16 @@ export interface ValidationResult {
   missing: string[];
 }
 
+export interface AgentRecoveryResult {
+  rawOutput: string;
+  notice?: string;
+}
+
+export interface AgentErrorRecoveryContext {
+  error: unknown;
+  prompt: string;
+}
+
 export interface Agent {
   name: string;
   binary: string;
@@ -32,4 +42,7 @@ export interface Agent {
     precontext: string,
     initialPrompt?: string
   ): string[];
+  recoverFromError?(
+    context: AgentErrorRecoveryContext
+  ): Promise<AgentRecoveryResult | null> | AgentRecoveryResult | null;
 }
