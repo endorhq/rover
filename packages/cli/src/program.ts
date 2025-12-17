@@ -18,6 +18,7 @@ import colors from 'ansi-colors';
 import { pushCommand } from './commands/push.js';
 import { stopCommand } from './commands/stop.js';
 import { mcpCommand } from './commands/mcp.js';
+import { compareCommand } from './commands/compare.js';
 import { showTips, TIP_TITLES } from './utils/display.js';
 import {
   Git,
@@ -318,6 +319,19 @@ export function createProgram(
     )
     .option('--json', 'Output JSON and skip confirmation prompts')
     .action(iterateCommand);
+
+  program
+    .command('compare')
+    .description(
+      'Compare multiple tasks and analyze implementation differences'
+    )
+    .argument('<taskIds...>', 'Task IDs to compare (2-5 tasks)')
+    .option('--json', 'Output in JSON format')
+    .option(
+      '--agent <agent>',
+      'AI agent to use for comparison (claude, gemini, etc.)'
+    )
+    .action(compareCommand);
 
   program.commandsGroup(colors.cyan('Debug a task:'));
 

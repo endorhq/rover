@@ -16,6 +16,7 @@ import {
 import { findProjectRoot, launchSync, VERBOSE } from 'rover-core';
 import sweWorkflow from './workflows/swe.yml';
 import techWriterWorkflow from './workflows/tech-writer.yml';
+import sweCompareWorkflow from './workflows/swe-compare.yml';
 import entrypointScript from './entrypoint.sh';
 import pupa from 'pupa';
 import { fileURLToPath } from 'node:url';
@@ -393,6 +394,7 @@ echo "======================================="
   generateInputs(): string {
     // For now, we only pass the task title and description as inputs
     const inputs = {
+      ...this.task.inputs,
       title: this.task.title,
       description: this.task.description,
     };
@@ -415,6 +417,10 @@ echo "======================================="
     switch (workflowName) {
       case 'tech-writer': {
         workflowPath = join(distDir, techWriterWorkflow);
+        break;
+      }
+      case 'swe-compare': {
+        workflowPath = join(distDir, sweCompareWorkflow);
         break;
       }
       default: {

@@ -65,8 +65,8 @@ describe('workflow utilities', () => {
       expect(workflowNames).toContain('swe');
       expect(workflowNames).toContain('tech-writer');
 
-      // Should have exactly 2 built-in workflows
-      expect(workflows).toHaveLength(2);
+      // Should have exactly 3 built-in workflows
+      expect(workflows).toHaveLength(3);
     });
 
     it('should return workflows with proper structure', () => {

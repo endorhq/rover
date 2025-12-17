@@ -19,7 +19,7 @@ export const GLOBAL_CONFIG_FILENAME = 'rover.json';
 /**
  * AI agent enum schema
  */
-export const AiAgentSchema = z.enum(AI_AGENT);
+export const AiAgentSchema = z.nativeEnum(AI_AGENT);
 
 /**
  * Telemetry status values
@@ -69,9 +69,9 @@ export const GlobalConfigSchema = z.object({
   /** Whether to show attribution in outputs */
   attribution: AttributionStatusSchema,
   /** Timestamp when the configuration was created */
-  createdAt: z.iso.datetime(),
+  createdAt: z.string().datetime(),
   /** Timestamp when the configuration was last updated */
-  updatedAt: z.iso.datetime(),
+  updatedAt: z.string().datetime(),
   /** List of projects available in the system */
   projects: z.array(GlobalProjectSchema),
 });
