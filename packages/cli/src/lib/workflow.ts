@@ -2,6 +2,7 @@
 import { WorkflowManager, WorkflowStore } from 'rover-schemas';
 import sweWorkflow from './workflows/swe.yml';
 import techWriterWorkflow from './workflows/tech-writer.yml';
+import sweCompareWorkflow from './workflows/swe-compare.yml';
 import { dirname, isAbsolute, join } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -31,6 +32,9 @@ export const initWorkflowStore = (): WorkflowStore => {
 
   const techWriter = loadBuiltInWorkflow(techWriterWorkflow);
   store.addWorkflow(techWriter);
+
+  const sweCompare = loadBuiltInWorkflow(sweCompareWorkflow);
+  store.addWorkflow(sweCompare);
 
   return store;
 };
