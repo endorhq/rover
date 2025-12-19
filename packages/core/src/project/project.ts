@@ -131,7 +131,7 @@ export class ProjectManager {
 
   /**
    * Create the folder structure for the project in the store.
-   * 
+   *
    * @throws When the folder cannot be created
    */
   private createProjectFolders(id: string) {
