@@ -116,12 +116,40 @@ export class ProjectManager {
       }
     }
 
+    try {
+      this.createProjectFolders(id);
+    } catch (error) {
+      throw new ProjectManagerRegistrationError(
+        `Could not create the project folders in the Rover store`,
+        error
+      );
+    }
+
     this.config.addProject(project);
     return;
   }
 
   /**
-   * Generate an ID to the project based on the current path. The format
+   * Create the folder structure for the project in the store.
+   * 
+   * @throws When the folder cannot be created
+   */
+  private createProjectFolders(id: string) {
+    const paths = [
+      join(this.projectsPath, id, 'tasks'),
+      join(this.projectsPath, id, 'workspaces'),
+      join(this.projectsPath, id, 'logs'),
+    ];
+
+    for (const path in paths) {
+      if (!existsSync(path)) {
+        mkdirSync(path, { recursive: true });
+      }
+    }
+  }
+
+  /**
+   * Generate an ID to the project based on the current name and path. The format
    * will be the name-SHA256(path).slice(0, 8). This makes the project easier
    * to identify, while reducing potential collisions.
    */
