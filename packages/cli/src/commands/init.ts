@@ -22,11 +22,11 @@ import { getTelemetry } from '../lib/telemetry.js';
 // Get the default prompt
 const { prompt } = enquirer;
 
-// Ensure .rover/tasks/ and .rover/settings.json are in .gitignore
+// Ensure .rover/tasks/ and .rover/settings.local.json are in .gitignore
 const ensureGitignore = async (projectPath: string): Promise<void> => {
   const gitignorePath = join(projectPath, '.gitignore');
   const roverTasksEntry = '.rover/tasks/';
-  const roverSettingsEntry = '.rover/settings.json';
+  const roverSettingsEntry = '.rover/settings.local.json';
 
   try {
     let content = '';
@@ -335,7 +335,7 @@ export const initCommand = async (
       console.log(colors.green('✓ Rover initialization complete!'));
       console.log(`├── ${colors.gray('Project config:')} rover.json`);
       console.log(
-        `└── ${colors.gray('User settings:')} .rover/settings.json (Added to .gitignore)`
+        `└── ${colors.gray('User settings:')} .rover/settings.json (.rover/settings.local.json added to .gitignore)`
       );
 
       showTips(

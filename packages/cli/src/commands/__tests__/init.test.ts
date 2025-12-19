@@ -139,7 +139,7 @@ describe('init command', () => {
     // Verify granular patterns were added
     const gitignore = readFileSync('.gitignore', 'utf8');
     expect(gitignore).toContain('.rover/tasks/');
-    expect(gitignore).toContain('.rover/settings.json');
+    expect(gitignore).toContain('.rover/settings.local.json');
   });
 
   it('should handle existing .gitignore with other entries', async () => {
@@ -156,11 +156,11 @@ describe('init command', () => {
     expect(gitignore).toContain('node_modules/');
     expect(gitignore).toContain('dist/');
     expect(gitignore).toContain('.rover/tasks/');
-    expect(gitignore).toContain('.rover/settings.json');
+    expect(gitignore).toContain('.rover/settings.local.json');
 
     // Ensure patterns were only added once
     const tasksMatches = gitignore.match(/\.rover\/tasks\//g);
-    const settingsMatches = gitignore.match(/\.rover\/settings\.json/g);
+    const settingsMatches = gitignore.match(/\.rover\/settings\.local\.json/g);
     expect(tasksMatches?.length).toBe(1);
     expect(settingsMatches?.length).toBe(1);
   });
@@ -188,7 +188,7 @@ describe('init command', () => {
     // Create .gitignore already containing granular patterns
     writeFileSync(
       '.gitignore',
-      '.rover/tasks/\n.rover/settings.json\nnode_modules/\n'
+      '.rover/tasks/\n.rover/settings.local.json\nnode_modules/\n'
     );
 
     // Create a simple project file for environment detection
@@ -199,7 +199,7 @@ describe('init command', () => {
     // Verify patterns weren't duplicated
     const gitignore = readFileSync('.gitignore', 'utf8');
     const tasksMatches = gitignore.match(/\.rover\/tasks\//g);
-    const settingsMatches = gitignore.match(/\.rover\/settings\.json/g);
+    const settingsMatches = gitignore.match(/\.rover\/settings\.local\.json/g);
     expect(tasksMatches?.length).toBe(1);
     expect(settingsMatches?.length).toBe(1);
   });
