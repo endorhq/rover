@@ -13,7 +13,7 @@ fi
 
 # Some tools might be installed under /root/local/.bin conditionally
 # depending on the chosen agent and requirements, make this directory
-# available in the $PATH
+# available in the $PATH.
 export PATH=/root/local/.bin:$PATH
 
 # Initially, use sudo to ensure even users without permissions can
@@ -22,7 +22,7 @@ export PATH=/root/local/.bin:$PATH
 sudo mkdir -p $HOME
 sudo mkdir -p $HOME/.config
 sudo mkdir -p $HOME/.local/bin
-echo 'export PATH="$HOME/.local/bin:$PATH"' >> $HOME/.profile
+echo 'export PATH="$HOME/.local/bin:$HOME/.local/npm/bin:$PATH"' >> $HOME/.profile
 sudo chown -R $(id -u):$(id -g) $HOME
 sudo chown -R $(id -u):$(id -g) /workspace
 sudo chown -R $(id -u):$(id -g) /output
@@ -107,8 +107,26 @@ echo "======================================="
 export PACKAGE_MANAGER_MCP_PORT=8090
 RUST_LOG=info package-manager-mcp-server $PACKAGE_MANAGER_MCP_PORT &
 
-while ! nc -w 0 127.0.0.1 "$PACKAGE_MANAGER_MCP_PORT" < /dev/null; do
-  echo "Waiting for package manager MCP to be ready at $PACKAGE_MANAGER_MCP_PORT..."
+PACKAGE_MANAGER_MCP_INIT_PAYLOAD='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{"tools":{},"resources":{},"prompts":{}},"clientInfo":{"name":"test-client","version":"1.0.0"}}}'
+
+while true; do
+  PACKAGE_MANAGER_MCP_RESPONSE=$(curl -s --connect-timeout 1 --max-time 1 \
+    -X POST \
+    -H "Content-Type: application/json" \
+    -H "Accept: application/json, text/event-stream" \
+    -d "$PACKAGE_MANAGER_MCP_INIT_PAYLOAD" \
+    http://127.0.0.1:$PACKAGE_MANAGER_MCP_PORT/mcp 2>/dev/null)
+
+  if [[ $? -ne 0 ]]; then
+    echo "Waiting for package manager MCP to be ready at $PACKAGE_MANAGER_MCP_PORT..."
+    sleep 1
+    continue
+  fi
+
+  if echo "$PACKAGE_MANAGER_MCP_RESPONSE" | grep 'serverInfo'; then
+    break
+  fi
+
   sleep 1
 done
 
