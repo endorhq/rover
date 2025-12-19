@@ -60,3 +60,11 @@ export {
   getCacheDir,
   ensureDirectories,
 } from './paths.js';
+
+export {
+  detectEnvironment,
+  ProjectManagerLoadError,
+  ProjectManagerRegistrationError,
+  ProjectManager,
+  type EnvironmentResult,
+} from './project/index.js';

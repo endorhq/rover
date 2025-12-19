@@ -1,5 +1,3 @@
-import type { Language, PackageManager, TaskManager } from 'rover-schemas';
-
 export interface ProjectInstructions {
   runDev: string;
   interaction: string;
@@ -49,12 +47,6 @@ export interface TaskStatus {
 export interface TaskExpansion {
   title: string;
   description: string;
-}
-
-export interface Environment {
-  languages: Language[];
-  packageManagers: PackageManager[];
-  taskManagers: TaskManager[];
 }
 
 export interface AIProvider {
