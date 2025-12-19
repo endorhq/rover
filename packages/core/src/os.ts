@@ -182,7 +182,11 @@ export function launch(
     );
 
     // Check first if we need to add logging
+    // Run in a new process group to prevent child processes from being
+    // terminated when signals are sent to the parent's process group.
+    // See: https://github.com/endorhq/rover/issues/374
     let newOpts: Options = {
+      detached: true,
       ...expandedOptions,
     } as Options;
 
@@ -234,10 +238,13 @@ export function launch(
     return execa(newOpts)`${parsedCommand}`;
   }
 
+  // Run in a new process group to prevent child processes from being
+  // terminated when signals are sent to the parent's process group.
+  // See: https://github.com/endorhq/rover/issues/374
   if (expandedOptions) {
-    return execa(expandedOptions)`${parsedCommand}`;
+    return execa({ detached: true, ...expandedOptions })`${parsedCommand}`;
   } else {
-    return execa`${parsedCommand}`;
+    return execa({ detached: true })`${parsedCommand}`;
   }
 }
 
