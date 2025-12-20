@@ -51,6 +51,7 @@ export const mcpInstallCommand = async (
     const installed = await agent.isInstalled();
 
     if (!installed) {
+      spinner.fail(`${agent.name} is not installed`);
       output.error = `The ${agent.name} is not installed in the system. Install it first`;
     } else {
       spinner.text = `Installing MCP server in ${agent.name}`;
