@@ -11,6 +11,7 @@ describe('ProjectManager', () => {
   let mockConfig: {
     projects: GlobalProject[];
     addProject: ReturnType<typeof vi.fn>;
+    removeProject: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(() => {
@@ -31,6 +32,9 @@ describe('ProjectManager', () => {
       projects: [],
       addProject: vi.fn((project: GlobalProject) => {
         mockConfig.projects.push(project);
+      }),
+      removeProject: vi.fn((id: string) => {
+        mockConfig.projects = mockConfig.projects.filter(p => p.id !== id);
       }),
     };
 
@@ -260,6 +264,140 @@ describe('ProjectManager', () => {
         expect.objectContaining({
           id: expect.stringMatching(/^my-project-name-[a-f0-9]{8}$/),
         })
+      );
+    });
+  });
+
+  describe('get', () => {
+    it('should return project when found by ID', async () => {
+      const existingProject: GlobalProject = {
+        id: 'test-project-123',
+        path: '/test/path',
+        repositoryName: 'test-project',
+        languages: ['typescript'],
+        packageManagers: ['npm'],
+        taskManagers: [],
+      };
+      mockConfig.projects = [existingProject];
+
+      const { ProjectManager } = await import('../project.js');
+
+      const manager = new ProjectManager();
+      const result = manager.get('test-project-123');
+
+      expect(result).toEqual(existingProject);
+    });
+
+    it('should throw ProjectManagerLoadError when project ID is not found', async () => {
+      mockConfig.projects = [];
+
+      const { ProjectManager, ProjectManagerLoadError } = await import(
+        '../project.js'
+      );
+
+      const manager = new ProjectManager();
+
+      expect(() => manager.get('non-existent-id')).toThrow(
+        ProjectManagerLoadError
+      );
+      expect(() => manager.get('non-existent-id')).toThrow(
+        'Project with ID non-existent-id not found'
+      );
+    });
+  });
+
+  describe('remove', () => {
+    it('should call removeProject on config', async () => {
+      const existingProject: GlobalProject = {
+        id: 'project-to-remove',
+        path: '/test/path',
+        repositoryName: 'test-project',
+        languages: [],
+        packageManagers: [],
+        taskManagers: [],
+      };
+      mockConfig.projects = [existingProject];
+
+      const { ProjectManager } = await import('../project.js');
+
+      const manager = new ProjectManager();
+      await manager.remove('project-to-remove');
+
+      expect(mockConfig.removeProject).toHaveBeenCalledWith(
+        'project-to-remove'
+      );
+    });
+
+    it('should delete project folders when they exist', async () => {
+      const projectId = 'project-with-folders';
+      const projectFolderPath = join(testDataDir, 'projects', projectId);
+
+      // Create project folders
+      mkdirSync(join(projectFolderPath, 'tasks'), { recursive: true });
+      mkdirSync(join(projectFolderPath, 'workspaces'), { recursive: true });
+      mkdirSync(join(projectFolderPath, 'logs'), { recursive: true });
+
+      expect(existsSync(projectFolderPath)).toBe(true);
+
+      const { ProjectManager } = await import('../project.js');
+
+      const manager = new ProjectManager();
+      await manager.remove(projectId);
+
+      expect(existsSync(projectFolderPath)).toBe(false);
+    });
+
+    it('should handle non-existent project folders gracefully', async () => {
+      const projectId = 'project-without-folders';
+      const projectFolderPath = join(testDataDir, 'projects', projectId);
+
+      expect(existsSync(projectFolderPath)).toBe(false);
+
+      const { ProjectManager } = await import('../project.js');
+
+      const manager = new ProjectManager();
+
+      // Should not throw when folders don't exist
+      await expect(manager.remove(projectId)).resolves.not.toThrow();
+      expect(mockConfig.removeProject).toHaveBeenCalledWith(projectId);
+    });
+  });
+
+  describe('getProjectTasksPath', () => {
+    it('should return correct path to tasks directory', async () => {
+      const { ProjectManager } = await import('../project.js');
+
+      const manager = new ProjectManager();
+      const result = manager.getProjectTasksPath('my-project-id');
+
+      expect(result).toBe(
+        join(testDataDir, 'projects', 'my-project-id', 'tasks')
+      );
+    });
+  });
+
+  describe('getProjectWorkspacesPath', () => {
+    it('should return correct path to workspaces directory', async () => {
+      const { ProjectManager } = await import('../project.js');
+
+      const manager = new ProjectManager();
+      const result = manager.getProjectWorkspacesPath('my-project-id');
+
+      expect(result).toBe(
+        join(testDataDir, 'projects', 'my-project-id', 'workspaces')
+      );
+    });
+  });
+
+  describe('getProjectLogsPath', () => {
+    it('should return correct path to logs directory', async () => {
+      const { ProjectManager } = await import('../project.js');
+
+      const manager = new ProjectManager();
+      const result = manager.getProjectLogsPath('my-project-id');
+
+      expect(result).toBe(
+        join(testDataDir, 'projects', 'my-project-id', 'logs')
       );
     });
   });
