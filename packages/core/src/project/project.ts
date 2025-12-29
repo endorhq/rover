@@ -1,6 +1,6 @@
 import { isAbsolute, join, resolve } from 'node:path';
 import { getDataDir } from '../paths.js';
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, rmdirSync } from 'node:fs';
 import { GlobalConfigManager, GlobalProject } from 'rover-schemas';
 import { createHash } from 'node:crypto';
 import { detectEnvironment } from './environment.js';
@@ -130,6 +130,64 @@ export class ProjectManager {
   }
 
   /**
+   * Retrieve a registered project by its ID
+   *
+   * @param id The ID of the project to retrieve
+   * @returns The registered project
+   * @throws When the project is not found
+   */
+  get(id: string): GlobalProject {
+    const project = this.config.projects.find(proj => proj.id === id);
+
+    if (!project) {
+      throw new ProjectManagerLoadError(`Project with ID ${id} not found`);
+    }
+
+    return project;
+  }
+
+  /**
+   * Unregister a project from the Rover system
+   *
+   * @param id The ID of the project to unregister
+   * @throws When the project files cannot be deleted
+   */
+  async remove(id: string): Promise<void> {
+    this.deleteProjectFolders(id);
+    this.config.removeProject(id);
+  }
+
+  /**
+   * Retrieve the task directory of the given project
+   *
+   * @param id The ID of the project
+   * @returns The path to the task directory
+   */
+  getProjectTasksPath(id: string): string {
+    return join(this.projectsPath, id, 'tasks');
+  }
+
+  /**
+   * Retrieve the workspaces directory of the given project
+   *
+   * @param id The ID of the project
+   * @returns The path to the workspaces directory
+   */
+  getProjectWorkspacesPath(id: string): string {
+    return join(this.projectsPath, id, 'workspaces');
+  }
+
+  /**
+   * Retrieve the logs directory of the given project
+   *
+   * @param id The ID of the project
+   * @returns The path to the logs directory
+   */
+  getProjectLogsPath(id: string): string {
+    return join(this.projectsPath, id, 'logs');
+  }
+
+  /**
    * Create the folder structure for the project in the store.
    *
    * @throws When the folder cannot be created
@@ -146,6 +204,19 @@ export class ProjectManager {
         mkdirSync(path, { recursive: true });
       }
     }
+  }
+
+  /**
+   * Delete the folder structure for the project in the store.
+   *
+   * @throws When the folder cannot be deleted
+   */
+  private deleteProjectFolders(id: string) {
+    if (!existsSync(join(this.projectsPath, id))) {
+      return;
+    }
+
+    rmdirSync(join(this.projectsPath, id), { recursive: true });
   }
 
   /**
