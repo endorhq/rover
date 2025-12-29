@@ -1,0 +1,732 @@
+# Software Engineering Comparison Workflow
+# This workflow compares multiple rover tasks to analyze implementation approaches,
+# architectural decisions, and trade-offs across different solutions
+#
+# IMPORTANT: This workflow receives copies of each compared task's output documents
+# in the comparison workspace under comparison-docs/task-<taskId>/. Use the provided
+# document paths (summary.md, changes.md, context.md, etc.) to perform the analysis.
+version: '1.0'
+name: 'swe-compare'
+description: 'Compare multiple rover task implementations with comprehensive analysis'
+
+inputs:
+  - name: tasks
+    description: 'JSON array of task metadata objects'
+    type: string
+    required: true
+  - name: task_count
+    description: 'Number of tasks being compared'
+    type: string
+    required: true
+  - name: task_ids
+    description: 'Comma-separated list of task IDs'
+    type: string
+    required: true
+  - name: task_documents
+    description: 'JSON array describing document paths for each task within the workspace'
+    type: string
+    required: true
+
+outputs:
+  - name: overview
+    description: 'High-level comparison of all tasks'
+    type: file
+    filename: OVERVIEW.md
+  - name: architectural_decisions
+    description: 'Comparison of design choices and architectural patterns'
+    type: file
+    filename: ARCHITECTURAL_DECISIONS.md
+  - name: implementation_differences
+    description: 'Code-level differences and implementation approaches'
+    type: file
+    filename: IMPLEMENTATION_DIFFERENCES.md
+  - name: security_considerations
+    description: 'Security implications and vulnerabilities comparison'
+    type: file
+    filename: SECURITY_CONSIDERATIONS.md
+  - name: performance_considerations
+    description: 'Performance trade-offs and optimization approaches'
+    type: file
+    filename: PERFORMANCE_CONSIDERATIONS.md
+  - name: user_experience_considerations
+    description: 'UX impact and usability differences'
+    type: file
+    filename: USER_EXPERIENCE_CONSIDERATIONS.md
+  - name: maintainability_considerations
+    description: 'Code maintainability and technical debt comparison'
+    type: file
+    filename: MAINTAINABILITY_CONSIDERATIONS.md
+  - name: summary
+    description: 'Executive summary with recommendations'
+    type: file
+    filename: SUMMARY.md
+
+defaults:
+  tool: claude
+  model: sonnet
+
+config:
+  timeout: 3600
+  continueOnError: false
+
+steps:
+  - id: overview
+    type: agent
+    name: 'Overview Analysis'
+    prompt: |
+      You are analyzing multiple rover task implementations to provide a high-level comparison.
+
+      Task IDs being compared: {{inputs.task_ids}}
+      Number of tasks: {{inputs.task_count}}
+      Task data: {{inputs.tasks}}
+      Task documents metadata: {{inputs.task_documents}}
+
+      Your goal is to create a comprehensive overview that helps developers understand the differences at a glance.
+
+      ## Instructions
+
+      1. Parse the task data to extract key information about each task
+      2. For each task, use the provided document paths to understand the implementation:
+         - Read summary.md, changes.md, context.md, and other docs from comparison-docs/task-<taskId>/
+         - Cross-reference the task description included in the metadata as needed
+         - Examine the git diff or changes in the worktree if present
+      3. Create a high-level comparison matrix covering:
+         - Task objectives and scope
+         - Completion status
+         - AI agents used
+         - Workflows employed
+         - Overall approach taken
+      4. Identify common patterns and unique differences
+
+      Write your analysis to `OVERVIEW.md` following this structure:
+
+      <template>
+      # Task Comparison Overview
+
+      ## Tasks Being Compared
+
+      | Task ID | Title | Agent | Workflow | Status |
+      |---------|-------|-------|----------|--------|
+      | ... | ... | ... | ... | ... |
+
+      ## Task Objectives
+
+      ### Task [ID]: [Title]
+      Brief description of what this task aimed to accomplish
+
+      ## Approach Comparison
+
+      ### Common Patterns
+      - Shared approaches across implementations
+
+      ### Unique Differences
+      - Key differences between implementations
+
+      ## High-Level Assessment
+
+      Brief summary of which approaches worked well and potential trade-offs
+      </template>
+    outputs:
+      - name: overview_file
+        description: 'High-level comparison overview'
+        type: file
+        filename: OVERVIEW.md
+
+  - id: architectural_decisions
+    type: agent
+    name: 'Architectural Decisions Analysis'
+    prompt: |
+      You are analyzing architectural and design decisions across multiple task implementations.
+
+      Task IDs: {{inputs.task_ids}}
+      Task documents metadata: {{inputs.task_documents}}
+      Overview: {{steps.overview.outputs.overview_file}}
+
+      ## Instructions
+
+      **IMPORTANT**: This analysis is OPTIONAL. Only create the `ARCHITECTURAL_DECISIONS.md` file if there are meaningful architectural differences to analyze. If the tasks being compared don't involve significant architectural decisions (e.g., simple bug fixes, documentation changes, minor tweaks), you may skip creating this file.
+
+      1. For each task, examine:
+         - Summary, changes, and context docs at comparison-docs/task-<taskId>/
+         - Design patterns used
+         - Code organization and structure
+         - Module boundaries and dependencies
+         - Abstraction levels
+         - Technology choices
+      2. Compare architectural decisions:
+         - Why different approaches were chosen
+         - Trade-offs for each approach
+         - Scalability implications
+         - Maintainability considerations
+      3. Identify best practices and anti-patterns
+
+      If you determine that architectural analysis is relevant, write your analysis to `ARCHITECTURAL_DECISIONS.md`:
+
+      <template>
+      # Architectural Decisions Comparison
+
+      ## Design Patterns
+
+      ### Task [ID]
+      - Pattern used: [pattern name]
+      - Rationale: [why this pattern]
+      - Trade-offs: [pros and cons]
+
+      ## Code Organization
+
+      ### Task [ID]
+      - Structure: [how code is organized]
+      - Module boundaries: [separation of concerns]
+
+      ## Technology Choices
+
+      ### Task [ID]
+      - Libraries/frameworks: [what was used]
+      - Justification: [why these choices]
+
+      ## Comparative Assessment
+
+      ### Best Practices Observed
+      - [Practice and which task(s) used it]
+
+      ### Areas for Improvement
+      - [Anti-patterns or concerns and which task(s)]
+
+      ### Recommendations
+      - [Which architectural approach is recommended and why]
+      </template>
+    outputs:
+      - name: architectural_file
+        description: 'Architectural decisions comparison'
+        type: file
+        filename: ARCHITECTURAL_DECISIONS.md
+
+  - id: implementation_differences
+    type: agent
+    name: 'Implementation Differences Analysis'
+    prompt: |
+      You are analyzing code-level implementation differences across multiple tasks.
+
+      Task IDs: {{inputs.task_ids}}
+      Task documents metadata: {{inputs.task_documents}}
+      Overview: {{steps.overview.outputs.overview_file}}
+
+      ## Instructions
+
+      **IMPORTANT**: This analysis is OPTIONAL. Only create the `IMPLEMENTATION_DIFFERENCES.md` file if there are meaningful implementation differences to analyze at the code level. If the tasks being compared don't involve significant code changes or use very similar approaches, you may skip creating this file.
+
+      1. For each task, examine the actual code changes:
+         - Use the provided document paths (comparison-docs/task-<taskId>/) to read summary, changes, and context
+         - Read modified files
+         - Analyze implementation logic
+         - Review error handling
+         - Check code quality
+      2. Compare implementations:
+         - Different algorithms or approaches
+         - Code complexity
+         - Readability and maintainability
+         - Testing coverage
+      3. Highlight significant code-level differences
+
+      If you determine that implementation analysis is relevant, write your analysis to `IMPLEMENTATION_DIFFERENCES.md`:
+
+      <template>
+      # Implementation Differences
+
+      ## Core Logic Comparison
+
+      ### Task [ID]
+      ```
+      [Key code snippet or pseudocode]
+      ```
+      - Approach: [description]
+      - Complexity: [O-notation or qualitative assessment]
+
+      ## Error Handling
+
+      ### Task [ID]
+      - Strategy: [how errors are handled]
+      - Coverage: [what scenarios are covered]
+
+      ## Code Quality Metrics
+
+      | Task ID | Files Modified | Lines Changed | Complexity | Readability |
+      |---------|----------------|---------------|------------|-------------|
+      | ... | ... | ... | ... | ... |
+
+      ## Notable Differences
+
+      ### [Specific aspect, e.g., "Data validation"]
+      - Task [ID]: [approach]
+      - Task [ID]: [different approach]
+      - Assessment: [which is better and why]
+
+      ## Testing Approach
+
+      ### Task [ID]
+      - Test coverage: [what's tested]
+      - Test strategy: [unit/integration/etc.]
+
+      ## Recommendations
+
+      - [Which implementation approach is clearer/more maintainable]
+      </template>
+    outputs:
+      - name: implementation_file
+        description: 'Code-level differences analysis'
+        type: file
+        filename: IMPLEMENTATION_DIFFERENCES.md
+
+  - id: security_considerations
+    type: agent
+    name: 'Security Analysis'
+    prompt: |
+      You are analyzing security implications across multiple task implementations.
+
+      Task IDs: {{inputs.task_ids}}
+      Task documents metadata: {{inputs.task_documents}}
+      Implementation differences: {{steps.implementation_differences.outputs.implementation_file}}
+
+      ## Instructions
+
+      **IMPORTANT**: This analysis is OPTIONAL. Only create the `SECURITY_CONSIDERATIONS.md` file if there are relevant security implications to analyze. If the tasks being compared don't involve security-sensitive changes (e.g., UI-only changes, documentation, refactoring without security impact), you may skip creating this file.
+
+      1. For each task, review security aspects:
+         - Start with the provided documents at comparison-docs/task-<taskId>/ (summary, changes, context)
+         - Input validation
+         - Authentication/authorization
+         - Data sanitization
+         - Secure API usage
+         - Dependency vulnerabilities
+         - Common vulnerabilities (OWASP Top 10)
+      2. Compare security approaches:
+         - Which implementation is more secure
+         - Potential vulnerabilities in each
+         - Security trade-offs
+      3. Provide security recommendations
+
+      If you determine that security analysis is relevant, write your analysis to `SECURITY_CONSIDERATIONS.md`:
+
+      <template>
+      # Security Considerations
+
+      ## Security Overview
+
+      Brief summary of security posture across all implementations
+
+      ## Task-by-Task Security Analysis
+
+      ### Task [ID]
+      **Security Strengths:**
+      - [What was done well]
+
+      **Security Concerns:**
+      - [Potential vulnerabilities or risks]
+      - Severity: [Critical/High/Medium/Low]
+
+      **Mitigation Recommendations:**
+      - [How to address concerns]
+
+      ## Comparative Security Assessment
+
+      | Task ID | Input Validation | Auth/AuthZ | Data Sanitization | Overall Security |
+      |---------|------------------|------------|-------------------|------------------|
+      | ... | ... | ... | ... | ... |
+
+      ## Common Security Issues
+
+      - [Issue found across multiple tasks]
+      - Impact: [description]
+      - Recommended fix: [solution]
+
+      ## Security Best Practices Observed
+
+      - [Best practice and which task(s) implemented it]
+
+      ## Final Security Recommendation
+
+      [Which implementation has the best security posture and why, or recommend combining approaches]
+      </template>
+    outputs:
+      - name: security_file
+        description: 'Security implications comparison'
+        type: file
+        filename: SECURITY_CONSIDERATIONS.md
+
+  - id: performance_considerations
+    type: agent
+    name: 'Performance Analysis'
+    prompt: |
+      You are analyzing performance characteristics across multiple task implementations.
+
+      Task IDs: {{inputs.task_ids}}
+      Task documents metadata: {{inputs.task_documents}}
+      Implementation differences: {{steps.implementation_differences.outputs.implementation_file}}
+
+      ## Instructions
+
+      **IMPORTANT**: This analysis is OPTIONAL. Only create the `PERFORMANCE_CONSIDERATIONS.md` file if there are meaningful performance implications to analyze. If the tasks being compared don't involve performance-sensitive changes (e.g., documentation, UI styling, minor fixes), you may skip creating this file.
+
+      1. For each task, analyze performance aspects:
+         - Review summary/changes/context docs via comparison-docs/task-<taskId>/
+         - Algorithm efficiency
+         - Resource usage (memory, CPU)
+         - I/O operations
+         - Database queries
+         - Caching strategies
+         - Scalability potential
+      2. Compare performance trade-offs:
+         - Speed vs. resource usage
+         - Optimization techniques used
+         - Performance bottlenecks
+      3. Provide performance recommendations
+
+      If you determine that performance analysis is relevant, write your analysis to `PERFORMANCE_CONSIDERATIONS.md`:
+
+      <template>
+      # Performance Considerations
+
+      ## Performance Overview
+
+      Brief summary of performance characteristics across implementations
+
+      ## Task-by-Task Performance Analysis
+
+      ### Task [ID]
+      **Algorithm Efficiency:**
+      - Time complexity: [O-notation]
+      - Space complexity: [O-notation]
+
+      **Resource Usage:**
+      - Memory: [qualitative assessment]
+      - CPU: [qualitative assessment]
+
+      **Optimization Techniques:**
+      - [What optimizations were applied]
+
+      **Performance Concerns:**
+      - [Potential bottlenecks or inefficiencies]
+
+      ## Comparative Performance Assessment
+
+      | Task ID | Time Complexity | Space Complexity | I/O Efficiency | Scalability |
+      |---------|-----------------|------------------|----------------|-------------|
+      | ... | ... | ... | ... | ... |
+
+      ## Performance Trade-offs
+
+      ### [Specific aspect, e.g., "Caching strategy"]
+      - Task [ID]: [approach and implications]
+      - Task [ID]: [different approach and implications]
+      - Assessment: [trade-offs analysis]
+
+      ## Scalability Analysis
+
+      - Task [ID]: [how it scales with increased load]
+
+      ## Performance Recommendations
+
+      [Which implementation performs best for different scenarios, or recommend combining approaches]
+      </template>
+    outputs:
+      - name: performance_file
+        description: 'Performance trade-offs analysis'
+        type: file
+        filename: PERFORMANCE_CONSIDERATIONS.md
+
+  - id: user_experience_considerations
+    type: agent
+    name: 'User Experience Analysis'
+    prompt: |
+      You are analyzing user experience and usability across multiple task implementations.
+
+      Task IDs: {{inputs.task_ids}}
+      Task documents metadata: {{inputs.task_documents}}
+      Overview: {{steps.overview.outputs.overview_file}}
+
+      ## Instructions
+
+      **IMPORTANT**: This analysis is OPTIONAL. Only create the `USER_EXPERIENCE_CONSIDERATIONS.md` file if there are meaningful UX implications to analyze. If the tasks being compared don't involve user-facing changes (e.g., internal refactoring, backend changes, build configuration), you may skip creating this file.
+
+      1. For each task, evaluate UX aspects:
+         - Review the provided output documents via comparison-docs/task-<taskId>/
+         - User interface changes
+         - Interaction patterns
+         - Error messages and feedback
+         - Accessibility
+         - Documentation
+         - Ease of use
+      2. Compare UX approaches:
+         - Which is more intuitive
+         - User feedback quality
+         - Learning curve
+      3. Provide UX recommendations
+
+      If you determine that UX analysis is relevant, write your analysis to `USER_EXPERIENCE_CONSIDERATIONS.md`:
+
+      <template>
+      # User Experience Considerations
+
+      ## UX Overview
+
+      Brief summary of user experience across implementations
+
+      ## Task-by-Task UX Analysis
+
+      ### Task [ID]
+      **Interface Changes:**
+      - [What changed in the UI/CLI/API]
+
+      **Interaction Patterns:**
+      - [How users interact with the feature]
+
+      **Error Handling & Feedback:**
+      - [Quality of error messages and user feedback]
+
+      **Accessibility:**
+      - [Accessibility considerations addressed]
+
+      **Documentation:**
+      - [Quality and completeness of documentation]
+
+      **Ease of Use:**
+      - Learning curve: [assessment]
+      - Intuitiveness: [assessment]
+
+      ## Comparative UX Assessment
+
+      | Task ID | Intuitiveness | Error Feedback | Documentation | Accessibility | Overall UX |
+      |---------|---------------|----------------|---------------|---------------|------------|
+      | ... | ... | ... | ... | ... | ... |
+
+      ## UX Trade-offs
+
+      - [Trade-off analysis between different approaches]
+
+      ## User Journey Comparison
+
+      ### Task [ID]
+      1. [Step in user journey]
+      2. [Next step]
+
+      ## UX Recommendations
+
+      [Which implementation provides the best user experience and why, or recommend combining approaches]
+      </template>
+    outputs:
+      - name: ux_file
+        description: 'User experience impact analysis'
+        type: file
+        filename: USER_EXPERIENCE_CONSIDERATIONS.md
+
+  - id: maintainability_considerations
+    type: agent
+    name: 'Maintainability Analysis'
+    prompt: |
+      You are analyzing code maintainability and long-term maintenance implications across multiple task implementations.
+
+      Task IDs: {{inputs.task_ids}}
+      Task documents metadata: {{inputs.task_documents}}
+      Implementation differences: {{steps.implementation_differences.outputs.implementation_file}}
+      Architectural decisions: {{steps.architectural_decisions.outputs.architectural_file}}
+
+      ## Instructions
+
+      **IMPORTANT**: This analysis is OPTIONAL. Only create the `MAINTAINABILITY_CONSIDERATIONS.md` file if there are meaningful maintainability implications to analyze. If the tasks being compared don't involve significant code changes that affect long-term maintenance (e.g., simple configuration changes, documentation-only updates), you may skip creating this file.
+
+      1. For each task, evaluate maintainability aspects:
+         - Review the provided output documents via comparison-docs/task-<taskId>/
+         - Code readability and clarity
+         - Code complexity and technical debt
+         - Documentation quality (inline comments, external docs)
+         - Testing coverage and test quality
+         - Code conventions and consistency
+         - Modularity and coupling
+         - Extensibility for future changes
+         - Refactoring needs
+      2. Compare maintainability approaches:
+         - Which code is easier to understand and modify
+         - Long-term maintenance burden
+         - Technical debt introduced or resolved
+         - Impact on future development
+      3. Provide maintainability recommendations
+
+      If you determine that maintainability analysis is relevant, write your analysis to `MAINTAINABILITY_CONSIDERATIONS.md`:
+
+      <template>
+      # Maintainability Considerations
+
+      ## Maintainability Overview
+
+      Brief summary of maintainability characteristics across implementations
+
+      ## Task-by-Task Maintainability Analysis
+
+      ### Task [ID]
+      **Code Readability:**
+      - Clarity: [assessment]
+      - Naming conventions: [assessment]
+      - Code organization: [assessment]
+
+      **Code Complexity:**
+      - Cyclomatic complexity: [qualitative assessment]
+      - Technical debt: [identified issues]
+      - Refactoring needs: [areas needing improvement]
+
+      **Documentation Quality:**
+      - Inline comments: [assessment]
+      - API documentation: [assessment]
+      - Usage examples: [assessment]
+
+      **Testing:**
+      - Test coverage: [qualitative assessment]
+      - Test quality: [maintainability of tests themselves]
+      - Test documentation: [assessment]
+
+      **Modularity:**
+      - Coupling: [level of interdependence]
+      - Cohesion: [how well components group related functionality]
+      - Separation of concerns: [assessment]
+
+      **Extensibility:**
+      - Ease of adding features: [assessment]
+      - Design patterns used: [which patterns aid extensibility]
+
+      ## Comparative Maintainability Assessment
+
+      | Task ID | Readability | Complexity | Documentation | Testing | Modularity | Extensibility | Overall |
+      |---------|-------------|------------|---------------|---------|------------|---------------|---------|
+      | ... | ... | ... | ... | ... | ... | ... | ... |
+
+      ## Maintainability Trade-offs
+
+      ### [Specific aspect, e.g., "Code structure"]
+      - Task [ID]: [approach and long-term implications]
+      - Task [ID]: [different approach and implications]
+      - Assessment: [trade-offs analysis]
+
+      ## Technical Debt Analysis
+
+      ### Task [ID]
+      **Debt Introduced:**
+      - [New technical debt items]
+
+      **Debt Resolved:**
+      - [Technical debt that was addressed]
+
+      **Net Impact:**
+      - [Overall impact on codebase health]
+
+      ## Long-term Maintenance Considerations
+
+      - Task [ID]: [How easy will this be to maintain in 6-12 months]
+      - Impact on onboarding: [How these changes affect new developers]
+
+      ## Maintainability Recommendations
+
+      [Which implementation is most maintainable for long-term development, or recommend combining approaches]
+
+      ### Best Practices Observed
+      - [Practices that enhance maintainability]
+
+      ### Areas for Improvement
+      - [Changes that would improve maintainability]
+
+      ### Refactoring Suggestions
+      - [Recommended refactorings for better long-term maintenance]
+      </template>
+    outputs:
+      - name: maintainability_file
+        description: 'Code maintainability analysis'
+        type: file
+        filename: MAINTAINABILITY_CONSIDERATIONS.md
+
+  - id: summary
+    type: agent
+    name: 'Executive Summary'
+    prompt: |
+      You are creating an executive summary of the comparison across all dimensions.
+
+      Task IDs: {{inputs.task_ids}}
+      Task documents metadata: {{inputs.task_documents}}
+      Overview: {{steps.overview.outputs.overview_file}}
+      Architectural: {{steps.architectural_decisions.outputs.architectural_file}}
+      Implementation: {{steps.implementation_differences.outputs.implementation_file}}
+      Security: {{steps.security_considerations.outputs.security_file}}
+      Performance: {{steps.performance_considerations.outputs.performance_file}}
+      UX: {{steps.user_experience_considerations.outputs.ux_file}}
+      Maintainability: {{steps.maintainability_considerations.outputs.maintainability_file}}
+
+      ## Instructions
+
+      **IMPORTANT**: This summary is MANDATORY. You must always create the `SUMMARY.md` file.
+
+      Note that some of the analysis files (Architectural, Implementation, Security, Performance, UX, Maintainability) may not exist if they weren't relevant to the comparison. Only synthesize findings from the analyses that were actually performed.
+
+      1. Synthesize findings from all available analysis steps
+      2. Provide clear, actionable recommendations
+      3. Highlight the best overall approach or recommend hybrid solutions
+      4. Keep it concise and executive-friendly
+      5. Only include sections for analyses that were actually performed
+
+      Write your summary to `SUMMARY.md`:
+
+      <template>
+      # Comparison Summary
+
+      ## Executive Summary
+
+      [2-3 paragraphs summarizing the comparison and key findings]
+
+      ## Key Findings
+
+      ### Architecture
+      - [Top finding about architectural approaches]
+
+      ### Implementation
+      - [Top finding about code-level differences]
+
+      ### Security
+      - [Top security finding]
+
+      ### Performance
+      - [Top performance finding]
+
+      ### User Experience
+      - [Top UX finding]
+
+      ### Maintainability
+      - [Top maintainability finding]
+
+      ## Comparison Matrix
+
+      | Dimension | Task [ID] | Task [ID] | Task [ID] | Winner/Recommendation |
+      |-----------|-----------|-----------|-----------|----------------------|
+      | Architecture | [rating] | [rating] | [rating] | [recommendation] |
+      | Implementation | [rating] | [rating] | [rating] | [recommendation] |
+      | Security | [rating] | [rating] | [rating] | [recommendation] |
+      | Performance | [rating] | [rating] | [rating] | [recommendation] |
+      | UX | [rating] | [rating] | [rating] | [recommendation] |
+      | Maintainability | [rating] | [rating] | [rating] | [recommendation] |
+
+      ## Final Recommendations
+
+      ### Best Overall Approach
+      [Which task implementation is recommended and why]
+
+      ### Hybrid Approach (if applicable)
+      [How to combine the best aspects of multiple implementations]
+
+      ### Next Steps
+      1. [Actionable next step]
+      2. [Actionable next step]
+
+      ## Conclusion
+
+      [Final thoughts and recommendations]
+      </template>
+    outputs:
+      - name: summary_file
+        description: 'Executive summary with recommendations'
+        type: file
+        filename: SUMMARY.md
