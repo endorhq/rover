@@ -12,6 +12,9 @@ ARG NIX_AI_TOOLS_REV
 ARG TARGETARCH
 ARG PACKAGE_MANAGER_MCP_SERVER_VERSION="v0.2.0"
 ENV NIX_AI_TOOLS_REV=${NIX_AI_TOOLS_REV}
+# This ensures that the user profile is always sourced when we `docker
+# exec` manually into the container for manual inspection.
+ENV ENV=/etc/profile
 RUN apk update && \
     apk add bash curl file g++ jq make nix python3 sudo uv && \
     case ${TARGETARCH} in \
