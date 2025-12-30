@@ -184,23 +184,23 @@ export class TaskDescriptionManager {
     // Preserve all execution-related fields
     migrated.containerId = data.containerId || '';
     migrated.executionStatus = data.executionStatus || '';
-    migrated.runningAt = data.runningAt || '';
-    migrated.errorAt = data.errorAt || '';
+    migrated.runningAt = data.runningAt || undefined;
+    migrated.errorAt = data.errorAt || undefined;
     migrated.exitCode = data.exitCode || 0;
 
     // Preserve optional datetime fields
-    migrated.startedAt = data.startedAt || '';
-    migrated.completedAt = data.completedAt || '';
-    migrated.failedAt = data.failedAt || '';
-    migrated.lastIterationAt = data.lastIterationAt || '';
-    migrated.lastStatusCheck = data.lastStatusCheck || '';
+    migrated.startedAt = data.startedAt || undefined;
+    migrated.completedAt = data.completedAt || undefined;
+    migrated.failedAt = data.failedAt || undefined;
+    migrated.lastIterationAt = data.lastIterationAt || undefined;
+    migrated.lastStatusCheck = data.lastStatusCheck || undefined;
 
     // Preserve error information
     migrated.error = data.error;
 
     // Preserve restart tracking information
     migrated.restartCount = data.restartCount || 0;
-    migrated.lastRestartAt = data.lastRestartAt || '';
+    migrated.lastRestartAt = data.lastRestartAt || undefined;
 
     // Preserve agent and sourceBranch fields
     migrated.agent = data.agent;

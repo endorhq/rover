@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { TaskDescriptionManager, TaskStatus } from '../index.js';
+import { clearProjectRootCache } from 'rover-core';
 
 describe('TaskDescriptionManager', () => {
   let testDir: string;
@@ -13,6 +14,7 @@ describe('TaskDescriptionManager', () => {
     testDir = mkdtempSync(join(tmpdir(), 'rover-description-test-'));
     originalCwd = process.cwd();
     process.chdir(testDir);
+    clearProjectRootCache();
   });
 
   afterEach(() => {
@@ -241,6 +243,58 @@ describe('TaskDescriptionManager', () => {
       const reloadedTask = TaskDescriptionManager.load(6);
       expect(reloadedTask.status).toBe('MERGED');
       expect(reloadedTask.isMerged()).toBe(true);
+    });
+
+    it('should set optional datetime fields to undefined when migrating from v1.1 with missing fields', () => {
+      // Import necessary modules
+      const { readFileSync, writeFileSync } = require('node:fs');
+
+      // Create a task (this automatically saves it)
+      TaskDescriptionManager.create({
+        id: 7,
+        title: 'Migration DateTime Test',
+        description: 'Test missing datetime fields',
+        inputs: new Map(),
+        workflowName: 'swe',
+      });
+
+      // Manually modify the task file to simulate v1.1 schema with missing optional datetime fields
+      const taskPath = join(
+        process.cwd(),
+        '.rover',
+        'tasks',
+        '7',
+        'description.json'
+      );
+      const taskData = JSON.parse(readFileSync(taskPath, 'utf8'));
+
+      // Simulate v1.1 schema by removing version and optional datetime fields
+      delete taskData.version;
+      delete taskData.startedAt;
+      delete taskData.completedAt;
+      delete taskData.failedAt;
+      delete taskData.lastIterationAt;
+      delete taskData.lastStatusCheck;
+      delete taskData.lastRestartAt;
+
+      writeFileSync(taskPath, JSON.stringify(taskData, null, 2), 'utf8');
+
+      // Reload the task - should trigger migration
+      const migratedTask = TaskDescriptionManager.load(7);
+
+      // Verify that optional datetime fields are undefined (not empty strings)
+      expect(migratedTask.startedAt).toBeUndefined();
+      expect(migratedTask.completedAt).toBeUndefined();
+      expect(migratedTask.failedAt).toBeUndefined();
+      expect(migratedTask.lastIterationAt).toBeUndefined();
+      expect(migratedTask.lastStatusCheck).toBeUndefined();
+      expect(migratedTask.lastRestartAt).toBeUndefined();
+
+      // Verify that the task was migrated to current version
+      expect(migratedTask.version).toBe('1.2');
+
+      // Ensure task can be saved without validation errors
+      expect(() => migratedTask.save()).not.toThrow();
     });
   });
 
