@@ -2,13 +2,17 @@ import colors from 'ansi-colors';
 import { join } from 'node:path';
 import { existsSync, mkdirSync } from 'node:fs';
 import { generateBranchName } from '../utils/branch-name.js';
-import { TaskDescriptionManager, TaskNotFoundError } from 'rover-schemas';
+import {
+  TaskDescriptionManager,
+  UserSettingsManager,
+  IterationManager,
+  AI_AGENT,
+  Git,
+} from 'rover-core';
+import { TaskNotFoundError } from 'rover-schemas';
 import { exitWithError, exitWithSuccess } from '../utils/exit.js';
 import { createSandbox } from '../lib/sandbox/index.js';
-import { UserSettingsManager } from 'rover-schemas';
-import { AI_AGENT, Git } from 'rover-core';
 import { CLIJsonOutput } from '../types.js';
-import { IterationManager } from 'rover-schemas';
 import { getTelemetry } from '../lib/telemetry.js';
 import { isJsonMode, setJsonMode } from '../lib/global-state.js';
 import yoctoSpinner from 'yocto-spinner';

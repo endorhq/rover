@@ -15,7 +15,7 @@ import type {
   WorkflowAgentStep,
   WorkflowInput,
   WorkflowOutput,
-} from '../workflow/types.js';
+} from 'rover-schemas';
 
 describe('WorkflowManager', () => {
   let testDir: string;

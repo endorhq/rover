@@ -2,15 +2,14 @@ import colors from 'ansi-colors';
 import enquirer from 'enquirer';
 import yoctoSpinner from 'yocto-spinner';
 import { existsSync } from 'node:fs';
-import { TaskDescriptionManager, TaskNotFoundError } from 'rover-schemas';
+import { TaskDescriptionManager, ProjectConfigManager, Git } from 'rover-core';
+import { TaskNotFoundError } from 'rover-schemas';
 import { getTelemetry } from '../lib/telemetry.js';
 import { CLIJsonOutput } from '../types.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
 import { isJsonMode, setJsonMode } from '../lib/global-state.js';
 import { showRoverChat, TIP_TITLES } from '../utils/display.js';
 import { statusColor } from '../utils/task-status.js';
-import { Git } from 'rover-core';
-import { ProjectConfigManager } from 'rover-schemas';
 
 const { prompt } = enquirer;
 

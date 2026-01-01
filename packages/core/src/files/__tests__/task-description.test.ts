@@ -2,8 +2,9 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { TaskDescriptionManager, TaskStatus } from '../index.js';
 import { clearProjectRootCache } from 'rover-core';
+import { TaskDescriptionManager } from '../task-description.js';
+import { TaskStatus } from 'rover-schemas';
 
 describe('TaskDescriptionManager', () => {
   let testDir: string;

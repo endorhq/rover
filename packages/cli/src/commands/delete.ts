@@ -2,7 +2,8 @@ import colors from 'ansi-colors';
 import enquirer from 'enquirer';
 import { rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { TaskDescriptionManager, TaskNotFoundError } from 'rover-schemas';
+import { TaskDescriptionManager, findProjectRoot, Git } from 'rover-core';
+import { TaskNotFoundError } from 'rover-schemas';
 import { getTelemetry } from '../lib/telemetry.js';
 import { showRoverChat } from '../utils/display.js';
 import { statusColor } from '../utils/task-status.js';
@@ -12,7 +13,6 @@ import {
   exitWithWarn,
 } from '../utils/exit.js';
 import { CLIJsonOutputWithErrors } from '../types.js';
-import { findProjectRoot, Git } from 'rover-core';
 import { isJsonMode, setJsonMode } from '../lib/global-state.js';
 
 const { prompt } = enquirer;

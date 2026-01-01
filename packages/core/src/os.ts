@@ -1,13 +1,19 @@
-import { execa, execaSync, parseCommandString } from 'execa';
+import {
+  execa,
+  execaSync,
+  parseCommandString,
+  type Options,
+  type SyncOptions,
+  type Result,
+  type SyncResult,
+} from 'execa';
+import colors from 'ansi-colors';
+import { VERBOSE } from './verbose.js';
 
-import type { Options, Result, SyncOptions, SyncResult } from 'execa';
+// Re-export types from execa
 export type { Options, Result, SyncOptions, SyncResult };
 
-import colors from 'ansi-colors';
-import { Git } from './git.js';
-
-import { VERBOSE } from './index.js';
-
+// Expand some types to add our custom options
 export type LaunchOptions = Options & {
   mightLogSensitiveInformation?: boolean;
 };
@@ -16,39 +22,12 @@ export type LaunchSyncOptions = SyncOptions & {
   mightLogSensitiveInformation?: boolean;
 };
 
-// Cache for project root to avoid redundant Git operations
-let projectRootCache: string | null = null;
-
 /**
- * Find the Git repository root directory. Falls back to current working directory
- * if not in a Git repository. Result is cached for the process lifetime to avoid
- * redundant Git subprocess calls.
- */
-export function findProjectRoot(): string {
-  if (projectRootCache !== null) {
-    return projectRootCache;
-  }
-
-  const git = new Git();
-  projectRootCache = git.getRepositoryRoot() || process.cwd();
-  return projectRootCache;
-}
-
-/**
- * Clear the cached project root. Useful for testing or edge cases where
- * the repository root might change during process execution.
+ * Logging function for stdout and stderr streams
  *
- * @example
- * // In tests, clear cache between test cases
- * afterEach(() => clearProjectRootCache());
- *
- * // In long-running processes, clear cache when workspace changes
- * vscode.workspace.onDidChangeWorkspaceFolders(() => clearProjectRootCache());
+ * @param stream the name of the strem it will log (stdout, stderr, etc)
+ * @returns a generator function that logs the chunk data
  */
-export function clearProjectRootCache(): void {
-  projectRootCache = null;
-}
-
 const log = (stream: string) => {
   return (options: { mightLogSensitiveInformation?: boolean }) => {
     return function* (chunk: unknown) {
@@ -75,6 +54,7 @@ const log = (stream: string) => {
   };
 };
 
+// Generate loggers
 const logStdout = log('stdout');
 const logStderr = log('stderr');
 

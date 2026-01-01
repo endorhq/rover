@@ -1,9 +1,10 @@
 import { isAbsolute, join, resolve } from 'node:path';
 import { getDataDir } from '../paths.js';
 import { existsSync, mkdirSync, rmdirSync } from 'node:fs';
-import { GlobalConfigManager, GlobalProject } from 'rover-schemas';
+import { GlobalProject } from 'rover-schemas';
 import { createHash } from 'node:crypto';
 import { detectEnvironment } from './environment.js';
+import { GlobalConfigManager } from '../files/global-config.js';
 
 // Folder inside the rover data store
 const PROJECTS_DATA_FOLDER = 'projects';

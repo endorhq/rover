@@ -5,19 +5,18 @@
 
 import { join } from 'node:path';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { findProjectRoot, AI_AGENT } from 'rover-core';
 import {
+  AI_AGENT,
   UserSettingsLoadError,
   UserSettingsValidationError,
   UserSettingsSaveError,
-} from './user-settings/errors.js';
-import {
   UserSettingsSchema,
   CURRENT_USER_SCHEMA_VERSION,
   USER_SETTINGS_FILENAME,
   USER_SETTINGS_DIR,
-} from './user-settings/schema.js';
-import type { UserSettings } from './user-settings/types.js';
+  type UserSettings,
+} from 'rover-schemas';
+import { findProjectRoot } from '../project-root.js';
 
 /**
  * Manager class for user settings (.rover/settings.json)

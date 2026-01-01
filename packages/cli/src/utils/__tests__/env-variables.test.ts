@@ -6,7 +6,7 @@ import {
   parseCustomEnvironmentVariables,
   loadEnvsFile,
 } from '../env-variables.js';
-import type { ProjectConfigManager } from 'rover-schemas';
+import type { ProjectConfigManager } from 'rover-core';
 
 /**
  * Create a mock ProjectConfigManager with the specified properties

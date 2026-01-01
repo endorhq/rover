@@ -1,9 +1,8 @@
 import { getAIAgentTool } from '../agents/index.js';
 import { join } from 'node:path';
-import { ProjectConfigManager } from 'rover-schemas';
+import { ProjectConfigManager, TaskDescriptionManager } from 'rover-core';
 import { Sandbox } from './types.js';
 import { SetupBuilder } from '../setup.js';
-import { TaskDescriptionManager } from 'rover-schemas';
 import { findProjectRoot, launch, ProcessManager, VERBOSE } from 'rover-core';
 import { existsSync } from 'node:fs';
 import { userInfo } from 'node:os';

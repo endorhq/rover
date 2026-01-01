@@ -1,11 +1,17 @@
 import colors from 'ansi-colors';
 import { formatTaskStatus, statusColor } from '../utils/task-status.js';
 import { getTelemetry } from '../lib/telemetry.js';
-import { TaskDescriptionStore, TaskDescriptionSchema } from 'rover-schemas';
-import { VERBOSE, showTips, Table, TableColumn } from 'rover-core';
-import { IterationStatusManager } from 'rover-schemas';
-import { IterationManager } from 'rover-schemas';
+import {
+  TaskDescriptionStore,
+  IterationStatusManager,
+  IterationManager,
+  VERBOSE,
+  showTips,
+  Table,
+  TableColumn,
+} from 'rover-core';
 import { isJsonMode, setJsonMode } from '../lib/global-state.js';
+import { TaskDescription } from 'rover-schemas';
 
 /**
  * Format duration from start to now or completion
@@ -122,7 +128,7 @@ export const listCommand = async (
     // JSON output mode
     if (isJsonMode()) {
       const jsonOutput: Array<
-        TaskDescriptionSchema & { iterationsData: IterationManager[] }
+        TaskDescription & { iterationsData: IterationManager[] }
       > = [];
 
       tasks.forEach(task => {

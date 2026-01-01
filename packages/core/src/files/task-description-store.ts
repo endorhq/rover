@@ -3,9 +3,10 @@
  */
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { findProjectRoot, VERBOSE } from 'rover-core';
 import colors from 'ansi-colors';
 import { TaskDescriptionManager } from './task-description.js';
+import { findProjectRoot } from '../project-root.js';
+import { VERBOSE } from '../verbose.js';
 
 /**
  * Store for managing collections of task descriptions

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { PromptBuilder } from '../index.js';
-import { IterationManager } from 'rover-schemas';
+import { IterationManager } from 'rover-core';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';

@@ -44,8 +44,8 @@ describe('ProjectManager', () => {
       getConfigDir: () => testConfigDir,
     }));
 
-    // Mock rover-schemas module
-    vi.doMock('rover-schemas', () => ({
+    // Mock global-config module (GlobalConfigManager is imported from files/global-config.js)
+    vi.doMock('../../files/global-config.js', () => ({
       GlobalConfigManager: {
         load: vi.fn(() => mockConfig),
       },
@@ -54,7 +54,7 @@ describe('ProjectManager', () => {
 
   afterEach(() => {
     vi.doUnmock('../../paths.js');
-    vi.doUnmock('rover-schemas');
+    vi.doUnmock('../../files/global-config.js');
 
     // Clean up test directories
     if (existsSync(testDataDir)) {
@@ -89,7 +89,9 @@ describe('ProjectManager', () => {
 
     it('should load global configuration', async () => {
       const { ProjectManager } = await import('../project.js');
-      const { GlobalConfigManager } = await import('rover-schemas');
+      const { GlobalConfigManager } = await import(
+        '../../files/global-config.js'
+      );
 
       new ProjectManager();
 
@@ -98,7 +100,7 @@ describe('ProjectManager', () => {
 
     it('should throw ProjectManagerLoadError when config fails to load', async () => {
       // Re-mock with error
-      vi.doMock('rover-schemas', () => ({
+      vi.doMock('../../files/global-config.js', () => ({
         GlobalConfigManager: {
           load: vi.fn(() => {
             throw new Error('Config load failed');

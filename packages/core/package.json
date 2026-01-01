@@ -11,6 +11,7 @@
   ],
   "scripts": {
     "build": "tsdown --env.TSUP_DEV=false src/index.ts",
+    "build-dev": "TSUP_DEV=true tsdown --env.TSUP_DEV=true src/index.ts",
     "dev": "TSUP_DEV=true tsdown --env.TSUP_DEV=true --watch src/ src/index.ts",
     "format": "prettier --write \"src/**/*.{ts,js,json}\"",
     "start": "node dist/index.js",
@@ -23,12 +24,12 @@
   },
   "author": "The Endor team",
   "dependencies": {
+    "rover-schemas": "^1.0.0",
     "ansi-colors": "^4.1.3",
     "boxen": "^8.0.1",
     "execa": "^9.6.0",
     "log-update": "^7.0.1",
-    "yaml": "^2.8.1",
-    "zod": "^4.1.12"
+    "yaml": "^2.8.1"
   },
   "devDependencies": {
     "@types/node": "^24.1.0",
