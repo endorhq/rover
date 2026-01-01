@@ -10,8 +10,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { IterationManager } from '../iteration.js';
-import { ITERATION_FILENAME } from '../iteration/schema.js';
-import type { Iteration } from '../iteration/types.js';
+import { ITERATION_FILENAME, type Iteration } from 'rover-schemas';
 
 describe('IterationManager', () => {
   let testDir: string;

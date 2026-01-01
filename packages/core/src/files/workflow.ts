@@ -4,26 +4,22 @@
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
-import { ZodError } from 'zod';
 import {
   CURRENT_WORKFLOW_SCHEMA_VERSION,
   WorkflowSchema,
-} from './workflow/schema.js';
-import type {
-  Workflow,
-  WorkflowInput,
-  WorkflowOutput,
-  WorkflowStep,
-  WorkflowAgentStep,
-  WorkflowDefaults,
-  WorkflowConfig,
-  WorkflowAgentTool,
-} from './workflow/types.js';
-import {
   WorkflowLoadError,
   WorkflowValidationError,
-} from './workflow/errors.js';
-import { isAgentStep } from './workflow/types.js';
+  isAgentStep,
+  type Workflow,
+  type WorkflowInput,
+  type WorkflowOutput,
+  type WorkflowStep,
+  type WorkflowAgentStep,
+  type WorkflowDefaults,
+  type WorkflowConfig,
+  type WorkflowAgentTool,
+  ZodError,
+} from 'rover-schemas';
 
 // Default step timeout in seconds
 const DEFAULT_STEP_TIMEOUT = 60 * 30; // 30 minutes

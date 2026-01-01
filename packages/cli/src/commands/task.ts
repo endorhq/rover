@@ -5,18 +5,21 @@ import { join } from 'node:path';
 import { getNextTaskId } from '../utils/task-id.js';
 import { homedir, platform } from 'node:os';
 import { getAIAgentTool, getUserAIAgent } from '../lib/agents/index.js';
-import { TaskDescriptionManager, ProjectConfigManager } from 'rover-schemas';
-import { createSandbox } from '../lib/sandbox/index.js';
-import { AI_AGENT, launchSync } from 'rover-core';
-import { resolveAgentImage } from '../lib/sandbox/container-common.js';
-import { IterationManager } from 'rover-schemas';
-import { generateBranchName } from '../utils/branch-name.js';
 import {
+  TaskDescriptionManager,
+  ProjectConfigManager,
+  IterationManager,
+  WorkflowManager,
+  AI_AGENT,
+  launchSync,
   findProjectRoot,
   ProcessManager,
   showProperties,
   Git,
 } from 'rover-core';
+import { createSandbox } from '../lib/sandbox/index.js';
+import { resolveAgentImage } from '../lib/sandbox/container-common.js';
+import { generateBranchName } from '../utils/branch-name.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { NewTaskProvider } from 'rover-telemetry';
 import { readFromStdin, stdinIsAvailable } from '../utils/stdin.js';
@@ -25,7 +28,6 @@ import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
 import { GitHub, GitHubError } from '../lib/github.js';
 import { copyEnvironmentFiles } from '../utils/env-files.js';
 import { initWorkflowStore } from '../lib/workflow.js';
-import { WorkflowManager } from 'rover-schemas';
 import { setJsonMode, isJsonMode } from '../lib/global-state.js';
 
 const { prompt } = enquirer;

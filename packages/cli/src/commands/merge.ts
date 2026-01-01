@@ -4,11 +4,15 @@ import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import yoctoSpinner from 'yocto-spinner';
 import { getAIAgentTool, type AIAgentTool } from '../lib/agents/index.js';
-import { TaskDescriptionManager, TaskNotFoundError } from 'rover-schemas';
-import { UserSettingsManager, ProjectConfigManager } from 'rover-schemas';
-import { AI_AGENT } from 'rover-core';
+import {
+  TaskDescriptionManager,
+  UserSettingsManager,
+  ProjectConfigManager,
+  AI_AGENT,
+  Git,
+} from 'rover-core';
+import { TaskNotFoundError } from 'rover-schemas';
 import { getTelemetry } from '../lib/telemetry.js';
-import { Git } from 'rover-core';
 import { showRoverChat, showTips } from '../utils/display.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
 import { CLIJsonOutput } from '../types.js';

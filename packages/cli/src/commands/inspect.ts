@@ -1,10 +1,7 @@
 import colors from 'ansi-colors';
 import { formatTaskStatus, statusColor } from '../utils/task-status.js';
-import {
-  TaskDescriptionManager,
-  TaskNotFoundError,
-  type TaskStatus,
-} from 'rover-schemas';
+import { TaskDescriptionManager } from 'rover-core';
+import { TaskNotFoundError, type TaskStatus } from 'rover-schemas';
 import { join } from 'node:path';
 import { getTelemetry } from '../lib/telemetry.js';
 import {
@@ -16,7 +13,7 @@ import {
   showTips,
   showTitle,
 } from 'rover-core';
-import { IterationManager } from 'rover-schemas';
+import { IterationManager } from 'rover-core';
 import { isJsonMode, setJsonMode } from '../lib/global-state.js';
 
 const DEFAULT_FILE_CONTENTS = 'summary.md';

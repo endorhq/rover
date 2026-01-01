@@ -4,7 +4,13 @@
  * by building the prompt and passing it.
  */
 
-import { launch, launchSync, VERBOSE } from 'rover-core';
+import {
+  launch,
+  launchSync,
+  VERBOSE,
+  WorkflowManager,
+  IterationStatusManager,
+} from 'rover-core';
 import colors from 'ansi-colors';
 import {
   copyFileSync,
@@ -18,7 +24,6 @@ import type {
   WorkflowOutput,
   WorkflowOutputType,
 } from 'rover-schemas';
-import { WorkflowManager, IterationStatusManager } from 'rover-schemas';
 import {
   parseAgentError,
   isWaitingForAuthentication,

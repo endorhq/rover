@@ -1,13 +1,11 @@
-export let VERBOSE = false;
 export const PROJECT_CONFIG_FILE = 'rover.json';
 
-export const setVerbose = (verbose: boolean) => {
-  VERBOSE = verbose;
-};
+// Re-export from verbose.ts
+export { VERBOSE, setVerbose } from './verbose.js';
+
+export { findProjectRoot, clearProjectRootCache } from './project-root.js';
 
 export {
-  findProjectRoot,
-  clearProjectRootCache,
   launch,
   launchSync,
   type Options,
@@ -52,7 +50,8 @@ export {
   type DiagramOptions,
 } from './display/index.js';
 
-export { AI_AGENT } from './agent.js';
+// Reexport the enum from schemas
+export { AI_AGENT } from 'rover-schemas';
 
 export {
   getConfigDir,
@@ -68,3 +67,16 @@ export {
   ProjectManager,
   type EnvironmentResult,
 } from './project/index.js';
+
+export {
+  GlobalConfigManager,
+  IterationStatusManager,
+  IterationManager,
+  PreContextDataManager,
+  ProjectConfigManager,
+  TaskDescriptionStore,
+  TaskDescriptionManager,
+  UserSettingsManager,
+  WorkflowStore,
+  WorkflowManager,
+} from './files/index.js';

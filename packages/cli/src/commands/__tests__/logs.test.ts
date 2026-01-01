@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { clearProjectRootCache } from 'rover-core';
 import { logsCommand } from '../logs.js';
-import { TaskDescriptionManager } from 'rover-schemas';
+import { TaskDescriptionManager } from 'rover-core';
 import { setJsonMode } from '../../lib/global-state.js';
 
 // Mock external dependencies

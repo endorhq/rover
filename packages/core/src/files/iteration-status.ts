@@ -3,16 +3,14 @@
  * Handles loading, validating, and managing iteration status with file persistence.
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { ZodError } from 'zod';
-import { IterationStatusSchema } from './iteration-status/schema.js';
-import type {
-  IterationStatus,
-  IterationStatusName,
-} from './iteration-status/types.js';
 import {
+  IterationStatusSchema,
   IterationStatusLoadError,
   IterationStatusValidationError,
-} from './iteration-status/errors.js';
+  type IterationStatus,
+  type IterationStatusName,
+  ZodError,
+} from 'rover-schemas';
 
 /**
  * IterationStatusManager class - Manages iteration status tracking and persistence.

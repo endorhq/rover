@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { WorkflowStore } from '../workflow-store.js';
 import { WorkflowManager } from '../workflow.js';
-import type { WorkflowAgentStep } from '../workflow/types.js';
+import type { WorkflowAgentStep } from 'rover-schemas';
 
 describe('WorkflowStore', () => {
   let testDir: string;

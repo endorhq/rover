@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { findProjectRoot, clearProjectRootCache } from '../os.js';
-import { Git } from '../git.js';
+import { findProjectRoot, clearProjectRootCache } from '../project-root.js';
 
 // Create a mock function that will be used by all Git instances
 const mockGetRepositoryRoot = vi.fn();
@@ -16,7 +15,7 @@ vi.mock('../git.js', () => {
   };
 });
 
-describe('os', () => {
+describe('project-root', () => {
   let originalCwd: string;
 
   beforeEach(() => {

@@ -13,9 +13,12 @@ import {
   checkQwen,
   checkGit,
 } from '../utils/system.js';
-import { ProjectConfigManager, UserSettingsManager } from 'rover-schemas';
+import {
+  ProjectConfigManager,
+  UserSettingsManager,
+  AI_AGENT,
+} from 'rover-core';
 import { showRoverChat, showTips, TIP_TITLES } from '../utils/display.js';
-import { AI_AGENT } from 'rover-core';
 import { getTelemetry } from '../lib/telemetry.js';
 
 // Get the default prompt

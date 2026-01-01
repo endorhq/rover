@@ -3,7 +3,7 @@
  */
 
 import { z } from 'zod';
-import { AI_AGENT } from 'rover-core';
+import { AI_AGENT } from '../agent.js';
 
 // Current schema version
 export const CURRENT_USER_SCHEMA_VERSION = '1.0';
@@ -15,7 +15,7 @@ export const USER_SETTINGS_DIR = '.rover';
 /**
  * AI agent enum schema
  */
-export const AiAgentSchema = z.nativeEnum(AI_AGENT);
+export const AiAgentSchema = z.enum(AI_AGENT);
 
 /**
  * User defaults schema

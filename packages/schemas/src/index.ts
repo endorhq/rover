@@ -1,3 +1,6 @@
+// Declare all schemas, types, and errors
+export { AI_AGENT } from './agent.js';
+
 // Workflow library
 export {
   type Workflow,
@@ -9,6 +12,7 @@ export {
   type WorkflowConfig,
   type WorkflowStep,
   type WorkflowAgentStep,
+  type WorkflowAgentTool,
   type WorkflowConditionalStep,
   type WorkflowParallelStep,
   type WorkflowSequentialStep,
@@ -21,8 +25,10 @@ export {
   WorkflowValidationError,
 } from './workflow/errors.js';
 
-export { WorkflowManager } from './workflow.js';
-export { WorkflowStore } from './workflow-store.js';
+export {
+  CURRENT_WORKFLOW_SCHEMA_VERSION,
+  WorkflowSchema,
+} from './workflow/schema.js';
 
 // Previous Iteration library
 export { type PreviousIteration } from './previous-iteration/types.js';
@@ -40,11 +46,10 @@ export {
   PreContextDataValidationError,
 } from './pre-context-data/errors.js';
 
-export { PreContextDataManager } from './pre-context-data.js';
-
 export {
   PRE_CONTEXT_DATA_FILENAME,
   CURRENT_PRE_CONTEXT_DATA_SCHEMA_VERSION,
+  PreContextDataSchema,
 } from './pre-context-data/schema.js';
 
 // Iteration Status library
@@ -58,9 +63,10 @@ export {
   IterationStatusValidationError,
 } from './iteration-status/errors.js';
 
-export { IterationStatusManager } from './iteration-status.js';
-
-export { ITERATION_STATUS_FILENAME } from './iteration-status/schema.js';
+export {
+  ITERATION_STATUS_FILENAME,
+  IterationStatusSchema,
+} from './iteration-status/schema.js';
 
 // Iteration library
 export {
@@ -73,14 +79,16 @@ export {
   IterationValidationError,
 } from './iteration/errors.js';
 
-export { IterationManager } from './iteration.js';
-
-export { ITERATION_FILENAME } from './iteration/schema.js';
+export {
+  ITERATION_FILENAME,
+  CURRENT_ITERATION_SCHEMA_VERSION,
+  IterationSchema,
+} from './iteration/schema.js';
 
 // Task Description library
 export {
   type TaskStatus,
-  type TaskDescriptionSchema,
+  type TaskDescription,
   type CreateTaskData,
   type StatusMetadata,
   type IterationMetadata,
@@ -93,10 +101,10 @@ export {
   TaskFileError,
 } from './task-description/errors.js';
 
-export { TaskDescriptionManager } from './task-description.js';
-export { TaskDescriptionStore } from './task-description-store.js';
-
-export { CURRENT_TASK_DESCRIPTION_SCHEMA_VERSION } from './task-description/schema.js';
+export {
+  CURRENT_TASK_DESCRIPTION_SCHEMA_VERSION,
+  TaskDescriptionSchema,
+} from './task-description/schema.js';
 
 // Project Config library
 export {
@@ -111,13 +119,13 @@ export {
 export {
   ProjectConfigLoadError,
   ProjectConfigValidationError,
+  ProjectConfigSaveError,
 } from './project-config/errors.js';
-
-export { ProjectConfigManager } from './project-config.js';
 
 export {
   CURRENT_PROJECT_SCHEMA_VERSION,
   PROJECT_CONFIG_FILENAME,
+  ProjectConfigSchema,
 } from './project-config/schema.js';
 
 // User Settings library
@@ -129,19 +137,20 @@ export {
 
 export {
   UserSettingsLoadError,
+  UserSettingsSaveError,
   UserSettingsValidationError,
 } from './user-settings/errors.js';
-
-export { UserSettingsManager } from './user-settings.js';
 
 export {
   CURRENT_USER_SCHEMA_VERSION,
   USER_SETTINGS_FILENAME,
   USER_SETTINGS_DIR,
+  UserSettingsSchema,
 } from './user-settings/schema.js';
 
 // Global Config library
 export {
+  type AttributionStatus,
   type TelemetryStatus,
   type GlobalProject,
   type GlobalConfig,
@@ -153,9 +162,11 @@ export {
   GlobalConfigSaveError,
 } from './global-config/errors.js';
 
-export { GlobalConfigManager } from './global-config.js';
-
 export {
   CURRENT_GLOBAL_CONFIG_VERSION,
   GLOBAL_CONFIG_FILENAME,
+  GlobalConfigSchema,
 } from './global-config/schema.js';
+
+// Rexport some Zod utilities so consumers do not need to depend on Zod
+export { ZodError } from 'zod';

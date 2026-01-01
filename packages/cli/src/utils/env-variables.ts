@@ -5,7 +5,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { parse as parseDotenv } from 'dotenv';
-import { ProjectConfigManager } from 'rover-schemas';
+import { ProjectConfigManager } from 'rover-core';
 
 /**
  * Parse custom environment variables from project config.

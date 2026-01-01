@@ -5,24 +5,20 @@
 
 import { join } from 'node:path';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { findProjectRoot } from 'rover-core';
 import {
   ProjectConfigLoadError,
   ProjectConfigValidationError,
   ProjectConfigSaveError,
-} from './project-config/errors.js';
-import {
   ProjectConfigSchema,
   CURRENT_PROJECT_SCHEMA_VERSION,
   PROJECT_CONFIG_FILENAME,
-} from './project-config/schema.js';
-import type {
-  ProjectConfig,
-  Language,
-  MCP,
-  PackageManager,
-  TaskManager,
-} from './project-config/types.js';
+  type ProjectConfig,
+  type Language,
+  type MCP,
+  type PackageManager,
+  type TaskManager,
+} from 'rover-schemas';
+import { findProjectRoot } from '../project-root.js';
 
 /**
  * Manager class for project configuration (rover.json)

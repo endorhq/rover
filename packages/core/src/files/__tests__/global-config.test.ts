@@ -13,16 +13,9 @@ import { join } from 'node:path';
 // Store mock config directory path
 let mockConfigDir: string;
 
-// Mock rover-core before imports
-vi.mock('rover-core', () => ({
+// Mock the paths module to control where config files are written
+vi.mock('../../paths.js', () => ({
   getConfigDir: () => mockConfigDir,
-  AI_AGENT: {
-    Claude: 'claude',
-    Codex: 'codex',
-    Cursor: 'cursor',
-    Gemini: 'gemini',
-    Qwen: 'qwen',
-  },
 }));
 
 // Mock rover-telemetry to avoid side effects
@@ -44,17 +37,13 @@ import { GlobalConfigManager } from '../global-config.js';
 import {
   GlobalConfigLoadError,
   GlobalConfigValidationError,
-} from '../global-config/errors.js';
-import {
   CURRENT_GLOBAL_CONFIG_VERSION,
   GLOBAL_CONFIG_FILENAME,
-} from '../global-config/schema.js';
-import { AI_AGENT } from 'rover-core';
-import type {
-  Language,
-  PackageManager,
-  TaskManager,
-} from '../project-config/types.js';
+  AI_AGENT,
+  type Language,
+  type PackageManager,
+  type TaskManager,
+} from 'rover-schemas';
 
 describe('GlobalConfigManager', () => {
   let testDir: string;

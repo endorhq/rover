@@ -4,7 +4,7 @@ import {
   WorkflowManager,
   IterationStatusManager,
   PreContextDataManager,
-} from 'rover-schemas';
+} from 'rover-core';
 import { parseCollectOptions } from '../lib/options.js';
 import { Runner } from '../lib/runner.js';
 import { existsSync, readFileSync } from 'node:fs';
