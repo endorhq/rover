@@ -1,12 +1,11 @@
-import { IterationStatusManager, PreContextDataManager } from 'rover-schemas';
 import colors from 'ansi-colors';
-import { CommandOutput } from '../cli.js';
 import {
   getVersion,
   launch,
   ProcessManager,
   showRegularHeader,
   VERBOSE,
+  PreContextDataManager,
 } from 'rover-core';
 import { createAgent } from '../lib/agents/index.js';
 import {
@@ -17,7 +16,6 @@ import {
   rmSync,
 } from 'node:fs';
 import { basename } from 'node:path';
-import { V } from 'vitest/dist/chunks/reporters.nr4dxCkA.js';
 
 interface SessionCommandOptions {
   // Paths to pre-context JSON files

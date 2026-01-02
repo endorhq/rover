@@ -5,19 +5,18 @@
 import colors from 'ansi-colors';
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { VERBOSE } from 'rover-core';
 import { IterationStatusManager } from './iteration-status.js';
 import {
   CURRENT_ITERATION_SCHEMA_VERSION,
   ITERATION_FILENAME,
   IterationSchema,
-} from './iteration/schema.js';
-import { ITERATION_STATUS_FILENAME } from './iteration-status/schema.js';
-import { Iteration, IterationPreviousContext } from './iteration/types.js';
-import {
+  ITERATION_STATUS_FILENAME,
   IterationLoadError,
   IterationValidationError,
-} from './iteration/errors.js';
+  type Iteration,
+  type IterationPreviousContext,
+} from 'rover-schemas';
+import { VERBOSE } from '../verbose.js';
 
 /**
  * Iteration configuration manager. It provides the agent with enough information to iterate over

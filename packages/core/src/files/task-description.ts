@@ -12,35 +12,32 @@ import {
 } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { findProjectRoot, VERBOSE } from 'rover-core';
 import {
-  TaskDescriptionSchema,
-  CreateTaskData,
-  StatusMetadata,
-  IterationMetadata,
-  TaskStatus,
-} from './task-description/types.js';
-import {
+  type TaskDescription,
+  type CreateTaskData,
+  type StatusMetadata,
+  type IterationMetadata,
+  type TaskStatus,
   TaskNotFoundError,
   TaskValidationError,
   TaskSchemaError,
   TaskFileError,
-} from './task-description/errors.js';
-import {
   CURRENT_TASK_DESCRIPTION_SCHEMA_VERSION,
-  TaskDescriptionSchema as TaskDescriptionZodSchema,
-} from './task-description/schema.js';
+  TaskDescriptionSchema,
+} from 'rover-schemas';
 import { IterationManager } from './iteration.js';
+import { findProjectRoot } from '../project-root.js';
+import { VERBOSE } from '../verbose.js';
 
 /**
  * TaskDescriptionManager class - Centralized management of task metadata
  */
 export class TaskDescriptionManager {
-  private data: TaskDescriptionSchema;
+  private data: TaskDescription;
   private taskId: number;
   private filePath: string;
 
-  constructor(data: TaskDescriptionSchema, taskId: number) {
+  constructor(data: TaskDescription, taskId: number) {
     this.data = data;
     this.taskId = taskId;
     this.filePath = this.getTaskDescriptionPath(taskId);
@@ -56,7 +53,7 @@ export class TaskDescriptionManager {
     const now = new Date().toISOString();
     const uuid = taskData.uuid || randomUUID();
 
-    const schema: TaskDescriptionSchema = {
+    const schema: TaskDescription = {
       id: taskData.id,
       uuid: uuid,
       title: taskData.title,
@@ -156,10 +153,10 @@ export class TaskDescriptionManager {
     }
   }
 
-  private static migrate(data: any, taskId: number): TaskDescriptionSchema {
+  private static migrate(data: any, taskId: number): TaskDescription {
     // If already current version, return as-is
     if (data.version === CURRENT_TASK_DESCRIPTION_SCHEMA_VERSION) {
-      return data as TaskDescriptionSchema;
+      return data as TaskDescription;
     }
 
     // Start with all existing data to preserve unknown fields
@@ -209,7 +206,7 @@ export class TaskDescriptionManager {
     // Preserve agentImage field
     migrated.agentImage = data.agentImage;
 
-    return migrated as TaskDescriptionSchema;
+    return migrated as TaskDescription;
   }
 
   private static migrateStatus(oldStatus: any): TaskStatus {
@@ -636,7 +633,7 @@ export class TaskDescriptionManager {
   get workflowName(): string {
     return this.data.workflowName;
   }
-  get rawData(): TaskDescriptionSchema {
+  get rawData(): TaskDescription {
     return this.data;
   }
   get inputs(): Record<string, string> {
@@ -718,7 +715,7 @@ export class TaskDescriptionManager {
   /**
    * Get raw JSON data
    */
-  toJSON(): TaskDescriptionSchema {
+  toJSON(): TaskDescription {
     return { ...this.data };
   }
 
@@ -799,14 +796,11 @@ export class TaskDescriptionManager {
    * Validate the task data using Zod schema
    */
   private validate(): void {
-    const result = TaskDescriptionZodSchema.safeParse(this.data);
+    const result = TaskDescriptionSchema.safeParse(this.data);
 
     if (!result.success) {
-      const errorMessages = result.error.issues
-        .map(err => `  - ${err.path.join('.')}: ${err.message}`)
-        .join('\n');
       throw new TaskValidationError(
-        `Task validation failed:\n${errorMessages}`
+        `Task validation failed: ${result.error.message}`
       );
     }
   }

@@ -6,24 +6,20 @@
 import Telemetry, { TELEMETRY_FROM } from 'rover-telemetry';
 import { join } from 'node:path';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { randomUUID } from 'node:crypto';
-import { AI_AGENT, getConfigDir } from 'rover-core';
 import {
+  AI_AGENT,
   GlobalConfigLoadError,
   GlobalConfigValidationError,
   GlobalConfigSaveError,
-} from './global-config/errors.js';
-import {
   GlobalConfigSchema,
   CURRENT_GLOBAL_CONFIG_VERSION,
   GLOBAL_CONFIG_FILENAME,
-} from './global-config/schema.js';
-import type {
-  AttributionStatus,
-  GlobalConfig,
-  GlobalProject,
-  TelemetryStatus,
-} from './global-config/types.js';
+  type AttributionStatus,
+  type GlobalConfig,
+  type GlobalProject,
+  type TelemetryStatus,
+} from 'rover-schemas';
+import { getConfigDir } from '../paths.js';
 
 /**
  * Manager class for global configuration

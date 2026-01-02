@@ -10,9 +10,8 @@ import {
   type AIAgentTool,
 } from '../lib/agents/index.js';
 import type { IPromptTask } from '../lib/prompts/index.js';
-import { TaskDescriptionManager, TaskNotFoundError } from 'rover-schemas';
-import { AI_AGENT } from 'rover-core';
-import { IterationManager } from 'rover-schemas';
+import { TaskDescriptionManager, IterationManager, AI_AGENT } from 'rover-core';
+import { TaskNotFoundError } from 'rover-schemas';
 import { getTelemetry } from '../lib/telemetry.js';
 import { readFromStdin, stdinIsAvailable } from '../utils/stdin.js';
 import { CLIJsonOutput } from '../types.js';

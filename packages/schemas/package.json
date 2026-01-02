@@ -16,16 +16,13 @@
     "start": "node dist/index.js",
     "clean": "rm -rf dist",
     "check": "tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:ui": "vitest --ui",
-    "test:coverage": "vitest run --coverage"
+    "test": "echo 'No tests for schemas package'",
+    "test:watch": "echo 'No tests for schemas package'",
+    "test:ui": "echo 'No tests for schemas package'",
+    "test:coverage": "echo 'No tests for schemas package'"
   },
   "author": "The Endor team",
   "dependencies": {
-    "ansi-colors": "^4.1.3",
-    "rover-core": "^1.0.0",
-    "yaml": "^2.8.1",
     "zod": "^4.1.12"
   },
   "devDependencies": {

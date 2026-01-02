@@ -7,10 +7,10 @@ import {
   showTitle,
   showProperties,
   showDiagram,
+  WorkflowManager,
   type DiagramStep,
 } from 'rover-core';
 import type { WorkflowOutput } from 'rover-schemas';
-import { WorkflowManager } from 'rover-schemas';
 import {
   readFileSync,
   existsSync,

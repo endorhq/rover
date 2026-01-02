@@ -8,7 +8,8 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { clearProjectRootCache, launchSync } from 'rover-core';
+import { launchSync } from 'rover-core';
+import { clearProjectRootCache } from '../../project-root.js';
 import { ProjectConfigManager } from '../project-config.js';
 
 describe('ProjectConfigManager - Environment Variable Configuration', () => {
@@ -16,6 +17,9 @@ describe('ProjectConfigManager - Environment Variable Configuration', () => {
   let originalCwd: string;
 
   beforeEach(() => {
+    // Clear cache before each test to ensure fresh project root detection
+    clearProjectRootCache();
+
     // Create temp directory for testing
     testDir = mkdtempSync(join(tmpdir(), 'rover-config-test-'));
     originalCwd = process.cwd();

@@ -1,5 +1,5 @@
 // Utilities to load and find workflows.
-import { WorkflowManager, WorkflowStore } from 'rover-schemas';
+import { WorkflowManager, WorkflowStore } from 'rover-core';
 import sweWorkflow from './workflows/swe.yml';
 import techWriterWorkflow from './workflows/tech-writer.yml';
 import { dirname, isAbsolute, join } from 'path';

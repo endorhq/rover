@@ -11,15 +11,17 @@ import {
   TaskDescriptionManager,
   IterationManager,
   PreContextDataManager,
-  type PreviousIteration,
-} from 'rover-schemas';
-import { findProjectRoot, launchSync, VERBOSE } from 'rover-core';
+  ProjectConfigManager,
+  findProjectRoot,
+  launchSync,
+  VERBOSE,
+} from 'rover-core';
+import type { PreviousIteration } from 'rover-schemas';
 import sweWorkflow from './workflows/swe.yml';
 import techWriterWorkflow from './workflows/tech-writer.yml';
 import entrypointScript from './entrypoint.sh';
 import pupa from 'pupa';
 import { fileURLToPath } from 'node:url';
-import { ProjectConfigManager } from 'rover-schemas';
 import type { SandboxPackage } from './sandbox/types.js';
 
 // Language packages
