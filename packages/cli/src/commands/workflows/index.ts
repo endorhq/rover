@@ -2,6 +2,7 @@
  * Defines the workflow subcommands for the CLI.
  */
 import { Command } from 'commander';
+import { addWorkflowCommand } from './add.js';
 import { listWorkflowsCommand } from './list.js';
 import { inspectWorkflowCommand } from './inspect.js';
 
@@ -10,6 +11,18 @@ export const addWorkflowCommands = (program: Command) => {
   const command = program
     .command('workflows')
     .description('Retrieve information about the available workflows');
+
+  command
+    .command('add <source>')
+    .description(
+      'Add a workflow from a URL or local path to the workflow store'
+    )
+    .option(
+      '--name <name>',
+      'Custom name for the workflow (without .yml extension)'
+    )
+    .option('--json', 'Output the result in JSON format', false)
+    .action(addWorkflowCommand);
 
   command
     .command('list')

@@ -7,4 +7,10 @@ export { TaskDescriptionStore } from './task-description-store.js';
 export { TaskDescriptionManager } from './task-description.js';
 export { UserSettingsManager } from './user-settings.js';
 export { WorkflowStore } from './workflow-store.js';
+export {
+  WorkflowStoreManager,
+  WorkflowStoreManagerError,
+  type WorkflowMetadata,
+  type AddWorkflowResult,
+} from './workflow-store-manager.js';
 export { WorkflowManager } from './workflow.js';
