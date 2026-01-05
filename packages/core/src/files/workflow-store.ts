@@ -5,38 +5,50 @@
  */
 import { WorkflowManager } from './workflow.js';
 
+/**
+ * Source of a workflow
+ */
+export enum WorkflowSource {
+  BuiltIn = 'built-in',
+  Global = 'global',
+  Project = 'project',
+}
+
+/**
+ * Workflow entry with source information
+ */
+export interface WorkflowEntry {
+  workflow: WorkflowManager;
+  source: WorkflowSource;
+}
+
 export class WorkflowStore {
-  private workflows: Map<string, WorkflowManager>;
-  // TODO: In the future, we will add the concept of "sources".
-  // The sources will be associated with a specific folder,
-  // like "global", "project", or similar.
-  //
-  // This would be required once we allow users to define their own
-  // workflows in their projects.
-  // private sources: Map<string, string>;
+  private workflows: Map<string, WorkflowEntry>;
 
   constructor() {
-    this.workflows = new Map<string, WorkflowManager>();
+    this.workflows = new Map<string, WorkflowEntry>();
   }
 
   /**
    * Add a workflow to the store
    *
    * @param workflow The WorkflowManager instance
+   * @param source The source of the workflow
    */
-  addWorkflow(workflow: WorkflowManager): void {
-    this.workflows.set(workflow.name, workflow);
+  addWorkflow(workflow: WorkflowManager, source: WorkflowSource): void {
+    this.workflows.set(workflow.name, { workflow, source });
   }
 
   /**
    * Load a workflow file and add it to the store
    *
    * @param path The file path to the workflow definition
+   * @param source The source of the workflow
    * @throws Error if the workflow cannot be loaded
    */
-  loadWorkflow(path: string): void {
+  loadWorkflow(path: string, source: WorkflowSource): void {
     const workflow = WorkflowManager.load(path);
-    this.addWorkflow(workflow);
+    this.addWorkflow(workflow, source);
   }
 
   /**
@@ -45,6 +57,15 @@ export class WorkflowStore {
    * @returns The WorkflowManager instance or undefined if not found
    */
   getWorkflow(name: string): WorkflowManager | undefined {
+    return this.workflows.get(name)?.workflow;
+  }
+
+  /**
+   * Get a workflow entry (with source) by name
+   * @param name The name of the workflow
+   * @returns The WorkflowEntry or undefined if not found
+   */
+  getWorkflowEntry(name: string): WorkflowEntry | undefined {
     return this.workflows.get(name);
   }
 
@@ -53,6 +74,14 @@ export class WorkflowStore {
    * @returns An array of WorkflowManager instances
    */
   getAllWorkflows(): WorkflowManager[] {
+    return Array.from(this.workflows.values()).map(entry => entry.workflow);
+  }
+
+  /**
+   * Get all workflow entries with source information
+   * @returns An array of WorkflowEntry instances
+   */
+  getAllWorkflowEntries(): WorkflowEntry[] {
     return Array.from(this.workflows.values());
   }
 }

@@ -22,6 +22,7 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { getTelemetry } from '../../lib/telemetry.js';
 import { isJsonMode, setJsonMode } from '../../lib/global-state.js';
+import { readFromStdin } from '../../utils/stdin.js';
 
 interface InspectWorkflowCommandOptions {
   // Output formats
@@ -154,6 +155,35 @@ export const inspectWorkflowCommand = async (
     // Track inspect workflow event
     telemetry?.eventInspectWorkflow();
 
+    // Handle stdin input when source is '-'
+    if (workflowSource === '-') {
+      const stdinContent = await readFromStdin();
+      if (!stdinContent) {
+        const errorMsg = 'No input provided on stdin';
+        if (isJsonMode()) {
+          console.log(
+            JSON.stringify(
+              {
+                success: false,
+                error: errorMsg,
+              },
+              null,
+              2
+            )
+          );
+        } else if (options.raw) {
+          console.error(`Error: ${errorMsg}`);
+        } else {
+          console.log(colors.red(`✗ ${errorMsg}`));
+        }
+        return;
+      }
+
+      // Create temporary file for stdin content
+      tempFile = createTempWorkflowFile(stdinContent);
+      workflowSource = tempFile;
+    }
+
     // Detect the type of source
     const sourceType = detectSourceType(workflowSource);
     let workflow: WorkflowManager | undefined;
@@ -197,7 +227,8 @@ export const inspectWorkflowCommand = async (
           throw new Error(`File not found: ${workflowSource}`);
         }
         workflow = WorkflowManager.load(workflowSource);
-        sourceOrigin = workflowSource;
+        // Set source origin to 'stdin' if it was read from stdin, otherwise use file path
+        sourceOrigin = tempFile !== null ? 'stdin' : workflowSource;
       } catch (error) {
         if (isJsonMode()) {
           console.log(

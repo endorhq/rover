@@ -3,7 +3,7 @@
  */
 import colors from 'ansi-colors';
 import { initWorkflowStore } from '../../lib/workflow.js';
-import { Table, TableColumn } from 'rover-core';
+import { Table, TableColumn, WorkflowSource } from 'rover-core';
 import { CLIJsonOutput } from '../../types.js';
 import { exitWithError, exitWithSuccess } from '../../utils/exit.js';
 import { Workflow } from 'rover-schemas';
@@ -16,10 +16,17 @@ interface ListWorkflowsCommandOptions {
 }
 
 /**
+ * Interface for workflow data with source for JSON output
+ */
+interface WorkflowWithSource extends Workflow {
+  source: WorkflowSource;
+}
+
+/**
  * Interface for JSON output
  */
 interface ListWorkflowsOutput extends CLIJsonOutput {
-  workflows: Workflow[];
+  workflows: WorkflowWithSource[];
 }
 
 /**
@@ -30,6 +37,7 @@ interface WorkflowRow {
   description: string;
   steps: string;
   inputs: string;
+  source: string;
 }
 
 /**
@@ -55,11 +63,12 @@ export const listWorkflowsCommand = async (
     // Track list workflows event
     telemetry?.eventListWorkflows();
     if (isJsonMode()) {
-      // For the JSON, add some extra information.
+      // For the JSON, add some extra information including source.
       output.success = true;
-      output.workflows = workflowStore
-        .getAllWorkflows()
-        .map(wf => wf.toObject());
+      output.workflows = workflowStore.getAllWorkflowEntries().map(entry => ({
+        ...entry.workflow.toObject(),
+        source: entry.source,
+      }));
 
       await exitWithSuccess('', output, { telemetry });
     } else {
@@ -89,19 +98,29 @@ export const listWorkflowsCommand = async (
           header: 'Inputs',
           key: 'inputs',
           minWidth: 8,
-          maxWidth: 50,
+          maxWidth: 30,
           truncate: 'ellipsis',
+        },
+        {
+          header: 'Source',
+          key: 'source',
+          minWidth: 8,
+          maxWidth: 10,
         },
       ];
 
-      const rows: WorkflowRow[] = workflowStore.getAllWorkflows().map(wf => {
-        return {
-          name: wf.name,
-          description: wf.description || '',
-          steps: wf.steps.length.toString(),
-          inputs: wf.inputs ? wf.inputs.map(i => i.name).join(', ') : 'None',
-        };
-      });
+      const rows: WorkflowRow[] = workflowStore
+        .getAllWorkflowEntries()
+        .map(entry => {
+          const wf = entry.workflow;
+          return {
+            name: wf.name,
+            description: wf.description || '',
+            steps: wf.steps.length.toString(),
+            inputs: wf.inputs ? wf.inputs.map(i => i.name).join(', ') : 'None',
+            source: entry.source,
+          };
+        });
 
       // Render the table
       const table = new Table(columns);

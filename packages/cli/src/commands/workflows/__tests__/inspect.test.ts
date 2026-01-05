@@ -65,6 +65,12 @@ vi.mock('../../../lib/workflow.js', () => ({
   }),
 }));
 
+// Mock stdin utilities
+let mockReadFromStdin = vi.fn();
+vi.mock('../../../utils/stdin.js', () => ({
+  readFromStdin: () => mockReadFromStdin(),
+}));
+
 // Mock global fetch for HTTP tests
 global.fetch = vi.fn();
 
@@ -80,6 +86,9 @@ describe('inspect workflow command', () => {
     // Spy on console methods
     consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    // Reset stdin mock
+    mockReadFromStdin = vi.fn().mockResolvedValue(null);
   });
 
   afterEach(() => {
@@ -437,6 +446,155 @@ steps:
       }
       const parsed = JSON.parse(output);
       expect(parsed.source).toBe(workflowFile);
+    });
+  });
+
+  describe('stdin input', () => {
+    it('should read workflow from stdin when source is "-"', async () => {
+      const workflowContent = `name: stdin-workflow
+description: Workflow from stdin
+version: 1.0.0
+inputs:
+  - name: task
+    description: Task to complete
+    type: string
+    required: true
+outputs:
+  - name: result
+    description: Task result
+    type: string
+steps:
+  - id: step1
+    name: analyze
+    type: agent
+    prompt: Analyze the task
+`;
+
+      mockReadFromStdin.mockResolvedValue(workflowContent);
+
+      await inspectWorkflowCommand('-', { json: false, raw: false });
+
+      expect(mockReadFromStdin).toHaveBeenCalled();
+      expect(consoleLogSpy).toHaveBeenCalled();
+      const output = consoleLogSpy.mock.calls
+        .map(call => call.join(' '))
+        .join('\n');
+      expect(output).toContain('Workflow Details');
+      expect(output).toContain('stdin-workflow');
+      expect(output).toContain('Workflow from stdin');
+    });
+
+    it('should output JSON when stdin is used with --json flag', async () => {
+      const workflowContent = `name: stdin-json
+description: JSON workflow from stdin
+version: 1.0.0
+steps:
+  - id: step1
+    name: step1
+    type: agent
+    prompt: Test
+`;
+
+      mockReadFromStdin.mockResolvedValue(workflowContent);
+
+      await inspectWorkflowCommand('-', { json: true, raw: false });
+
+      expect(mockReadFromStdin).toHaveBeenCalled();
+      expect(consoleLogSpy).toHaveBeenCalled();
+
+      const output = consoleLogSpy.mock.calls[0]?.[0];
+      if (typeof output !== 'string') {
+        throw new Error('Expected console.log output to be a string');
+      }
+      const parsed = JSON.parse(output);
+      expect(parsed.success).toBe(true);
+      expect(parsed.workflow.name).toBe('stdin-json');
+      expect(parsed.source).toBe('stdin');
+    });
+
+    it('should output raw YAML when stdin is used with --raw flag', async () => {
+      const workflowContent = `name: stdin-raw
+description: Raw workflow from stdin
+version: 1.0.0
+steps:
+  - id: step1
+    name: step1
+    type: agent
+    prompt: Test
+`;
+
+      mockReadFromStdin.mockResolvedValue(workflowContent);
+
+      await inspectWorkflowCommand('-', { json: false, raw: true });
+
+      expect(mockReadFromStdin).toHaveBeenCalled();
+      expect(consoleLogSpy).toHaveBeenCalled();
+
+      const output = consoleLogSpy.mock.calls[0]?.[0];
+      if (typeof output !== 'string') {
+        throw new Error('Expected console.log output to be a string');
+      }
+      expect(output).toContain('name: stdin-raw');
+      expect(output).toContain('description: Raw workflow from stdin');
+    });
+
+    it('should handle empty stdin input', async () => {
+      mockReadFromStdin.mockResolvedValue(null);
+
+      await inspectWorkflowCommand('-', { json: false, raw: false });
+
+      expect(mockReadFromStdin).toHaveBeenCalled();
+      expect(consoleLogSpy).toHaveBeenCalled();
+      const output = consoleLogSpy.mock.calls
+        .map(call => call.join(' '))
+        .join('\n');
+      expect(output).toContain('No input provided on stdin');
+    });
+
+    it('should handle empty stdin input with --json flag', async () => {
+      mockReadFromStdin.mockResolvedValue(null);
+
+      await inspectWorkflowCommand('-', { json: true, raw: false });
+
+      expect(mockReadFromStdin).toHaveBeenCalled();
+      expect(consoleLogSpy).toHaveBeenCalled();
+
+      const output = consoleLogSpy.mock.calls[0]?.[0];
+      if (typeof output !== 'string') {
+        throw new Error('Expected console.log output to be a string');
+      }
+      const parsed = JSON.parse(output);
+      expect(parsed.success).toBe(false);
+      expect(parsed.error).toBe('No input provided on stdin');
+    });
+
+    it('should handle empty stdin input with --raw flag', async () => {
+      mockReadFromStdin.mockResolvedValue(null);
+
+      await inspectWorkflowCommand('-', { json: false, raw: true });
+
+      expect(mockReadFromStdin).toHaveBeenCalled();
+      expect(consoleErrorSpy).toHaveBeenCalled();
+      const output = consoleErrorSpy.mock.calls
+        .map(call => call.join(' '))
+        .join('\n');
+      expect(output).toContain('No input provided on stdin');
+    });
+
+    it('should handle invalid workflow content from stdin', async () => {
+      const invalidContent = 'invalid yaml content: [[[';
+
+      mockReadFromStdin.mockResolvedValue(invalidContent);
+
+      await inspectWorkflowCommand('-', { json: false, raw: false });
+
+      expect(mockReadFromStdin).toHaveBeenCalled();
+      expect(consoleLogSpy).toHaveBeenCalled();
+      const output = consoleLogSpy.mock.calls
+        .map(call => call.join(' '))
+        .join('\n');
+      // Should show an error about the workflow being invalid
+      expect(output).toContain('Failed to load workflow');
     });
   });
 });
