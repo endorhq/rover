@@ -15,6 +15,7 @@
   ],
   "scripts": {
     "build": "tsdown --env.TSUP_DEV=false",
+    "build-dev": "tsdown --env.TSUP_DEV=true",
     "dev": "TSUP_DEV=true tsdown --env.TSUP_DEV=true --watch src/",
     "format": "prettier --write \"src/**/*.{ts,js,json}\"",
     "start": "node dist/cli.js",
@@ -30,11 +31,13 @@
     "yaml": "^2.8.1",
     "ansi-colors": "^4.1.3",
     "commander": "^14.0.0",
-    "execa": "^9.6.0",
+    "execa": "catalog:runtime",
     "ora": "^8.2.0",
     "zod": "^4.1.12"
   },
   "devDependencies": {
+    "rover-core": "workspace:*",
+    "rover-schemas": "workspace:*",
     "@types/node": "^24.1.0",
     "@vitest/ui": "^2.1.8",
     "tsdown": "^0.13.0",

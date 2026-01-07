@@ -13,39 +13,35 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20.x
-
-      - name: Setup npm cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-npm-cache-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-npm-cache-
+          cache: 'pnpm'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Build
-        run: npm run build
+        run: pnpm run build
 
       - name: Run type checking
-        run: npm run check
+        run: pnpm run check
         working-directory: packages/extension
 
       - name: Run linting
-        run: npm run lint
+        run: pnpm run lint
         working-directory: packages/extension
 
       - name: Compile extension
-        run: npm run compile
+        run: pnpm run compile
         working-directory: packages/extension
 
       - name: Package extension
-        run: npm run package
+        run: pnpm run package
         working-directory: packages/extension
 
       - name: Upload VSIX artifact

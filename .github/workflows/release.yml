@@ -54,10 +54,14 @@ jobs:
       - name: Clone
         uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: 'pnpm'
 
       - name: Create or Update Release Branch
         run: |
@@ -94,7 +98,7 @@ jobs:
           if [ "$CURRENT_VERSION" == "$TARGET_VERSION" ]; then
             echo "Version already set to $TARGET_VERSION, skipping bump"
           else
-            npm version "$TARGET_VERSION"
+            pnpm version "$TARGET_VERSION"
           fi
         working-directory: ./packages/${{ inputs.project }}
 
@@ -107,26 +111,26 @@ jobs:
           if [ "$CURRENT_VERSION" == "$TARGET_VERSION" ]; then
             echo "Version already set to $TARGET_VERSION, skipping bump"
           else
-            npm version "$TARGET_VERSION"
+            pnpm version "$TARGET_VERSION"
           fi
         working-directory: ./packages/agent
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Check
-        run: npm run check:${{ inputs.project }}
+        run: pnpm run check:${{ inputs.project }}
 
       - name: Test
         # For now, skip tests on the VSCode Extension
         if: inputs.project == 'cli'
-        run: npm run test:${{ inputs.project }}
+        run: pnpm run test:${{ inputs.project }}
 
       - name: Build
-        run: npm run build:${{ inputs.project }}
+        run: pnpm run build:${{ inputs.project }}
 
       - name: Package
-        run: npm run package:${{ inputs.project }}
+        run: pnpm run package:${{ inputs.project }}
 
       - name: (Dry Run) Commit and tag
         if: inputs.dryRun == true

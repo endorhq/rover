@@ -8,7 +8,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { launchSync } from 'rover-core';
+import { launchSync } from '../../os.js';
 import { clearProjectRootCache } from '../../project-root.js';
 import { ProjectConfigManager } from '../project-config.js';
 

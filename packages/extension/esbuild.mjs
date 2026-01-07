@@ -46,8 +46,6 @@ const copyCodiconsPlugin = {
       // Dist path for the codicon library
       const srcPath = path.join(
         __dirname,
-        '../',
-        '../',
         'node_modules',
         '@vscode',
         'codicons',
