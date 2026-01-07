@@ -216,7 +216,7 @@ export function createProgram(
     )
     .option(
       '-a, --agent <agent>',
-      `AI agent to use. Use -a multiple times for parallel tasks (e.g., -a claude -a gemini). Available: ${Object.values(AI_AGENT).join(', ')}`,
+      `AI agent with optional model (e.g., claude:opus, gemini:flash). Repeat for multiple agents. Available: ${Object.values(AI_AGENT).join(', ')}`,
       (value: string, previous: string[] | undefined) =>
         previous ? [...previous, value] : [value]
     )

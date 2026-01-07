@@ -9,6 +9,10 @@ export class CodexAgent extends BaseAgent {
   name = 'Codex';
   binary = 'codex';
 
+  constructor(version: string = 'latest', model?: string) {
+    super(version, model);
+  }
+
   getInstallCommand(): string {
     const packageSpec = `@openai/codex@${this.version}`;
     return `npm install -g ${packageSpec}`;
@@ -121,12 +125,16 @@ export class CodexAgent extends BaseAgent {
   }
 
   toolArguments(): string[] {
-    return [
+    const args = [
       'exec',
       '--dangerously-bypass-approvals-and-sandbox',
       '--skip-git-repo-check',
-      '-',
     ];
+    if (this.model) {
+      args.push('--model', this.model);
+    }
+    args.push('-');
+    return args;
   }
 
   toolInteractiveArguments(

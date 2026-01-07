@@ -11,6 +11,10 @@ export class CursorAgent extends BaseAgent {
   name = 'Cursor';
   binary = 'cursor-agent';
 
+  constructor(version: string = 'latest', model?: string) {
+    super(version, model);
+  }
+
   getInstallCommand(): string {
     return `nix build --no-link --accept-flake-config github:numtide/nix-ai-tools/${process.env.NIX_AI_TOOLS_REV}#cursor-agent`;
   }
@@ -147,7 +151,7 @@ export class CursorAgent extends BaseAgent {
   }
 
   toolArguments(): string[] {
-    return [
+    const args = [
       'agent',
       '--approve-mcps',
       '--browser',
@@ -156,6 +160,10 @@ export class CursorAgent extends BaseAgent {
       '--output-format',
       'json',
     ];
+    if (this.model) {
+      args.push('--model', this.model);
+    }
+    return args;
   }
 
   toolInteractiveArguments(
