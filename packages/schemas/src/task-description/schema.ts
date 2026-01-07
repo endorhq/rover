@@ -47,6 +47,17 @@ export const TaskDescriptionSchema = z.object({
   agentModel: z.string().optional(),
   sourceBranch: z.string().optional(),
 
+  // Per-step agent/model overrides (step ID -> { tool, model })
+  stepAgents: z
+    .record(
+      z.string(),
+      z.object({
+        tool: z.string().optional(),
+        model: z.string().optional(),
+      })
+    )
+    .optional(),
+
   // Docker Execution
   containerId: z.string().optional(),
   executionStatus: z.string().optional(),

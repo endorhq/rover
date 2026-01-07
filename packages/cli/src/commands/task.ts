@@ -33,6 +33,12 @@ import { GitHub, GitHubError } from '../lib/github.js';
 import { copyEnvironmentFiles } from '../utils/env-files.js';
 import { initWorkflowStore } from '../lib/workflow.js';
 import { setJsonMode, isJsonMode } from '../lib/global-state.js';
+import {
+  parseStepAgentString,
+  stepAgentsToRecord,
+  validateStepIds,
+  type ParsedStepAgent,
+} from '../utils/step-agent-parser.js';
 
 const { prompt } = enquirer;
 
@@ -204,6 +210,7 @@ interface TaskOptions {
   sourceBranch?: string;
   targetBranch?: string;
   agent?: string[];
+  override?: string[];
   json?: boolean;
   debug?: boolean;
 }
@@ -220,7 +227,8 @@ const createTaskForAgent = async (
   workflowName: string,
   baseBranch: string,
   git: Git,
-  jsonMode: boolean
+  jsonMode: boolean,
+  stepAgents?: Record<string, { tool?: string; model?: string }>
 ): Promise<{
   taskId: number;
   title: string;
@@ -288,6 +296,7 @@ const createTaskForAgent = async (
     agent: selectedAiAgent,
     agentModel: selectedModel,
     sourceBranch: sourceBranch,
+    stepAgents: stepAgents,
   });
 
   // Setup git worktree and branch
@@ -493,6 +502,52 @@ export const taskCommand = async (
     jsonOutput.error = `The workflow ${workflow} does not exist`;
     await exitWithError(jsonOutput, { telemetry });
     return;
+  }
+
+  // Parse and validate step-agent overrides
+  let stepAgents: Record<string, { tool?: string; model?: string }> | undefined;
+  if (options.override && options.override.length > 0) {
+    const parsedStepAgents: ParsedStepAgent[] = [];
+
+    for (const overrideStr of options.override) {
+      try {
+        const parsed = parseStepAgentString(overrideStr);
+        parsedStepAgents.push(parsed);
+      } catch (err) {
+        jsonOutput.error =
+          err instanceof Error
+            ? err.message
+            : `Invalid override: ${overrideStr}`;
+        await exitWithError(jsonOutput, { telemetry });
+        return;
+      }
+    }
+
+    // Validate step IDs against the workflow
+    const validStepIds = workflow.steps.map(s => s.id);
+    try {
+      validateStepIds(parsedStepAgents, validStepIds);
+    } catch (err) {
+      jsonOutput.error =
+        err instanceof Error ? err.message : 'Invalid step IDs';
+      await exitWithError(jsonOutput, { telemetry });
+      return;
+    }
+
+    // Validate agents for each step
+    for (const stepAgent of parsedStepAgents) {
+      const valid = validations(stepAgent.tool);
+      if (valid != null) {
+        jsonOutput.error = `${stepAgent.tool}: ${valid.error}`;
+        await exitWithError(jsonOutput, {
+          tips: valid.tips,
+          telemetry,
+        });
+        return;
+      }
+    }
+
+    stepAgents = stepAgentsToRecord(parsedStepAgents);
   }
 
   // Many workflows require instructions and this is the default input we collect
@@ -808,7 +863,8 @@ export const taskCommand = async (
         workflowName,
         baseBranch!,
         git,
-        json || false
+        json || false,
+        stepAgents
       );
 
       if (taskResult) {

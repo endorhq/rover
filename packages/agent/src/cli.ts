@@ -59,6 +59,10 @@ program
     'Agent model to use. It overrides defaults, but prioritize step tools if available.'
   )
   .option(
+    '--step-agents <json>',
+    'JSON object mapping step IDs to {tool, model} overrides'
+  )
+  .option(
     '--task-id <id>',
     'Task ID for status tracking (required if --status-file is provided)'
   )

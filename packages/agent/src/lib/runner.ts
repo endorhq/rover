@@ -82,19 +82,27 @@ export class Runner {
     private defaultModel: string | undefined,
     private statusManager?: IterationStatusManager,
     private totalSteps: number = 0,
-    private currentStepIndex: number = 0
+    private currentStepIndex: number = 0,
+    private stepAgents?: Record<string, { tool?: string; model?: string }>
   ) {
     // Get the step from the workflow
     this.step = this.workflow.getStep(stepId);
 
-    // Determine which tool to use
-    const stepTool = this.workflow.getStepTool(stepId, this.defaultTool);
+    // Check for step-specific overrides first
+    const stepOverride = this.stepAgents?.[stepId];
+
+    // Determine which tool to use: stepOverride > workflow step > default
+    const stepTool =
+      stepOverride?.tool || this.workflow.getStepTool(stepId, this.defaultTool);
 
     if (!stepTool) {
       throw new Error(
         'The workflow does not specify any AI Coding Agent and the user did not provide it.'
       );
     }
+
+    // Determine model to use: stepOverride > defaultModel
+    const modelToUse = stepOverride?.model || this.defaultModel;
 
     // Check if the tool is available
     let availableTool: string | undefined;
@@ -123,7 +131,7 @@ export class Runner {
 
     if (availableTool) {
       this.tool = availableTool;
-      this.agent = createAgent(availableTool, 'latest', this.defaultModel);
+      this.agent = createAgent(availableTool, 'latest', modelToUse);
     } else {
       throw new Error(`Could not find any tool to run the '${stepId}' step`);
     }

@@ -220,6 +220,12 @@ export function createProgram(
       (value: string, previous: string[] | undefined) =>
         previous ? [...previous, value] : [value]
     )
+    .option(
+      '-o, --override <step:tool[:model]>',
+      'Override tool/model for specific workflow steps (e.g., -o implement:claude:opus -o context:gemini)',
+      (value: string, previous: string[] | undefined) =>
+        previous ? [...previous, value] : [value]
+    )
     .option('--json', 'Output the result in JSON format')
     .option('--debug', 'Show debug information like running commands')
     .argument(

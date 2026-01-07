@@ -18,6 +18,8 @@ interface RunCommandOptions {
   agentTool?: string;
   // Model to use instead of workflow defaults
   agentModel?: string;
+  // Per-step agent/model overrides (JSON string)
+  stepAgents?: string;
   // Task ID for status tracking
   taskId?: string;
   // Path to status.json file
@@ -277,6 +279,20 @@ export const runCommand = async (
       let runSteps = 0;
       const totalSteps = workflowManager.steps.length;
 
+      // Parse step agents if provided
+      let parsedStepAgents:
+        | Record<string, { tool?: string; model?: string }>
+        | undefined;
+      if (options.stepAgents) {
+        try {
+          parsedStepAgents = JSON.parse(options.stepAgents);
+        } catch (err) {
+          console.log(colors.red(`\n✗ Invalid step-agents JSON: ${err}`));
+          output.error = `Invalid step-agents JSON: ${err}`;
+          return;
+        }
+      }
+
       for (
         let stepIndex = 0;
         stepIndex < workflowManager.steps.length;
@@ -292,7 +308,8 @@ export const runCommand = async (
           options.agentModel,
           statusManager,
           totalSteps,
-          stepIndex
+          stepIndex,
+          parsedStepAgents
         );
 
         runSteps++;
