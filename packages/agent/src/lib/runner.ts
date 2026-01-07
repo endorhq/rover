@@ -118,7 +118,7 @@ export class Runner {
 
     if (availableTool) {
       this.tool = availableTool;
-      this.agent = createAgent(availableTool);
+      this.agent = createAgent(availableTool, 'latest', this.defaultModel);
     } else {
       throw new Error(`Could not find any tool to run the '${stepId}' step`);
     }

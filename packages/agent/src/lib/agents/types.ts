@@ -23,6 +23,7 @@ export interface Agent {
   name: string;
   binary: string;
   version: string;
+  model?: string;
 
   getRequiredCredentials(): AgentCredentialFile[];
   validateCredentials(): ValidationResult;

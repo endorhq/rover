@@ -147,7 +147,7 @@ export class CursorAgent extends BaseAgent {
   }
 
   toolArguments(): string[] {
-    return [
+    const args = [
       'agent',
       '--approve-mcps',
       '--browser',
@@ -156,6 +156,10 @@ export class CursorAgent extends BaseAgent {
       '--output-format',
       'json',
     ];
+    if (this.model) {
+      args.push('--model', this.model);
+    }
+    return args;
   }
 
   toolInteractiveArguments(

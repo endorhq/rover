@@ -160,7 +160,12 @@ export class ClaudeAgent extends BaseAgent {
   }
 
   toolArguments(): string[] {
-    return ['--dangerously-skip-permissions', '--output-format', 'json', '-p'];
+    const args = ['--dangerously-skip-permissions', '--output-format', 'json'];
+    if (this.model) {
+      args.push('--model', this.model);
+    }
+    args.push('-p');
+    return args;
   }
 
   toolInteractiveArguments(

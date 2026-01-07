@@ -111,7 +111,12 @@ export class QwenAgent extends BaseAgent {
   }
 
   toolArguments(): string[] {
-    return ['--yolo', '-p'];
+    const args = ['--yolo'];
+    if (this.model) {
+      args.push('--model', this.model);
+    }
+    args.push('-p');
+    return args;
   }
 
   toolInteractiveArguments(
