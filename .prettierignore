@@ -47,3 +47,6 @@ coverage/
 
 # Ignore license files
 LICENSE.md
+
+# Lock
+pnpm-lock.yaml
