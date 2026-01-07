@@ -18,6 +18,11 @@ import { ProjectConfigManager, UserSettingsManager } from 'rover-schemas';
 import { showRoverChat, showTips, TIP_TITLES } from '../utils/display.js';
 import { AI_AGENT } from 'rover-core';
 import { getTelemetry } from '../lib/telemetry.js';
+import {
+  getAvailableModels,
+  hasMultipleModels,
+  getDefaultModelName,
+} from '../lib/agent-models.js';
 
 // Get the default prompt
 const { prompt } = enquirer;
@@ -249,6 +254,59 @@ export const initCommand = async (
       defaultAIAgent = availableAgents[0];
     }
 
+    // Model selection for agents with multiple models
+    const selectedModels: Map<AI_AGENT, string> = new Map();
+
+    if (!options.yes) {
+      // Check if any available agent has multiple model options
+      const agentsWithModels = availableAgents.filter(agent =>
+        hasMultipleModels(agent)
+      );
+
+      if (agentsWithModels.length > 0) {
+        console.log(colors.bold('\nModel Preferences'));
+        console.log(colors.gray('├── Select default model for each AI agent'));
+        console.log(
+          colors.gray(
+            '└── Override per task with -a agent:model (e.g., claude:opus)\n'
+          )
+        );
+
+        for (const agent of agentsWithModels) {
+          const models = getAvailableModels(agent);
+          const defaultModel = getDefaultModelName(agent);
+
+          try {
+            const result = (await prompt({
+              type: 'select',
+              name: 'model',
+              message: `Default model for ${agent.charAt(0).toUpperCase() + agent.slice(1)}:`,
+              choices: models.map(m => ({
+                name: `${m.name}${m.isDefault ? ' (recommended)' : ''} - ${m.description}`,
+                value: m.name,
+              })),
+              initial: models.findIndex(m => m.name === defaultModel),
+            })) as { model: string };
+
+            selectedModels.set(agent, result.model);
+          } catch (error) {
+            // User cancelled, use default
+            if (defaultModel) {
+              selectedModels.set(agent, defaultModel);
+            }
+          }
+        }
+      }
+    } else {
+      // With --yes, use defaults for all agents
+      for (const agent of availableAgents) {
+        const defaultModel = getDefaultModelName(agent);
+        if (defaultModel && hasMultipleModels(agent)) {
+          selectedModels.set(agent, defaultModel);
+        }
+      }
+    }
+
     let attribution = true;
 
     if (!options.yes) {
@@ -330,6 +388,11 @@ export const initCommand = async (
         // Set available AI agents and default
         availableAgents.forEach(agent => userSettings.addAiAgent(agent));
         userSettings.setDefaultAiAgent(defaultAIAgent);
+      }
+
+      // Save model preferences
+      for (const [agent, model] of selectedModels) {
+        userSettings.setDefaultModel(agent, model);
       }
 
       console.log(colors.green('✓ Rover initialization complete!'));

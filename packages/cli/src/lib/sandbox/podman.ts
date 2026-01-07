@@ -164,6 +164,11 @@ export class PodmanSandbox extends Sandbox {
       '/inputs.json'
     );
 
+    // Pass model if specified
+    if (this.task.agentModel) {
+      podmanArgs.push('--agent-model', this.task.agentModel);
+    }
+
     // Forward verbose flag to rover-agent if enabled
     if (VERBOSE) {
       podmanArgs.push('-v');
@@ -287,6 +292,11 @@ export class PodmanSandbox extends Sandbox {
 
     if (initialPrompt) {
       podmanArgs.push(initialPrompt);
+    }
+
+    // Pass model if specified
+    if (this.task.agentModel) {
+      podmanArgs.push('--agent-model', this.task.agentModel);
     }
 
     // Forward verbose flag to rover-agent if enabled

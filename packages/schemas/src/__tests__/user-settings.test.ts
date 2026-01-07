@@ -46,15 +46,15 @@ describe('UserSettingsManager', () => {
       expect(existsSync('.rover/settings.json')).toBe(true);
       const jsonData = JSON.parse(readFileSync('.rover/settings.json', 'utf8'));
 
-      // Version should be 1.0
-      expect(jsonData.version).toBe('1.0');
+      // Version should be 1.1
+      expect(jsonData.version).toBe('1.1');
 
       // Should have empty arrays and empty defaults
       expect(jsonData.aiAgents).toEqual([]);
-      expect(jsonData.defaults).toEqual({});
+      expect(jsonData.defaults).toEqual({ models: {} });
 
       // Getters should return expected values
-      expect(settings.version).toBe('1.0');
+      expect(settings.version).toBe('1.1');
       expect(settings.aiAgents).toEqual([]);
       expect(settings.defaultAiAgent).toBeUndefined();
     });
@@ -73,12 +73,12 @@ describe('UserSettingsManager', () => {
     it('should create default settings when file does not exist', () => {
       const settings = UserSettingsManager.load();
 
-      expect(settings.version).toBe('1.0');
+      expect(settings.version).toBe('1.1');
       expect(settings.aiAgents).toEqual([]);
       expect(settings.defaultAiAgent).toBeUndefined();
     });
 
-    it('should load existing settings file', () => {
+    it('should load existing settings file and migrate v1.0 to v1.1', () => {
       mkdirSync('.rover');
       writeFileSync(
         '.rover/settings.json',
@@ -97,7 +97,8 @@ describe('UserSettingsManager', () => {
 
       const settings = UserSettingsManager.load();
 
-      expect(settings.version).toBe('1.0');
+      // v1.0 settings should be migrated to v1.1
+      expect(settings.version).toBe('1.1');
       expect(settings.aiAgents).toEqual([AI_AGENT.Claude, AI_AGENT.Gemini]);
       expect(settings.defaultAiAgent).toBe(AI_AGENT.Claude);
     });
@@ -118,15 +119,15 @@ describe('UserSettingsManager', () => {
 
       const settings = UserSettingsManager.load();
 
-      // Should be migrated to current version
-      expect(settings.version).toBe('1.0');
+      // Should be migrated to current version (1.1)
+      expect(settings.version).toBe('1.1');
       // Migration provides default Claude agent
       expect(settings.aiAgents).toEqual([AI_AGENT.Claude]);
       expect(settings.defaultAiAgent).toBe(AI_AGENT.Claude);
 
       // Check saved file
       const jsonData = JSON.parse(readFileSync('.rover/settings.json', 'utf8'));
-      expect(jsonData.version).toBe('1.0');
+      expect(jsonData.version).toBe('1.1');
       expect(jsonData.aiAgents).toEqual([AI_AGENT.Claude]);
       expect(jsonData.defaults.aiAgent).toBe(AI_AGENT.Claude);
     });
@@ -134,10 +135,11 @@ describe('UserSettingsManager', () => {
     it('should not re-migrate current version settings', () => {
       mkdirSync('.rover');
       const originalData = {
-        version: '1.0',
+        version: '1.1',
         aiAgents: [AI_AGENT.Gemini],
         defaults: {
           aiAgent: AI_AGENT.Gemini,
+          models: {},
         },
       };
       writeFileSync(
@@ -147,8 +149,8 @@ describe('UserSettingsManager', () => {
 
       const settings = UserSettingsManager.load();
 
-      // Should remain at version 1.0
-      expect(settings.version).toBe('1.0');
+      // Should remain at version 1.1
+      expect(settings.version).toBe('1.1');
 
       // All fields should be preserved exactly
       expect(settings.aiAgents).toEqual([AI_AGENT.Gemini]);
@@ -381,9 +383,9 @@ describe('UserSettingsManager', () => {
       const json = settings.toJSON();
 
       expect(json).toEqual({
-        version: '1.0',
+        version: '1.1',
         aiAgents: [AI_AGENT.Claude],
-        defaults: {},
+        defaults: { models: {} },
       });
     });
 
@@ -399,7 +401,7 @@ describe('UserSettingsManager', () => {
   });
 
   describe('edge cases', () => {
-    it('should handle empty agents array', () => {
+    it('should handle empty agents array by setting Claude as default agent during migration', () => {
       mkdirSync('.rover');
       writeFileSync(
         '.rover/settings.json',
@@ -416,8 +418,9 @@ describe('UserSettingsManager', () => {
 
       const settings = UserSettingsManager.load();
 
+      // Migration preserves empty aiAgents array but sets Claude as default agent
       expect(settings.aiAgents).toEqual([]);
-      expect(settings.defaultAiAgent).toBeUndefined();
+      expect(settings.defaultAiAgent).toBe(AI_AGENT.Claude);
     });
 
     it('should handle removing last agent when it is the default', () => {
@@ -451,7 +454,7 @@ describe('UserSettingsManager', () => {
       const settings = UserSettingsManager.load();
 
       // Migration should add default from Claude fallback
-      expect(settings.version).toBe('1.0');
+      expect(settings.version).toBe('1.1');
       expect(settings.defaultAiAgent).toBe(AI_AGENT.Claude);
     });
   });

@@ -23,6 +23,7 @@ export interface CreateTaskData {
   workflowName: string;
   uuid?: string; // Optional, will be generated if not provided
   agent?: string; // AI agent to use for execution
+  agentModel?: string; // AI model to use (e.g., opus, sonnet, flash)
   sourceBranch?: string; // Source branch task was created from
 }
 

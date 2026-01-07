@@ -71,6 +71,7 @@ export class TaskDescriptionManager {
       workflowName: taskData.workflowName,
       branchName: '',
       agent: taskData.agent,
+      agentModel: taskData.agentModel,
       sourceBranch: taskData.sourceBranch,
       version: CURRENT_TASK_DESCRIPTION_SCHEMA_VERSION,
     };
@@ -202,8 +203,9 @@ export class TaskDescriptionManager {
     migrated.restartCount = data.restartCount || 0;
     migrated.lastRestartAt = data.lastRestartAt || '';
 
-    // Preserve agent and sourceBranch fields
+    // Preserve agent, agentModel, and sourceBranch fields
     migrated.agent = data.agent;
+    migrated.agentModel = data.agentModel;
     migrated.sourceBranch = data.sourceBranch;
 
     // Preserve agentImage field
@@ -602,6 +604,9 @@ export class TaskDescriptionManager {
   }
   get agent(): string | undefined {
     return this.data.agent;
+  }
+  get agentModel(): string | undefined {
+    return this.data.agentModel;
   }
   get sourceBranch(): string | undefined {
     return this.data.sourceBranch;

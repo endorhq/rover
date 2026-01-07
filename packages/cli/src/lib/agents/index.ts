@@ -125,3 +125,19 @@ export const getUserAIAgent = (): AI_AGENT => {
     throw new AIAgentConfigError();
   }
 };
+
+/**
+ * Get the user's default model for a specific AI agent.
+ * Returns undefined if no default model is configured.
+ */
+export const getUserDefaultModel = (agent: AI_AGENT): string | undefined => {
+  try {
+    if (UserSettingsManager.exists()) {
+      const userSettings = UserSettingsManager.load();
+      return userSettings.getDefaultModel(agent);
+    }
+    return undefined;
+  } catch (error) {
+    return undefined;
+  }
+};

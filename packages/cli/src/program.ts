@@ -213,7 +213,7 @@ export function createProgram(
     )
     .option(
       '-a, --agent <agent...>',
-      `AI agent(s) to use - can be specified multiple times (${Object.values(AI_AGENT).join(', ')})`
+      `AI agent(s) with optional model (e.g., claude:opus, gemini:flash). Available: ${Object.values(AI_AGENT).join(', ')}`
     )
     .option('--json', 'Output the result in JSON format')
     .option('--debug', 'Show debug information like running commands')

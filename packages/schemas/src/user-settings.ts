@@ -77,7 +77,9 @@ export class UserSettingsManager {
     const schema: UserSettings = {
       version: CURRENT_USER_SCHEMA_VERSION,
       aiAgents: [],
-      defaults: {},
+      defaults: {
+        models: {},
+      },
     };
 
     const instance = new UserSettingsManager(schema);
@@ -110,7 +112,7 @@ export class UserSettingsManager {
       return data as UserSettings;
     }
 
-    // Migration from older versions
+    // Migration from older versions (1.0 or earlier)
     // NOTE: Unlike createDefault() which uses empty arrays and no default agent,
     // migration provides Claude as the default for backward compatibility with
     // existing installations that may have been using Claude implicitly.
@@ -119,6 +121,8 @@ export class UserSettingsManager {
       aiAgents: data.aiAgents || [AI_AGENT.Claude],
       defaults: {
         aiAgent: data.defaults?.aiAgent || AI_AGENT.Claude,
+        // v1.1: Add empty models object for existing users
+        models: data.defaults?.models || {},
       },
     };
 
@@ -167,6 +171,9 @@ export class UserSettingsManager {
   get defaultAiAgent(): AI_AGENT | undefined {
     return this.data.defaults.aiAgent;
   }
+  get defaultModels(): Record<string, string> {
+    return this.data.defaults.models || {};
+  }
 
   // Data Modification (Setters)
   /**
@@ -208,6 +215,39 @@ export class UserSettingsManager {
       ) {
         this.data.defaults.aiAgent = this.data.aiAgents[0];
       }
+      this.save();
+    }
+  }
+
+  /**
+   * Get the default model for a specific AI agent
+   */
+  getDefaultModel(agent: AI_AGENT): string | undefined {
+    return this.data.defaults.models?.[agent];
+  }
+
+  /**
+   * Set the default model for a specific AI agent
+   * Automatically adds the agent to the available agents list if not already present
+   */
+  setDefaultModel(agent: AI_AGENT, model: string): void {
+    if (!this.data.defaults.models) {
+      this.data.defaults.models = {};
+    }
+    this.data.defaults.models[agent] = model;
+    // Ensure the agent is in the available agents list
+    if (!this.data.aiAgents.includes(agent)) {
+      this.data.aiAgents.push(agent);
+    }
+    this.save();
+  }
+
+  /**
+   * Remove the default model for a specific AI agent
+   */
+  removeDefaultModel(agent: AI_AGENT): void {
+    if (this.data.defaults.models?.[agent]) {
+      delete this.data.defaults.models[agent];
       this.save();
     }
   }

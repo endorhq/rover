@@ -119,10 +119,13 @@ describe('init command', () => {
     // Verify content
     const settings = JSON.parse(readFileSync('.rover/settings.json', 'utf8'));
     expect(settings).toMatchObject({
-      version: '1.0',
+      version: '1.1',
       aiAgents: ['claude'],
       defaults: {
         aiAgent: 'claude',
+        models: {
+          claude: 'sonnet',
+        },
       },
     });
   });

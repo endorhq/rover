@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { AI_AGENT } from 'rover-core';
 
 // Current schema version
-export const CURRENT_USER_SCHEMA_VERSION = '1.0';
+export const CURRENT_USER_SCHEMA_VERSION = '1.1';
 
 // Filename constants
 export const USER_SETTINGS_FILENAME = 'settings.json';
@@ -23,6 +23,8 @@ export const AiAgentSchema = z.nativeEnum(AI_AGENT);
 export const UserDefaultsSchema = z.object({
   /** Default AI agent to use */
   aiAgent: AiAgentSchema.optional(),
+  /** Default model per agent (e.g., { "claude": "opus", "gemini": "flash" }) */
+  models: z.record(z.string(), z.string()).optional(),
 });
 
 /**
