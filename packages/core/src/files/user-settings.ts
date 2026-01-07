@@ -166,6 +166,9 @@ export class UserSettingsManager {
   get defaultAiAgent(): AI_AGENT | undefined {
     return this.data.defaults.aiAgent;
   }
+  get watchIntervalSeconds(): number {
+    return this.data.defaults.watchIntervalSeconds ?? 3;
+  }
 
   // Data Modification (Setters)
   /**

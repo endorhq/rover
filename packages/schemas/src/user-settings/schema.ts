@@ -23,6 +23,8 @@ export const AiAgentSchema = z.enum(AI_AGENT);
 export const UserDefaultsSchema = z.object({
   /** Default AI agent to use */
   aiAgent: AiAgentSchema.optional(),
+  /** Watch interval in seconds for `rover list --watch` (default: 3) */
+  watchIntervalSeconds: z.number().min(1).max(60).optional(),
 });
 
 /**
