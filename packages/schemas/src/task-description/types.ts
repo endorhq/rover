@@ -3,16 +3,13 @@
  * Defines the structure for task metadata and configuration.
  */
 import { z } from 'zod';
-import {
-  TaskStatusSchema,
-  TaskDescriptionSchema as TaskDescriptionZodSchema,
-} from './schema.js';
+import { TaskStatusSchema, TaskDescriptionSchema } from './schema.js';
 
 // Infer TaskStatus type from Zod schema
 export type TaskStatus = z.infer<typeof TaskStatusSchema>;
 
 // Infer TaskDescriptionSchema type from Zod schema
-export type TaskDescriptionSchema = z.infer<typeof TaskDescriptionZodSchema>;
+export type TaskDescription = z.infer<typeof TaskDescriptionSchema>;
 
 // Data required to create a new task
 export interface CreateTaskData {

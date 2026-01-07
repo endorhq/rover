@@ -4,18 +4,16 @@
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { WorkflowAgentStep } from './workflow/types.js';
-import type { PreviousIteration } from './previous-iteration/types.js';
 import {
   CURRENT_PRE_CONTEXT_DATA_SCHEMA_VERSION,
   PRE_CONTEXT_DATA_FILENAME,
   PreContextDataSchema,
-} from './pre-context-data/schema.js';
-import type { PreContextData, InitialTask } from './pre-context-data/types.js';
-import {
   PreContextDataLoadError,
   PreContextDataValidationError,
-} from './pre-context-data/errors.js';
+  type PreContextData,
+  type InitialTask,
+  type PreviousIteration,
+} from 'rover-schemas';
 
 /**
  * Pre-context data manager. It provides the ability to load and manage

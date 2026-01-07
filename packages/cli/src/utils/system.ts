@@ -1,14 +1,14 @@
 /**
  * An utility library to check the existence of different tools and commands.
  */
-import { execa } from 'execa';
+import { launch } from 'rover-core';
 
 const checkCommand = async (
   command: string,
   args: string[] = ['--version']
 ): Promise<boolean> => {
   try {
-    await execa(command, args);
+    await launch(command, args);
     return true;
   } catch {
     return false;

@@ -1,7 +1,12 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import type { Environment } from '../types.js';
 import type { Language, PackageManager, TaskManager } from 'rover-schemas';
+
+export interface EnvironmentResult {
+  languages: Language[];
+  packageManagers: PackageManager[];
+  taskManagers: TaskManager[];
+}
 
 /**
  * Identify project types based on the given files
@@ -123,7 +128,7 @@ export async function detectTaskManagers(
 
 export async function detectEnvironment(
   projectPath: string
-): Promise<Environment> {
+): Promise<EnvironmentResult> {
   const [languages, packageManagers, taskManagers] = await Promise.all([
     detectLanguages(projectPath),
     detectPackageManagers(projectPath),

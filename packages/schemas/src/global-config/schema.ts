@@ -3,7 +3,7 @@
  */
 
 import { z } from 'zod';
-import { AI_AGENT } from 'rover-core';
+import { AI_AGENT } from '../index.js';
 import {
   LanguageSchema,
   PackageManagerSchema,

@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { clearProjectRootCache, launchSync } from 'rover-core';
 import { stopCommand } from '../stop.js';
-import { TaskDescriptionManager } from 'rover-schemas';
+import { TaskDescriptionManager } from 'rover-core';
 
 // Mock external dependencies
 vi.mock('../../lib/telemetry.js', () => ({

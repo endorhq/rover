@@ -3,8 +3,7 @@ import { join } from 'node:path';
 import colors from 'ansi-colors';
 import ora from 'ora';
 import enquirer from 'enquirer';
-import { detectEnvironment } from '../utils/environment.js';
-import type { Environment } from '../types.js';
+import { detectEnvironment, type EnvironmentResult } from 'rover-core';
 import {
   checkClaude,
   checkCodex,
@@ -14,9 +13,12 @@ import {
   checkQwen,
   checkGit,
 } from '../utils/system.js';
-import { ProjectConfigManager, UserSettingsManager } from 'rover-schemas';
+import {
+  ProjectConfigManager,
+  UserSettingsManager,
+  AI_AGENT,
+} from 'rover-core';
 import { showRoverChat, showTips, TIP_TITLES } from '../utils/display.js';
-import { AI_AGENT } from 'rover-core';
 import { getTelemetry } from '../lib/telemetry.js';
 
 // Get the default prompt
@@ -196,7 +198,7 @@ export const initCommand = async (
   console.log('');
 
   try {
-    const environment: Environment = await detectEnvironment(path);
+    const environment: EnvironmentResult = await detectEnvironment(path);
     let defaultAIAgent: AI_AGENT = AI_AGENT.Claude;
 
     const availableAgents: AI_AGENT[] = [];
