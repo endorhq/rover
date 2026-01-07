@@ -266,72 +266,61 @@ export const initCommand = async (
       defaultAIAgent = availableAgents[0];
     }
 
-    // Model selection for agents with multiple models
+    // Model selection for the selected default agent only
     const selectedModels: Map<AI_AGENT, string> = new Map();
 
-    if (!options.yes) {
-      // Check if any available agent has multiple model options
-      const agentsWithModels = availableAgents.filter(agent =>
-        hasMultipleModels(agent)
+    if (!options.yes && hasMultipleModels(defaultAIAgent)) {
+      const agent = defaultAIAgent;
+      const models = getAvailableModels(agent);
+
+      console.log(colors.bold('\nModel Preference'));
+      console.log(colors.gray('├── Select default model for your AI agent'));
+      console.log(
+        colors.gray(
+          '├── Override per task with -a agent:model (e.g., claude:opus)'
+        )
+      );
+      console.log(
+        colors.gray(
+          '└── Works like agent CLI --model flag (e.g., claude --model sonnet)\n'
+        )
       );
 
-      if (agentsWithModels.length > 0) {
-        console.log(colors.bold('\nModel Preferences'));
-        console.log(colors.gray('├── Select default model for each AI agent'));
-        console.log(colors.gray('├── Override per task with -a agent:model (e.g., claude:opus)'));
-        console.log(
-          colors.gray(
-            '└── Works like agent CLI --model flag (e.g., claude --model sonnet)\n'
-          )
-        );
+      try {
+        // Use plain strings for choices to avoid enquirer name/value confusion
+        const inheritOption = 'Inherit (use agent default) (recommended)';
+        const otherOption = 'Other (enter custom model)';
+        const modelChoices = models.map(m => `${m.name} - ${m.description}`);
+        const choices = [inheritOption, ...modelChoices, otherOption];
 
-        for (const agent of agentsWithModels) {
-          const models = getAvailableModels(agent);
+        const result = (await prompt({
+          type: 'select',
+          name: 'model',
+          message: `Default model for ${agent.charAt(0).toUpperCase() + agent.slice(1)}:`,
+          choices,
+          initial: 0, // "Inherit" is first and recommended
+        })) as { model: string };
 
-          try {
-            const choices = [
-              {
-                name: 'Inherit (use agent default) (recommended)',
-                value: '__inherit__',
-              },
-              ...models.map(m => ({
-                name: `${m.name} - ${m.description}`,
-                value: m.name,
-              })),
-              {
-                name: 'Other (enter custom model)',
-                value: '__other__',
-              },
-            ];
+        // Handle based on what was selected
+        if (result.model === otherOption) {
+          // Ask for custom model name using readline
+          const customModel = await askForInput(
+            `Enter custom model name for ${agent}:`
+          );
 
-            const result = (await prompt({
-              type: 'select',
-              name: 'model',
-              message: `Default model for ${agent.charAt(0).toUpperCase() + agent.slice(1)}:`,
-              choices,
-              initial: 0, // "Inherit" is first and recommended
-            })) as { model: string };
-
-            // Only save if user chose a specific model, not "inherit"
-            if (result.model === '__other__') {
-              // Ask for custom model name using readline
-              const customModel = await askForInput(
-                `Enter custom model name for ${agent}:`
-              );
-
-              if (customModel?.trim()) {
-                selectedModels.set(agent, customModel.trim());
-              }
-            } else if (result.model !== '__inherit__') {
-              selectedModels.set(agent, result.model);
-            }
-          } catch (error) {
-            // User cancelled, don't set any model (inherit behavior)
+          if (customModel?.trim()) {
+            selectedModels.set(agent, customModel.trim());
           }
+        } else if (result.model !== inheritOption) {
+          // Extract model name from "modelName - description"
+          const modelName = result.model.split(' - ')[0];
+          selectedModels.set(agent, modelName);
         }
+      } catch (error) {
+        // User cancelled, don't set any model (inherit behavior)
       }
     }
-    // With --yes or no agents with multiple models, selectedModels stays empty (inherit behavior)
+    // With --yes or agent without multiple models, selectedModels stays empty (inherit behavior)
 
     // Per-step workflow configuration (opt-in)
     const workflowStepConfigs: Map<
@@ -388,16 +377,11 @@ export const initCommand = async (
                 : step.name;
 
               // Build tool choices - "Inherit/Default" first, then available agents
-              const toolChoices = [
-                {
-                  name: 'Inherit/Default',
-                  value: '__inherit__',
-                },
-                ...availableAgents.map(agent => ({
-                  name: agent.charAt(0).toUpperCase() + agent.slice(1),
-                  value: agent,
-                })),
-              ];
+              const inheritToolOption = 'Inherit/Default';
+              const agentToolChoices = availableAgents.map(
+                agent => agent.charAt(0).toUpperCase() + agent.slice(1)
+              );
+              const toolChoices = [inheritToolOption, ...agentToolChoices];
 
               try {
                 const toolResult = (await prompt({
@@ -408,24 +392,25 @@ export const initCommand = async (
                   initial: 0,
                 })) as { tool: string };
 
-                if (toolResult.tool !== '__inherit__') {
+                // Convert display name back to agent value
+                const selectedTool =
+                  toolResult.tool === inheritToolOption
+                    ? '__inherit__'
+                    : toolResult.tool.toLowerCase();
+
+                if (selectedTool !== '__inherit__') {
                   // Ask for model if tool was selected
-                  const models = getAvailableModels(
-                    toolResult.tool as AI_AGENT
+                  const models = getAvailableModels(selectedTool as AI_AGENT);
+                  // Use plain strings for choices to avoid enquirer name/value confusion
+                  const inheritModelOption = 'Inherit/Default';
+                  const otherModelOption = 'Other (enter custom model)';
+                  const stepModelChoices = models.map(
+                    m => `${m.name} - ${m.description}`
                   );
                   const modelChoices = [
-                    {
-                      name: 'Inherit/Default',
-                      value: '__inherit__',
-                    },
-                    ...models.map(m => ({
-                      name: `${m.name} - ${m.description}`,
-                      value: m.name,
-                    })),
-                    {
-                      name: 'Other (enter custom model)',
-                      value: '__other__',
-                    },
+                    inheritModelOption,
+                    ...stepModelChoices,
+                    otherModelOption,
                   ];
 
                   const modelResult = (await prompt({
@@ -437,17 +422,18 @@ export const initCommand = async (
                   })) as { model: string };
 
                   let finalModel: string | undefined;
-                  if (modelResult.model === '__other__') {
+                  if (modelResult.model === otherModelOption) {
                     const customModel = await askForInput(
                       `Enter custom model name:`
                     );
                     finalModel = customModel?.trim() || undefined;
-                  } else if (modelResult.model !== '__inherit__') {
-                    finalModel = modelResult.model;
+                  } else if (modelResult.model !== inheritModelOption) {
+                    // Extract model name from "modelName - description"
+                    finalModel = modelResult.model.split(' - ')[0];
                   }
 
                   stepConfigs.set(step.id, {
-                    tool: toolResult.tool,
+                    tool: selectedTool,
                     model: finalModel,
                   });
                 }
