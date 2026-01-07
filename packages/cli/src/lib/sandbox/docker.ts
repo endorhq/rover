@@ -93,7 +93,17 @@ export class DockerSandbox extends Sandbox {
       );
     }
     // Remove duplicates from mounts and env vars
-    const uniqueMounts = [...new Set(dockerMounts)];
+    // Mounts come as pairs ['-v', 'path1', '-v', 'path2'], so deduplicate by mount path
+    const seenMounts = new Set<string>();
+    const uniqueMounts: string[] = [];
+    for (let i = 0; i < dockerMounts.length; i += 2) {
+      const flag = dockerMounts[i];
+      const mount = dockerMounts[i + 1];
+      if (mount && !seenMounts.has(mount)) {
+        seenMounts.add(mount);
+        uniqueMounts.push(flag, mount);
+      }
+    }
     const uniqueEnvVars = [...new Set(envVariables)];
 
     // Clean up any existing container with same name
@@ -283,7 +293,17 @@ export class DockerSandbox extends Sandbox {
       );
     }
     // Remove duplicates from mounts and env vars
-    const uniqueMounts = [...new Set(dockerMounts)];
+    // Mounts come as pairs ['-v', 'path1', '-v', 'path2'], so deduplicate by mount path
+    const seenMounts = new Set<string>();
+    const uniqueMounts: string[] = [];
+    for (let i = 0; i < dockerMounts.length; i += 2) {
+      const flag = dockerMounts[i];
+      const mount = dockerMounts[i + 1];
+      if (mount && !seenMounts.has(mount)) {
+        seenMounts.add(mount);
+        uniqueMounts.push(flag, mount);
+      }
+    }
     const uniqueEnvVars = [...new Set(envVariables)];
 
     const interactiveName = `${this.sandboxName}-i`;
