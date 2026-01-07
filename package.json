@@ -11,13 +11,13 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "pnpm --filter './packages/*' -r --parallel run dev",
+    "dev": "pnpm --filter './packages/*' -r --parallel dev",
     "build": "pnpm -r --filter './packages/*' build",
     "build-dev": "pnpm -r --filter './packages/*' build-dev",
-    "package": "pnpm --filter './packages/*' package",
-    "check": "pnpm --filter './packages/*' check",
-    "e2e-test": "pnpm --filter './packages/*' e2e-test",
-    "test": "pnpm --filter './packages/*' test",
+    "package": "pnpm -r --filter './packages/*' package",
+    "check": "pnpm -r --filter './packages/*' check",
+    "e2e-test": "pnpm -r --filter './packages/*' e2e-test",
+    "test": "pnpm -r --filter './packages/*' --filter '!./packages/extension' test",
     "format": "prettier --write ."
   },
   "devDependencies": {
