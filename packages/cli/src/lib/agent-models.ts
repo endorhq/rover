@@ -28,17 +28,24 @@ export const AGENT_MODELS: Record<AI_AGENT, AgentModelConfig[]> = {
     { name: 'haiku', description: 'Fastest and cheapest' },
   ],
   [AI_AGENT.Gemini]: [
-    { name: 'flash', description: 'Fast and efficient', isDefault: true },
-    { name: 'pro', description: 'Highest capability' },
+    { name: 'flash', description: 'Balance of speed and reasoning', isDefault: true },
+    { name: 'pro', description: 'Deep reasoning and creativity' },
+    { name: 'flash-lite', description: 'Fast and lightweight' },
   ],
   [AI_AGENT.Qwen]: [
     { name: 'plus', description: 'General purpose', isDefault: true },
     { name: 'qwq', description: 'Reasoning model' },
   ],
   [AI_AGENT.Codex]: [
-    { name: 'o3', description: 'OpenAI o3 reasoning model', isDefault: true },
-    { name: 'o4-mini', description: 'OpenAI o4-mini' },
-    { name: 'gpt-4.1', description: 'GPT-4.1' },
+    {
+      name: 'gpt-5.1-codex-max',
+      description: 'Codex-optimized flagship for deep reasoning',
+      isDefault: true,
+    },
+    { name: 'gpt-5.1-codex', description: 'Optimized for codex' },
+    { name: 'gpt-5.1-codex-mini', description: 'Faster and cheaper codex model' },
+    { name: 'gpt-5.2', description: 'Latest frontier model' },
+    { name: 'gpt-5.1', description: 'Strong general reasoning' },
   ],
   [AI_AGENT.Cursor]: [
     { name: 'sonnet-4', description: 'Claude Sonnet 4', isDefault: true },
