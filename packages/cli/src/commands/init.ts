@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { createInterface } from 'node:readline';
 import colors from 'ansi-colors';
 import ora from 'ora';
 import enquirer from 'enquirer';
@@ -23,6 +24,20 @@ import { initWorkflowStore } from '../lib/workflow.js';
 
 // Get the default prompt
 const { prompt } = enquirer;
+
+// Helper to get text input using readline (more reliable than enquirer for this case)
+const askForInput = (message: string): Promise<string> => {
+  return new Promise(resolve => {
+    const rl = createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+    rl.question(colors.cyan('? ') + message + ' ', answer => {
+      rl.close();
+      resolve(answer);
+    });
+  });
+};
 
 // Ensure .rover/tasks/ and .rover/settings.local.json are in .gitignore
 const ensureGitignore = async (projectPath: string): Promise<void> => {
@@ -263,9 +278,10 @@ export const initCommand = async (
       if (agentsWithModels.length > 0) {
         console.log(colors.bold('\nModel Preferences'));
         console.log(colors.gray('├── Select default model for each AI agent'));
+        console.log(colors.gray('├── Override per task with -a agent:model (e.g., claude:opus)'));
         console.log(
           colors.gray(
-            '└── Override per task with -a agent:model (e.g., claude:opus)\n'
+            '└── Works like agent CLI --model flag (e.g., claude --model sonnet)\n'
           )
         );
 
@@ -298,15 +314,13 @@ export const initCommand = async (
 
             // Only save if user chose a specific model, not "inherit"
             if (result.model === '__other__') {
-              // Ask for custom model name
-              const customResult = (await prompt({
-                type: 'input',
-                name: 'customModel',
-                message: `Enter custom model name for ${agent}:`,
-              })) as { customModel: string };
+              // Ask for custom model name using readline
+              const customModel = await askForInput(
+                `Enter custom model name for ${agent}:`
+              );
 
-              if (customResult.customModel?.trim()) {
-                selectedModels.set(agent, customResult.customModel.trim());
+              if (customModel?.trim()) {
+                selectedModels.set(agent, customModel.trim());
               }
             } else if (result.model !== '__inherit__') {
               selectedModels.set(agent, result.model);
@@ -339,6 +353,20 @@ export const initCommand = async (
           const workflowStore = initWorkflowStore();
           const workflows = workflowStore.listWorkflows();
 
+          // Step descriptions for user guidance
+          const stepDescriptions: Record<string, string> = {
+            // SWE workflow
+            context: 'Analyze codebase and gather technical context',
+            plan: 'Create implementation plan for complex tasks',
+            implement: 'Write code changes to complete the task',
+            review: 'Review implementation for issues and improvements',
+            apply_review: 'Apply fixes from review feedback',
+            summary: 'Generate summary of changes made',
+            // Tech-writer workflow
+            outline: 'Create document structure and outline',
+            draft: 'Write the document content',
+          };
+
           for (const workflow of workflows) {
             console.log(
               colors.bold(`\nWorkflow: ${workflow.name}`) +
@@ -346,7 +374,7 @@ export const initCommand = async (
             );
             console.log(
               colors.gray(
-                `├── Configure tool/model per step (default: use -a value)\n`
+                `├── Configure tool/model per step (Inherit/Default: use -a value)\n`
               )
             );
 
@@ -354,10 +382,15 @@ export const initCommand = async (
               new Map();
 
             for (const step of workflow.steps) {
-              // Build tool choices - "Inherit" first, then available agents
+              const stepDesc = stepDescriptions[step.id];
+              const stepLabel = stepDesc
+                ? `${step.name} - ${colors.gray(stepDesc)}`
+                : step.name;
+
+              // Build tool choices - "Inherit/Default" first, then available agents
               const toolChoices = [
                 {
-                  name: 'Inherit (use -a value)',
+                  name: 'Inherit/Default',
                   value: '__inherit__',
                 },
                 ...availableAgents.map(agent => ({
@@ -370,7 +403,7 @@ export const initCommand = async (
                 const toolResult = (await prompt({
                   type: 'select',
                   name: 'tool',
-                  message: `${step.name} - tool:`,
+                  message: `${stepLabel} - tool:`,
                   choices: toolChoices,
                   initial: 0,
                 })) as { tool: string };
@@ -382,7 +415,7 @@ export const initCommand = async (
                   );
                   const modelChoices = [
                     {
-                      name: 'Inherit (use agent default)',
+                      name: 'Inherit/Default',
                       value: '__inherit__',
                     },
                     ...models.map(m => ({
@@ -405,12 +438,10 @@ export const initCommand = async (
 
                   let finalModel: string | undefined;
                   if (modelResult.model === '__other__') {
-                    const customResult = (await prompt({
-                      type: 'input',
-                      name: 'customModel',
-                      message: `Enter custom model name:`,
-                    })) as { customModel: string };
-                    finalModel = customResult.customModel?.trim() || undefined;
+                    const customModel = await askForInput(
+                      `Enter custom model name:`
+                    );
+                    finalModel = customModel?.trim() || undefined;
                   } else if (modelResult.model !== '__inherit__') {
                     finalModel = modelResult.model;
                   }

@@ -144,6 +144,19 @@ npm install -g @endorhq/rover@latest
    rover task
    ```
 
+   You can specify which AI agent and model to use:
+
+   ```sh
+   # Use a specific agent
+   rover task -a claude
+
+   # Use a specific agent and model
+   rover task -a claude:opus
+
+   # Override tool/model for specific workflow steps
+   rover task -a claude:sonnet -o implement:claude:opus
+   ```
+
 3. Check the status of your task:
 
    ```sh
