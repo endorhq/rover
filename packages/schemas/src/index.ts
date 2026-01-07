@@ -113,6 +113,7 @@ export {
   type PackageManager,
   type TaskManager,
   type SandboxConfig,
+  type HooksConfig,
   type ProjectConfig,
 } from './project-config/types.js';
 

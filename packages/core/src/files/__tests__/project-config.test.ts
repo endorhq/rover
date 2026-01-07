@@ -531,4 +531,209 @@ describe('ProjectConfigManager - Environment Variable Configuration', () => {
     expect(config.agentImage).toBe('myregistry/agent:custom');
     expect(config.initScript).toBe('scripts/setup.sh');
   });
+
+  it('should create new config without hooks field', () => {
+    const config = ProjectConfigManager.create();
+
+    expect(existsSync('rover.json')).toBe(true);
+    const jsonData = JSON.parse(readFileSync('rover.json', 'utf8'));
+
+    // Optional hooks field should not be present if undefined
+    expect('hooks' in jsonData).toBe(false);
+
+    // Getter should return undefined
+    expect(config.hooks).toBeUndefined();
+  });
+
+  it('should create config with onMerge hooks', () => {
+    writeFileSync(
+      'rover.json',
+      JSON.stringify(
+        {
+          version: '1.2',
+          languages: ['typescript'],
+          packageManagers: ['npm'],
+          taskManagers: [],
+          attribution: true,
+          mcps: [],
+          hooks: {
+            onMerge: ['echo "merged"', 'npm run lint'],
+          },
+        },
+        null,
+        2
+      )
+    );
+
+    const config = ProjectConfigManager.load();
+
+    expect(config.hooks).toEqual({
+      onMerge: ['echo "merged"', 'npm run lint'],
+    });
+    expect(config.hooks?.onMerge).toEqual(['echo "merged"', 'npm run lint']);
+    expect(config.hooks?.onPush).toBeUndefined();
+  });
+
+  it('should create config with onPush hooks', () => {
+    writeFileSync(
+      'rover.json',
+      JSON.stringify(
+        {
+          version: '1.2',
+          languages: ['typescript'],
+          packageManagers: ['npm'],
+          taskManagers: [],
+          attribution: true,
+          mcps: [],
+          hooks: {
+            onPush: ['echo "pushed"'],
+          },
+        },
+        null,
+        2
+      )
+    );
+
+    const config = ProjectConfigManager.load();
+
+    expect(config.hooks).toEqual({
+      onPush: ['echo "pushed"'],
+    });
+    expect(config.hooks?.onPush).toEqual(['echo "pushed"']);
+    expect(config.hooks?.onMerge).toBeUndefined();
+  });
+
+  it('should create config with both onMerge and onPush hooks', () => {
+    writeFileSync(
+      'rover.json',
+      JSON.stringify(
+        {
+          version: '1.2',
+          languages: ['typescript'],
+          packageManagers: ['npm'],
+          taskManagers: [],
+          attribution: true,
+          mcps: [],
+          hooks: {
+            onMerge: ['npm run test'],
+            onPush: ['npm run deploy'],
+          },
+        },
+        null,
+        2
+      )
+    );
+
+    const config = ProjectConfigManager.load();
+
+    expect(config.hooks).toEqual({
+      onMerge: ['npm run test'],
+      onPush: ['npm run deploy'],
+    });
+  });
+
+  it('should migrate from version 1.1 to 1.2 preserving hooks field', () => {
+    writeFileSync(
+      'rover.json',
+      JSON.stringify(
+        {
+          version: '1.1',
+          languages: ['typescript'],
+          packageManagers: ['npm'],
+          taskManagers: [],
+          attribution: true,
+          hooks: {
+            onMerge: ['echo "migrated hook"'],
+          },
+        },
+        null,
+        2
+      )
+    );
+
+    const config = ProjectConfigManager.load();
+
+    // Should be migrated to 1.2
+    expect(config.version).toBe('1.2');
+
+    // Should preserve hooks field
+    expect(config.hooks).toEqual({
+      onMerge: ['echo "migrated hook"'],
+    });
+
+    // Check saved file
+    const jsonData = JSON.parse(readFileSync('rover.json', 'utf8'));
+    expect(jsonData.version).toBe('1.2');
+    expect(jsonData.hooks).toEqual({
+      onMerge: ['echo "migrated hook"'],
+    });
+  });
+
+  it('should handle empty hooks arrays', () => {
+    writeFileSync(
+      'rover.json',
+      JSON.stringify(
+        {
+          version: '1.2',
+          languages: [],
+          packageManagers: [],
+          taskManagers: [],
+          attribution: true,
+          mcps: [],
+          hooks: {
+            onMerge: [],
+            onPush: [],
+          },
+        },
+        null,
+        2
+      )
+    );
+
+    const config = ProjectConfigManager.load();
+
+    expect(config.hooks?.onMerge).toEqual([]);
+    expect(config.hooks?.onPush).toEqual([]);
+  });
+
+  it('should preserve all fields including hooks during migration', () => {
+    writeFileSync(
+      'rover.json',
+      JSON.stringify(
+        {
+          version: '1.0',
+          languages: ['typescript', 'python'],
+          packageManagers: ['npm', 'pip'],
+          taskManagers: ['make'],
+          attribution: false,
+          envs: ['NODE_ENV'],
+          envsFile: '.env',
+          agentImage: 'myregistry/agent:custom',
+          initScript: 'scripts/setup.sh',
+          hooks: {
+            onMerge: ['npm run build'],
+            onPush: ['npm run deploy'],
+          },
+        },
+        null,
+        2
+      )
+    );
+
+    const config = ProjectConfigManager.load();
+
+    expect(config.version).toBe('1.2');
+    expect(config.languages).toEqual(['typescript', 'python']);
+    expect(config.packageManagers).toEqual(['npm', 'pip']);
+    expect(config.taskManagers).toEqual(['make']);
+    expect(config.attribution).toBe(false);
+    expect(config.envs).toEqual(['NODE_ENV']);
+    expect(config.envsFile).toBe('.env');
+    expect(config.agentImage).toBe('myregistry/agent:custom');
+    expect(config.initScript).toBe('scripts/setup.sh');
+    expect(config.hooks).toEqual({
+      onMerge: ['npm run build'],
+      onPush: ['npm run deploy'],
+    });
+  });
 });

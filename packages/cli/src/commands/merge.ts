@@ -12,6 +12,7 @@ import {
   Git,
 } from 'rover-core';
 import { TaskNotFoundError } from 'rover-schemas';
+import { executeHooks } from '../lib/hooks.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { showRoverChat, showTips } from '../utils/display.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
@@ -376,9 +377,6 @@ export const mergeCommand = async (
       console.log('');
       console.log(colors.cyan('The merge process will'));
       if (hasWorktreeChanges) {
-        true;
-        4;
-        false;
         console.log(colors.cyan('├── Commit changes in the task worktree'));
       }
       console.log(
@@ -619,6 +617,19 @@ export const mergeCommand = async (
       }
 
       if (mergeSuccessful) {
+        // Execute onMerge hooks if configured
+        if (projectConfig?.hooks?.onMerge?.length) {
+          executeHooks(
+            projectConfig.hooks.onMerge,
+            {
+              taskId: numericTaskId,
+              taskBranch: taskBranch,
+              taskTitle: task.title,
+            },
+            'onMerge'
+          );
+        }
+
         jsonOutput.success = true;
         await exitWithSuccess(
           'Task has been successfully merged into your current branch',
