@@ -212,8 +212,10 @@ export function createProgram(
       'Custom name for the worktree branch'
     )
     .option(
-      '-a, --agent <agent...>',
-      `AI agent(s) with optional model (e.g., claude:opus, gemini:flash). Available: ${Object.values(AI_AGENT).join(', ')}`
+      '-a, --agent <agent>',
+      `AI agent with optional model (e.g., claude:opus, gemini:flash). Repeat for multiple agents. Available: ${Object.values(AI_AGENT).join(', ')}`,
+      (value: string, previous: string[] | undefined) =>
+        previous ? [...previous, value] : [value]
     )
     .option('--json', 'Output the result in JSON format')
     .option('--debug', 'Show debug information like running commands')

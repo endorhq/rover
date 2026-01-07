@@ -18,11 +18,7 @@ import { ProjectConfigManager, UserSettingsManager } from 'rover-schemas';
 import { showRoverChat, showTips, TIP_TITLES } from '../utils/display.js';
 import { AI_AGENT } from 'rover-core';
 import { getTelemetry } from '../lib/telemetry.js';
-import {
-  getAvailableModels,
-  hasMultipleModels,
-  getDefaultModelName,
-} from '../lib/agent-models.js';
+import { getAvailableModels, hasMultipleModels } from '../lib/agent-models.js';
 
 // Get the default prompt
 const { prompt } = enquirer;
@@ -274,38 +270,38 @@ export const initCommand = async (
 
         for (const agent of agentsWithModels) {
           const models = getAvailableModels(agent);
-          const defaultModel = getDefaultModelName(agent);
 
           try {
+            const choices = [
+              {
+                name: 'Inherit (use agent default) (recommended)',
+                value: '__inherit__',
+              },
+              ...models.map(m => ({
+                name: `${m.name} - ${m.description}`,
+                value: m.name,
+              })),
+            ];
+
             const result = (await prompt({
               type: 'select',
               name: 'model',
               message: `Default model for ${agent.charAt(0).toUpperCase() + agent.slice(1)}:`,
-              choices: models.map(m => ({
-                name: `${m.name}${m.isDefault ? ' (recommended)' : ''} - ${m.description}`,
-                value: m.name,
-              })),
-              initial: models.findIndex(m => m.name === defaultModel),
+              choices,
+              initial: 0, // "Inherit" is first and recommended
             })) as { model: string };
 
-            selectedModels.set(agent, result.model);
-          } catch (error) {
-            // User cancelled, use default
-            if (defaultModel) {
-              selectedModels.set(agent, defaultModel);
+            // Only save if user chose a specific model, not "inherit"
+            if (result.model !== '__inherit__') {
+              selectedModels.set(agent, result.model);
             }
+          } catch (error) {
+            // User cancelled, don't set any model (inherit behavior)
           }
         }
       }
-    } else {
-      // With --yes, use defaults for all agents
-      for (const agent of availableAgents) {
-        const defaultModel = getDefaultModelName(agent);
-        if (defaultModel && hasMultipleModels(agent)) {
-          selectedModels.set(agent, defaultModel);
-        }
-      }
     }
+    // With --yes or no agents with multiple models, selectedModels stays empty (inherit behavior)
 
     let attribution = true;
 

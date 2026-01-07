@@ -118,16 +118,11 @@ describe('init command', () => {
 
     // Verify content
     const settings = JSON.parse(readFileSync('.rover/settings.json', 'utf8'));
-    expect(settings).toMatchObject({
-      version: '1.1',
-      aiAgents: ['claude'],
-      defaults: {
-        aiAgent: 'claude',
-        models: {
-          claude: 'sonnet',
-        },
-      },
-    });
+    expect(settings.version).toBe('1.1');
+    expect(settings.aiAgents).toEqual(['claude']);
+    expect(settings.defaults.aiAgent).toBe('claude');
+    // With --yes, inherit behavior - no models saved (field may be empty or absent)
+    expect(settings.defaults.models || {}).toEqual({});
   });
 
   it('should add granular .rover patterns to .gitignore if not present', async () => {
