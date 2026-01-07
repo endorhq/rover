@@ -346,6 +346,10 @@ export class WorkflowManager {
     return this.data.description;
   }
 
+  get useCases(): string | undefined {
+    return this.data.useCases;
+  }
+
   get inputs(): WorkflowInput[] {
     return this.data.inputs || [];
   }

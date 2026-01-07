@@ -4,6 +4,7 @@
 version: '1.0'
 name: 'swe'
 description: 'Complete software engineering workflow with adaptive complexity handling'
+useCases: 'For example: making a PR for a new feature or bug fix'
 
 inputs:
   - name: description

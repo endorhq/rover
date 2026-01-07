@@ -201,6 +201,8 @@ export const WorkflowSchema = z
     name: z.string(),
     /** Human-readable description */
     description: z.string(),
+    /** Example use cases for the workflow */
+    useCases: z.string().optional(),
     /** Input parameters required by this workflow */
     inputs: z.array(WorkflowInputSchema).optional(),
     /** Expected outputs from the workflow */

@@ -4,6 +4,7 @@
 version: '1.0'
 name: 'tech-writer'
 description: 'Write documentation and tutorials for your technical projects'
+useCases: 'For example: writing a README, API documentation, or getting started guide'
 
 inputs:
   - name: description

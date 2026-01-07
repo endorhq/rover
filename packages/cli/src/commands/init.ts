@@ -366,6 +366,9 @@ export const initCommand = async (
 
             console.log(colors.bold(`\nWorkflow: ${displayName}`));
             console.log(colors.gray(`├── ${workflow.description}`));
+            if (workflow.useCases) {
+              console.log(colors.gray(`├── ${workflow.useCases}`));
+            }
             console.log(
               colors.gray(
                 `└── Configure tool/model per step (Inherit/Default: use -a value)\n`
