@@ -14,6 +14,10 @@ export class GeminiAgent extends BaseAgent {
   name = 'Gemini';
   binary = 'gemini';
 
+  constructor(version: string = 'latest', model?: string) {
+    super(version, model);
+  }
+
   getInstallCommand(): string {
     const packageSpec = `@google/gemini-cli@${this.version}`;
     return `npm install -g ${packageSpec}`;
@@ -116,7 +120,11 @@ export class GeminiAgent extends BaseAgent {
   }
 
   toolArguments(): string[] {
-    return ['--yolo', '--output-format', 'json'];
+    const args = ['--yolo', '--output-format', 'json'];
+    if (this.model) {
+      args.push('--model', this.model);
+    }
+    return args;
   }
 
   toolInteractiveArguments(

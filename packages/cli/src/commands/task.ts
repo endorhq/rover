@@ -11,12 +11,16 @@ import {
   IterationManager,
   WorkflowManager,
   AI_AGENT,
-  launchSync,
   findProjectRoot,
   ProcessManager,
   showProperties,
   Git,
 } from 'rover-core';
+import {
+  parseAgentString,
+  formatAgentWithModel,
+  type ParsedAgent,
+} from '../utils/agent-parser.js';
 import { createSandbox } from '../lib/sandbox/index.js';
 import { resolveAgentImage } from '../lib/sandbox/container-common.js';
 import { generateBranchName } from '../utils/branch-name.js';
@@ -209,6 +213,7 @@ interface TaskOptions {
  */
 const createTaskForAgent = async (
   selectedAiAgent: string,
+  selectedModel: string | undefined,
   options: TaskOptions,
   description: string,
   inputsData: Map<string, string>,
@@ -281,6 +286,7 @@ const createTaskForAgent = async (
     inputs: inputsData,
     workflowName: workflowName,
     agent: selectedAiAgent,
+    agentModel: selectedModel,
     sourceBranch: sourceBranch,
   });
 
@@ -417,50 +423,40 @@ export const taskCommand = async (
     return;
   }
 
-  // Convert agent option to array and normalize to lowercase
-  let selectedAiAgents: string[] = [];
+  // Parse agent options with optional model (supports "agent:model" syntax)
+  let selectedAgents: ParsedAgent[] = [];
 
   // Check if --agent option is provided and validate it
   if (agent && agent.length > 0) {
-    // Normalize and validate all agents
-    for (const agentName of agent) {
-      const agentLower = agentName.toLowerCase();
-      let normalizedAgent: string;
-
-      if (agentLower === 'claude') {
-        normalizedAgent = AI_AGENT.Claude;
-      } else if (agentLower === 'codex') {
-        normalizedAgent = AI_AGENT.Codex;
-      } else if (agentLower === 'cursor') {
-        normalizedAgent = AI_AGENT.Cursor;
-      } else if (agentLower === 'gemini') {
-        normalizedAgent = AI_AGENT.Gemini;
-      } else if (agentLower === 'qwen') {
-        normalizedAgent = AI_AGENT.Qwen;
-      } else {
-        jsonOutput.error = `Invalid agent: ${agentName}. Valid options are: ${Object.values(AI_AGENT).join(', ')}`;
+    // Parse and validate all agents using colon syntax
+    for (const agentString of agent) {
+      try {
+        const parsed = parseAgentString(agentString);
+        selectedAgents.push(parsed);
+      } catch (err) {
+        jsonOutput.error =
+          err instanceof Error ? err.message : `Invalid agent: ${agentString}`;
         await exitWithError(jsonOutput, { telemetry });
         return;
       }
-
-      selectedAiAgents.push(normalizedAgent);
     }
   } else {
     // Fall back to user settings if no agent specified
     try {
-      selectedAiAgents = [getUserAIAgent()];
+      const defaultAgent = getUserAIAgent();
+      selectedAgents = [{ agent: defaultAgent, model: undefined }];
     } catch (_err) {
       if (!json) {
         console.log(
           colors.yellow('⚠ Could not load user settings, defaulting to Claude')
         );
       }
-      selectedAiAgents = [AI_AGENT.Claude];
+      selectedAgents = [{ agent: AI_AGENT.Claude, model: undefined }];
     }
   }
 
   // Validate all agents before proceeding
-  for (const selectedAiAgent of selectedAiAgents) {
+  for (const { agent: selectedAiAgent } of selectedAgents) {
     const valid = validations(selectedAiAgent);
 
     if (valid != null) {
@@ -638,7 +634,7 @@ export const taskCommand = async (
                 );
               }
 
-              const agentTool = getAIAgentTool(selectedAiAgents[0]);
+              const agentTool = getAIAgentTool(selectedAgents[0].agent);
               const extractedInputs = await agentTool.extractGithubInputs(
                 issueData.body,
                 inputs.filter(el => el.name !== 'description')
@@ -786,20 +782,26 @@ export const taskCommand = async (
     }> = [];
     const failedAgents: string[] = [];
 
-    for (let i = 0; i < selectedAiAgents.length; i++) {
-      const selectedAiAgent = selectedAiAgents[i];
+    for (let i = 0; i < selectedAgents.length; i++) {
+      const { agent: selectedAiAgent, model: selectedModel } =
+        selectedAgents[i];
 
       // Add progress indication for multiple agents in non-JSON mode
-      if (!json && selectedAiAgents.length > 1) {
+      if (!json && selectedAgents.length > 1) {
+        const agentDisplay = formatAgentWithModel(
+          selectedAiAgent,
+          selectedModel
+        );
         console.log(
           colors.gray(
-            `\nCreating task ${i + 1} of ${selectedAiAgents.length} (${selectedAiAgent})...`
+            `\nCreating task ${i + 1} of ${selectedAgents.length} (${agentDisplay})...`
           )
         );
       }
 
       const taskResult = await createTaskForAgent(
         selectedAiAgent,
+        selectedModel,
         options,
         description,
         inputsData,
@@ -817,12 +819,13 @@ export const taskCommand = async (
     }
 
     // Track new task event (send only once for all agents)
-    const isMultiAgent = selectedAiAgents.length > 1;
+    const isMultiAgent = selectedAgents.length > 1;
+    const agentNames = selectedAgents.map(a => a.agent);
     telemetry?.eventNewTask(
       fromGithub != null ? NewTaskProvider.GITHUB : NewTaskProvider.INPUT,
       workflowName,
       isMultiAgent,
-      selectedAiAgents
+      agentNames
     );
 
     // Handle results

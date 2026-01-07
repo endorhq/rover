@@ -21,6 +21,10 @@ export class ClaudeAgent extends BaseAgent {
   name = 'Claude';
   binary = 'claude';
 
+  constructor(version: string = 'latest', model?: string) {
+    super(version, model);
+  }
+
   getInstallCommand(): string {
     const packageSpec = `@anthropic-ai/claude-code@${this.version}`;
     return `npm install -g ${packageSpec}`;
@@ -160,7 +164,12 @@ export class ClaudeAgent extends BaseAgent {
   }
 
   toolArguments(): string[] {
-    return ['--dangerously-skip-permissions', '--output-format', 'json', '-p'];
+    const args = ['--dangerously-skip-permissions', '--output-format', 'json'];
+    if (this.model) {
+      args.push('--model', this.model);
+    }
+    args.push('-p');
+    return args;
   }
 
   toolInteractiveArguments(

@@ -7,9 +7,11 @@ export abstract class BaseAgent implements Agent {
   abstract name: string;
   abstract binary: string;
   version: string;
+  model?: string;
 
-  constructor(version: string = 'latest') {
+  constructor(version: string = 'latest', model?: string) {
     this.version = version;
+    this.model = model;
   }
 
   abstract getRequiredCredentials(): AgentCredentialFile[];

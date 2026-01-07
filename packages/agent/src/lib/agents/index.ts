@@ -15,19 +15,20 @@ export { QwenAgent } from './qwen.js';
 
 export function createAgent(
   agentName: string,
-  version: string = 'latest'
+  version: string = 'latest',
+  model?: string
 ): Agent {
   switch (agentName.toLowerCase()) {
     case 'claude':
-      return new ClaudeAgent(version);
+      return new ClaudeAgent(version, model);
     case 'codex':
-      return new CodexAgent(version);
+      return new CodexAgent(version, model);
     case 'cursor':
-      return new CursorAgent(version);
+      return new CursorAgent(version, model);
     case 'gemini':
-      return new GeminiAgent(version);
+      return new GeminiAgent(version, model);
     case 'qwen':
-      return new QwenAgent(version);
+      return new QwenAgent(version, model);
     default:
       throw new Error(
         `Unknown agent: ${agentName}. Supported agents: ${Object.values(AI_AGENT).join(', ')}`

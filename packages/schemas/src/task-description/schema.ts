@@ -44,6 +44,7 @@ export const TaskDescriptionSchema = z.object({
   worktreePath: z.string(),
   branchName: z.string(),
   agent: z.string().optional(),
+  agentModel: z.string().optional(),
   sourceBranch: z.string().optional(),
 
   // Docker Execution

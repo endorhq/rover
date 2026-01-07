@@ -9,6 +9,10 @@ export class QwenAgent extends BaseAgent {
   name = 'Qwen';
   binary = 'qwen';
 
+  constructor(version: string = 'latest', model?: string) {
+    super(version, model);
+  }
+
   getInstallCommand(): string {
     const packageSpec = `@qwen-code/qwen-code@${this.version}`;
     return `npm install -g ${packageSpec}`;
@@ -111,7 +115,12 @@ export class QwenAgent extends BaseAgent {
   }
 
   toolArguments(): string[] {
-    return ['--yolo', '-p'];
+    const args = ['--yolo'];
+    if (this.model) {
+      args.push('--model', this.model);
+    }
+    args.push('-p');
+    return args;
   }
 
   toolInteractiveArguments(

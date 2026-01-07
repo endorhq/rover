@@ -183,6 +183,11 @@ export class DockerSandbox extends Sandbox {
       '/inputs.json'
     );
 
+    // Pass model if specified
+    if (this.task.agentModel) {
+      dockerArgs.push('--agent-model', this.task.agentModel);
+    }
+
     // Forward verbose flag to rover-agent if enabled
     if (VERBOSE) {
       dockerArgs.push('-v');
@@ -321,6 +326,11 @@ export class DockerSandbox extends Sandbox {
 
     if (initialPrompt) {
       dockerArgs.push(initialPrompt);
+    }
+
+    // Pass model if specified
+    if (this.task.agentModel) {
+      dockerArgs.push('--agent-model', this.task.agentModel);
     }
 
     // Forward verbose flag to rover-agent if enabled
