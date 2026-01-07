@@ -357,13 +357,18 @@ export const initCommand = async (
           };
 
           for (const workflow of workflows) {
-            console.log(
-              colors.bold(`\nWorkflow: ${workflow.name}`) +
-                colors.gray(` (${workflow.id})`)
-            );
+            // Format workflow name for display (e.g., "swe" -> "SWE", "tech-writer" -> "Tech Writer")
+            const displayName = workflow.name
+              .split('-')
+              .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+              .join(' ')
+              .replace(/^Swe$/, 'SWE'); // Special case for SWE acronym
+
+            console.log(colors.bold(`\nWorkflow: ${displayName}`));
+            console.log(colors.gray(`├── ${workflow.description}`));
             console.log(
               colors.gray(
-                `├── Configure tool/model per step (Inherit/Default: use -a value)\n`
+                `└── Configure tool/model per step (Inherit/Default: use -a value)\n`
               )
             );
 
