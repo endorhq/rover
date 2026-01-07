@@ -212,8 +212,10 @@ export function createProgram(
       'Custom name for the worktree branch'
     )
     .option(
-      '-a, --agent <agent...>',
-      `AI agent(s) to use - can be specified multiple times (${Object.values(AI_AGENT).join(', ')})`
+      '-a, --agent <agent>',
+      `AI agent to use. Use -a multiple times for parallel tasks (e.g., -a claude -a gemini). Available: ${Object.values(AI_AGENT).join(', ')}`,
+      (value: string, previous: string[] | undefined) =>
+        previous ? [...previous, value] : [value]
     )
     .option('--json', 'Output the result in JSON format')
     .option('--debug', 'Show debug information like running commands')
