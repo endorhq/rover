@@ -91,15 +91,20 @@ check_command "node" || safe_exit 1
 START_TIME=$(date -u +%Y-%m-%dT%H:%M:%S%z)
 {validateTaskFileCall}
 
-# Setup the agent
-AGENT={agent}
+# Setup the agents (may be multiple if per-step agents are configured)
+AGENTS=({agents})
+PRIMARY_AGENT={primaryAgent}
 
-if [ "$AGENT" = "cursor" ]; then
-  echo -e "\n======================================="
-  echo "📦 Running nix daemon"
-  echo "======================================="
-  sudo nix-daemon &> /dev/null &
-fi
+# Start nix-daemon if cursor is in the agents list
+for AGENT in "${AGENTS[@]}"; do
+  if [ "$AGENT" = "cursor" ]; then
+    echo -e "\n======================================="
+    echo "📦 Running nix daemon for cursor"
+    echo "======================================="
+    sudo nix-daemon &> /dev/null &
+    break
+  fi
+done
 
 echo -e "\n======================================="
 echo "📦 Starting the package manager MCP server"
@@ -135,24 +140,31 @@ echo "✅ Package manager MCP is ready"
 {installAllPackages}
 
 # Agent-specific CLI installation and credential setup
-echo -e "\n📦 Installing Agent CLI and setting up credentials"
-# Pass the environment variables to ensure it loads the right credentials
-sudo -E rover-agent install $AGENT --user-dir $HOME
+echo -e "\n📦 Installing Agent CLI(s) and setting up credentials"
+
+# Install all agents that will be used in the workflow
+for AGENT in "${AGENTS[@]}"; do
+  echo "Installing $AGENT..."
+  # Pass the environment variables to ensure it loads the right credentials
+  sudo -E rover-agent install $AGENT --user-dir $HOME
+  if [ $? -eq 0 ]; then
+    echo "✅ $AGENT was installed successfully."
+  else
+    echo "❌ $AGENT could not be installed"
+    safe_exit 1
+  fi
+done
+
 # Set the right permissions after installing and moving credentials
 sudo chown -R $(id -u):$(id -g) $HOME
 
-if [ $? -eq 0 ]; then
-    echo "✅ $AGENT was installed successfully."
-else
-    echo "❌ $AGENT could not be installed"
-    safe_exit 1
-fi
-
-echo -e "\n📦 Done installing agent"
+echo -e "\n📦 Done installing agent(s)"
 
 echo -e "\n📦 Installing MCP servers"
-# Configure built-in MCPs
-rover-agent config mcp $AGENT package-manager --transport "http" http://127.0.0.1:8090/mcp
+# Configure built-in MCPs for all agents
+for AGENT in "${AGENTS[@]}"; do
+  rover-agent config mcp $AGENT package-manager --transport "http" http://127.0.0.1:8090/mcp
+done
 
 # Configure MCPs from rover.json if mcps array exists
 #

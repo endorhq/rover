@@ -53,7 +53,7 @@ import { TaskSandboxPackage } from './sandbox/task-managers/task.js';
  * Replaces the existing docker-setup.sh and docker-setup-gemini.sh files
  */
 export class SetupBuilder {
-  private agent: string;
+  private agents: string[];
   private task: TaskDescriptionManager;
   private taskDir: string;
   private isDockerRootless: boolean;
@@ -61,10 +61,10 @@ export class SetupBuilder {
 
   constructor(
     taskDescription: TaskDescriptionManager,
-    agent: string,
+    agents: string[],
     projectConfig: ProjectConfigManager
   ) {
-    this.agent = agent;
+    this.agents = agents;
     this.task = taskDescription;
     this.projectConfig = projectConfig;
 
@@ -267,24 +267,26 @@ ${installScripts.join('\n')}
     if (mcps && mcps.length > 0) {
       configureAllMCPCommands.push('echo "✅ Configuring custom MCPs"');
       for (const mcp of mcps) {
-        const transport = mcp.transport || 'stdio';
-        let cmd = `rover-agent config mcp ${this.agent} "${mcp.name}" --transport "${mcp.transport}"`;
+        // Configure MCP for each agent that will be used
+        for (const agent of this.agents) {
+          let cmd = `rover-agent config mcp ${agent} "${mcp.name}" --transport "${mcp.transport}"`;
 
-        if (mcp.envs && mcp.envs.length > 0) {
-          for (const env of mcp.envs) {
-            cmd += ` --env "${env}"`;
+          if (mcp.envs && mcp.envs.length > 0) {
+            for (const env of mcp.envs) {
+              cmd += ` --env "${env}"`;
+            }
           }
-        }
 
-        if (mcp.headers && mcp.headers.length > 0) {
-          for (const header of mcp.headers) {
-            cmd += ` --header "${header}"`;
+          if (mcp.headers && mcp.headers.length > 0) {
+            for (const header of mcp.headers) {
+              cmd += ` --header "${header}"`;
+            }
           }
+
+          cmd += ` "${mcp.commandOrUrl}"`;
+
+          configureAllMCPCommands.push(cmd);
         }
-
-        cmd += ` "${mcp.commandOrUrl}"`;
-
-        configureAllMCPCommands.push(cmd);
       }
     } else {
       configureAllMCPCommands.push(
@@ -365,7 +367,8 @@ echo "======================================="
 
     // Generate script content
     const scriptContent = pupa(entrypointScript, {
-      agent: this.agent,
+      agents: this.agents.join(' '),
+      primaryAgent: this.agents[0],
       configureAllMCPCommands: configureAllMCPCommands.join('\n  '),
       recoverPermissions,
       installAllPackages,
@@ -572,10 +575,10 @@ echo "======================================="
    */
   static generate(
     taskDescription: TaskDescriptionManager,
-    agent: string
+    agents: string[]
   ): string {
     const projectConfig = ProjectConfigManager.load();
-    const builder = new SetupBuilder(taskDescription, agent, projectConfig);
+    const builder = new SetupBuilder(taskDescription, agents, projectConfig);
     return builder.generateEntrypoint();
   }
 }

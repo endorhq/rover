@@ -24,6 +24,21 @@ export class DockerSandbox extends Sandbox {
     super(task, processManager);
   }
 
+  /**
+   * Collect all unique agents that will be used in the workflow.
+   * This includes the default agent and any per-step agent overrides.
+   */
+  private collectUniqueAgents(): string[] {
+    const agents = new Set<string>();
+    agents.add(this.task.agent!);
+    if (this.task.stepAgents) {
+      for (const config of Object.values(this.task.stepAgents)) {
+        if (config.tool) agents.add(config.tool);
+      }
+    }
+    return Array.from(agents);
+  }
+
   async isBackendAvailable(): Promise<boolean> {
     try {
       // Check if docker command exists and verify it's actual Docker (not Podman)
@@ -57,24 +72,29 @@ export class DockerSandbox extends Sandbox {
       );
     }
 
+    // Collect all unique agents (default + per-step overrides)
+    const allAgents = this.collectUniqueAgents();
+
     // Generate setup script using SetupBuilder
-    const setupBuilder = new SetupBuilder(
-      this.task,
-      this.task.agent!,
-      projectConfig
-    );
+    const setupBuilder = new SetupBuilder(this.task, allAgents, projectConfig);
     const entrypointScriptPath = setupBuilder.generateEntrypoint();
     const inputsPath = setupBuilder.generateInputs();
     const workflowPath = setupBuilder.saveWorkflow(this.task.workflowName);
     const preContextPaths = setupBuilder.generatePreContextFiles();
 
-    // Get agent-specific Docker mounts and environment variables
-    const agent = getAIAgentTool(this.task.agent!);
-    const dockerMounts: string[] = agent.getContainerMounts();
-    const envVariables: string[] = this.getSandboxEnvironmentVariables(
-      agent,
-      projectConfig
-    );
+    // Get Docker mounts and environment variables for ALL agents
+    const dockerMounts: string[] = [];
+    const envVariables: string[] = [];
+    for (const agentName of allAgents) {
+      const agent = getAIAgentTool(agentName);
+      dockerMounts.push(...agent.getContainerMounts());
+      envVariables.push(
+        ...this.getSandboxEnvironmentVariables(agent, projectConfig)
+      );
+    }
+    // Remove duplicates from mounts and env vars
+    const uniqueMounts = [...new Set(dockerMounts)];
+    const uniqueEnvVars = [...new Set(envVariables)];
 
     // Clean up any existing container with same name
     try {
@@ -126,7 +146,7 @@ export class DockerSandbox extends Sandbox {
       `${worktreePath}:/workspace:Z,rw`,
       '-v',
       `${iteration.iterationPath}:/output:Z,rw`,
-      ...dockerMounts,
+      ...uniqueMounts,
       '-v',
       `${entrypointScriptPath}:/entrypoint.sh:Z,ro`,
       '-v',
@@ -163,7 +183,7 @@ export class DockerSandbox extends Sandbox {
     }
 
     dockerArgs.push(
-      ...envVariables,
+      ...uniqueEnvVars,
       '-w',
       '/workspace',
       '--entrypoint',
@@ -241,25 +261,30 @@ export class DockerSandbox extends Sandbox {
       );
     }
 
+    // Collect all unique agents (default + per-step overrides)
+    const allAgents = this.collectUniqueAgents();
+
     // Generate setup script using SetupBuilder
-    const setupBuilder = new SetupBuilder(
-      this.task,
-      this.task.agent!,
-      projectConfig
-    );
+    const setupBuilder = new SetupBuilder(this.task, allAgents, projectConfig);
     const entrypointScriptPath = setupBuilder.generateEntrypoint(
       false,
       'entrypoint-iterate.sh'
     );
     const preContextPaths = setupBuilder.generatePreContextFiles();
 
-    // Get agent-specific Docker mounts and environment variables
-    const agent = getAIAgentTool(this.task.agent!);
-    const dockerMounts: string[] = agent.getContainerMounts();
-    const envVariables: string[] = this.getSandboxEnvironmentVariables(
-      agent,
-      projectConfig
-    );
+    // Get Docker mounts and environment variables for ALL agents
+    const dockerMounts: string[] = [];
+    const envVariables: string[] = [];
+    for (const agentName of allAgents) {
+      const agent = getAIAgentTool(agentName);
+      dockerMounts.push(...agent.getContainerMounts());
+      envVariables.push(
+        ...this.getSandboxEnvironmentVariables(agent, projectConfig)
+      );
+    }
+    // Remove duplicates from mounts and env vars
+    const uniqueMounts = [...new Set(dockerMounts)];
+    const uniqueEnvVars = [...new Set(envVariables)];
 
     const interactiveName = `${this.sandboxName}-i`;
     const dockerArgs = ['run', '--name', interactiveName, '-it', '--rm'];
@@ -305,7 +330,7 @@ export class DockerSandbox extends Sandbox {
       `${worktreePath}:/workspace:Z,rw`,
       '-v',
       `${iteration.iterationPath}:/output:Z,rw`,
-      ...dockerMounts,
+      ...uniqueMounts,
       '-v',
       `${entrypointScriptPath}:/entrypoint.sh:Z,ro`
     );
@@ -319,7 +344,7 @@ export class DockerSandbox extends Sandbox {
     });
 
     dockerArgs.push(
-      ...envVariables,
+      ...uniqueEnvVars,
       '-w',
       '/workspace',
       '--entrypoint',
