@@ -78,6 +78,8 @@ export const HooksConfigSchema = z.object({
   onMerge: z.array(z.string()).optional(),
   /** Commands to run when a task is pushed */
   onPush: z.array(z.string()).optional(),
+  /** Commands to run when a task completes (success or failure) */
+  onComplete: z.array(z.string()).optional(),
 });
 
 /**

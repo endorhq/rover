@@ -371,5 +371,97 @@ describe('hooks library', () => {
         })
       );
     });
+
+    it('should pass ROVER_TASK_STATUS when taskStatus is provided', () => {
+      mockedLaunchSync.mockReturnValue({
+        stdout: '',
+        stderr: '',
+        exitCode: 0,
+        command: 'sh',
+        escapedCommand: 'sh -c "test"',
+        failed: false,
+        timedOut: false,
+        killed: false,
+      } as any);
+
+      const context: HookContext = {
+        taskId: 42,
+        taskBranch: 'task/42-done',
+        taskTitle: 'Completed task',
+        taskStatus: 'completed',
+      };
+
+      executeHook('echo done', context);
+
+      expect(mockedLaunchSync).toHaveBeenCalledWith(
+        'sh',
+        ['-c', 'echo done'],
+        expect.objectContaining({
+          env: expect.objectContaining({
+            ROVER_TASK_ID: '42',
+            ROVER_TASK_BRANCH: 'task/42-done',
+            ROVER_TASK_TITLE: 'Completed task',
+            ROVER_TASK_STATUS: 'completed',
+          }),
+        })
+      );
+    });
+
+    it('should pass ROVER_TASK_STATUS as failed for failed tasks', () => {
+      mockedLaunchSync.mockReturnValue({
+        stdout: '',
+        stderr: '',
+        exitCode: 0,
+        command: 'sh',
+        escapedCommand: 'sh -c "test"',
+        failed: false,
+        timedOut: false,
+        killed: false,
+      } as any);
+
+      const context: HookContext = {
+        taskId: 43,
+        taskBranch: 'task/43-failed',
+        taskTitle: 'Failed task',
+        taskStatus: 'failed',
+      };
+
+      executeHook('echo failed', context);
+
+      expect(mockedLaunchSync).toHaveBeenCalledWith(
+        'sh',
+        ['-c', 'echo failed'],
+        expect.objectContaining({
+          env: expect.objectContaining({
+            ROVER_TASK_STATUS: 'failed',
+          }),
+        })
+      );
+    });
+
+    it('should not include ROVER_TASK_STATUS when taskStatus is not provided', () => {
+      mockedLaunchSync.mockReturnValue({
+        stdout: '',
+        stderr: '',
+        exitCode: 0,
+        command: 'sh',
+        escapedCommand: 'sh -c "test"',
+        failed: false,
+        timedOut: false,
+        killed: false,
+      } as any);
+
+      const context: HookContext = {
+        taskId: 44,
+        taskBranch: 'task/44-merge',
+        taskTitle: 'Merge task',
+        // taskStatus not provided
+      };
+
+      executeHook('echo merge', context);
+
+      const callArgs = mockedLaunchSync.mock.calls[0];
+      expect(callArgs[2].env).not.toHaveProperty('ROVER_TASK_STATUS');
+    });
   });
 });

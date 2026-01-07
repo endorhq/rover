@@ -17,6 +17,8 @@ export interface HookContext {
   taskBranch: string;
   /** The task title */
   taskTitle: string;
+  /** The task status (for onComplete hooks: 'completed' or 'failed') */
+  taskStatus?: string;
 }
 
 /**
@@ -47,6 +49,7 @@ export function executeHook(command: string, context: HookContext): HookResult {
       ROVER_TASK_ID: context.taskId.toString(),
       ROVER_TASK_BRANCH: context.taskBranch,
       ROVER_TASK_TITLE: context.taskTitle,
+      ...(context.taskStatus && { ROVER_TASK_STATUS: context.taskStatus }),
     };
 
     // Execute the command synchronously using launchSync

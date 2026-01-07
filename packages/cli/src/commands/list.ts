@@ -10,9 +10,17 @@ import {
   Table,
   TableColumn,
   UserSettingsManager,
+  ProjectConfigManager,
 } from 'rover-core';
 import { isJsonMode, setJsonMode } from '../lib/global-state.js';
-import { TaskDescription } from 'rover-schemas';
+import { type TaskDescription } from 'rover-schemas';
+import { executeHooks } from '../lib/hooks.js';
+
+/**
+ * Track previous task statuses to detect transitions for onComplete hooks.
+ * Module-level to persist across watch mode polling cycles.
+ */
+const previousTaskStatuses = new Map<number, string>();
 
 /**
  * Format duration from start to now or completion
@@ -115,10 +123,45 @@ export const listCommand = async (
       }
     }
 
-    // Update task status
+    // Load project config for hooks (outside loop for efficiency)
+    let projectConfig;
+    try {
+      projectConfig = ProjectConfigManager.load();
+    } catch {
+      // Project config is optional, continue without hooks
+    }
+
+    // Update task status and detect transitions for onComplete hooks
     tasks.forEach(task => {
       try {
+        // Get previous status before update
+        const previousStatus = previousTaskStatuses.get(task.id);
+
+        // Update status from iteration
         task.updateStatusFromIteration();
+        const currentStatus = task.status;
+
+        // Detect NEW transition to COMPLETED or FAILED
+        const isNewCompletion =
+          previousStatus !== currentStatus &&
+          (currentStatus === 'COMPLETED' || currentStatus === 'FAILED');
+
+        // Execute onComplete hooks if configured and this is a new completion
+        if (isNewCompletion && projectConfig?.hooks?.onComplete?.length) {
+          executeHooks(
+            projectConfig.hooks.onComplete,
+            {
+              taskId: task.id,
+              taskBranch: task.branchName,
+              taskTitle: task.title,
+              taskStatus: currentStatus.toLowerCase(),
+            },
+            'onComplete'
+          );
+        }
+
+        // Update tracking for next iteration
+        previousTaskStatuses.set(task.id, currentStatus);
       } catch (err) {
         if (!isJsonMode()) {
           console.log(

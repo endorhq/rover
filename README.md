@@ -235,6 +235,7 @@ Rover supports hooks that run shell commands when task lifecycle events occur. C
 ```json
 {
   "hooks": {
+    "onComplete": ["./scripts/on-complete.sh"],
     "onMerge": ["./scripts/on-merge.sh"],
     "onPush": ["echo 'Task $ROVER_TASK_ID pushed'"]
   }
@@ -242,6 +243,7 @@ Rover supports hooks that run shell commands when task lifecycle events occur. C
 ```
 
 **Available hooks:**
+- `onComplete` - Runs when a task completes (success or failure), detected via `rover list` or `rover list --watch`
 - `onMerge` - Runs after a task is successfully merged via `rover merge`
 - `onPush` - Runs after a task branch is pushed via `rover push`
 
@@ -251,15 +253,16 @@ Rover supports hooks that run shell commands when task lifecycle events occur. C
 | `ROVER_TASK_ID` | The task ID |
 | `ROVER_TASK_BRANCH` | The task branch name |
 | `ROVER_TASK_TITLE` | The task title |
+| `ROVER_TASK_STATUS` | Task status: "completed" or "failed" (onComplete only) |
 
-**Example hook script** (`scripts/on-merge.sh`):
+**Example hook script** (`scripts/on-complete.sh`):
 ```bash
 #!/bin/bash
-echo "Task $ROVER_TASK_ID ($ROVER_TASK_TITLE) merged!"
+echo "Task $ROVER_TASK_ID ($ROVER_TASK_TITLE) finished with status: $ROVER_TASK_STATUS"
 # Notify your team, trigger CI, update a dashboard, etc.
 ```
 
-Hook failures are logged as warnings but do not block the merge/push operation.
+Hook failures are logged as warnings but do not block operations.
 
 ### Report Issues
 
