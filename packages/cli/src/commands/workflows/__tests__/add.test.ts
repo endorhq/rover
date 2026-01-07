@@ -12,6 +12,12 @@ vi.mock('../../../lib/telemetry.js', () => ({
   }),
 }));
 
+// Mock stdin utilities
+let mockReadFromStdin = vi.fn();
+vi.mock('../../../utils/stdin.js', () => ({
+  readFromStdin: () => mockReadFromStdin(),
+}));
+
 // Mock WorkflowStoreManager
 let mockWorkflowStoreManager: any;
 vi.mock('rover-core', async () => {
@@ -35,6 +41,7 @@ describe('add workflow command', () => {
   let testDir: string;
   let consoleLogSpy: ReturnType<typeof vi.spyOn>;
   let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+  let processExitSpy: any;
 
   beforeEach(() => {
     // Create temp directory for testing
@@ -44,10 +51,16 @@ describe('add workflow command', () => {
     consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    // Reset mock
+    // Mock process.exit to prevent tests from actually exiting
+    processExitSpy = vi
+      .spyOn(process, 'exit')
+      .mockImplementation((() => {}) as any);
+
+    // Reset mocks
     mockWorkflowStoreManager = {
       add: vi.fn(),
     };
+    mockReadFromStdin = vi.fn().mockResolvedValue(null);
   });
 
   afterEach(() => {
@@ -58,6 +71,7 @@ describe('add workflow command', () => {
     vi.clearAllMocks();
     consoleLogSpy.mockRestore();
     consoleErrorSpy.mockRestore();
+    processExitSpy.mockRestore();
   });
 
   describe('adding from local path', () => {
@@ -250,7 +264,7 @@ steps: []
       }
       const parsed = JSON.parse(output);
       expect(parsed.success).toBe(false);
-      expect(parsed.error).toBe('Workflow already exists');
+      expect(parsed.errors).toContain('Workflow already exists');
     });
   });
 
@@ -418,6 +432,142 @@ steps: []
         'source.yml',
         ''
       );
+    });
+  });
+
+  describe('stdin input', () => {
+    it('should read workflow from stdin when source is "-"', async () => {
+      const workflowContent = `
+version: '1.0'
+name: stdin-workflow
+description: Workflow from stdin
+inputs: []
+outputs: []
+steps: []
+`;
+
+      mockReadFromStdin.mockResolvedValue(workflowContent);
+      mockWorkflowStoreManager.add.mockResolvedValue({
+        name: 'stdin-workflow',
+        path: join(testDir, '.rover', 'workflows', 'stdin-workflow.yml'),
+        isLocal: true,
+      });
+
+      await addWorkflowCommand('-', { json: false });
+
+      expect(mockReadFromStdin).toHaveBeenCalled();
+      expect(mockWorkflowStoreManager.add).toHaveBeenCalled();
+
+      // Check that a temporary file path was passed (not '-')
+      const addCallArgs = mockWorkflowStoreManager.add.mock.calls[0];
+      expect(addCallArgs[0]).not.toBe('-');
+      expect(addCallArgs[0]).toContain('rover-workflow-stdin-');
+      expect(addCallArgs[1]).toBeUndefined();
+
+      expect(consoleLogSpy).toHaveBeenCalled();
+      const output = consoleLogSpy.mock.calls
+        .map(call => call.join(' '))
+        .join('\n');
+      expect(output).toContain('stdin-workflow');
+    });
+
+    it('should read workflow from stdin with custom name', async () => {
+      const workflowContent = `
+version: '1.0'
+name: original
+description: Workflow from stdin
+inputs: []
+outputs: []
+steps: []
+`;
+
+      mockReadFromStdin.mockResolvedValue(workflowContent);
+      mockWorkflowStoreManager.add.mockResolvedValue({
+        name: 'custom-stdin',
+        path: join(testDir, '.rover', 'workflows', 'custom-stdin.yml'),
+        isLocal: true,
+      });
+
+      await addWorkflowCommand('-', { name: 'custom-stdin', json: false });
+
+      expect(mockReadFromStdin).toHaveBeenCalled();
+      expect(mockWorkflowStoreManager.add).toHaveBeenCalled();
+
+      // Check that custom name was passed
+      const addCallArgs = mockWorkflowStoreManager.add.mock.calls[0];
+      expect(addCallArgs[1]).toBe('custom-stdin');
+
+      expect(consoleLogSpy).toHaveBeenCalled();
+      const output = consoleLogSpy.mock.calls
+        .map(call => call.join(' '))
+        .join('\n');
+      expect(output).toContain('custom-stdin');
+    });
+
+    it('should handle empty stdin input', async () => {
+      mockReadFromStdin.mockResolvedValue(null);
+
+      await addWorkflowCommand('-', { json: false });
+
+      expect(mockReadFromStdin).toHaveBeenCalled();
+      expect(mockWorkflowStoreManager.add).not.toHaveBeenCalled();
+
+      expect(consoleLogSpy).toHaveBeenCalled();
+      const output = consoleLogSpy.mock.calls
+        .map(call => call.join(' '))
+        .join('\n');
+      expect(output).toContain('No input provided on stdin');
+    });
+
+    it('should output JSON when stdin is used with --json flag', async () => {
+      const workflowContent = `
+version: '1.0'
+name: stdin-json
+description: Workflow from stdin
+inputs: []
+outputs: []
+steps: []
+`;
+
+      mockReadFromStdin.mockResolvedValue(workflowContent);
+      mockWorkflowStoreManager.add.mockResolvedValue({
+        name: 'stdin-json',
+        path: join(testDir, '.rover', 'workflows', 'stdin-json.yml'),
+        isLocal: true,
+      });
+
+      await addWorkflowCommand('-', { json: true });
+
+      expect(mockReadFromStdin).toHaveBeenCalled();
+      expect(consoleLogSpy).toHaveBeenCalled();
+
+      const output = consoleLogSpy.mock.calls[0]?.[0];
+      if (typeof output !== 'string') {
+        throw new Error('Expected console.log output to be a string');
+      }
+      const parsed = JSON.parse(output);
+      expect(parsed.success).toBe(true);
+      expect(parsed.workflow.name).toBe('stdin-json');
+    });
+
+    it('should handle errors when reading from stdin', async () => {
+      const workflowContent = 'invalid workflow content';
+
+      mockReadFromStdin.mockResolvedValue(workflowContent);
+
+      const { WorkflowStoreManagerError } = await import('rover-core');
+      mockWorkflowStoreManager.add.mockRejectedValue(
+        new WorkflowStoreManagerError('Invalid workflow format')
+      );
+
+      await addWorkflowCommand('-', { json: false });
+
+      expect(mockReadFromStdin).toHaveBeenCalled();
+      expect(consoleLogSpy).toHaveBeenCalled();
+      const output = consoleLogSpy.mock.calls
+        .map(call => call.join(' '))
+        .join('\n');
+      expect(output).toContain('Invalid workflow format');
     });
   });
 });

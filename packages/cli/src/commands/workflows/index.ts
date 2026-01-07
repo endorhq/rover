@@ -15,7 +15,7 @@ export const addWorkflowCommands = (program: Command) => {
   command
     .command('add <source>')
     .description(
-      'Add a workflow from a URL or local path to the workflow store'
+      'Add a workflow from a URL, local path, or stdin (use "-") to the workflow store'
     )
     .option(
       '--name <name>',
