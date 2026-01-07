@@ -33,8 +33,7 @@ export const AGENT_MODELS: Record<AI_AGENT, AgentModelConfig[]> = {
     { name: 'flash-lite', description: 'Fast and lightweight' },
   ],
   [AI_AGENT.Qwen]: [
-    { name: 'plus', description: 'General purpose', isDefault: true },
-    { name: 'qwq', description: 'Reasoning model' },
+    { name: 'coder-model', description: 'Coding-optimized model', isDefault: true },
   ],
   [AI_AGENT.Codex]: [
     {
@@ -48,9 +47,17 @@ export const AGENT_MODELS: Record<AI_AGENT, AgentModelConfig[]> = {
     { name: 'gpt-5.1', description: 'Strong general reasoning' },
   ],
   [AI_AGENT.Cursor]: [
-    { name: 'sonnet-4', description: 'Claude Sonnet 4', isDefault: true },
-    { name: 'sonnet-4-thinking', description: 'Claude Sonnet 4 with thinking' },
-    { name: 'gpt-5', description: 'GPT-5' },
+    { name: 'auto', description: 'Automatic model selection', isDefault: true },
+    { name: 'sonnet-4.5', description: 'Claude 4.5 Sonnet' },
+    { name: 'sonnet-4.5-thinking', description: 'Claude 4.5 Sonnet (Thinking)' },
+    { name: 'opus-4.5', description: 'Claude 4.5 Opus' },
+    { name: 'opus-4.5-thinking', description: 'Claude 4.5 Opus (Thinking)' },
+    { name: 'opus-4.1', description: 'Claude 4.1 Opus' },
+    { name: 'gemini-3-pro', description: 'Gemini 3 Pro' },
+    { name: 'gemini-3-flash', description: 'Gemini 3 Flash' },
+    { name: 'gpt-5.2', description: 'GPT-5.2' },
+    { name: 'gpt-5.1', description: 'GPT-5.1' },
+    { name: 'grok', description: 'Grok' },
   ],
 };
 
