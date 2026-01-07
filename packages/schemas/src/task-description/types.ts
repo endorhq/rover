@@ -14,6 +14,12 @@ export type TaskStatus = z.infer<typeof TaskStatusSchema>;
 // Infer TaskDescriptionSchema type from Zod schema
 export type TaskDescriptionSchema = z.infer<typeof TaskDescriptionZodSchema>;
 
+// Step agent config type
+export interface StepAgentConfig {
+  tool?: string;
+  model?: string;
+}
+
 // Data required to create a new task
 export interface CreateTaskData {
   id: number;
@@ -24,6 +30,7 @@ export interface CreateTaskData {
   uuid?: string; // Optional, will be generated if not provided
   agent?: string; // AI agent to use for execution
   agentModel?: string; // AI model to use (e.g., opus, sonnet, flash)
+  stepAgents?: Record<string, StepAgentConfig>; // Per-step tool/model overrides
   sourceBranch?: string; // Source branch task was created from
 }
 

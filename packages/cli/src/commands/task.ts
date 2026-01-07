@@ -21,6 +21,13 @@ import {
   type ParsedAgent,
 } from '../utils/agent-parser.js';
 import {
+  parseStepAgentString,
+  validateStepIds,
+  stepAgentsToRecord,
+  type ParsedStepAgent,
+} from '../utils/step-agent-parser.js';
+import { UserSettingsManager } from 'rover-schemas';
+import {
   findProjectRoot,
   ProcessManager,
   showProperties,
@@ -207,6 +214,7 @@ interface TaskOptions {
   sourceBranch?: string;
   targetBranch?: string;
   agent?: string[];
+  stepAgent?: string[];
   json?: boolean;
   debug?: boolean;
 }
@@ -217,6 +225,7 @@ interface TaskOptions {
 const createTaskForAgent = async (
   selectedAiAgent: string,
   selectedModel: string | undefined,
+  stepAgents: Record<string, { tool?: string; model?: string }> | undefined,
   options: TaskOptions,
   description: string,
   inputsData: Map<string, string>,
@@ -290,6 +299,7 @@ const createTaskForAgent = async (
     workflowName: workflowName,
     agent: selectedAiAgent,
     agentModel: selectedModel,
+    stepAgents: stepAgents,
     sourceBranch: sourceBranch,
   });
 
@@ -501,6 +511,39 @@ export const taskCommand = async (
     jsonOutput.error = `The workflow ${workflow} does not exist`;
     await exitWithError(jsonOutput, { telemetry });
     return;
+  }
+
+  // Parse and validate step agents from CLI
+  let stepAgents: Record<string, { tool?: string; model?: string }> | undefined;
+  const validStepIds = workflow.steps.map(s => s.id);
+
+  if (options.stepAgent && options.stepAgent.length > 0) {
+    try {
+      const parsedStepAgents: ParsedStepAgent[] = options.stepAgent.map(sa =>
+        parseStepAgentString(sa)
+      );
+      validateStepIds(parsedStepAgents, validStepIds);
+      stepAgents = stepAgentsToRecord(parsedStepAgents);
+    } catch (err) {
+      jsonOutput.error =
+        err instanceof Error ? err.message : 'Invalid step agent format';
+      await exitWithError(jsonOutput, { telemetry });
+      return;
+    }
+  }
+
+  // Merge with settings-based workflow config
+  if (UserSettingsManager.exists()) {
+    const userSettings = UserSettingsManager.load();
+    const workflowConfig = userSettings.getWorkflowConfig(workflowName);
+
+    if (workflowConfig) {
+      // Merge settings config with CLI overrides (CLI takes precedence)
+      stepAgents = {
+        ...workflowConfig,
+        ...stepAgents,
+      };
+    }
   }
 
   // Many workflows require instructions and this is the default input we collect
@@ -810,6 +853,7 @@ export const taskCommand = async (
       const taskResult = await createTaskForAgent(
         selectedAiAgent,
         selectedModel,
+        stepAgents,
         options,
         description,
         inputsData,

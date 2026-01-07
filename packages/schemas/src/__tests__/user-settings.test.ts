@@ -46,15 +46,15 @@ describe('UserSettingsManager', () => {
       expect(existsSync('.rover/settings.json')).toBe(true);
       const jsonData = JSON.parse(readFileSync('.rover/settings.json', 'utf8'));
 
-      // Version should be 1.1
-      expect(jsonData.version).toBe('1.1');
+      // Version should be 1.2
+      expect(jsonData.version).toBe('1.2');
 
       // Should have empty arrays and empty defaults
       expect(jsonData.aiAgents).toEqual([]);
-      expect(jsonData.defaults).toEqual({ models: {} });
+      expect(jsonData.defaults).toEqual({ models: {}, workflows: {} });
 
       // Getters should return expected values
-      expect(settings.version).toBe('1.1');
+      expect(settings.version).toBe('1.2');
       expect(settings.aiAgents).toEqual([]);
       expect(settings.defaultAiAgent).toBeUndefined();
     });
@@ -73,12 +73,12 @@ describe('UserSettingsManager', () => {
     it('should create default settings when file does not exist', () => {
       const settings = UserSettingsManager.load();
 
-      expect(settings.version).toBe('1.1');
+      expect(settings.version).toBe('1.2');
       expect(settings.aiAgents).toEqual([]);
       expect(settings.defaultAiAgent).toBeUndefined();
     });
 
-    it('should load existing settings file and migrate v1.0 to v1.1', () => {
+    it('should load existing settings file and migrate v1.0 to v1.2', () => {
       mkdirSync('.rover');
       writeFileSync(
         '.rover/settings.json',
@@ -97,8 +97,8 @@ describe('UserSettingsManager', () => {
 
       const settings = UserSettingsManager.load();
 
-      // v1.0 settings should be migrated to v1.1
-      expect(settings.version).toBe('1.1');
+      // v1.0 settings should be migrated to v1.2
+      expect(settings.version).toBe('1.2');
       expect(settings.aiAgents).toEqual([AI_AGENT.Claude, AI_AGENT.Gemini]);
       expect(settings.defaultAiAgent).toBe(AI_AGENT.Claude);
     });
@@ -119,15 +119,15 @@ describe('UserSettingsManager', () => {
 
       const settings = UserSettingsManager.load();
 
-      // Should be migrated to current version (1.1)
-      expect(settings.version).toBe('1.1');
+      // Should be migrated to current version (1.2)
+      expect(settings.version).toBe('1.2');
       // Migration provides default Claude agent
       expect(settings.aiAgents).toEqual([AI_AGENT.Claude]);
       expect(settings.defaultAiAgent).toBe(AI_AGENT.Claude);
 
       // Check saved file
       const jsonData = JSON.parse(readFileSync('.rover/settings.json', 'utf8'));
-      expect(jsonData.version).toBe('1.1');
+      expect(jsonData.version).toBe('1.2');
       expect(jsonData.aiAgents).toEqual([AI_AGENT.Claude]);
       expect(jsonData.defaults.aiAgent).toBe(AI_AGENT.Claude);
     });
@@ -135,11 +135,12 @@ describe('UserSettingsManager', () => {
     it('should not re-migrate current version settings', () => {
       mkdirSync('.rover');
       const originalData = {
-        version: '1.1',
+        version: '1.2',
         aiAgents: [AI_AGENT.Gemini],
         defaults: {
           aiAgent: AI_AGENT.Gemini,
           models: {},
+          workflows: {},
         },
       };
       writeFileSync(
@@ -149,8 +150,8 @@ describe('UserSettingsManager', () => {
 
       const settings = UserSettingsManager.load();
 
-      // Should remain at version 1.1
-      expect(settings.version).toBe('1.1');
+      // Should remain at version 1.2
+      expect(settings.version).toBe('1.2');
 
       // All fields should be preserved exactly
       expect(settings.aiAgents).toEqual([AI_AGENT.Gemini]);
@@ -383,9 +384,9 @@ describe('UserSettingsManager', () => {
       const json = settings.toJSON();
 
       expect(json).toEqual({
-        version: '1.1',
+        version: '1.2',
         aiAgents: [AI_AGENT.Claude],
-        defaults: { models: {} },
+        defaults: { models: {}, workflows: {} },
       });
     });
 
@@ -454,7 +455,7 @@ describe('UserSettingsManager', () => {
       const settings = UserSettingsManager.load();
 
       // Migration should add default from Claude fallback
-      expect(settings.version).toBe('1.1');
+      expect(settings.version).toBe('1.2');
       expect(settings.defaultAiAgent).toBe(AI_AGENT.Claude);
     });
   });

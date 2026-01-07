@@ -36,10 +36,14 @@ export const AGENT_MODELS: Record<AI_AGENT, AgentModelConfig[]> = {
     { name: 'qwq', description: 'Reasoning model' },
   ],
   [AI_AGENT.Codex]: [
-    { name: 'default', description: 'Default model', isDefault: true },
+    { name: 'o3', description: 'OpenAI o3 reasoning model', isDefault: true },
+    { name: 'o4-mini', description: 'OpenAI o4-mini' },
+    { name: 'gpt-4.1', description: 'GPT-4.1' },
   ],
   [AI_AGENT.Cursor]: [
-    { name: 'default', description: 'Default model', isDefault: true },
+    { name: 'sonnet-4', description: 'Claude Sonnet 4', isDefault: true },
+    { name: 'sonnet-4-thinking', description: 'Claude Sonnet 4 with thinking' },
+    { name: 'gpt-5', description: 'GPT-5' },
   ],
 };
 

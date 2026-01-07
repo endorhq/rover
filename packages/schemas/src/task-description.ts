@@ -19,6 +19,7 @@ import {
   StatusMetadata,
   IterationMetadata,
   TaskStatus,
+  StepAgentConfig,
 } from './task-description/types.js';
 import {
   TaskNotFoundError,
@@ -72,6 +73,7 @@ export class TaskDescriptionManager {
       branchName: '',
       agent: taskData.agent,
       agentModel: taskData.agentModel,
+      stepAgents: taskData.stepAgents,
       sourceBranch: taskData.sourceBranch,
       version: CURRENT_TASK_DESCRIPTION_SCHEMA_VERSION,
     };
@@ -203,9 +205,10 @@ export class TaskDescriptionManager {
     migrated.restartCount = data.restartCount || 0;
     migrated.lastRestartAt = data.lastRestartAt || '';
 
-    // Preserve agent, agentModel, and sourceBranch fields
+    // Preserve agent, agentModel, stepAgents, and sourceBranch fields
     migrated.agent = data.agent;
     migrated.agentModel = data.agentModel;
+    migrated.stepAgents = data.stepAgents;
     migrated.sourceBranch = data.sourceBranch;
 
     // Preserve agentImage field
@@ -607,6 +610,9 @@ export class TaskDescriptionManager {
   }
   get agentModel(): string | undefined {
     return this.data.agentModel;
+  }
+  get stepAgents(): Record<string, StepAgentConfig> | undefined {
+    return this.data.stepAgents;
   }
   get sourceBranch(): string | undefined {
     return this.data.sourceBranch;

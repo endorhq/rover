@@ -79,6 +79,7 @@ export class UserSettingsManager {
       aiAgents: [],
       defaults: {
         models: {},
+        workflows: {},
       },
     };
 
@@ -112,7 +113,7 @@ export class UserSettingsManager {
       return data as UserSettings;
     }
 
-    // Migration from older versions (1.0 or earlier)
+    // Migration from older versions (1.0, 1.1 or earlier)
     // NOTE: Unlike createDefault() which uses empty arrays and no default agent,
     // migration provides Claude as the default for backward compatibility with
     // existing installations that may have been using Claude implicitly.
@@ -123,6 +124,8 @@ export class UserSettingsManager {
         aiAgent: data.defaults?.aiAgent || AI_AGENT.Claude,
         // v1.1: Add empty models object for existing users
         models: data.defaults?.models || {},
+        // v1.2: Add empty workflows object for existing users
+        workflows: data.defaults?.workflows || {},
       },
     };
 
@@ -248,6 +251,67 @@ export class UserSettingsManager {
   removeDefaultModel(agent: AI_AGENT): void {
     if (this.data.defaults.models?.[agent]) {
       delete this.data.defaults.models[agent];
+      this.save();
+    }
+  }
+
+  /**
+   * Get all workflow configurations
+   */
+  get workflows(): Record<
+    string,
+    Record<string, { tool?: string; model?: string }>
+  > {
+    return this.data.defaults.workflows || {};
+  }
+
+  /**
+   * Get the configuration for a specific workflow
+   */
+  getWorkflowConfig(
+    workflow: string
+  ): Record<string, { tool?: string; model?: string }> | undefined {
+    return this.data.defaults.workflows?.[workflow];
+  }
+
+  /**
+   * Get the configuration for a specific step in a workflow
+   */
+  getWorkflowStepConfig(
+    workflow: string,
+    stepId: string
+  ): { tool?: string; model?: string } | undefined {
+    return this.data.defaults.workflows?.[workflow]?.[stepId];
+  }
+
+  /**
+   * Set the configuration for a specific step in a workflow
+   */
+  setWorkflowStepConfig(
+    workflow: string,
+    stepId: string,
+    config: { tool?: string; model?: string }
+  ): void {
+    if (!this.data.defaults.workflows) {
+      this.data.defaults.workflows = {};
+    }
+    if (!this.data.defaults.workflows[workflow]) {
+      this.data.defaults.workflows[workflow] = {};
+    }
+    this.data.defaults.workflows[workflow][stepId] = config;
+    this.save();
+  }
+
+  /**
+   * Remove the configuration for a specific step in a workflow
+   */
+  removeWorkflowStepConfig(workflow: string, stepId: string): void {
+    if (this.data.defaults.workflows?.[workflow]?.[stepId]) {
+      delete this.data.defaults.workflows[workflow][stepId];
+      // Clean up empty workflow objects
+      if (Object.keys(this.data.defaults.workflows[workflow]).length === 0) {
+        delete this.data.defaults.workflows[workflow];
+      }
       this.save();
     }
   }

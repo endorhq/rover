@@ -19,6 +19,7 @@ import { showRoverChat, showTips, TIP_TITLES } from '../utils/display.js';
 import { AI_AGENT } from 'rover-core';
 import { getTelemetry } from '../lib/telemetry.js';
 import { getAvailableModels, hasMultipleModels } from '../lib/agent-models.js';
+import { initWorkflowStore } from '../lib/workflow.js';
 
 // Get the default prompt
 const { prompt } = enquirer;
@@ -281,6 +282,10 @@ export const initCommand = async (
                 name: `${m.name} - ${m.description}`,
                 value: m.name,
               })),
+              {
+                name: 'Other (enter custom model)',
+                value: '__other__',
+              },
             ];
 
             const result = (await prompt({
@@ -292,7 +297,18 @@ export const initCommand = async (
             })) as { model: string };
 
             // Only save if user chose a specific model, not "inherit"
-            if (result.model !== '__inherit__') {
+            if (result.model === '__other__') {
+              // Ask for custom model name
+              const customResult = (await prompt({
+                type: 'input',
+                name: 'customModel',
+                message: `Enter custom model name for ${agent}:`,
+              })) as { customModel: string };
+
+              if (customResult.customModel?.trim()) {
+                selectedModels.set(agent, customResult.customModel.trim());
+              }
+            } else if (result.model !== '__inherit__') {
               selectedModels.set(agent, result.model);
             }
           } catch (error) {
@@ -302,6 +318,122 @@ export const initCommand = async (
       }
     }
     // With --yes or no agents with multiple models, selectedModels stays empty (inherit behavior)
+
+    // Per-step workflow configuration (opt-in)
+    const workflowStepConfigs: Map<
+      string,
+      Map<string, { tool?: string; model?: string }>
+    > = new Map();
+
+    if (!options.yes && availableAgents.length > 1) {
+      try {
+        const { configureSteps } = await prompt<{ configureSteps: boolean }>({
+          type: 'confirm',
+          name: 'configureSteps',
+          message:
+            'Configure per-step tool/model for workflows? (advanced, can change anytime)',
+          initial: false,
+        });
+
+        if (configureSteps) {
+          const workflowStore = initWorkflowStore();
+          const workflows = workflowStore.listWorkflows();
+
+          for (const workflow of workflows) {
+            console.log(
+              colors.bold(`\nWorkflow: ${workflow.name}`) +
+                colors.gray(` (${workflow.id})`)
+            );
+            console.log(
+              colors.gray(
+                `├── Configure tool/model per step (default: use -a value)\n`
+              )
+            );
+
+            const stepConfigs: Map<string, { tool?: string; model?: string }> =
+              new Map();
+
+            for (const step of workflow.steps) {
+              // Build tool choices - "Inherit" first, then available agents
+              const toolChoices = [
+                {
+                  name: 'Inherit (use -a value)',
+                  value: '__inherit__',
+                },
+                ...availableAgents.map(agent => ({
+                  name: agent.charAt(0).toUpperCase() + agent.slice(1),
+                  value: agent,
+                })),
+              ];
+
+              try {
+                const toolResult = (await prompt({
+                  type: 'select',
+                  name: 'tool',
+                  message: `${step.name} - tool:`,
+                  choices: toolChoices,
+                  initial: 0,
+                })) as { tool: string };
+
+                if (toolResult.tool !== '__inherit__') {
+                  // Ask for model if tool was selected
+                  const models = getAvailableModels(
+                    toolResult.tool as AI_AGENT
+                  );
+                  const modelChoices = [
+                    {
+                      name: 'Inherit (use agent default)',
+                      value: '__inherit__',
+                    },
+                    ...models.map(m => ({
+                      name: `${m.name} - ${m.description}`,
+                      value: m.name,
+                    })),
+                    {
+                      name: 'Other (enter custom model)',
+                      value: '__other__',
+                    },
+                  ];
+
+                  const modelResult = (await prompt({
+                    type: 'select',
+                    name: 'model',
+                    message: `${step.name} - model:`,
+                    choices: modelChoices,
+                    initial: 0,
+                  })) as { model: string };
+
+                  let finalModel: string | undefined;
+                  if (modelResult.model === '__other__') {
+                    const customResult = (await prompt({
+                      type: 'input',
+                      name: 'customModel',
+                      message: `Enter custom model name:`,
+                    })) as { customModel: string };
+                    finalModel = customResult.customModel?.trim() || undefined;
+                  } else if (modelResult.model !== '__inherit__') {
+                    finalModel = modelResult.model;
+                  }
+
+                  stepConfigs.set(step.id, {
+                    tool: toolResult.tool,
+                    model: finalModel,
+                  });
+                }
+              } catch {
+                // User cancelled this step, skip it
+              }
+            }
+
+            if (stepConfigs.size > 0) {
+              workflowStepConfigs.set(workflow.id, stepConfigs);
+            }
+          }
+        }
+      } catch {
+        // User cancelled, skip per-step configuration
+      }
+    }
 
     let attribution = true;
 
@@ -389,6 +521,13 @@ export const initCommand = async (
       // Save model preferences
       for (const [agent, model] of selectedModels) {
         userSettings.setDefaultModel(agent, model);
+      }
+
+      // Save per-step workflow configurations
+      for (const [workflowId, stepConfigs] of workflowStepConfigs) {
+        for (const [stepId, config] of stepConfigs) {
+          userSettings.setWorkflowStepConfig(workflowId, stepId, config);
+        }
       }
 
       console.log(colors.green('✓ Rover initialization complete!'));

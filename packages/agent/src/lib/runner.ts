@@ -75,6 +75,9 @@ export class Runner {
     private stepsOutput: Map<string, Map<string, string>>,
     private defaultTool: string | undefined,
     private defaultModel: string | undefined,
+    private stepAgents:
+      | Record<string, { tool?: string; model?: string }>
+      | undefined,
     private statusManager?: IterationStatusManager,
     private totalSteps: number = 0,
     private currentStepIndex: number = 0
@@ -82,10 +85,16 @@ export class Runner {
     // Get the step from the workflow
     this.step = this.workflow.getStep(stepId);
 
-    // Determine which tool to use
-    const stepTool = this.workflow.getStepTool(stepId, this.defaultTool);
+    // Check for step-specific tool/model overrides from stepAgents
+    const stepOverride = this.stepAgents?.[stepId];
+    const effectiveTool =
+      stepOverride?.tool || this.workflow.getStepTool(stepId, this.defaultTool);
+    const effectiveModel =
+      stepOverride?.model ||
+      this.defaultModel ||
+      this.workflow.getStepModel(stepId);
 
-    if (!stepTool) {
+    if (!effectiveTool) {
       throw new Error(
         'The workflow does not specify any AI Coding Agent and the user did not provide it.'
       );
@@ -96,15 +105,17 @@ export class Runner {
 
     // Try the step-specific tool first
     try {
-      const binary = Runner.getToolBinary(stepTool);
+      const binary = Runner.getToolBinary(effectiveTool);
       launchSync(binary, ['--version']);
-      availableTool = stepTool;
+      availableTool = effectiveTool;
     } catch (err) {
-      console.log(colors.yellow(`${stepTool} is not available in the system`));
+      console.log(
+        colors.yellow(`${effectiveTool} is not available in the system`)
+      );
 
       // Try fallback to default tool if different
-      const fallbackTool = stepTool || this.workflow.defaults?.tool;
-      if (fallbackTool && fallbackTool !== stepTool) {
+      const fallbackTool = effectiveTool || this.workflow.defaults?.tool;
+      if (fallbackTool && fallbackTool !== effectiveTool) {
         try {
           const fallbackBinary = Runner.getToolBinary(fallbackTool);
           launchSync(fallbackBinary, ['--version']);
@@ -118,7 +129,7 @@ export class Runner {
 
     if (availableTool) {
       this.tool = availableTool;
-      this.agent = createAgent(availableTool, 'latest', this.defaultModel);
+      this.agent = createAgent(availableTool, 'latest', effectiveModel);
     } else {
       throw new Error(`Could not find any tool to run the '${stepId}' step`);
     }

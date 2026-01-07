@@ -18,6 +18,8 @@ interface RunCommandOptions {
   agentTool?: string;
   // Model to use instead of workflow defaults
   agentModel?: string;
+  // Per-step tool/model overrides (JSON string)
+  stepAgents?: string;
   // Task ID for status tracking
   taskId?: string;
   // Path to status.json file
@@ -27,6 +29,9 @@ interface RunCommandOptions {
   // Paths to pre-context JSON files
   preContextFile: string[];
 }
+
+// Type for parsed step agents
+type StepAgentsConfig = Record<string, { tool?: string; model?: string }>;
 
 interface RunCommandOutput extends CommandOutput {}
 
@@ -187,6 +192,20 @@ export const runCommand = async (
     // Handle pre-context injection
     handlePreContextInjection(options, workflowManager);
 
+    // Parse step agents from JSON string if provided
+    let stepAgents: StepAgentsConfig | undefined;
+    if (options.stepAgents) {
+      try {
+        stepAgents = JSON.parse(options.stepAgents);
+      } catch (err) {
+        console.log(
+          colors.yellow(
+            `\n⚠ Failed to parse --step-agents JSON: ${err instanceof Error ? err.message : String(err)}. Ignoring step agents.`
+          )
+        );
+      }
+    }
+
     let providedInputs = new Map();
 
     if (options.inputsJson != null) {
@@ -290,6 +309,7 @@ export const runCommand = async (
           stepsOutput,
           options.agentTool,
           options.agentModel,
+          stepAgents,
           statusManager,
           totalSteps,
           stepIndex

@@ -217,6 +217,12 @@ export function createProgram(
       (value: string, previous: string[] | undefined) =>
         previous ? [...previous, value] : [value]
     )
+    .option(
+      '-o, --step-agent <step:tool:model>',
+      'Override tool/model for a specific workflow step (e.g., implement:claude:opus). Repeat for multiple steps.',
+      (value: string, previous: string[] | undefined) =>
+        previous ? [...previous, value] : [value]
+    )
     .option('--json', 'Output the result in JSON format')
     .option('--debug', 'Show debug information like running commands')
     .argument(

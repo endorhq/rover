@@ -84,6 +84,7 @@ export {
   type CreateTaskData,
   type StatusMetadata,
   type IterationMetadata,
+  type StepAgentConfig,
 } from './task-description/types.js';
 
 export {
