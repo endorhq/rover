@@ -28,11 +28,11 @@
     "boxen": "^8.0.1",
     "execa": "catalog:runtime",
     "log-update": "^7.0.1",
+    "rover-schemas": "workspace:*",
+    "rover-telemetry": "workspace:*",
     "yaml": "^2.8.1"
   },
   "devDependencies": {
-    "rover-schemas": "workspace:*",
-    "rover-telemetry": "workspace:*",
     "@types/node": "^24.1.0",
     "@types/react": "^19.1.8",
     "@types/uuid": "^10.0.0",

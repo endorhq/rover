@@ -4,7 +4,7 @@
   "author": "The Endor Team <hello@endor.dev>",
   "engines": {
     "pnpm": ">=10",
-    "node": ">=22"
+    "node": ">=20"
   },
   "packageManager": "pnpm@10.25.0",
   "workspaces": [

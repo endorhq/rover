@@ -30,13 +30,13 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build the project
-        run: pnpm run build
+        run: pnpm build
 
       - name: Run TypeScript check
-        run: pnpm run check
+        run: pnpm check
 
       - name: Test
-        run: pnpm run test
+        run: pnpm test
 
       - name: Test Build Artifact
         run: node dist/index.js --version

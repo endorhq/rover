@@ -148,6 +148,12 @@ importers:
       log-update:
         specifier: ^7.0.1
         version: 7.0.1
+      rover-schemas:
+        specifier: workspace:*
+        version: link:../schemas
+      rover-telemetry:
+        specifier: workspace:*
+        version: link:../telemetry
       yaml:
         specifier: ^2.8.1
         version: 2.8.1
@@ -164,12 +170,6 @@ importers:
       '@vitest/ui':
         specifier: ^2.1.8
         version: 2.1.9(vitest@2.1.9)
-      rover-schemas:
-        specifier: workspace:*
-        version: link:../schemas
-      rover-telemetry:
-        specifier: workspace:*
-        version: link:../telemetry
       tsdown:
         specifier: ^0.13.0
         version: 0.13.4(typescript@5.9.2)
