@@ -258,7 +258,7 @@ export function createProgram(
     .command('list')
     .alias('ls')
     .description('Show tasks and their status')
-    .option('-w, --watch', 'Watch for changes and refresh every 5 seconds')
+    .option('-w, --watch [seconds]', 'Watch for changes (default 3s, or specify interval)')
     .option('--json', 'Output in JSON format')
     .action(listCommand);
 

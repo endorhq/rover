@@ -9,6 +9,7 @@ import {
   showTips,
   Table,
   TableColumn,
+  UserSettingsManager,
 } from 'rover-core';
 import { isJsonMode, setJsonMode } from '../lib/global-state.js';
 import { TaskDescription } from 'rover-schemas';
@@ -74,7 +75,7 @@ interface TaskRow {
 
 export const listCommand = async (
   options: {
-    watch?: boolean;
+    watch?: boolean | string;
     verbose?: boolean;
     json?: boolean;
     watching?: boolean;
@@ -99,13 +100,19 @@ export const listCommand = async (
       } else {
         console.log(colors.yellow('📋 No tasks found'));
 
-        showTips(
-          'Use ' +
-            colors.cyan('rover task') +
-            ' to assign a new task to an agent'
-        );
+        if (!options.watch) {
+          showTips(
+            'Use ' +
+              colors.cyan('rover task') +
+              ' to assign a new task to an agent'
+          );
+        }
       }
-      return;
+
+      // Don't return early if in watch mode - continue to watch for new tasks
+      if (!options.watch) {
+        return;
+      }
     }
 
     // Update task status
@@ -270,10 +277,26 @@ export const listCommand = async (
       });
     }
 
-    // Watch mode (simple refresh every 3 seconds)
+    // Watch mode (configurable refresh interval, default 3 seconds)
     if (options.watch) {
+      // CLI argument takes precedence, then settings, then default (3s)
+      let intervalSeconds: number;
+      if (typeof options.watch === 'string') {
+        intervalSeconds = parseInt(options.watch, 10);
+        if (isNaN(intervalSeconds) || intervalSeconds < 1 || intervalSeconds > 60) {
+          console.error(colors.red('Watch interval must be between 1 and 60 seconds'));
+          return;
+        }
+      } else {
+        const settings = UserSettingsManager.load();
+        intervalSeconds = settings.watchIntervalSeconds;
+      }
+      const intervalMs = intervalSeconds * 1000;
+
       console.log(
-        colors.gray('\n⏱️  Watching for changes every 3s (Ctrl+C to exit)...')
+        colors.gray(
+          `\n⏱️  Watching for changes every ${intervalSeconds}s (Ctrl+C to exit)...`
+        )
       );
 
       const watchInterval = setInterval(async () => {
@@ -281,9 +304,11 @@ export const listCommand = async (
         process.stdout.write('\x1b[2J\x1b[0f');
         await listCommand({ ...options, watch: false, watching: true });
         console.log(
-          colors.gray('\n⏱️  Refreshing every 3s (Ctrl+C to exit)...')
+          colors.gray(
+            `\n⏱️  Refreshing every ${intervalSeconds}s (Ctrl+C to exit)...`
+          )
         );
-      }, 3000);
+      }, intervalMs);
 
       // Handle Ctrl+C
       process.on('SIGINT', () => {

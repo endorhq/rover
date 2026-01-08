@@ -150,6 +150,22 @@ npm install -g @endorhq/rover@latest
    rover ls -w
    ```
 
+   You can specify a custom refresh interval (1-60 seconds):
+
+   ```sh
+   rover ls -w 10  # Refresh every 10 seconds
+   ```
+
+   Or set a default in `.rover/settings.json`:
+
+   ```json
+   {
+     "defaults": {
+       "watchIntervalSeconds": 5
+     }
+   }
+   ```
+
 4. Keep working on your own tasks 🤓
 
 5. After finishing, check the task result:
