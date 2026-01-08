@@ -24,10 +24,10 @@
     "zod": "catalog:runtime"
   },
   "devDependencies": {
-    "@types/node": "^24.1.0",
-    "@vitest/ui": "^2.1.8",
+    "@types/node": "catalog:build",
+    "@vitest/ui": "catalog:build",
     "tsdown": "catalog:build",
-    "typescript": "^5.8.3",
-    "vitest": "^2.1.8"
+    "typescript": "catalog:build",
+    "vitest": "catalog:build"
   }
 }
