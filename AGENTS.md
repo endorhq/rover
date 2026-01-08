@@ -180,7 +180,7 @@ pnpm --filter rover-schemas test
 
 ### Formatting
 
-When you have finished implementing changes, run `pnpm format` to ensure all files follow the correct format. You can focus on files that you have changed by running `pnpm exec prettier --write PATH` to format only those files.
+When you have finished implementing changes, run `pnpm format` to ensure all files follow the correct format. You can focus on files that you have changed by running `pnpm exec biome format --changed` to format only those files.
 
 ## AI Agent Guidelines
 

@@ -151,8 +151,9 @@ export class DropdownButton extends LitElement {
           ${this.buttonLabel}
         </button>
 
-        ${this.showDropdown
-          ? html`
+        ${
+          this.showDropdown
+            ? html`
               <div class="dropdown-menu">
                 ${this.actions.map(
                   action => html`
@@ -168,7 +169,8 @@ export class DropdownButton extends LitElement {
                 )}
               </div>
             `
-          : ''}
+            : ''
+        }
       </div>
     `;
   }

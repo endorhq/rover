@@ -7,10 +7,7 @@
   "engines": {
     "vscode": "^1.102.0"
   },
-  "categories": [
-    "Other",
-    "Programming Languages"
-  ],
+  "categories": ["Other", "Programming Languages"],
   "icon": "./assets/logo.png",
   "main": "./dist/extension.js",
   "author": "Endor Team <hello@endor.dev>",
@@ -208,7 +205,6 @@
     "watch-tests": "tsc -p . -w --outDir out",
     "pretest": "pnpm compile-tests && pnpm compile && pnpm lint",
     "check": "tsc --noEmit",
-    "format": "prettier --write \"src/**/*.{ts,mts,js,json}\"",
     "lint": "eslint src",
     "test": "vscode-test"
   },

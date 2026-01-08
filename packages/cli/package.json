@@ -28,11 +28,7 @@
     "url": "https://github.com/endorhq/rover.git",
     "directory": "packages/cli"
   },
-  "files": [
-    "README.md",
-    "LICENSE.md",
-    "dist/*"
-  ],
+  "files": ["README.md", "LICENSE.md", "dist/*"],
   "scripts": {
     "build": "tsdown",
     "build-dev": "TSUP_DEV=true tsdown",
@@ -40,7 +36,6 @@
     "start": "node --enable-source-maps dist/index.mjs",
     "clean": "rm -rf dist",
     "check": "tsc --noEmit",
-    "format": "prettier --write \"src/**/*.{ts,js,json}\"",
     "package": "pnpm pack",
     "test": "vitest --run --silent",
     "test:watch": "vitest",

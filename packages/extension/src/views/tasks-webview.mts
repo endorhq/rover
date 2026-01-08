@@ -224,8 +224,9 @@ export class TasksWebview extends LitElement {
 
     return html`
       <div class="tasks-container">
-        ${this.loading
-          ? html`
+        ${
+          this.loading
+            ? html`
               <div class="loading-state">
                 <div class="loading-spinner">
                   <i class="codicon codicon-loading spinner-icon"></i>
@@ -236,17 +237,18 @@ export class TasksWebview extends LitElement {
                 </div>
               </div>
             `
-          : this.tasks.length === 0
-            ? html`<tasks-intro></tasks-intro> ${this.renderCreateForm()}`
-            : this.tasks.map(
-                task => html`
+            : this.tasks.length === 0
+              ? html`<tasks-intro></tasks-intro> ${this.renderCreateForm()}`
+              : this.tasks.map(
+                  task => html`
                   <task-card
                     .task=${task}
                     @inspect-task=${this.handleInspectTask}
                     @task-action=${this.handleTaskAction}
                   ></task-card>
                 `
-              )}
+                )
+        }
       </div>
 
       ${!this.loading && this.tasks.length > 0 ? this.renderCreateForm() : null}

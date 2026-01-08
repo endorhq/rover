@@ -5,18 +5,14 @@
   "main": "dist/index.mjs",
   "types": "dist/index.d.mts",
   "type": "module",
-  "files": [
-    "LICENSE.md",
-    "dist/*"
-  ],
+  "files": ["LICENSE.md", "dist/*"],
   "scripts": {
     "build": "tsdown --env.TSUP_DEV=false",
     "build-dev": "TSUP_DEV=true tsdown --env.TSUP_DEV=true",
     "dev": "TSUP_DEV=true tsdown --env.TSUP_DEV=true --watch src/",
     "start": "echo 'Telemetry package is not a CLI'",
     "clean": "rm -rf dist",
-    "check": "tsc --noEmit",
-    "format": "prettier --write \"src/**/*.{ts,js,json}\""
+    "check": "tsc --noEmit"
   },
   "author": "The Endor team",
   "dependencies": {
