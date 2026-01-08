@@ -41,7 +41,24 @@
       "!**/pnpm-lock.yaml"
     ]
   },
-  "linter": { "enabled": true, "rules": { "recommended": true } },
+  "linter": {
+    "enabled": true,
+    "rules": { "recommended": true },
+    "includes": [
+      "packages/telemetry/**",
+      "!**/node_modules/",
+      "!**/dist/",
+      "!**/build/",
+      "!**/out/",
+      "!**/*.generated.*",
+      "!**/*.min.js",
+      "!**/*.min.css",
+      "!**/package-lock.json",
+      "!**/*.tgz",
+      "!packages/extension/*.vsix",
+      "!**/.git/"
+    ]
+  },
   "javascript": {
     "formatter": {
       "jsxQuoteStyle": "double",

@@ -1,4 +1,4 @@
-name: Check Format
+name: Check Format and Lint
 
 on:
   push:
@@ -27,5 +27,8 @@ jobs:
 
       - name: Check Format
         run: |
-          pnpm run format
+          pnpm format
           git diff --exit-code
+
+      - name: Lint
+        run: pnpm lint --error-on-warnings
