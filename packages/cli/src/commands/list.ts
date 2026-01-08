@@ -283,8 +283,14 @@ export const listCommand = async (
       let intervalSeconds: number;
       if (typeof options.watch === 'string') {
         intervalSeconds = parseInt(options.watch, 10);
-        if (isNaN(intervalSeconds) || intervalSeconds < 1 || intervalSeconds > 60) {
-          console.error(colors.red('Watch interval must be between 1 and 60 seconds'));
+        if (
+          isNaN(intervalSeconds) ||
+          intervalSeconds < 1 ||
+          intervalSeconds > 60
+        ) {
+          console.error(
+            colors.red('Watch interval must be between 1 and 60 seconds')
+          );
           return;
         }
       } else {
