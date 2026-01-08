@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execSync } from 'node:child_process';
 import { restartCommand } from '../restart.js';
-import { TaskDescriptionManager } from 'rover-core';
+import { TaskDescriptionManager, clearProjectRootCache } from 'rover-core';
 
 // Mock external dependencies
 vi.mock('../../lib/telemetry.js', () => ({
@@ -39,6 +39,9 @@ describe('restart command', async () => {
   let originalCwd: string;
 
   beforeEach(() => {
+    // Clear project root cache to ensure tests use the correct directory
+    clearProjectRootCache();
+
     // Create temporary directory for test
     testDir = mkdtempSync(join(tmpdir(), 'rover-test-'));
     originalCwd = process.cwd();
@@ -62,10 +65,20 @@ describe('restart command', async () => {
       // Branch might already exist or be called 'master'
     }
 
+    // Create .rover directory
+    mkdirSync(join(testDir, '.rover'), { recursive: true });
+
     // Create rover.json to indicate this is a Rover project
     writeFileSync(
       join(testDir, 'rover.json'),
-      JSON.stringify({ name: 'test-project' })
+      JSON.stringify({
+        version: '1.2',
+        languages: [],
+        mcps: [],
+        packageManagers: [],
+        taskManagers: [],
+        attribution: true,
+      })
     );
 
     // Clear all mocks
@@ -80,6 +93,9 @@ describe('restart command', async () => {
     if (existsSync(testDir)) {
       rmSync(testDir, { recursive: true, force: true });
     }
+
+    // Clear project root cache after test
+    clearProjectRootCache();
   });
 
   describe('basic functionality', () => {

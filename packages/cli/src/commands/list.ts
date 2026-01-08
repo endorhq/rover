@@ -12,6 +12,7 @@ import {
 } from 'rover-core';
 import { isJsonMode, setJsonMode } from '../lib/global-state.js';
 import { TaskDescription } from 'rover-schemas';
+import { isRoverInitialized } from '../utils/repo-checks.js';
 
 /**
  * Format duration from start to now or completion
@@ -85,6 +86,21 @@ export const listCommand = async (
   }
 
   const telemetry = getTelemetry();
+
+  // Check if rover is initialized - if not, just show "no tasks" message
+  if (!isRoverInitialized()) {
+    if (isJsonMode()) {
+      console.log(JSON.stringify([]));
+    } else {
+      console.log(colors.yellow('📋 No tasks found'));
+      showTips(
+        'Run ' +
+          colors.cyan('rover init') +
+          ' to initialize Rover in this directory'
+      );
+    }
+    return;
+  }
 
   try {
     const tasks = TaskDescriptionStore.getAllDescriptions();

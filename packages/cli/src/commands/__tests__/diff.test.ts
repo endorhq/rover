@@ -8,7 +8,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { launchSync } from 'rover-core';
+import { launchSync, clearProjectRootCache } from 'rover-core';
 import { diffCommand } from '../diff.js';
 import { TaskDescriptionManager } from 'rover-core';
 
@@ -36,6 +36,9 @@ describe('diff command', () => {
   let originalCwd: string;
 
   beforeEach(() => {
+    // Clear project root cache to ensure tests use the correct directory
+    clearProjectRootCache();
+
     // Create temp directory with git repo
     testDir = mkdtempSync(join(tmpdir(), 'rover-diff-test-'));
     originalCwd = process.cwd();
@@ -56,6 +59,19 @@ describe('diff command', () => {
     // Create .rover directory structure
     mkdirSync('.rover/tasks', { recursive: true });
 
+    // Create rover.json to indicate this is a Rover project
+    writeFileSync(
+      'rover.json',
+      JSON.stringify({
+        version: '1.2',
+        languages: [],
+        mcps: [],
+        packageManagers: [],
+        taskManagers: [],
+        attribution: true,
+      })
+    );
+
     // Clear console mocks
     consoleSpy.log.mockClear();
     consoleSpy.error.mockClear();
@@ -65,6 +81,9 @@ describe('diff command', () => {
     process.chdir(originalCwd);
     rmSync(testDir, { recursive: true, force: true });
     vi.clearAllMocks();
+
+    // Clear project root cache after test
+    clearProjectRootCache();
   });
 
   // Helper to create a test task with a worktree
@@ -568,6 +587,9 @@ describe('diff command', () => {
     it('should handle empty repository', async () => {
       // Create a new temp dir with empty git repo
       const emptyDir = mkdtempSync(join(tmpdir(), 'rover-empty-diff-'));
+
+      // Clear cache before changing directory
+      clearProjectRootCache();
       process.chdir(emptyDir);
 
       launchSync('git', ['init']);
@@ -575,6 +597,19 @@ describe('diff command', () => {
       launchSync('git', ['config', 'user.name', 'Test User']);
       launchSync('git', ['config', 'commit.gpgsign', 'false']);
       mkdirSync('.rover/tasks', { recursive: true });
+
+      // Create rover.json to indicate this is a Rover project
+      writeFileSync(
+        'rover.json',
+        JSON.stringify({
+          version: '1.2',
+          languages: [],
+          mcps: [],
+          packageManagers: [],
+          taskManagers: [],
+          attribution: true,
+        })
+      );
 
       const task = TaskDescriptionManager.create({
         id: 1,
