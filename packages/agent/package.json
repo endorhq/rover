@@ -9,15 +9,11 @@
   "bin": {
     "rover-agent": "dist/cli.mjs"
   },
-  "files": [
-    "LICENSE.md",
-    "dist/*"
-  ],
+  "files": ["LICENSE.md", "dist/*"],
   "scripts": {
     "build": "tsdown --env.TSUP_DEV=false",
     "build-dev": "tsdown --env.TSUP_DEV=true",
     "dev": "TSUP_DEV=true tsdown --env.TSUP_DEV=true --watch src/",
-    "format": "prettier --write \"src/**/*.{ts,js,json}\"",
     "start": "node --enable-source-maps dist/cli.mjs",
     "clean": "rm -rf dist",
     "check": "tsc --noEmit",

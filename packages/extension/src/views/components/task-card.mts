@@ -210,18 +210,26 @@ export class TaskCard extends LitElement {
             <i class="codicon ${this.getStatusIcon(this.task.status)}"></i>
             ${this.getStatusName(this.task.status)}
           </span>
-          ${this.task.workflowName
-            ? html`<span class="task-workflow">${this.task.workflowName}</span>`
-            : ''}
-          ${timeInfo
-            ? html`<span class="task-timestamp">${timeInfo}</span>`
-            : ''}
-          ${this.task.progress !== undefined && this.task.progress > 0
-            ? html`<span class="task-progress">${this.task.progress}%</span>`
-            : ''}
-          ${this.task.currentStep && isRunning
-            ? html`<span class="task-progress">${this.task.currentStep}</span>`
-            : ''}
+          ${
+            this.task.workflowName
+              ? html`<span class="task-workflow">${this.task.workflowName}</span>`
+              : ''
+          }
+          ${
+            timeInfo
+              ? html`<span class="task-timestamp">${timeInfo}</span>`
+              : ''
+          }
+          ${
+            this.task.progress !== undefined && this.task.progress > 0
+              ? html`<span class="task-progress">${this.task.progress}%</span>`
+              : ''
+          }
+          ${
+            this.task.currentStep && isRunning
+              ? html`<span class="task-progress">${this.task.currentStep}</span>`
+              : ''
+          }
         </div>
 
         <!-- Action buttons -->
@@ -229,8 +237,9 @@ export class TaskCard extends LitElement {
           <!-- Left side: Quick actions + More actions -->
           <div class="action-group">
             <!-- Primary actions based on status -->
-            ${isCompleted
-              ? html`
+            ${
+              isCompleted
+                ? html`
                   <button
                     class="action-button"
                     @click=${(e: Event) =>
@@ -250,9 +259,11 @@ export class TaskCard extends LitElement {
                     Merge
                   </button>
                 `
-              : ''}
-            ${isRunning
-              ? html`
+                : ''
+            }
+            ${
+              isRunning
+                ? html`
                   <button
                     class="action-button"
                     @click=${(e: Event) =>
@@ -272,9 +283,11 @@ export class TaskCard extends LitElement {
                     Shell
                   </button>
                 `
-              : ''}
-            ${isFailed
-              ? html`
+                : ''
+            }
+            ${
+              isFailed
+                ? html`
                   <button
                     class="action-button"
                     @click=${(e: Event) =>
@@ -294,7 +307,8 @@ export class TaskCard extends LitElement {
                     Retry
                   </button>
                 `
-              : ''}
+                : ''
+            }
 
             <!-- More actions button -->
             <div class="more-actions-container">
@@ -306,16 +320,16 @@ export class TaskCard extends LitElement {
                 <i class="codicon codicon-ellipsis"></i>
               </button>
 
-              ${this.showDropdown
-                ? html`
+              ${
+                this.showDropdown
+                  ? html`
                     <div class="more-actions-dropdown">
                       ${this.getMoreActions().map(
                         action => html`
                           <button
-                            class="dropdown-item ${action.action ===
-                            'deleteTask'
-                              ? 'danger'
-                              : ''}"
+                            class="dropdown-item ${
+                              action.action === 'deleteTask' ? 'danger' : ''
+                            }"
                             @click=${(e: Event) =>
                               this.handleMoreAction(e, action.action)}
                             title=${action.label}
@@ -327,7 +341,8 @@ export class TaskCard extends LitElement {
                       )}
                     </div>
                   `
-                : ''}
+                  : ''
+              }
             </div>
           </div>
 
