@@ -17,30 +17,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-
-      - name: Setup npm cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-npm-cache-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-npm-cache-
+          cache: 'pnpm'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Build the project
-        run: npm run build
+        run: pnpm build
 
       - name: Run TypeScript check
-        run: npm run check
+        run: pnpm check
 
       - name: Test
-        run: npm run test
+        run: pnpm test
 
       - name: Test Build Artifact
         run: node dist/index.js --version

@@ -1,0 +1,7 @@
+packages:
+  - packages/*
+
+catalogs:
+  runtime:
+    'execa': '^9.6.0'
+    'zod': '^4.1.12'

@@ -66,6 +66,9 @@ jobs:
       - name: Clone
         uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
@@ -147,7 +150,7 @@ jobs:
         if: inputs.project == 'cli' && inputs.dryRun == false
         run: |
           echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
-          npm publish ${{ env.ASSET_NAME }} --access public
+          pnpm publish ${{ env.ASSET_NAME }} --access public --no-git-checks
           echo "✓ Successfully published to NPM"
 
       - name: (Dry Run) Publish NPM (CLI)
@@ -155,9 +158,9 @@ jobs:
         run: echo "Skipping publish phase."
 
       - name: Publish VSCode Marketplace (Extension)
-        if: inputs.project == 'extension'
+        if: inputs.project == 'extension' && inputs.dryRun == false
         run: |
-          npx @vscode/vsce publish --pat ${{ secrets.VSCODE_MARKETPLACE_TOKEN }} --packagePath ${{ github.workspace }}/${{ env.ASSET_NAME }}
+          pnpm dlx @vscode/vsce publish --pat ${{ secrets.VSCODE_MARKETPLACE_TOKEN }} --packagePath ${{ github.workspace }}/${{ env.ASSET_NAME }} --no-dependencies
           echo "✓ Successfully published to VSCode Marketplace"
 
       - name: (Dry Run) Publish VSCode Marketplace (Extension)

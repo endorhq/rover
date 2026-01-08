@@ -1,6 +1,7 @@
 {
   "name": "rover-schemas",
   "version": "1.0.0",
+  "private": true,
   "description": "Define project file schemas and utilities to manage them",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -11,6 +12,7 @@
   ],
   "scripts": {
     "build": "tsdown --env.TSUP_DEV=false src/index.ts",
+    "build-dev": "tsdown --env.TSUP_DEV=true src/index.ts",
     "dev": "TSUP_DEV=true tsdown --env.TSUP_DEV=true --watch src/ src/index.ts",
     "format": "prettier --write \"src/**/*.{ts,js,json}\"",
     "start": "node dist/index.js",
@@ -23,7 +25,7 @@
   },
   "author": "The Endor team",
   "dependencies": {
-    "zod": "^4.1.12"
+    "zod": "catalog:runtime"
   },
   "devDependencies": {
     "@types/node": "^24.1.0",

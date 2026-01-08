@@ -24,23 +24,16 @@ rover/
 
 ```bash
 # Development workflow
-npm run dev           # Start all packages in development mode
-npm run dev:cli       # Start CLI package in development mode only
-npm run dev:telemetry # Start telemetry package in development mode only
+pnpm dev              # Start all packages in development mode
 
 # Building
-npm run build         # Build all packages
-npm run build:cli     # Build CLI package only
-npm run build:extension # Build extension package only
-npm run build:telemetry # Build telemetry package only
+pnpm build            # Build all packages
 
 # Testing
-npm test              # Run tests for all packages
-npm run test:cli      # Run CLI tests only
-npm run e2e:extension # Run extension tests only
+pnpm test             # Run tests for all packages
 
 # Formatting
-npm run format        # Format all files
+pnpm format           # Format all files
 ```
 
 ### Package-Specific Commands
@@ -48,26 +41,26 @@ npm run format        # Format all files
 ```bash
 # CLI package (packages/cli/)
 cd packages/cli
-npm run dev    # Development mode with watch
-npm run build  # Type-check and build
-npm run check  # TypeScript type checking
-npm run test   # Run tests with Vitest
-npm run test:watch   # Run tests in watch mode
-npm run test:ui      # Open Vitest UI
-npm run test:coverage # Run tests with coverage
+pnpm dev           # Development mode with watch
+pnpm build         # Type-check and build
+pnpm check         # TypeScript type checking
+pnpm test          # Run tests with Vitest
+pnpm test:watch    # Run tests in watch mode
+pnpm test:ui       # Open Vitest UI
+pnpm test:coverage # Run tests with coverage
 
 # Extension package (packages/extension/)
 cd packages/extension
-npm run compile      # Compile TypeScript
-npm run watch       # Watch mode for development
-npm run package     # Build for production
-npm test            # Run VS Code extension tests
+pnpm compile       # Compile TypeScript
+pnpm watch         # Watch mode for development
+pnpm package       # Build for production
+pnpm test          # Run VS Code extension tests
 
 # Telemetry package (packages/telemetry/)
 cd packages/telemetry
-npm run dev    # Development mode with watch
-npm run build  # Build for production
-npm run check  # TypeScript type checking
+pnpm dev           # Development mode with watch
+pnpm build         # Build for production
+pnpm check         # TypeScript type checking
 ```
 
 ## Architecture
@@ -106,8 +99,8 @@ Key architectural decisions:
 
 - **TypeScript**: Strict mode enabled, targeting ES2022
 - **Module system**: ES modules with Node.js compatibility
-- **Node version**: Requires Node.js 22.17.0 and npm 10.9.2 (see root package.json engines)
-- **Monorepo**: Uses npm workspaces for package management
+- **Node version**: Requires Node.js 20+ and pnpm 10+ (see root package.json engines)
+- **Monorepo**: Uses pnpm workspaces for package management
 
 ## Testing Philosophy & Guidelines
 
@@ -134,18 +127,18 @@ Key architectural decisions:
 
 ```bash
 # All tests
-npm run test
+pnpm test
 
 # Test per package
-npm run test:cli
-npm run test:agent
-npm run test:core
-npm run test:schemas
+pnpm --filter @endorhq/rover test
+pnpm --filter @endorhq/agent test
+pnpm --filter rover-core test
+pnpm --filter rover-schemas test
 ```
 
 ### Formatting
 
-When you have finished implementing changes, run the `npm run format` to ensure all files follow the correct format. You can focus on files that you have changed by running `npx prettier --write PATH` to format only those files.
+When you have finished implementing changes, run `pnpm format` to ensure all files follow the correct format. You can focus on files that you have changed by running `pnpm exec prettier --write PATH` to format only those files.
 
 ## AI Agent Guidelines
 
