@@ -3,5 +3,10 @@ packages:
 
 catalogs:
   runtime:
-    'execa': '^9.6.0'
-    'zod': '^4.1.12'
+    execa: ^9.6.0
+    zod: ^4.1.12
+  build:
+    tsdown: ^0.18.0
+
+onlyBuiltDependencies:
+  - esbuild

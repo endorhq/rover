@@ -2,8 +2,8 @@
   "name": "rover-core",
   "version": "1.0.0",
   "description": "Provide common logic for the CLI and the VSCode extension",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "dist/index.mjs",
+  "types": "dist/index.d.mts",
   "type": "module",
   "files": [
     "LICENSE.md",
@@ -34,10 +34,9 @@
   },
   "devDependencies": {
     "@types/node": "^24.1.0",
-    "@types/react": "^19.1.8",
     "@types/uuid": "^10.0.0",
     "@vitest/ui": "^2.1.8",
-    "tsdown": "^0.13.0",
+    "tsdown": "catalog:build",
     "typescript": "^5.8.3",
     "vitest": "^2.1.8"
   }
