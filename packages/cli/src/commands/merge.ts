@@ -18,6 +18,7 @@ import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
 import { CLIJsonOutput } from '../types.js';
 import { isJsonMode, setJsonMode } from '../lib/global-state.js';
 import { findProjectRoot } from 'rover-core';
+import { isRoverInitialized } from '../utils/repo-checks.js';
 
 const { prompt } = enquirer;
 
@@ -234,6 +235,16 @@ export const mergeCommand = async (
   if (!git.isGitRepo()) {
     jsonOutput.error = 'No worktree found for this task';
     await exitWithError(jsonOutput, { telemetry });
+    return;
+  }
+
+  // Check if rover is initialized
+  if (!isRoverInitialized()) {
+    jsonOutput.error = 'Rover is not initialized in this directory';
+    await exitWithError(jsonOutput, {
+      tips: ['Run ' + colors.cyan('rover init') + ' first'],
+      telemetry,
+    });
     return;
   }
 

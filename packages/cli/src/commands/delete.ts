@@ -14,6 +14,7 @@ import {
 } from '../utils/exit.js';
 import { CLIJsonOutputWithErrors } from '../types.js';
 import { isJsonMode, setJsonMode } from '../lib/global-state.js';
+import { isRoverInitialized } from '../utils/repo-checks.js';
 
 const { prompt } = enquirer;
 
@@ -52,6 +53,13 @@ export const deleteCommand = async (
   }
 
   if (jsonOutput.errors.length > 0) {
+    await exitWithErrors(jsonOutput, { telemetry });
+    return;
+  }
+
+  // Check if rover is initialized
+  if (!isRoverInitialized()) {
+    jsonOutput.errors?.push('Rover is not initialized in this directory');
     await exitWithErrors(jsonOutput, { telemetry });
     return;
   }
