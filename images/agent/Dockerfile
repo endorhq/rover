@@ -3,9 +3,12 @@ FROM node:24-alpine AS agent-builder
 COPY . /app
 WORKDIR /app
 
+# Load corepack
+RUN corepack enable pnpm
+
 # Build the agent
-RUN npm install && npm run build:agent
-RUN cd ./packages/agent && npm pack && mv *.tgz /rover-agent.tgz
+RUN pnpm install && pnpm build-libs && pnpm --filter @endorhq/agent build
+RUN cd ./packages/agent && pnpm pack && mv *.tgz /rover-agent.tgz
 
 FROM node:24-alpine
 ARG NIX_AI_TOOLS_REV
