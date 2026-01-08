@@ -1,7 +1,6 @@
 import { defineConfig } from 'tsdown';
 import path from 'path';
-
-const isProd = process.env.TSUP_DEV !== 'true';
+import { createConfig, isProd } from '../../tsdown.config.js';
 
 // For dev builds, resolve workspace packages to their TypeScript source
 // This ensures source maps point to original .ts files, not compiled dist
@@ -22,23 +21,16 @@ if (!isProd) {
   };
 }
 
-export default defineConfig({
-  format: ['esm'],
-  entry: entryPoints,
-  outDir: './dist',
-  dts: false,
-  shims: true,
-  clean: true,
-  target: 'node20',
-  platform: 'node',
-  minify: isProd,
-  sourcemap: !isProd,
-  // Resolve to TypeScript source for proper source maps in dev
-  alias: devAliases,
-  loader: {
-    '.md': 'text',
-    '.yml': 'asset',
-    '.yaml': 'asset',
-    '.sh': 'text',
-  },
-});
+export default defineConfig(
+  createConfig({
+    entry: entryPoints,
+    dts: false,
+    alias: devAliases,
+    loader: {
+      '.md': 'text',
+      '.yml': 'asset',
+      '.yaml': 'asset',
+      '.sh': 'text',
+    },
+  })
+);
