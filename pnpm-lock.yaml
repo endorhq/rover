@@ -42,6 +42,9 @@ importers:
       '@biomejs/biome':
         specifier: 2.3.11
         version: 2.3.11
+      tsdown:
+        specifier: catalog:build
+        version: 0.18.4(typescript@5.9.3)
 
   packages/agent:
     dependencies:

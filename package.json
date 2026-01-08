@@ -21,6 +21,7 @@
     "lint": "biome lint --write"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.3.11"
+    "@biomejs/biome": "2.3.11",
+    "tsdown": "catalog:build"
   }
 }
