@@ -39,5 +39,5 @@ jobs:
         run: pnpm test
 
       - name: Test Build Artifact
-        run: node dist/index.js --version
+        run: pnpm start --version
         working-directory: packages/cli

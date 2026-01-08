@@ -3,11 +3,11 @@
   "private": true,
   "version": "0.0.0-dev",
   "description": "Provide a library to define and manage AI agent workflows for Rover",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "dist/index.mjs",
+  "types": "dist/index.d.mts",
   "type": "module",
   "bin": {
-    "rover-agent": "dist/cli.js"
+    "rover-agent": "dist/cli.mjs"
   },
   "files": [
     "LICENSE.md",
@@ -18,7 +18,7 @@
     "build-dev": "tsdown --env.TSUP_DEV=true",
     "dev": "TSUP_DEV=true tsdown --env.TSUP_DEV=true --watch src/",
     "format": "prettier --write \"src/**/*.{ts,js,json}\"",
-    "start": "node dist/cli.js",
+    "start": "node --enable-source-maps dist/cli.mjs",
     "clean": "rm -rf dist",
     "check": "tsc --noEmit",
     "test": "vitest run",
@@ -33,14 +33,14 @@
     "commander": "^14.0.0",
     "execa": "catalog:runtime",
     "ora": "^8.2.0",
-    "zod": "^4.1.12"
+    "zod": "catalog:runtime"
   },
   "devDependencies": {
     "rover-core": "workspace:*",
     "rover-schemas": "workspace:*",
     "@types/node": "^24.1.0",
     "@vitest/ui": "^2.1.8",
-    "tsdown": "^0.13.0",
+    "tsdown": "catalog:build",
     "typescript": "^5.8.3",
     "vitest": "^2.1.8"
   }

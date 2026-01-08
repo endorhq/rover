@@ -69,7 +69,7 @@ pnpm check         # TypeScript type checking
 
 - **Entry point**: `src/index.ts` - Sets up the CLI using Commander.js
 - **Commands**: `src/commands/` - Each command is implemented as a separate module
-- **Build output**: `dist/index.js` - Single bundled ES module file
+- **Build output**: `dist/index.mjs` - Single bundled ES module file
 - **Libraries**: `src/lib/` - Core functionality (Git, Docker, AI agents, configs)
 - **Utilities**: `src/utils/` - Helper functions and utilities
 - **Testing**: Uses Vitest with real Git operations and mocked external dependencies
@@ -101,6 +101,48 @@ Key architectural decisions:
 - **Module system**: ES modules with Node.js compatibility
 - **Node version**: Requires Node.js 20+ and pnpm 10+ (see root package.json engines)
 - **Monorepo**: Uses pnpm workspaces for package management
+
+## Build Pipeline
+
+The project uses tsdown for bundling with two distinct build modes controlled by the `TSUP_DEV` environment variable.
+
+### Production Build (`pnpm build`)
+
+- **Minified output** for smaller bundle size
+- **No source maps** generated
+- **Workspace packages kept external** (imported from their `dist/` folders)
+- Used for releases and distribution
+
+### Development Build (`pnpm build-dev` or `pnpm dev`)
+
+- **No minification** for readable stack traces
+- **Source maps enabled** pointing to original TypeScript files
+- **Workspace packages bundled and aliased** to their TypeScript source (`src/index.ts`)
+- Enables full debugging with accurate line numbers across all packages
+
+Key differences in `packages/cli/tsdown.config.ts`:
+
+| Feature     | Production | Development                    |
+| ----------- | ---------- | ------------------------------ |
+| `minify`    | `true`     | `false`                        |
+| `sourcemap` | `false`    | `true`                         |
+| `alias`     | `{}`       | Points to workspace `src/*.ts` |
+
+### Running with Source-Mapped Stack Traces
+
+After building in dev mode, use `pnpm start` in the CLI package to run with full source maps:
+
+```bash
+# Build all packages in dev mode
+pnpm build-dev
+
+# Run CLI with source-mapped backtraces (from packages/cli/)
+cd packages/cli
+pnpm start <command>
+
+# Example: run the list command with full TypeScript backtraces
+pnpm start list
+```
 
 ## Testing Philosophy & Guidelines
 
