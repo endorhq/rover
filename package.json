@@ -17,7 +17,8 @@
     "check": "pnpm -r --filter './packages/*' check",
     "e2e-test": "pnpm -r --filter './packages/*' e2e-test",
     "test": "pnpm -r --filter './packages/*' --filter '!./packages/extension' test",
-    "format": "biome format --write"
+    "format": "biome format --write",
+    "lint": "biome lint --write"
   },
   "devDependencies": {
     "@biomejs/biome": "2.3.11"
