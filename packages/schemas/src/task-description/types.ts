@@ -4,6 +4,7 @@
  */
 import { z } from 'zod';
 import { TaskStatusSchema, TaskDescriptionSchema } from './schema.js';
+import { type NetworkConfig } from '../project-config/types.js';
 
 // Infer TaskStatus type from Zod schema
 export type TaskStatus = z.infer<typeof TaskStatusSchema>;
@@ -22,6 +23,7 @@ export interface CreateTaskData {
   agent?: string; // AI agent to use for execution
   agentModel?: string; // AI model to use (e.g., opus, sonnet, flash)
   sourceBranch?: string; // Source branch task was created from
+  networkConfig?: NetworkConfig; // Network filtering config (overrides project config)
 }
 
 // Metadata for status updates
