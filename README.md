@@ -228,6 +228,42 @@ After an AI agent finishes the task, all code changes and output documents are a
 
 Once you are ready, you can merge changes or push the branch. That's it! 🚀
 
+### Task Lifecycle Hooks
+
+Rover supports hooks that run shell commands when task lifecycle events occur. Configure hooks in your `rover.json`:
+
+```json
+{
+  "hooks": {
+    "onComplete": ["./scripts/on-complete.sh"],
+    "onMerge": ["./scripts/on-merge.sh"],
+    "onPush": ["echo 'Task $ROVER_TASK_ID pushed'"]
+  }
+}
+```
+
+**Available hooks:**
+- `onComplete` - Runs when a task completes (success or failure), detected via `rover list` or `rover list --watch`
+- `onMerge` - Runs after a task is successfully merged via `rover merge`
+- `onPush` - Runs after a task branch is pushed via `rover push`
+
+**Environment variables** passed to hook commands:
+| Variable | Description |
+|----------|-------------|
+| `ROVER_TASK_ID` | The task ID |
+| `ROVER_TASK_BRANCH` | The task branch name |
+| `ROVER_TASK_TITLE` | The task title |
+| `ROVER_TASK_STATUS` | Task status: "completed" or "failed" (onComplete only) |
+
+**Example hook script** (`scripts/on-complete.sh`):
+```bash
+#!/bin/bash
+echo "Task $ROVER_TASK_ID ($ROVER_TASK_TITLE) finished with status: $ROVER_TASK_STATUS"
+# Notify your team, trigger CI, update a dashboard, etc.
+```
+
+Hook failures are logged as warnings but do not block operations.
+
 ### Report Issues
 
 Found a bug or have a feature request? Please [open an issue on GitHub](https://github.com/endorhq/rover/issues). We appreciate detailed bug reports and thoughtful feature suggestions.
