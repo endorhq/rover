@@ -1,20 +1,20 @@
 import colors from 'ansi-colors';
-import { formatTaskStatus, statusColor } from '../utils/task-status.js';
-import { getTelemetry } from '../lib/telemetry.js';
 import {
-  TaskDescriptionStore,
-  IterationStatusManager,
   IterationManager,
-  VERBOSE,
+  IterationStatusManager,
+  ProjectConfigManager,
   showTips,
   Table,
   TableColumn,
+  TaskDescriptionStore,
   UserSettingsManager,
-  ProjectConfigManager,
+  VERBOSE,
 } from 'rover-core';
-import { isJsonMode, setJsonMode } from '../lib/global-state.js';
 import { type TaskDescription } from 'rover-schemas';
+import { isJsonMode, setJsonMode } from '../lib/global-state.js';
 import { executeHooks } from '../lib/hooks.js';
+import { getTelemetry } from '../lib/telemetry.js';
+import { formatTaskStatus, statusColor } from '../utils/task-status.js';
 
 /**
  * Track previous task statuses to detect transitions for onComplete hooks.
