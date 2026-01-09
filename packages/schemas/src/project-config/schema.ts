@@ -61,6 +61,35 @@ export const PackageManagerSchema = z.enum([
 export const TaskManagerSchema = z.enum(['just', 'make', 'task']);
 
 /**
+ * Network filtering mode
+ */
+export const NetworkModeSchema = z.enum(['allowlist', 'blocklist', 'none']);
+
+/**
+ * Network rule entry - can be domain name, IP, or CIDR
+ */
+export const NetworkRuleSchema = z.object({
+  /** Host pattern: domain name, IP address, or CIDR notation */
+  host: z.string(),
+  /** Optional description for documentation */
+  description: z.string().optional(),
+});
+
+/**
+ * Network filtering configuration for container sandboxes
+ */
+export const NetworkConfigSchema = z.object({
+  /** Filtering mode: allowlist (deny all except), blocklist (allow all except), or none */
+  mode: NetworkModeSchema.default('none'),
+  /** List of network rules (domains, IPs, or CIDRs) */
+  rules: z.array(NetworkRuleSchema).default([]),
+  /** Allow DNS resolution (always recommended, defaults to true) */
+  allowDns: z.boolean().default(true),
+  /** Allow localhost/loopback traffic (defaults to true for MCP servers) */
+  allowLocalhost: z.boolean().default(true),
+});
+
+/**
  * Sandbox configuration for custom agent images and initialization
  */
 export const SandboxConfigSchema = z.object({
@@ -70,6 +99,8 @@ export const SandboxConfigSchema = z.object({
   initScript: z.string().optional(),
   /** Extra arguments to pass to the Docker/Podman container */
   extraArgs: z.union([z.string(), z.array(z.string())]).optional(),
+  /** Network filtering configuration */
+  network: NetworkConfigSchema.optional(),
 });
 
 /**

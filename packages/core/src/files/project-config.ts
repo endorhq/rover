@@ -18,6 +18,7 @@ import {
   type PackageManager,
   type TaskManager,
   type HooksConfig,
+  type NetworkConfig,
 } from 'rover-schemas';
 import { findProjectRoot } from '../project-root.js';
 
@@ -207,6 +208,9 @@ export class ProjectConfigManager {
   }
   get hooks(): HooksConfig | undefined {
     return this.data.hooks;
+  }
+  get network(): NetworkConfig | undefined {
+    return this.data.sandbox?.network;
   }
 
   // Data Modification (Setters)
