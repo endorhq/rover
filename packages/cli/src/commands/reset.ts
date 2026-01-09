@@ -7,6 +7,7 @@ import yoctoSpinner from 'yocto-spinner';
 import { TaskDescriptionManager } from 'rover-core';
 import { TaskNotFoundError } from 'rover-schemas';
 import { getTelemetry } from '../lib/telemetry.js';
+import { exitWithError, exitWithWarn, exitWithSuccess } from '../utils/exit.js';
 
 const { prompt } = enquirer;
 
@@ -18,7 +19,13 @@ export const resetCommand = async (
   // Convert string taskId to number
   const numericTaskId = parseInt(taskId, 10);
   if (isNaN(numericTaskId)) {
-    console.log(colors.red(`✗ Invalid task ID '${taskId}' - must be a number`));
+    await exitWithError(
+      {
+        success: false,
+        error: `Invalid task ID '${taskId}' - must be a number`,
+      },
+      { telemetry }
+    );
     return;
   }
 
@@ -62,7 +69,11 @@ export const resetCommand = async (
       });
 
       if (!confirm) {
-        console.log(colors.yellow('\n⚠ Task reset cancelled'));
+        await exitWithWarn(
+          'Task reset cancelled',
+          { success: true },
+          { telemetry }
+        );
         return;
       }
     }
@@ -134,13 +145,24 @@ export const resetCommand = async (
     console.log(colors.gray('  Status: ') + colors.cyan('NEW'));
     console.log(colors.gray('  All execution metadata cleared'));
     console.log(colors.gray('  Workspace and branch removed'));
+
+    await exitWithSuccess(
+      'Task has been reset to original state',
+      { success: true },
+      { telemetry }
+    );
+    return;
   } catch (error) {
     if (error instanceof TaskNotFoundError) {
-      console.log(colors.red(`✗ ${error.message}`));
+      await exitWithError(
+        { success: false, error: error.message },
+        { telemetry }
+      );
     } else {
-      console.error(colors.red('Error resetting task:'), error);
+      await exitWithError(
+        { success: false, error: `Error resetting task: ${error}` },
+        { telemetry }
+      );
     }
-  } finally {
-    await telemetry?.shutdown();
   }
 };
