@@ -23,6 +23,7 @@ import entrypointScript from './entrypoint.sh';
 import pupa from 'pupa';
 import { fileURLToPath } from 'node:url';
 import type { SandboxPackage } from './sandbox/types.js';
+import { mergeNetworkConfig, generateNetworkScript } from './network-config.js';
 
 // Language packages
 import { JavaScriptSandboxPackage } from './sandbox/languages/javascript.js';
@@ -312,6 +313,13 @@ fi
 `;
     }
 
+    // Generate network filtering configuration
+    const effectiveNetworkConfig = mergeNetworkConfig(
+      this.projectConfig.network,
+      this.task.networkConfig
+    );
+    const networkConfigSection = generateNetworkScript(effectiveNetworkConfig);
+
     // Generate template variables for task-related sections
     const validateTaskFileFunction = includeTaskSetup
       ? `
@@ -372,6 +380,7 @@ echo "======================================="
       recoverPermissions,
       installAllPackages,
       initScriptExecution,
+      networkConfigSection,
       validateTaskFileFunction,
       validateTaskFileCall,
       taskDataSection,
