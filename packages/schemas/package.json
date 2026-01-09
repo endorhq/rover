@@ -8,8 +8,8 @@
   "type": "module",
   "files": ["LICENSE.md", "dist/*"],
   "scripts": {
-    "build": "tsdown --env.TSUP_DEV=false src/index.ts",
-    "build-dev": "tsdown --env.TSUP_DEV=true src/index.ts",
+    "build": "tsdown --env.TSUP_DEV=false --config-loader unrun src/index.ts",
+    "build-dev": "tsdown --env.TSUP_DEV=true --config-loader unrun src/index.ts",
     "dev": "TSUP_DEV=true tsdown --env.TSUP_DEV=true --watch src/ src/index.ts",
     "start": "echo 'Schemas package is not a CLI'",
     "clean": "rm -rf dist",
@@ -24,10 +24,10 @@
     "zod": "catalog:runtime"
   },
   "devDependencies": {
-    "@types/node": "^24.1.0",
-    "@vitest/ui": "^2.1.8",
+    "@types/node": "catalog:build",
+    "@vitest/ui": "catalog:build",
     "tsdown": "catalog:build",
-    "typescript": "^5.8.3",
-    "vitest": "^2.1.8"
+    "typescript": "catalog:build",
+    "vitest": "catalog:build"
   }
 }

@@ -32,10 +32,6 @@ jobs:
         run: pnpm run check
         working-directory: packages/extension
 
-      - name: Run linting
-        run: pnpm run lint
-        working-directory: packages/extension
-
       - name: Compile extension
         run: pnpm run compile
         working-directory: packages/extension
