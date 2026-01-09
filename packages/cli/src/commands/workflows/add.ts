@@ -26,7 +26,7 @@ interface AddWorkflowOutput extends CLIJsonOutput {
   workflow?: {
     name: string;
     path: string;
-    store: 'local' | 'central';
+    store: 'local' | 'global';
   };
 }
 
@@ -82,7 +82,7 @@ export const addWorkflowCommand = async (
     output.workflow = {
       name: result.name,
       path: result.path,
-      store: result.isLocal ? 'local' : 'central',
+      store: result.isLocal ? 'local' : 'global',
     };
 
     if (isJsonMode()) {
@@ -91,7 +91,7 @@ export const addWorkflowCommand = async (
       // Format human-readable output
       const storeType = result.isLocal
         ? colors.cyan('local')
-        : colors.cyan('central');
+        : colors.cyan('global');
       const workflowName = colors.bold(result.name);
       const storePath = colors.gray(result.path);
 

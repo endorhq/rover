@@ -1,5 +1,5 @@
 /**
- * Load workflows from folders. It acts as a central place to gather all
+ * Load workflows from folders. It acts as a global place to gather all
  * available workflows for the current context. It might use different folders
  * or even include individual workflow files.
  */
