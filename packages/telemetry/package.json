@@ -1,9 +1,10 @@
 {
   "name": "rover-telemetry",
   "version": "1.0.0",
+  "private": true,
   "description": "Provide basic telemetry to the rover CLI and extension",
   "main": "dist/index.mjs",
-  "types": "dist/index.d.mts",
+  "types": "src/index.ts",
   "type": "module",
   "files": ["LICENSE.md", "dist/*"],
   "scripts": {

@@ -4,7 +4,7 @@
   "private": true,
   "description": "Define project file schemas and utilities to manage them",
   "main": "dist/index.mjs",
-  "types": "dist/index.d.mts",
+  "types": "src/index.ts",
   "type": "module",
   "files": ["LICENSE.md", "dist/*"],
   "scripts": {
