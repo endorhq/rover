@@ -17,6 +17,7 @@ import { readFromStdin, stdinIsAvailable } from '../utils/stdin.js';
 import { CLIJsonOutput } from '../types.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
 import { isJsonMode } from '../lib/global-state.js';
+import { isRoverInitialized } from '../utils/repo-checks.js';
 
 const { prompt } = enquirer;
 
@@ -102,6 +103,13 @@ export const iterateCommand = async (
   }
 
   result.taskId = numericTaskId;
+
+  // Check if rover is initialized
+  if (!isRoverInitialized()) {
+    result.error = 'Rover is not initialized in this directory';
+    exitWithError(result, { telemetry });
+    return;
+  }
 
   // Load the task first.
   let task: TaskDescriptionManager;

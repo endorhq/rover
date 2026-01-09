@@ -18,6 +18,7 @@ import { isJsonMode, setJsonMode } from '../lib/global-state.js';
 import yoctoSpinner from 'yocto-spinner';
 import { copyEnvironmentFiles } from '../utils/env-files.js';
 import { findProjectRoot } from 'rover-core';
+import { isRoverInitialized } from '../utils/repo-checks.js';
 
 /**
  * Interface for JSON output
@@ -53,6 +54,16 @@ export const restartCommand = async (
   if (isNaN(numericTaskId)) {
     jsonOutput.error = `Invalid task ID '${taskId}' - must be a number`;
     await exitWithError(jsonOutput, { telemetry });
+    return;
+  }
+
+  // Check if rover is initialized
+  if (!isRoverInitialized()) {
+    jsonOutput.error = 'Rover is not initialized in this directory';
+    await exitWithError(jsonOutput, {
+      tips: ['Run ' + colors.cyan('rover init') + ' first'],
+      telemetry,
+    });
     return;
   }
 
