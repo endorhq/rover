@@ -1,6 +1,6 @@
 import { isAbsolute, join, resolve } from 'node:path';
 import { getDataDir } from '../paths.js';
-import { existsSync, mkdirSync, rmdirSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import { GlobalProject } from 'rover-schemas';
 import { createHash } from 'node:crypto';
 import { detectEnvironment } from './environment.js';
@@ -217,7 +217,7 @@ export class ProjectManager {
       return;
     }
 
-    rmdirSync(join(this.projectsPath, id), { recursive: true });
+    rmSync(join(this.projectsPath, id), { recursive: true });
   }
 
   /**
