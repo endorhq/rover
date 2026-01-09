@@ -13,6 +13,7 @@ import {
   warnIfCustomImage,
   tmpUserGroupFiles,
 } from './container-common.js';
+import { mergeNetworkConfig } from '../network-config.js';
 import { isJsonMode } from '../global-state.js';
 import colors from 'ansi-colors';
 
@@ -93,6 +94,15 @@ export class PodmanSandbox extends Sandbox {
       agentImage,
       userInfo_
     );
+
+    // Add NET_ADMIN capability if network filtering is configured
+    const effectiveNetworkConfig = mergeNetworkConfig(
+      projectConfig.network,
+      this.task.networkConfig
+    );
+    if (effectiveNetworkConfig && effectiveNetworkConfig.mode !== 'none') {
+      podmanArgs.push('--cap-add=NET_ADMIN');
+    }
 
     podmanArgs.push(
       '-v',
@@ -252,6 +262,18 @@ export class PodmanSandbox extends Sandbox {
       agentImage,
       userInfo_
     );
+
+    // Add NET_ADMIN capability if network filtering is configured
+    const effectiveNetworkConfigInteractive = mergeNetworkConfig(
+      projectConfig.network,
+      this.task.networkConfig
+    );
+    if (
+      effectiveNetworkConfigInteractive &&
+      effectiveNetworkConfigInteractive.mode !== 'none'
+    ) {
+      podmanArgs.push('--cap-add=NET_ADMIN');
+    }
 
     podmanArgs.push(
       '-v',
