@@ -15,12 +15,52 @@ import {
 } from './container-common.js';
 import { isJsonMode } from '../global-state.js';
 import colors from 'ansi-colors';
+import {
+  loadSandboxConfig,
+  isGVisorAvailable,
+  getResourceLimitArgs,
+  getNetworkArgs,
+  getGVisorRuntimeArgs,
+  type SandboxConfig,
+} from './config.js';
 
 export class DockerSandbox extends Sandbox {
   backend = ContainerBackend.Docker;
+  protected sandboxConfig: SandboxConfig;
+  protected useGVisor: boolean = false;
 
   constructor(task: TaskDescriptionManager, processManager?: ProcessManager) {
     super(task, processManager);
+    this.sandboxConfig = loadSandboxConfig();
+  }
+
+  /**
+   * Initialize gVisor support if available and configured.
+   * Call this before creating containers to enable enhanced security.
+   */
+  async initializeGVisor(): Promise<boolean> {
+    if (
+      this.sandboxConfig.securityLevel === 'enhanced' ||
+      this.sandboxConfig.forceBackend === 'gvisor'
+    ) {
+      this.useGVisor = await isGVisorAvailable();
+      if (!this.useGVisor && this.sandboxConfig.forceBackend === 'gvisor') {
+        throw new Error(
+          'gVisor (runsc) runtime not available. Install gVisor or use a different backend.'
+        );
+      }
+    }
+    return this.useGVisor;
+  }
+
+  /**
+   * Get the effective security level being used.
+   */
+  getEffectiveSecurityLevel(): string {
+    if (this.useGVisor) {
+      return 'enhanced (gVisor)';
+    }
+    return 'standard (Docker)';
   }
 
   async isBackendAvailable(): Promise<boolean> {
@@ -56,13 +96,21 @@ export class DockerSandbox extends Sandbox {
       );
     }
 
+    // Initialize gVisor if configured (must be done before generating entrypoint)
+    await this.initializeGVisor();
+
     // Generate setup script using SetupBuilder
     const setupBuilder = new SetupBuilder(
       this.task,
       this.task.agent!,
       projectConfig
     );
-    const entrypointScriptPath = setupBuilder.generateEntrypoint();
+    // Pass useGVisor flag to generate the appropriate entrypoint (no sudo for gVisor)
+    const entrypointScriptPath = setupBuilder.generateEntrypoint(
+      true,
+      'entrypoint.sh',
+      this.useGVisor
+    );
     const inputsPath = setupBuilder.generateInputs();
     const workflowPath = setupBuilder.saveWorkflow(this.task.workflowName);
     const preContextPaths = setupBuilder.generatePreContextFiles();
@@ -83,6 +131,15 @@ export class DockerSandbox extends Sandbox {
     }
 
     const dockerArgs = ['create', '--name', this.sandboxName];
+
+    // Add gVisor runtime if enabled
+    dockerArgs.push(...getGVisorRuntimeArgs(this.useGVisor));
+
+    // Add network isolation
+    dockerArgs.push(...getNetworkArgs(this.sandboxConfig.networkMode));
+
+    // Add resource limits
+    dockerArgs.push(...getResourceLimitArgs(this.sandboxConfig.resources));
 
     const userInfo_ = userInfo();
 
@@ -235,6 +292,9 @@ export class DockerSandbox extends Sandbox {
       );
     }
 
+    // Initialize gVisor if configured (must be done before generating entrypoint)
+    await this.initializeGVisor();
+
     // Generate setup script using SetupBuilder
     const setupBuilder = new SetupBuilder(
       this.task,
@@ -243,7 +303,8 @@ export class DockerSandbox extends Sandbox {
     );
     const entrypointScriptPath = setupBuilder.generateEntrypoint(
       false,
-      'entrypoint-iterate.sh'
+      'entrypoint-iterate.sh',
+      this.useGVisor
     );
     const preContextPaths = setupBuilder.generatePreContextFiles();
 
@@ -257,6 +318,15 @@ export class DockerSandbox extends Sandbox {
 
     const interactiveName = `${this.sandboxName}-i`;
     const dockerArgs = ['run', '--name', interactiveName, '-it', '--rm'];
+
+    // Add gVisor runtime if enabled
+    dockerArgs.push(...getGVisorRuntimeArgs(this.useGVisor));
+
+    // Add network isolation
+    dockerArgs.push(...getNetworkArgs(this.sandboxConfig.networkMode));
+
+    // Add resource limits
+    dockerArgs.push(...getResourceLimitArgs(this.sandboxConfig.resources));
 
     const userInfo_ = userInfo();
 
