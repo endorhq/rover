@@ -78,5 +78,7 @@ export {
   TaskDescriptionManager,
   UserSettingsManager,
   WorkflowStore,
+  WorkflowSource,
   WorkflowManager,
+  type WorkflowEntry,
 } from './files/index.js';

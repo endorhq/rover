@@ -51,6 +51,9 @@ describe('logs command', () => {
   let originalCwd: string;
 
   beforeEach(async () => {
+    // Clear project root cache to ensure tests use the correct directory
+    clearProjectRootCache();
+
     // Create temp directory with git repo
     testDir = mkdtempSync(join(tmpdir(), 'rover-logs-test-'));
     originalCwd = process.cwd();
@@ -74,6 +77,19 @@ describe('logs command', () => {
 
     // Create .rover directory structure
     mkdirSync('.rover/tasks', { recursive: true });
+
+    // Create rover.json to indicate this is a Rover project
+    writeFileSync(
+      'rover.json',
+      JSON.stringify({
+        version: '1.2',
+        languages: [],
+        mcps: [],
+        packageManagers: [],
+        taskManagers: [],
+        attribution: true,
+      })
+    );
   });
 
   afterEach(() => {

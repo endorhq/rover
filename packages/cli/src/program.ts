@@ -32,6 +32,10 @@ import {
 import { addWorkflowCommands } from './commands/workflows/index.js';
 import { setJsonMode, isJsonMode } from './lib/global-state.js';
 
+function isWorkflowsToplevelCommand(command: Command): boolean {
+  return command.parent?.name() === 'workflows';
+}
+
 export function createProgram(
   options: { excludeRuntimeHooks?: boolean } = {}
 ): Command {
@@ -49,7 +53,9 @@ export function createProgram(
       })
       .hook('preAction', (_thisCommand, actionCommand) => {
         const commandName = actionCommand.name();
+
         if (
+          !isWorkflowsToplevelCommand(actionCommand) &&
           !['init', 'mcp'].includes(commandName) &&
           !ProjectConfigManager.exists()
         ) {
@@ -75,51 +81,54 @@ export function createProgram(
         }
       })
       .hook('preAction', (_thisCommand, actionCommand) => {
-        const git = new Git();
-        try {
-          git.version();
-        } catch (error) {
-          exitWithError(
-            {
-              error: 'Git is not installed',
-              success: false,
-            },
-            {
-              tips: ['Install git and try again'],
-            }
-          );
-        }
-        if (!git.isGitRepo()) {
-          exitWithError(
-            {
-              error: 'Not in a git repository',
-              success: false,
-            },
-            {
-              tips: [
-                'Rover requires the project to be in a git repository. You can initialize a git repository by running ' +
-                  colors.cyan('git init'),
-              ],
-            }
-          );
-        }
-        if (!git.hasCommits()) {
-          exitWithError(
-            {
-              error: 'No commits found in git repository',
-              success: false,
-            },
-            {
-              tips: [
-                'Git worktree requires at least one commit in the repository in order to have common history',
-              ],
-            }
-          );
+        if (!isWorkflowsToplevelCommand(actionCommand)) {
+          const git = new Git();
+          try {
+            git.version();
+          } catch (error) {
+            exitWithError(
+              {
+                error: 'Git is not installed',
+                success: false,
+              },
+              {
+                tips: ['Install git and try again'],
+              }
+            );
+          }
+          if (!git.isGitRepo()) {
+            exitWithError(
+              {
+                error: 'Not in a git repository',
+                success: false,
+              },
+              {
+                tips: [
+                  'Rover requires the project to be in a git repository. You can initialize a git repository by running ' +
+                    colors.cyan('git init'),
+                ],
+              }
+            );
+          }
+          if (!git.hasCommits()) {
+            exitWithError(
+              {
+                error: 'No commits found in git repository',
+                success: false,
+              },
+              {
+                tips: [
+                  'Git worktree requires at least one commit in the repository in order to have common history',
+                ],
+              }
+            );
+          }
         }
       })
       .hook('preAction', (thisCommand, actionCommand) => {
         const commandName = actionCommand.name();
         if (
+          !isWorkflowsToplevelCommand(actionCommand) &&
           !['init', 'mcp'].includes(commandName) &&
           ProjectConfigManager.exists() &&
           !UserSettingsManager.exists()
@@ -156,7 +165,10 @@ export function createProgram(
           return;
         }
 
-        if (['init', 'task'].includes(commandName)) {
+        if (
+          !isWorkflowsToplevelCommand(actionCommand) &&
+          ['init', 'task'].includes(commandName)
+        ) {
           showSplashHeader();
         } else if (commandName !== 'mcp') {
           showRegularHeader(version, process.cwd());

@@ -21,7 +21,7 @@ export const addWorkflowCommands = (program: Command) => {
   command
     .command('inspect <workflow-source>')
     .description(
-      'Display detailed information about a specific workflow (name, URL, or file path)'
+      'Display detailed information about a specific workflow (name, URL, file path, or stdin with "-")'
     )
     .option('--json', 'Output workflow details in JSON format', false)
     .option('--raw', 'Output workflow as raw YAML', false)
