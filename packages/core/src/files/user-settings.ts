@@ -118,6 +118,7 @@ export class UserSettingsManager {
       aiAgents: data.aiAgents || [AI_AGENT.Claude],
       defaults: {
         aiAgent: data.defaults?.aiAgent || AI_AGENT.Claude,
+        models: data.defaults?.models,
       },
     };
 
@@ -170,6 +171,13 @@ export class UserSettingsManager {
     return this.data.defaults.watchIntervalSeconds ?? 3;
   }
 
+  /**
+   * Get the default model for a specific agent
+   */
+  getDefaultModel(agent: AI_AGENT): string | undefined {
+    return this.data.defaults.models?.[agent];
+  }
+
   // Data Modification (Setters)
   /**
    * Set the default AI agent
@@ -182,6 +190,27 @@ export class UserSettingsManager {
       this.data.aiAgents.push(agent);
     }
     this.save();
+  }
+
+  /**
+   * Set the default model for a specific agent
+   */
+  setDefaultModel(agent: AI_AGENT, model: string): void {
+    this.data.defaults.models = {
+      ...this.data.defaults.models,
+      [agent]: model,
+    } as Record<AI_AGENT, string>;
+    this.save();
+  }
+
+  /**
+   * Remove the default model for a specific agent
+   */
+  removeDefaultModel(agent: AI_AGENT): void {
+    if (this.data.defaults.models?.[agent]) {
+      delete this.data.defaults.models[agent];
+      this.save();
+    }
   }
 
   /**
