@@ -30,8 +30,8 @@
   },
   "files": ["README.md", "LICENSE.md", "dist/*"],
   "scripts": {
-    "build": "tsdown",
-    "build-dev": "TSUP_DEV=true tsdown",
+    "build": "tsdown --config-loader unrun",
+    "build-dev": "TSUP_DEV=true tsdown --config-loader unrun",
     "dev": "TSUP_DEV=true tsdown --watch src/",
     "start": "node --enable-source-maps dist/index.mjs",
     "clean": "rm -rf dist",

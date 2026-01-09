@@ -7,8 +7,8 @@
   "type": "module",
   "files": ["LICENSE.md", "dist/*"],
   "scripts": {
-    "build": "tsdown --env.TSUP_DEV=false",
-    "build-dev": "TSUP_DEV=true tsdown --env.TSUP_DEV=true",
+    "build": "tsdown --config-loader unrun --env.TSUP_DEV=false",
+    "build-dev": "TSUP_DEV=true tsdown --config-loader unrun --env.TSUP_DEV=true",
     "dev": "TSUP_DEV=true tsdown --env.TSUP_DEV=true --watch src/",
     "start": "echo 'Telemetry package is not a CLI'",
     "clean": "rm -rf dist",

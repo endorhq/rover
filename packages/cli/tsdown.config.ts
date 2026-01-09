@@ -1,12 +1,12 @@
-import { defineConfig } from 'tsdown';
 import path from 'path';
+import { defineConfig } from 'tsdown';
 import { createConfig, isProd } from '../../tsdown.config.js';
 
 // For dev builds, resolve workspace packages to their TypeScript source
 // This ensures source maps point to original .ts files, not compiled dist
 // Note: telemetry is excluded because it uses build-time __BUILD_CONFIG__ define
 const devAliases = isProd
-  ? {}
+  ? undefined
   : {
       'rover-core': path.resolve(__dirname, '../core/src/index.ts'),
       'rover-schemas': path.resolve(__dirname, '../schemas/src/index.ts'),

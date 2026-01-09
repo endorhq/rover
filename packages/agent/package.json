@@ -11,8 +11,8 @@
   },
   "files": ["LICENSE.md", "dist/*"],
   "scripts": {
-    "build": "tsdown --env.TSUP_DEV=false",
-    "build-dev": "tsdown --env.TSUP_DEV=true",
+    "build": "tsdown --env.TSUP_DEV=false --config-loader unrun",
+    "build-dev": "tsdown --env.TSUP_DEV=true --config-loader unrun",
     "dev": "TSUP_DEV=true tsdown --env.TSUP_DEV=true --watch src/",
     "start": "node --enable-source-maps dist/cli.mjs",
     "clean": "rm -rf dist",
