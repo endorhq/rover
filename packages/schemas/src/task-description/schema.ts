@@ -64,6 +64,10 @@ export const TaskDescriptionSchema = z.object({
   // Agent Image
   agentImage: z.string().optional(),
 
+  // Container Network Configuration
+  network: z.string().optional(),
+  extraHosts: z.array(z.string()).optional(),
+
   // Metadata
   version: z.string(),
 });

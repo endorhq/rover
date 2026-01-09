@@ -70,6 +70,8 @@ export class TaskDescriptionManager {
       agent: taskData.agent,
       agentModel: taskData.agentModel,
       sourceBranch: taskData.sourceBranch,
+      network: taskData.network,
+      extraHosts: taskData.extraHosts,
       version: CURRENT_TASK_DESCRIPTION_SCHEMA_VERSION,
     };
 
@@ -207,6 +209,10 @@ export class TaskDescriptionManager {
 
     // Preserve agentImage field
     migrated.agentImage = data.agentImage;
+
+    // Preserve network configuration fields
+    migrated.network = data.network;
+    migrated.extraHosts = data.extraHosts;
 
     return migrated as TaskDescription;
   }
@@ -646,6 +652,12 @@ export class TaskDescriptionManager {
   }
   get agentImage(): string | undefined {
     return this.data.agentImage;
+  }
+  get network(): string | undefined {
+    return this.data.network;
+  }
+  get extraHosts(): string[] | undefined {
+    return this.data.extraHosts;
   }
 
   // Data Modification (Setters)
