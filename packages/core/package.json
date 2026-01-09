@@ -1,9 +1,10 @@
 {
   "name": "rover-core",
   "version": "1.0.0",
+  "private": true,
   "description": "Provide common logic for the CLI and the VSCode extension",
   "main": "dist/index.mjs",
-  "types": "dist/index.d.mts",
+  "types": "src/index.ts",
   "type": "module",
   "files": ["LICENSE.md", "dist/*"],
   "scripts": {
