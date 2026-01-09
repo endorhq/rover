@@ -206,6 +206,8 @@ interface TaskOptions {
   agent?: string[];
   json?: boolean;
   debug?: boolean;
+  network?: string;
+  addHost?: string[];
 }
 
 /**
@@ -220,7 +222,9 @@ const createTaskForAgent = async (
   workflowName: string,
   baseBranch: string,
   git: Git,
-  jsonMode: boolean
+  jsonMode: boolean,
+  network?: string,
+  extraHosts?: string[]
 ): Promise<{
   taskId: number;
   title: string;
@@ -288,6 +292,8 @@ const createTaskForAgent = async (
     agent: selectedAiAgent,
     agentModel: selectedModel,
     sourceBranch: sourceBranch,
+    network: network,
+    extraHosts: extraHosts,
   });
 
   // Setup git worktree and branch
@@ -808,7 +814,9 @@ export const taskCommand = async (
         workflowName,
         baseBranch!,
         git,
-        json || false
+        json || false,
+        options.network,
+        options.addHost
       );
 
       if (taskResult) {

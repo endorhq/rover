@@ -81,6 +81,21 @@ export class PodmanSandbox extends Sandbox {
 
     const podmanArgs = ['create', '--name', this.sandboxName];
 
+    // Add network configuration if specified (from task or project config)
+    const network = this.task.network || projectConfig.sandbox?.network;
+    if (network) {
+      podmanArgs.push('--network', network);
+    }
+
+    // Add extra host mappings if specified (from task or project config)
+    const extraHosts =
+      this.task.extraHosts || projectConfig.sandbox?.extraHosts;
+    if (extraHosts && extraHosts.length > 0) {
+      for (const hostMapping of extraHosts) {
+        podmanArgs.push('--add-host', hostMapping);
+      }
+    }
+
     const userInfo_ = userInfo();
 
     // Resolve the agent image from env var, stored task image, config, or default
@@ -239,6 +254,21 @@ export class PodmanSandbox extends Sandbox {
 
     const interactiveName = `${this.sandboxName}-i`;
     const podmanArgs = ['run', '--name', interactiveName, '-it', '--rm'];
+
+    // Add network configuration if specified (from task or project config)
+    const network = this.task.network || projectConfig.sandbox?.network;
+    if (network) {
+      podmanArgs.push('--network', network);
+    }
+
+    // Add extra host mappings if specified (from task or project config)
+    const extraHosts =
+      this.task.extraHosts || projectConfig.sandbox?.extraHosts;
+    if (extraHosts && extraHosts.length > 0) {
+      for (const hostMapping of extraHosts) {
+        podmanArgs.push('--add-host', hostMapping);
+      }
+    }
 
     const userInfo_ = userInfo();
 

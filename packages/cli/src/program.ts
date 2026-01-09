@@ -234,6 +234,11 @@ export function createProgram(
     )
     .option('--json', 'Output the result in JSON format')
     .option('--debug', 'Show debug information like running commands')
+    .option('--network <network>', 'Docker network to connect the container to')
+    .option(
+      '--add-host <mapping...>',
+      'Add host-to-IP mapping (can be used multiple times, e.g., host.docker.internal:host-gateway)'
+    )
     .argument(
       '[description]',
       'The task description, or provide it later. Mandatory in non-interactive environments'

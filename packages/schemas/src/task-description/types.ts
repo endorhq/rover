@@ -22,6 +22,8 @@ export interface CreateTaskData {
   agent?: string; // AI agent to use for execution
   agentModel?: string; // AI model to use (e.g., opus, sonnet, flash)
   sourceBranch?: string; // Source branch task was created from
+  network?: string; // Docker network to connect the container to
+  extraHosts?: string[]; // Extra host-to-IP mappings for the container
 }
 
 // Metadata for status updates

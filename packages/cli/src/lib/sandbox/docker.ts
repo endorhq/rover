@@ -84,6 +84,21 @@ export class DockerSandbox extends Sandbox {
 
     const dockerArgs = ['create', '--name', this.sandboxName];
 
+    // Add network configuration if specified (from task or project config)
+    const network = this.task.network || projectConfig.sandbox?.network;
+    if (network) {
+      dockerArgs.push('--network', network);
+    }
+
+    // Add extra host mappings if specified (from task or project config)
+    const extraHosts =
+      this.task.extraHosts || projectConfig.sandbox?.extraHosts;
+    if (extraHosts && extraHosts.length > 0) {
+      for (const hostMapping of extraHosts) {
+        dockerArgs.push('--add-host', hostMapping);
+      }
+    }
+
     const userInfo_ = userInfo();
 
     // If we cannot retrieve the UID in the current environment,
@@ -257,6 +272,21 @@ export class DockerSandbox extends Sandbox {
 
     const interactiveName = `${this.sandboxName}-i`;
     const dockerArgs = ['run', '--name', interactiveName, '-it', '--rm'];
+
+    // Add network configuration if specified (from task or project config)
+    const network = this.task.network || projectConfig.sandbox?.network;
+    if (network) {
+      dockerArgs.push('--network', network);
+    }
+
+    // Add extra host mappings if specified (from task or project config)
+    const extraHosts =
+      this.task.extraHosts || projectConfig.sandbox?.extraHosts;
+    if (extraHosts && extraHosts.length > 0) {
+      for (const hostMapping of extraHosts) {
+        dockerArgs.push('--add-host', hostMapping);
+      }
+    }
 
     const userInfo_ = userInfo();
 

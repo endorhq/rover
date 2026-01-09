@@ -68,6 +68,10 @@ export const SandboxConfigSchema = z.object({
   agentImage: z.string().optional(),
   /** Initialization script to run in the container */
   initScript: z.string().optional(),
+  /** Docker network to connect the container to */
+  network: z.string().optional(),
+  /** Extra host-to-IP mappings for the container (e.g., host.docker.internal:host-gateway) */
+  extraHosts: z.array(z.string()).optional(),
 });
 
 /**
