@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { ProjectConfigManager, TaskDescriptionManager } from 'rover-core';
 import { Sandbox } from './types.js';
 import { SetupBuilder } from '../setup.js';
-import { findProjectRoot, launch, ProcessManager, VERBOSE } from 'rover-core';
+import { launch, ProcessManager, VERBOSE } from 'rover-core';
 import { existsSync } from 'node:fs';
 import { userInfo } from 'node:os';
 import { generateRandomId } from '../../utils/branch-name.js';
@@ -15,12 +15,28 @@ import {
 } from './container-common.js';
 import { isJsonMode } from '../global-state.js';
 import colors from 'ansi-colors';
+import {
+  loadSandboxConfig,
+  getResourceLimitArgs,
+  getNetworkArgs,
+  type SandboxConfig,
+} from './config.js';
 
 export class PodmanSandbox extends Sandbox {
   backend = ContainerBackend.Podman;
+  protected sandboxConfig: SandboxConfig;
 
   constructor(task: TaskDescriptionManager, processManager?: ProcessManager) {
     super(task, processManager);
+    this.sandboxConfig = loadSandboxConfig();
+  }
+
+  /**
+   * Get the effective security level being used.
+   * Note: Podman does not support gVisor, so enhanced mode falls back to standard.
+   */
+  getEffectiveSecurityLevel(): string {
+    return 'standard (Podman)';
   }
 
   async isBackendAvailable(): Promise<boolean> {
@@ -80,6 +96,12 @@ export class PodmanSandbox extends Sandbox {
     }
 
     const podmanArgs = ['create', '--name', this.sandboxName];
+
+    // Add network isolation
+    podmanArgs.push(...getNetworkArgs(this.sandboxConfig.networkMode));
+
+    // Add resource limits
+    podmanArgs.push(...getResourceLimitArgs(this.sandboxConfig.resources));
 
     const userInfo_ = userInfo();
 
@@ -239,6 +261,12 @@ export class PodmanSandbox extends Sandbox {
 
     const interactiveName = `${this.sandboxName}-i`;
     const podmanArgs = ['run', '--name', interactiveName, '-it', '--rm'];
+
+    // Add network isolation
+    podmanArgs.push(...getNetworkArgs(this.sandboxConfig.networkMode));
+
+    // Add resource limits
+    podmanArgs.push(...getResourceLimitArgs(this.sandboxConfig.resources));
 
     const userInfo_ = userInfo();
 

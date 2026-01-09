@@ -15,12 +15,52 @@ import {
 } from './container-common.js';
 import { isJsonMode } from '../global-state.js';
 import colors from 'ansi-colors';
+import {
+  loadSandboxConfig,
+  isGVisorAvailable,
+  getResourceLimitArgs,
+  getNetworkArgs,
+  getGVisorRuntimeArgs,
+  type SandboxConfig,
+} from './config.js';
 
 export class DockerSandbox extends Sandbox {
   backend = ContainerBackend.Docker;
+  protected sandboxConfig: SandboxConfig;
+  protected useGVisor: boolean = false;
 
   constructor(task: TaskDescriptionManager, processManager?: ProcessManager) {
     super(task, processManager);
+    this.sandboxConfig = loadSandboxConfig();
+  }
+
+  /**
+   * Initialize gVisor support if available and configured.
+   * Call this before creating containers to enable enhanced security.
+   */
+  async initializeGVisor(): Promise<boolean> {
+    if (
+      this.sandboxConfig.securityLevel === 'enhanced' ||
+      this.sandboxConfig.forceBackend === 'gvisor'
+    ) {
+      this.useGVisor = await isGVisorAvailable();
+      if (!this.useGVisor && this.sandboxConfig.forceBackend === 'gvisor') {
+        throw new Error(
+          'gVisor (runsc) runtime not available. Install gVisor or use a different backend.'
+        );
+      }
+    }
+    return this.useGVisor;
+  }
+
+  /**
+   * Get the effective security level being used.
+   */
+  getEffectiveSecurityLevel(): string {
+    if (this.useGVisor) {
+      return 'enhanced (gVisor)';
+    }
+    return 'standard (Docker)';
   }
 
   async isBackendAvailable(): Promise<boolean> {
@@ -82,7 +122,19 @@ export class DockerSandbox extends Sandbox {
       // Container doesn't exist, which is fine
     }
 
+    // Initialize gVisor if configured
+    await this.initializeGVisor();
+
     const dockerArgs = ['create', '--name', this.sandboxName];
+
+    // Add gVisor runtime if enabled
+    dockerArgs.push(...getGVisorRuntimeArgs(this.useGVisor));
+
+    // Add network isolation
+    dockerArgs.push(...getNetworkArgs(this.sandboxConfig.networkMode));
+
+    // Add resource limits
+    dockerArgs.push(...getResourceLimitArgs(this.sandboxConfig.resources));
 
     const userInfo_ = userInfo();
 
@@ -257,6 +309,18 @@ export class DockerSandbox extends Sandbox {
 
     const interactiveName = `${this.sandboxName}-i`;
     const dockerArgs = ['run', '--name', interactiveName, '-it', '--rm'];
+
+    // Initialize gVisor if configured (for interactive sessions too)
+    await this.initializeGVisor();
+
+    // Add gVisor runtime if enabled
+    dockerArgs.push(...getGVisorRuntimeArgs(this.useGVisor));
+
+    // Add network isolation
+    dockerArgs.push(...getNetworkArgs(this.sandboxConfig.networkMode));
+
+    // Add resource limits
+    dockerArgs.push(...getResourceLimitArgs(this.sandboxConfig.resources));
 
     const userInfo_ = userInfo();
 
