@@ -264,6 +264,45 @@ echo "Task $ROVER_TASK_ID ($ROVER_TASK_TITLE) finished with status: $ROVER_TASK_
 
 Hook failures are logged as warnings but do not block operations.
 
+### Container Networking
+
+By default, Rover task containers run on Docker's default bridge network. If your tasks need to access other Docker containers (databases, APIs, etc.) or host services, you can configure networking options.
+
+#### Command Line Options
+
+```sh
+# Connect to an existing Docker network
+rover task "Add search feature" --network myproject_default
+
+# Add host-to-IP mappings (useful for host.docker.internal on Linux)
+rover task "Fix database connection" --add-host host.docker.internal:host-gateway
+
+# Combine both options
+rover task "Integrate OpenSearch" \
+  --network myproject_default \
+  --add-host host.docker.internal:host-gateway
+```
+
+#### Configuration File
+
+Set default network options in `rover.json`:
+
+```json
+{
+  "sandbox": {
+    "network": "myproject_default",
+    "extraHosts": ["host.docker.internal:host-gateway"]
+  }
+}
+```
+
+Command-line options override config file settings when both are specified.
+
+**Common use cases:**
+- Connect to Docker Compose services by hostname
+- Access databases running in other containers
+- Use `host.docker.internal` to reach services on the host machine (Linux)
+
 ### Report Issues
 
 Found a bug or have a feature request? Please [open an issue on GitHub](https://github.com/endorhq/rover/issues). We appreciate detailed bug reports and thoughtful feature suggestions.
