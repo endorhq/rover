@@ -18,6 +18,7 @@ import {
   tmpUserGroupFiles,
   normalizeExtraArgs,
 } from './container-common.js';
+import { mergeNetworkConfig } from '../network-config.js';
 import { isJsonMode } from '../context.js';
 import colors from 'ansi-colors';
 
@@ -123,6 +124,15 @@ export class DockerSandbox extends Sandbox {
       agentImage,
       userInfo_
     );
+
+    // Add NET_ADMIN capability if network filtering is configured
+    const effectiveNetworkConfig = mergeNetworkConfig(
+      projectConfig.network,
+      this.task.networkConfig
+    );
+    if (effectiveNetworkConfig && effectiveNetworkConfig.mode !== 'none') {
+      dockerArgs.push('--cap-add=NET_ADMIN');
+    }
 
     dockerArgs.push(
       '-v',
@@ -304,6 +314,18 @@ export class DockerSandbox extends Sandbox {
       agentImage,
       userInfo_
     );
+
+    // Add NET_ADMIN capability if network filtering is configured
+    const effectiveNetworkConfigInteractive = mergeNetworkConfig(
+      projectConfig.network,
+      this.task.networkConfig
+    );
+    if (
+      effectiveNetworkConfigInteractive &&
+      effectiveNetworkConfigInteractive.mode !== 'none'
+    ) {
+      dockerArgs.push('--cap-add=NET_ADMIN');
+    }
 
     dockerArgs.push(
       '-v',
