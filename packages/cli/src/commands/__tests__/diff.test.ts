@@ -34,8 +34,14 @@ const consoleSpy = {
 describe('diff command', () => {
   let testDir: string;
   let originalCwd: string;
+  let processExitSpy: any;
 
   beforeEach(() => {
+    // Mock process.exit to prevent test from exiting
+    processExitSpy = vi
+      .spyOn(process, 'exit')
+      .mockImplementation((() => {}) as any);
+
     // Create temp directory with git repo
     testDir = mkdtempSync(join(tmpdir(), 'rover-diff-test-'));
     originalCwd = process.cwd();
@@ -64,6 +70,7 @@ describe('diff command', () => {
   afterEach(() => {
     process.chdir(originalCwd);
     rmSync(testDir, { recursive: true, force: true });
+    processExitSpy.mockRestore();
     vi.clearAllMocks();
   });
 
