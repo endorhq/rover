@@ -71,6 +71,18 @@ export const SandboxConfigSchema = z.object({
 });
 
 /**
+ * Hooks configuration for task lifecycle events
+ */
+export const HooksConfigSchema = z.object({
+  /** Commands to run when a task is merged */
+  onMerge: z.array(z.string()).optional(),
+  /** Commands to run when a task is pushed */
+  onPush: z.array(z.string()).optional(),
+  /** Commands to run when a task completes (success or failure) */
+  onComplete: z.array(z.string()).optional(),
+});
+
+/**
  * Complete project configuration schema
  * Defines the structure of a rover.json file
  */
@@ -93,4 +105,6 @@ export const ProjectConfigSchema = z.object({
   envsFile: z.string().optional(),
   /** Optional sandbox configuration */
   sandbox: SandboxConfigSchema.optional(),
+  /** Optional hooks configuration for task lifecycle events */
+  hooks: HooksConfigSchema.optional(),
 });

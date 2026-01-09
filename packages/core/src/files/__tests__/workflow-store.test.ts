@@ -9,7 +9,11 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { WorkflowStore, WorkflowStoreError } from '../workflow-store.js';
+import {
+  WorkflowStore,
+  WorkflowStoreError,
+  WorkflowSource,
+} from '../workflow-store.js';
 import { WorkflowManager } from '../workflow.js';
 import type { WorkflowAgentStep } from 'rover-schemas';
 import { PROJECT_CONFIG_FILENAME } from 'rover-schemas';
@@ -70,7 +74,7 @@ describe('WorkflowStore', () => {
         []
       );
 
-      store.addWorkflow(workflow);
+      store.addWorkflow(workflow, WorkflowSource.BuiltIn);
 
       const retrieved = store.getWorkflow('test-workflow');
       expect(retrieved).toBeDefined();
@@ -97,8 +101,8 @@ describe('WorkflowStore', () => {
         []
       );
 
-      store.addWorkflow(workflow1);
-      store.addWorkflow(workflow2);
+      store.addWorkflow(workflow1, WorkflowSource.BuiltIn);
+      store.addWorkflow(workflow2, WorkflowSource.Global);
 
       expect(store.getWorkflow('workflow-1')).toBeDefined();
       expect(store.getWorkflow('workflow-2')).toBeDefined();
@@ -124,8 +128,8 @@ describe('WorkflowStore', () => {
         []
       );
 
-      store.addWorkflow(workflow1);
-      store.addWorkflow(workflow2);
+      store.addWorkflow(workflow1, WorkflowSource.BuiltIn);
+      store.addWorkflow(workflow2, WorkflowSource.Global);
 
       const retrieved = store.getWorkflow('duplicate-name');
       expect(retrieved?.description).toBe('Second description');
@@ -159,7 +163,7 @@ describe('WorkflowStore', () => {
         steps
       );
 
-      store.addWorkflow(workflow);
+      store.addWorkflow(workflow, WorkflowSource.BuiltIn);
 
       const retrieved = store.getWorkflow('complex-workflow');
       expect(retrieved?.steps).toHaveLength(1);
@@ -192,7 +196,7 @@ steps:
 
       writeFileSync(workflowPath1, yamlContent, 'utf8');
 
-      store.loadWorkflow(workflowPath1);
+      store.loadWorkflow(workflowPath1, WorkflowSource.Global);
 
       const retrieved = store.getWorkflow('loaded-workflow');
       expect(retrieved).toBeDefined();
@@ -223,8 +227,8 @@ steps: []
       writeFileSync(workflowPath1, yamlContent1, 'utf8');
       writeFileSync(workflowPath2, yamlContent2, 'utf8');
 
-      store.loadWorkflow(workflowPath1);
-      store.loadWorkflow(workflowPath2);
+      store.loadWorkflow(workflowPath1, WorkflowSource.Global);
+      store.loadWorkflow(workflowPath2, WorkflowSource.Project);
 
       expect(store.getAllWorkflows()).toHaveLength(2);
       expect(store.getWorkflow('workflow-1')).toBeDefined();
@@ -235,7 +239,7 @@ steps: []
       const nonExistentPath = join(testDir, 'non-existent.yaml');
 
       expect(() => {
-        store.loadWorkflow(nonExistentPath);
+        store.loadWorkflow(nonExistentPath, WorkflowSource.Global);
       }).toThrow('Workflow configuration not found');
     });
 
@@ -250,7 +254,7 @@ description: test
       writeFileSync(workflowPath1, invalidYaml, 'utf8');
 
       expect(() => {
-        store.loadWorkflow(workflowPath1);
+        store.loadWorkflow(workflowPath1, WorkflowSource.Global);
       }).toThrow('Failed to load workflow config');
     });
 
@@ -266,7 +270,7 @@ steps: []
       writeFileSync(workflowPath1, incompleteYaml, 'utf8');
 
       expect(() => {
-        store.loadWorkflow(workflowPath1);
+        store.loadWorkflow(workflowPath1, WorkflowSource.Global);
       }).toThrow(); // Zod validation error
     });
   });
@@ -282,7 +286,7 @@ steps: []
         []
       );
 
-      store.addWorkflow(workflow);
+      store.addWorkflow(workflow, WorkflowSource.BuiltIn);
 
       const retrieved = store.getWorkflow('test-workflow');
       expect(retrieved).toBeDefined();
@@ -313,8 +317,8 @@ steps: []
         []
       );
 
-      store.addWorkflow(workflow1);
-      store.addWorkflow(workflow2);
+      store.addWorkflow(workflow1, WorkflowSource.BuiltIn);
+      store.addWorkflow(workflow2, WorkflowSource.Global);
 
       const retrieved = store.getWorkflow('workflow-2');
       expect(retrieved?.name).toBe('workflow-2');
@@ -331,7 +335,7 @@ steps: []
         []
       );
 
-      store.addWorkflow(workflow);
+      store.addWorkflow(workflow, WorkflowSource.BuiltIn);
 
       expect(store.getWorkflow('TestWorkflow')).toBeDefined();
       expect(store.getWorkflow('testworkflow')).toBeUndefined();
@@ -365,8 +369,8 @@ steps: []
         []
       );
 
-      store.addWorkflow(workflow1);
-      store.addWorkflow(workflow2);
+      store.addWorkflow(workflow1, WorkflowSource.BuiltIn);
+      store.addWorkflow(workflow2, WorkflowSource.Global);
 
       const workflows = store.getAllWorkflows();
       expect(workflows).toHaveLength(2);
@@ -386,7 +390,7 @@ steps: []
         []
       );
 
-      store.addWorkflow(workflow);
+      store.addWorkflow(workflow, WorkflowSource.BuiltIn);
 
       const workflows = store.getAllWorkflows();
       expect(workflows[0]).toBeInstanceOf(WorkflowManager);
@@ -403,7 +407,7 @@ steps: []
         []
       );
 
-      store.addWorkflow(workflow);
+      store.addWorkflow(workflow, WorkflowSource.BuiltIn);
 
       const workflows1 = store.getAllWorkflows();
       const workflows2 = store.getAllWorkflows();
@@ -424,7 +428,7 @@ steps: []
         []
       );
 
-      store.addWorkflow(workflow);
+      store.addWorkflow(workflow, WorkflowSource.BuiltIn);
 
       const retrieved = store.getWorkflow('');
       expect(retrieved).toBeDefined();
@@ -442,7 +446,7 @@ steps: []
         []
       );
 
-      store.addWorkflow(workflow);
+      store.addWorkflow(workflow, WorkflowSource.BuiltIn);
 
       const retrieved = store.getWorkflow(specialName);
       expect(retrieved).toBeDefined();
@@ -460,7 +464,7 @@ steps: []
         []
       );
 
-      store.addWorkflow(workflow);
+      store.addWorkflow(workflow, WorkflowSource.BuiltIn);
 
       const retrieved = store.getWorkflow(unicodeName);
       expect(retrieved).toBeDefined();
@@ -479,7 +483,7 @@ steps: []
           [],
           []
         );
-        store.addWorkflow(workflow);
+        store.addWorkflow(workflow, WorkflowSource.BuiltIn);
       }
 
       expect(store.getAllWorkflows()).toHaveLength(workflowCount);
@@ -510,7 +514,7 @@ steps: []
         steps
       );
 
-      store.addWorkflow(workflow);
+      store.addWorkflow(workflow, WorkflowSource.BuiltIn);
       const retrieved = store.getWorkflow('identity-test');
 
       // Verify all properties are preserved
@@ -537,7 +541,7 @@ steps: []
       workflow.save();
 
       // Load it into store
-      store.loadWorkflow(workflowPath1);
+      store.loadWorkflow(workflowPath1, WorkflowSource.Global);
 
       const retrieved = store.getWorkflow('saved-workflow');
       expect(retrieved).toBeDefined();
@@ -555,7 +559,7 @@ steps: []
 
       writeFileSync(workflowPath1, oldVersionYaml, 'utf8');
 
-      store.loadWorkflow(workflowPath1);
+      store.loadWorkflow(workflowPath1, WorkflowSource.Global);
 
       const retrieved = store.getWorkflow('old-version-workflow');
       expect(retrieved).toBeDefined();
@@ -582,7 +586,7 @@ steps: []
         steps
       );
 
-      store.addWorkflow(workflow);
+      store.addWorkflow(workflow, WorkflowSource.BuiltIn);
 
       const retrieved = store.getWorkflow('operational-workflow');
       expect(retrieved).toBeDefined();
@@ -600,11 +604,11 @@ steps: []
   });
 
   describe('constructor and store path selection', () => {
-    it('should use central store when not in a Rover project', () => {
+    it('should use global store when not in a Rover project', () => {
       const manager = new WorkflowStore();
       expect(manager.isInRoverProject()).toBe(false);
       expect(manager.getLocalStorePath()).toBeNull();
-      expect(manager.getCentralStorePath()).toContain('workflows');
+      expect(manager.getGlobalStorePath()).toContain('workflows');
     });
 
     it('should use local store when in a Rover project', () => {
@@ -629,8 +633,139 @@ steps: []
     });
   });
 
-  describe('add() - from local path', () => {
-    it('should add a workflow from a local file', async () => {
+  describe('workflow source tracking', () => {
+    it('should track workflow source when adding', () => {
+      const workflow = WorkflowManager.create(
+        workflowPath1,
+        'test-workflow',
+        'Test workflow',
+        [],
+        [],
+        []
+      );
+
+      store.addWorkflow(workflow, WorkflowSource.BuiltIn);
+
+      const entry = store.getWorkflowEntry('test-workflow');
+      expect(entry).toBeDefined();
+      expect(entry?.source).toBe(WorkflowSource.BuiltIn);
+    });
+
+    it('should track different sources for different workflows', () => {
+      const workflow1 = WorkflowManager.create(
+        workflowPath1,
+        'workflow-1',
+        'Built-in workflow',
+        [],
+        [],
+        []
+      );
+
+      const workflow2 = WorkflowManager.create(
+        workflowPath2,
+        'workflow-2',
+        'Global workflow',
+        [],
+        [],
+        []
+      );
+
+      store.addWorkflow(workflow1, WorkflowSource.BuiltIn);
+      store.addWorkflow(workflow2, WorkflowSource.Global);
+
+      const entry1 = store.getWorkflowEntry('workflow-1');
+      const entry2 = store.getWorkflowEntry('workflow-2');
+
+      expect(entry1?.source).toBe(WorkflowSource.BuiltIn);
+      expect(entry2?.source).toBe(WorkflowSource.Global);
+    });
+
+    it('should return workflow entries with source information', () => {
+      const workflow1 = WorkflowManager.create(
+        workflowPath1,
+        'workflow-1',
+        'First',
+        [],
+        [],
+        []
+      );
+
+      const workflow2 = WorkflowManager.create(
+        workflowPath2,
+        'workflow-2',
+        'Second',
+        [],
+        [],
+        []
+      );
+
+      store.addWorkflow(workflow1, WorkflowSource.BuiltIn);
+      store.addWorkflow(workflow2, WorkflowSource.Project);
+
+      const entries = store.getAllWorkflowEntries();
+      expect(entries).toHaveLength(2);
+
+      const entry1 = entries.find(e => e.workflow.name === 'workflow-1');
+      const entry2 = entries.find(e => e.workflow.name === 'workflow-2');
+
+      expect(entry1?.source).toBe(WorkflowSource.BuiltIn);
+      expect(entry2?.source).toBe(WorkflowSource.Project);
+    });
+
+    it('should load workflow with specified source', () => {
+      const yamlContent = `
+version: '1.0'
+name: loaded-workflow
+description: Test workflow
+inputs: []
+outputs: []
+steps: []
+`;
+
+      writeFileSync(workflowPath1, yamlContent, 'utf8');
+
+      store.loadWorkflow(workflowPath1, WorkflowSource.Global);
+
+      const entry = store.getWorkflowEntry('loaded-workflow');
+      expect(entry).toBeDefined();
+      expect(entry?.source).toBe(WorkflowSource.Global);
+    });
+
+    it('should update source when replacing workflow with same name', () => {
+      const workflow1 = WorkflowManager.create(
+        workflowPath1,
+        'same-name',
+        'First description',
+        [],
+        [],
+        []
+      );
+
+      const workflow2 = WorkflowManager.create(
+        workflowPath2,
+        'same-name',
+        'Second description',
+        [],
+        [],
+        []
+      );
+
+      store.addWorkflow(workflow1, WorkflowSource.BuiltIn);
+      store.addWorkflow(workflow2, WorkflowSource.Project);
+
+      const entry = store.getWorkflowEntry('same-name');
+      expect(entry?.source).toBe(WorkflowSource.Project);
+      expect(entry?.workflow.description).toBe('Second description');
+    });
+
+    it('should return undefined for non-existent workflow entry', () => {
+      const entry = store.getWorkflowEntry('non-existent');
+      expect(entry).toBeUndefined();
+    });
+  });
+
+  describe('saveWorkflow() - from local path', () => {
+    it('should save a workflow from a local file', async () => {
       const workflowContent = `
 version: '1.0'
 name: test-workflow
@@ -644,7 +779,7 @@ steps: []
       writeFileSync(sourcePath, workflowContent, 'utf8');
 
       const manager = new WorkflowStore();
-      const result = await manager.add(sourcePath);
+      const result = await manager.saveWorkflow(sourcePath);
 
       expect(result.name).toBe('test-workflow');
       expect(result.isLocal).toBe(false); // Not in a Rover project
@@ -673,7 +808,7 @@ steps: []
       writeFileSync(sourcePath, workflowContent, 'utf8');
 
       const manager = new WorkflowStore();
-      const result = await manager.add(sourcePath, 'custom-name');
+      const result = await manager.saveWorkflow(sourcePath, 'custom-name');
 
       expect(result.name).toBe('custom-name');
       expect(result.path).toContain('custom-name.yml');
@@ -703,7 +838,7 @@ steps: []
       writeFileSync(sourcePath, workflowContent, 'utf8');
 
       const manager = new WorkflowStore();
-      const result = await manager.add(sourcePath, 'custom-json-name');
+      const result = await manager.saveWorkflow(sourcePath, 'custom-json-name');
 
       expect(result.name).toBe('custom-json-name');
       expect(result.path).toContain('custom-json-name.yml');
@@ -729,7 +864,7 @@ steps: []
       writeFileSync(sourcePath, workflowContent, 'utf8');
 
       const manager = new WorkflowStore();
-      const result = await manager.add(sourcePath);
+      const result = await manager.saveWorkflow(sourcePath);
 
       expect(result.name).toBe('my-awesome-workflow');
     });
@@ -738,7 +873,7 @@ steps: []
       const manager = new WorkflowStore();
       const nonExistentPath = join(testProjectDir, 'non-existent.yml');
 
-      await expect(manager.add(nonExistentPath)).rejects.toThrow(
+      await expect(manager.saveWorkflow(nonExistentPath)).rejects.toThrow(
         WorkflowStoreError
       );
     });
@@ -757,17 +892,17 @@ steps: []
       writeFileSync(sourcePath, workflowContent, 'utf8');
 
       const manager = new WorkflowStore();
-      await manager.add(sourcePath);
+      await manager.saveWorkflow(sourcePath);
 
-      // Try to add again
-      await expect(manager.add(sourcePath)).rejects.toThrow(
+      // Try to save again
+      await expect(manager.saveWorkflow(sourcePath)).rejects.toThrow(
         /already exists in the store/
       );
     });
   });
 
-  describe('add() - from URL', () => {
-    it('should add a workflow from a URL', async () => {
+  describe('saveWorkflow() - from URL', () => {
+    it('should save a workflow from a URL', async () => {
       const workflowContent = `
 version: '1.0'
 name: remote-workflow
@@ -785,7 +920,7 @@ steps: []
 
       const manager = new WorkflowStore();
       const url = 'https://example.com/workflows/remote-workflow.yml';
-      const result = await manager.add(url);
+      const result = await manager.saveWorkflow(url);
 
       expect(result.name).toBe('remote-workflow');
       expect(existsSync(result.path)).toBe(true);
@@ -813,7 +948,7 @@ steps: []
 
       const manager = new WorkflowStore();
       const url = 'https://example.com/path/to/swe-agent.yaml';
-      const result = await manager.add(url);
+      const result = await manager.saveWorkflow(url);
 
       expect(result.name).toBe('swe-agent');
     });
@@ -835,7 +970,7 @@ steps: []
 
       const manager = new WorkflowStore();
       const url = 'https://example.com/workflows/custom-workflow';
-      const result = await manager.add(url);
+      const result = await manager.saveWorkflow(url);
 
       expect(result.name).toBe('custom-workflow');
     });
@@ -850,7 +985,9 @@ steps: []
       const manager = new WorkflowStore();
       const url = 'https://example.com/missing.yml';
 
-      await expect(manager.add(url)).rejects.toThrow(WorkflowStoreError);
+      await expect(manager.saveWorkflow(url)).rejects.toThrow(
+        WorkflowStoreError
+      );
     });
 
     it('should throw error when network request fails', async () => {
@@ -859,14 +996,18 @@ steps: []
       const manager = new WorkflowStore();
       const url = 'https://example.com/workflow.yml';
 
-      await expect(manager.add(url)).rejects.toThrow(WorkflowStoreError);
+      await expect(manager.saveWorkflow(url)).rejects.toThrow(
+        WorkflowStoreError
+      );
     });
 
     it('should throw error for invalid URL', async () => {
       const manager = new WorkflowStore();
       const invalidUrl = 'not-a-valid-url';
 
-      await expect(manager.add(invalidUrl)).rejects.toThrow(WorkflowStoreError);
+      await expect(manager.saveWorkflow(invalidUrl)).rejects.toThrow(
+        WorkflowStoreError
+      );
     });
   });
 
@@ -877,7 +1018,7 @@ steps: []
       writeFileSync(sourcePath, workflowContent, 'utf8');
 
       const manager = new WorkflowStore();
-      const result = await manager.add(sourcePath);
+      const result = await manager.saveWorkflow(sourcePath);
 
       const savedContent = readFileSync(result.path, 'utf8');
       expect(savedContent).toContain('# Original Checksum:');
@@ -896,7 +1037,7 @@ steps: []
 
       const manager = new WorkflowStore();
       const beforeAdd = new Date();
-      const result = await manager.add(sourcePath);
+      const result = await manager.saveWorkflow(sourcePath);
       const afterAdd = new Date();
 
       const savedContent = readFileSync(result.path, 'utf8');
@@ -920,7 +1061,7 @@ steps: []`;
       writeFileSync(sourcePath, workflowContent, 'utf8');
 
       const manager = new WorkflowStore();
-      const result = await manager.add(sourcePath);
+      const result = await manager.saveWorkflow(sourcePath);
 
       const savedContent = readFileSync(result.path, 'utf8');
       expect(savedContent).toContain(workflowContent);
@@ -1018,28 +1159,28 @@ steps: []
       writeFileSync(sourcePath, workflowContent, 'utf8');
 
       const manager = new WorkflowStore();
-      const result = await manager.add(sourcePath);
+      const result = await manager.saveWorkflow(sourcePath);
 
       expect(result.isLocal).toBe(true);
       expect(result.path).toContain('.rover/workflows');
       expect(result.path).toContain(testProjectDir);
     });
 
-    it('should save to central store when not in a Rover project', async () => {
+    it('should save to global store when not in a Rover project', async () => {
       const workflowContent = `
 version: '1.0'
-name: central-workflow
+name: global-workflow
 description: Test
 inputs: []
 outputs: []
 steps: []
 `;
 
-      const sourcePath = join(testProjectDir, 'central.yml');
+      const sourcePath = join(testProjectDir, 'global.yml');
       writeFileSync(sourcePath, workflowContent, 'utf8');
 
       const manager = new WorkflowStore();
-      const result = await manager.add(sourcePath);
+      const result = await manager.saveWorkflow(sourcePath);
 
       expect(result.isLocal).toBe(false);
       expect(result.path).toContain('config/workflows');
@@ -1061,7 +1202,7 @@ steps: []
       writeFileSync(sourcePath, workflowContent, 'utf8');
 
       const manager = new WorkflowStore();
-      const result = await manager.add(sourcePath);
+      const result = await manager.saveWorkflow(sourcePath);
 
       expect(result.name).toBe('my-special_workflow@v2');
     });
@@ -1081,7 +1222,7 @@ steps: []
       writeFileSync(sourcePath, workflowContent, 'utf8');
 
       const manager = new WorkflowStore();
-      const result = await manager.add(sourcePath, longName);
+      const result = await manager.saveWorkflow(sourcePath, longName);
 
       expect(result.name).toBe(longName);
     });
@@ -1092,7 +1233,7 @@ steps: []
       writeFileSync(sourcePath, workflowContent, 'utf8');
 
       const manager = new WorkflowStore();
-      const result = await manager.add(sourcePath);
+      const result = await manager.saveWorkflow(sourcePath);
 
       expect(result.name).toBe('empty');
       expect(existsSync(result.path)).toBe(true);
@@ -1116,7 +1257,7 @@ steps: []`;
       writeFileSync(sourcePath, workflowContent, 'utf8');
 
       const manager = new WorkflowStore();
-      const result = await manager.add(sourcePath);
+      const result = await manager.saveWorkflow(sourcePath);
 
       const savedContent = readFileSync(result.path, 'utf8');
       expect(savedContent).toContain('# Rover Workflow Metadata');
@@ -1141,7 +1282,7 @@ steps: []
       writeFileSync(sourcePath, workflowContent, 'utf8');
 
       const manager = new WorkflowStore();
-      const result = await manager.add(sourcePath);
+      const result = await manager.saveWorkflow(sourcePath);
 
       expect(result.name).toBe('workflow');
       expect(existsSync(result.path)).toBe(true);

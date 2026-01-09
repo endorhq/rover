@@ -3,9 +3,9 @@
  * available workflows for the current context. It might use different folders
  * or even include individual workflow files.
  *
- * Also handles workflow persistence and addition to local and central stores.
+ * Also handles workflow persistence and addition to local and global stores.
  */
-import { join } from 'node:path';
+import { join, basename } from 'node:path';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { WorkflowManager } from './workflow.js';
@@ -14,7 +14,7 @@ import { findProjectRoot } from '../project-root.js';
 import { PROJECT_CONFIG_FILENAME } from 'rover-schemas';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 
-// Folder for workflows in central store
+// Folder for workflows in global store
 const WORKFLOWS_FOLDER = 'workflows';
 
 /**
@@ -45,23 +45,33 @@ export interface WorkflowMetadata {
 export interface AddWorkflowResult {
   name: string; // Name of the workflow (may be renamed)
   path: string; // Absolute path where the workflow was saved
-  isLocal: boolean; // True if saved to local store, false if central
+  isLocal: boolean; // True if saved to local store, false if global
+}
+
+/**
+ * Source of a workflow
+ */
+export enum WorkflowSource {
+  BuiltIn = 'built-in',
+  Global = 'global',
+  Project = 'project',
+}
+
+/**
+ * Workflow entry with source information
+ */
+export interface WorkflowEntry {
+  workflow: WorkflowManager;
+  source: WorkflowSource;
 }
 
 export class WorkflowStore {
-  private workflows: Map<string, WorkflowManager>;
+  private workflows: Map<string, WorkflowEntry>;
   private localStorePath: string | null;
-  private centralStorePath: string;
-  // TODO: In the future, we will add the concept of "sources".
-  // The sources will be associated with a specific folder,
-  // like "global", "project", or similar.
-  //
-  // This would be required once we allow users to define their own
-  // workflows in their projects.
-  // private sources: Map<string, string>;
+  private globalStorePath: string;
 
   constructor() {
-    this.workflows = new Map<string, WorkflowManager>();
+    this.workflows = new Map<string, WorkflowEntry>();
 
     // Check if we're in a Rover project
     const projectRoot = findProjectRoot();
@@ -73,11 +83,11 @@ export class WorkflowStore {
       ? join(projectRoot, '.rover', WORKFLOWS_FOLDER)
       : null;
 
-    this.centralStorePath = join(getConfigDir(), WORKFLOWS_FOLDER);
+    this.globalStorePath = join(getConfigDir(), WORKFLOWS_FOLDER);
 
-    // Ensure central store exists
-    if (!existsSync(this.centralStorePath)) {
-      mkdirSync(this.centralStorePath, { recursive: true, mode: 0o700 });
+    // Ensure global store exists
+    if (!existsSync(this.globalStorePath)) {
+      mkdirSync(this.globalStorePath, { recursive: true, mode: 0o700 });
     }
   }
 
@@ -85,20 +95,22 @@ export class WorkflowStore {
    * Add a workflow to the store
    *
    * @param workflow The WorkflowManager instance
+   * @param source The source of the workflow
    */
-  addWorkflow(workflow: WorkflowManager): void {
-    this.workflows.set(workflow.name, workflow);
+  addWorkflow(workflow: WorkflowManager, source: WorkflowSource): void {
+    this.workflows.set(workflow.name, { workflow, source });
   }
 
   /**
    * Load a workflow file and add it to the store
    *
    * @param path The file path to the workflow definition
+   * @param source The source of the workflow
    * @throws Error if the workflow cannot be loaded
    */
-  loadWorkflow(path: string): void {
+  loadWorkflow(path: string, source: WorkflowSource): void {
     const workflow = WorkflowManager.load(path);
-    this.addWorkflow(workflow);
+    this.addWorkflow(workflow, source);
   }
 
   /**
@@ -107,6 +119,15 @@ export class WorkflowStore {
    * @returns The WorkflowManager instance or undefined if not found
    */
   getWorkflow(name: string): WorkflowManager | undefined {
+    return this.workflows.get(name)?.workflow;
+  }
+
+  /**
+   * Get a workflow entry (with source) by name
+   * @param name The name of the workflow
+   * @returns The WorkflowEntry or undefined if not found
+   */
+  getWorkflowEntry(name: string): WorkflowEntry | undefined {
     return this.workflows.get(name);
   }
 
@@ -115,11 +136,19 @@ export class WorkflowStore {
    * @returns An array of WorkflowManager instances
    */
   getAllWorkflows(): WorkflowManager[] {
+    return Array.from(this.workflows.values()).map(entry => entry.workflow);
+  }
+
+  /**
+   * Get all workflow entries with source information
+   * @returns An array of WorkflowEntry instances
+   */
+  getAllWorkflowEntries(): WorkflowEntry[] {
     return Array.from(this.workflows.values());
   }
 
   /**
-   * Get the appropriate store path (local if in a Rover project, otherwise central)
+   * Get the appropriate store path (local if in a Rover project, otherwise global)
    */
   getStorePath(): string {
     if (this.localStorePath) {
@@ -129,14 +158,14 @@ export class WorkflowStore {
       }
       return this.localStorePath;
     }
-    return this.centralStorePath;
+    return this.globalStorePath;
   }
 
   /**
-   * Get the central store path
+   * Get the global store path
    */
-  getCentralStorePath(): string {
-    return this.centralStorePath;
+  getGlobalStorePath(): string {
+    return this.globalStorePath;
   }
 
   /**
@@ -154,13 +183,18 @@ export class WorkflowStore {
   }
 
   /**
-   * Add a workflow from a URL or local path
+   * Save a workflow from a URL or local path to the store
    *
    * @param source URL or local path to the workflow
    * @param name Optional custom name for the workflow (without .yml extension)
-   * @returns Information about the added workflow
+   * @param forceGlobal If true, save to global store even when in a project
+   * @returns Information about the saved workflow
    */
-  async add(source: string, name?: string): Promise<AddWorkflowResult> {
+  async saveWorkflow(
+    source: string,
+    name?: string,
+    forceGlobal?: boolean
+  ): Promise<AddWorkflowResult> {
     let content: string;
     let workflowName: string;
 
@@ -210,8 +244,8 @@ export class WorkflowStore {
     };
     const contentWithFrontMatter = this.addFrontMatter(content, metadata);
 
-    // Determine destination path
-    const storePath = this.getStorePath();
+    // Determine destination path (use global store if forceGlobal is set)
+    const storePath = forceGlobal ? this.globalStorePath : this.getStorePath();
     const fileName = `${workflowName}.yml`;
     const destPath = join(storePath, fileName);
 
@@ -235,7 +269,7 @@ export class WorkflowStore {
     return {
       name: workflowName,
       path: destPath,
-      isLocal: this.isInRoverProject(),
+      isLocal: forceGlobal ? false : this.isInRoverProject(),
     };
   }
 
@@ -295,7 +329,7 @@ export class WorkflowStore {
    * Extract workflow name from local path (filename without extension)
    */
   private extractNameFromPath(path: string): string {
-    const fileName = path.split('/').pop() || path.split('\\').pop() || path;
+    const fileName = basename(path);
 
     // Remove .yml or .yaml extension if present
     return fileName.replace(/\.(yml|yaml)$/i, '');

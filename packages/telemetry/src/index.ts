@@ -1,9 +1,19 @@
 import { PostHog } from 'posthog-node';
-import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync } from 'fs';
-import { homedir } from 'os';
-import { join } from 'path';
+import {
+  readFileSync,
+  writeFileSync,
+  mkdirSync,
+  existsSync,
+  rmSync,
+} from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import { v4 as uuidv4 } from 'uuid';
-import { NewTaskMetadata, IterateMetadata, InitMetadata } from './types.js';
+import type {
+  NewTaskMetadata,
+  IterateMetadata,
+  InitMetadata,
+} from './types.js';
 
 export enum NewTaskProvider {
   INPUT = 'user_input',
@@ -86,13 +96,13 @@ class Telemetry {
     if (existsSync(USER_CONFIG_PATH)) {
       try {
         userId = readFileSync(USER_CONFIG_PATH, 'utf-8').trim();
-      } catch (error) {
+      } catch (_error) {
         userId = uuidv4();
-        this.writeUserId(userId);
+        Telemetry.writeUserId(userId);
       }
     } else {
       userId = uuidv4();
-      this.writeUserId(userId);
+      Telemetry.writeUserId(userId);
     }
 
     const isDisabled =

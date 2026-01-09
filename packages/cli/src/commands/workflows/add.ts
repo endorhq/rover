@@ -15,6 +15,8 @@ import { writeFileSync, mkdtempSync, rmSync } from 'node:fs';
 interface AddWorkflowCommandOptions {
   // Custom name for the workflow
   name?: string;
+  // Force save to global store
+  global?: boolean;
   // Output format
   json: boolean;
 }
@@ -74,8 +76,12 @@ export const addWorkflowCommand = async (
     // Track add workflow event
     telemetry?.eventAddWorkflow();
 
-    // Add the workflow
-    const result = await store.add(actualSource, options.name);
+    // Save the workflow
+    const result = await store.saveWorkflow(
+      actualSource,
+      options.name,
+      options.global
+    );
 
     // Prepare output
     output.success = true;

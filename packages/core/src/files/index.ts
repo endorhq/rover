@@ -9,7 +9,9 @@ export { UserSettingsManager } from './user-settings.js';
 export {
   WorkflowStore,
   WorkflowStoreError,
+  WorkflowSource,
   type WorkflowMetadata,
   type AddWorkflowResult,
+  type WorkflowEntry,
 } from './workflow-store.js';
 export { WorkflowManager } from './workflow.js';

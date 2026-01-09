@@ -210,25 +210,35 @@ export class TaskDetailsView extends LitElement {
                 <span
                   class="codicon ${this.getStatusIcon(this.taskData.status)}"
                 ></span>
-                ${this.taskData.formattedStatus ||
-                this.taskData.status ||
-                'Unknown'}
+                ${
+                  this.taskData.formattedStatus ||
+                  this.taskData.status ||
+                  'Unknown'
+                }
               </span>
-              ${this.taskData.workflowName
-                ? html`<span class="workflow-name"
+              ${
+                this.taskData.workflowName
+                  ? html`<span class="workflow-name"
                     >${this.taskData.workflowName}</span
                   >`
-                : ''}
+                  : ''
+              }
               <span class="time-info">
-                ${this.taskData.createdAt
-                  ? `Created ${this.formatRelativeTime(new Date(this.taskData.createdAt))}`
-                  : ''}
-                ${this.taskData.completedAt
-                  ? ` • Completed ${this.formatRelativeTime(new Date(this.taskData.completedAt))}`
-                  : ''}
-                ${this.taskData.failedAt
-                  ? ` • Failed ${this.formatRelativeTime(new Date(this.taskData.failedAt))}`
-                  : ''}
+                ${
+                  this.taskData.createdAt
+                    ? `Created ${this.formatRelativeTime(new Date(this.taskData.createdAt))}`
+                    : ''
+                }
+                ${
+                  this.taskData.completedAt
+                    ? ` • Completed ${this.formatRelativeTime(new Date(this.taskData.completedAt))}`
+                    : ''
+                }
+                ${
+                  this.taskData.failedAt
+                    ? ` • Failed ${this.formatRelativeTime(new Date(this.taskData.failedAt))}`
+                    : ''
+                }
               </span>
             </div>
           </div>
@@ -282,18 +292,18 @@ export class TaskDetailsView extends LitElement {
 
       <div class="section">
         <div
-          class="section-header ${this.expandedSections.has('iterations')
-            ? 'expanded'
-            : ''}"
+          class="section-header ${
+            this.expandedSections.has('iterations') ? 'expanded' : ''
+          }"
           @click=${() => this.toggleSection('iterations')}
         >
           <span class="codicon codicon-chevron-right"></span>
           <span>Iterations</span>
         </div>
         <div
-          class="section-content ${!this.expandedSections.has('iterations')
-            ? 'collapsed'
-            : ''}"
+          class="section-content ${
+            !this.expandedSections.has('iterations') ? 'collapsed' : ''
+          }"
         >
           ${this.renderIterations()}
         </div>
@@ -468,13 +478,15 @@ export class TaskDetailsView extends LitElement {
                     ></span>
                     ${iteration.status || 'Unknown'}
                   </span>
-                  ${iteration.startedAt
-                    ? html`<span
+                  ${
+                    iteration.startedAt
+                      ? html`<span
                         >${this.formatRelativeTime(
                           new Date(iteration.startedAt)
                         )}</span
                       >`
-                    : ''}
+                      : ''
+                  }
                 </div>
               </div>
               <div class="iteration-content ${!isExpanded ? 'collapsed' : ''}">
@@ -484,8 +496,9 @@ export class TaskDetailsView extends LitElement {
                     >${this.formatDate(iteration.startedAt)}</span
                   >
                 </div>
-                ${iteration.completedAt
-                  ? html`
+                ${
+                  iteration.completedAt
+                    ? html`
                       <div class="field-row">
                         <span class="field-label">Completed:</span>
                         <span class="field-value"
@@ -493,14 +506,16 @@ export class TaskDetailsView extends LitElement {
                         >
                       </div>
                     `
-                  : ''}
+                    : ''
+                }
                 <div class="field-row">
                   <span class="field-label">Files:</span>
                   <div class="field-value">
                     <div class="file-buttons">
-                      ${iteration.files?.length
-                        ? iteration.files.map(
-                            (file: any) => html`
+                      ${
+                        iteration.files?.length
+                          ? iteration.files.map(
+                              (file: any) => html`
                               <button
                                 class="file-button"
                                 @click=${() => this.openFile(file.path)}
@@ -510,11 +525,12 @@ export class TaskDetailsView extends LitElement {
                                 ${file.name}
                               </button>
                             `
-                          )
-                        : html`<span
+                            )
+                          : html`<span
                             style="color: var(--vscode-descriptionForeground);"
                             >No files available</span
-                          >`}
+                          >`
+                      }
                     </div>
                   </div>
                 </div>
