@@ -221,7 +221,9 @@ interface TaskOptions {
 /**
  * Build NetworkConfig from CLI options
  */
-const buildNetworkConfig = (options: TaskOptions): NetworkConfig | undefined => {
+const buildNetworkConfig = (
+  options: TaskOptions
+): NetworkConfig | undefined => {
   const { networkMode, networkAllow, networkBlock } = options;
 
   // If no network options specified, return undefined (use project config)
