@@ -70,6 +70,7 @@ export class TaskDescriptionManager {
       agent: taskData.agent,
       agentModel: taskData.agentModel,
       sourceBranch: taskData.sourceBranch,
+      stepAgents: taskData.stepAgents,
       version: CURRENT_TASK_DESCRIPTION_SCHEMA_VERSION,
     };
 
@@ -200,9 +201,10 @@ export class TaskDescriptionManager {
     migrated.restartCount = data.restartCount || 0;
     migrated.lastRestartAt = data.lastRestartAt || undefined;
 
-    // Preserve agent, agentModel, and sourceBranch fields
+    // Preserve agent, agentModel, stepAgents, and sourceBranch fields
     migrated.agent = data.agent;
     migrated.agentModel = data.agentModel;
+    migrated.stepAgents = data.stepAgents;
     migrated.sourceBranch = data.sourceBranch;
 
     // Preserve agentImage field
@@ -604,6 +606,11 @@ export class TaskDescriptionManager {
   }
   get agentModel(): string | undefined {
     return this.data.agentModel;
+  }
+  get stepAgents():
+    | Record<string, { tool?: string; model?: string }>
+    | undefined {
+    return this.data.stepAgents;
   }
   get sourceBranch(): string | undefined {
     return this.data.sourceBranch;
