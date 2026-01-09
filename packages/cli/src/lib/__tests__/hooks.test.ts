@@ -461,7 +461,7 @@ describe('hooks library', () => {
       executeHook('echo merge', context);
 
       const callArgs = mockedLaunchSync.mock.calls[0];
-      expect(callArgs[2].env).not.toHaveProperty('ROVER_TASK_STATUS');
+      expect(callArgs?.[2]?.env).not.toHaveProperty('ROVER_TASK_STATUS');
     });
   });
 });

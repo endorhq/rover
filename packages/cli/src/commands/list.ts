@@ -124,7 +124,7 @@ export const listCommand = async (
     }
 
     // Load project config for hooks (outside loop for efficiency)
-    let projectConfig;
+    let projectConfig: ProjectConfigManager | undefined;
     try {
       projectConfig = ProjectConfigManager.load();
     } catch {
