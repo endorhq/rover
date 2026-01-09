@@ -20,6 +20,7 @@ import type { PreviousIteration } from 'rover-schemas';
 import sweWorkflow from './workflows/swe.yml';
 import techWriterWorkflow from './workflows/tech-writer.yml';
 import entrypointScript from './entrypoint.sh';
+import entrypointGvisorScript from './entrypoint-gvisor.sh';
 import pupa from 'pupa';
 import { fileURLToPath } from 'node:url';
 import type { SandboxPackage } from './sandbox/types.js';
@@ -198,10 +199,14 @@ export class SetupBuilder {
 
   /**
    * Generate and save the setup script to the appropriate task directory
+   * @param includeTaskSetup Whether to include task-specific setup sections
+   * @param entrypointFilename The filename for the generated entrypoint
+   * @param useGVisor Whether to use the gVisor-compatible entrypoint (no sudo)
    */
   generateEntrypoint(
     includeTaskSetup: boolean = true,
-    entrypointFilename: string = 'entrypoint.sh'
+    entrypointFilename: string = 'entrypoint.sh',
+    useGVisor: boolean = false
   ): string {
     let recoverPermissions = '';
 
@@ -365,8 +370,13 @@ echo "======================================="
 `
       : '';
 
+    // Select the appropriate entrypoint template based on runtime
+    const entrypointTemplate = useGVisor
+      ? entrypointGvisorScript
+      : entrypointScript;
+
     // Generate script content
-    const scriptContent = pupa(entrypointScript, {
+    const scriptContent = pupa(entrypointTemplate, {
       agent: this.agent,
       configureAllMCPCommands: configureAllMCPCommands.join('\n  '),
       recoverPermissions,

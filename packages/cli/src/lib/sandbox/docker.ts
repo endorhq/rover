@@ -96,13 +96,21 @@ export class DockerSandbox extends Sandbox {
       );
     }
 
+    // Initialize gVisor if configured (must be done before generating entrypoint)
+    await this.initializeGVisor();
+
     // Generate setup script using SetupBuilder
     const setupBuilder = new SetupBuilder(
       this.task,
       this.task.agent!,
       projectConfig
     );
-    const entrypointScriptPath = setupBuilder.generateEntrypoint();
+    // Pass useGVisor flag to generate the appropriate entrypoint (no sudo for gVisor)
+    const entrypointScriptPath = setupBuilder.generateEntrypoint(
+      true,
+      'entrypoint.sh',
+      this.useGVisor
+    );
     const inputsPath = setupBuilder.generateInputs();
     const workflowPath = setupBuilder.saveWorkflow(this.task.workflowName);
     const preContextPaths = setupBuilder.generatePreContextFiles();
@@ -121,9 +129,6 @@ export class DockerSandbox extends Sandbox {
     } catch (error) {
       // Container doesn't exist, which is fine
     }
-
-    // Initialize gVisor if configured
-    await this.initializeGVisor();
 
     const dockerArgs = ['create', '--name', this.sandboxName];
 
@@ -287,6 +292,9 @@ export class DockerSandbox extends Sandbox {
       );
     }
 
+    // Initialize gVisor if configured (must be done before generating entrypoint)
+    await this.initializeGVisor();
+
     // Generate setup script using SetupBuilder
     const setupBuilder = new SetupBuilder(
       this.task,
@@ -295,7 +303,8 @@ export class DockerSandbox extends Sandbox {
     );
     const entrypointScriptPath = setupBuilder.generateEntrypoint(
       false,
-      'entrypoint-iterate.sh'
+      'entrypoint-iterate.sh',
+      this.useGVisor
     );
     const preContextPaths = setupBuilder.generatePreContextFiles();
 
@@ -309,9 +318,6 @@ export class DockerSandbox extends Sandbox {
 
     const interactiveName = `${this.sandboxName}-i`;
     const dockerArgs = ['run', '--name', interactiveName, '-it', '--rm'];
-
-    // Initialize gVisor if configured (for interactive sessions too)
-    await this.initializeGVisor();
 
     // Add gVisor runtime if enabled
     dockerArgs.push(...getGVisorRuntimeArgs(this.useGVisor));
