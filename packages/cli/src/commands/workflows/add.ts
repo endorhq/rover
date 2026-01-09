@@ -2,7 +2,7 @@
  * Add a workflow from a URL or local path to the workflow store.
  */
 import colors from 'ansi-colors';
-import { WorkflowStoreManager, WorkflowStoreManagerError } from 'rover-core';
+import { WorkflowStore, WorkflowStoreError } from 'rover-core';
 import { CLIJsonOutput } from '../../types.js';
 import { exitWithError, exitWithSuccess } from '../../utils/exit.js';
 import { getTelemetry } from '../../lib/telemetry.js';
@@ -69,13 +69,13 @@ export const addWorkflowCommand = async (
       actualSource = tempFile;
     }
 
-    const manager = new WorkflowStoreManager();
+    const store = new WorkflowStore();
 
     // Track add workflow event
     telemetry?.eventAddWorkflow();
 
     // Add the workflow
-    const result = await manager.add(actualSource, options.name);
+    const result = await store.add(actualSource, options.name);
 
     // Prepare output
     output.success = true;
@@ -103,7 +103,7 @@ export const addWorkflowCommand = async (
       await exitWithSuccess(message, output, { telemetry });
     }
   } catch (error) {
-    if (error instanceof WorkflowStoreManagerError) {
+    if (error instanceof WorkflowStoreError) {
       output.error = error.message;
     } else {
       output.error = 'Failed to add workflow.';

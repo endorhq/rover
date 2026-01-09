@@ -18,20 +18,20 @@ vi.mock('../../../utils/stdin.js', () => ({
   readFromStdin: () => mockReadFromStdin(),
 }));
 
-// Mock WorkflowStoreManager
-let mockWorkflowStoreManager: any;
+// Mock WorkflowStore
+let mockWorkflowStore: any;
 vi.mock('rover-core', async () => {
   const actual =
     await vi.importActual<typeof import('rover-core')>('rover-core');
   return {
     ...actual,
-    WorkflowStoreManager: vi
+    WorkflowStore: vi
       .fn()
-      .mockImplementation(() => mockWorkflowStoreManager),
-    WorkflowStoreManagerError: class extends Error {
+      .mockImplementation(() => mockWorkflowStore),
+    WorkflowStoreError: class extends Error {
       constructor(message: string) {
         super(message);
-        this.name = 'WorkflowStoreManagerError';
+        this.name = 'WorkflowStoreError';
       }
     },
   };
@@ -57,7 +57,7 @@ describe('add workflow command', () => {
       .mockImplementation((() => {}) as any);
 
     // Reset mocks
-    mockWorkflowStoreManager = {
+    mockWorkflowStore = {
       add: vi.fn(),
     };
     mockReadFromStdin = vi.fn().mockResolvedValue(null);
@@ -87,7 +87,7 @@ steps: []
 `;
       writeFileSync(workflowFile, workflowContent, 'utf8');
 
-      mockWorkflowStoreManager.add.mockResolvedValue({
+      mockWorkflowStore.add.mockResolvedValue({
         name: 'test-workflow',
         path: join(testDir, '.rover', 'workflows', 'test-workflow.yml'),
         isLocal: true,
@@ -95,7 +95,7 @@ steps: []
 
       await addWorkflowCommand(workflowFile, { json: false });
 
-      expect(mockWorkflowStoreManager.add).toHaveBeenCalledWith(
+      expect(mockWorkflowStore.add).toHaveBeenCalledWith(
         workflowFile,
         undefined
       );
@@ -119,7 +119,7 @@ steps: []
 `;
       writeFileSync(workflowFile, workflowContent, 'utf8');
 
-      mockWorkflowStoreManager.add.mockResolvedValue({
+      mockWorkflowStore.add.mockResolvedValue({
         name: 'custom-name',
         path: join(testDir, '.rover', 'workflows', 'custom-name.yml'),
         isLocal: true,
@@ -130,7 +130,7 @@ steps: []
         json: false,
       });
 
-      expect(mockWorkflowStoreManager.add).toHaveBeenCalledWith(
+      expect(mockWorkflowStore.add).toHaveBeenCalledWith(
         workflowFile,
         'custom-name'
       );
@@ -153,7 +153,7 @@ steps: []
 `;
       writeFileSync(workflowFile, workflowContent, 'utf8');
 
-      mockWorkflowStoreManager.add.mockResolvedValue({
+      mockWorkflowStore.add.mockResolvedValue({
         name: 'test',
         path: join(tmpdir(), '.rover', 'config', 'workflows', 'test.yml'),
         isLocal: false,
@@ -166,7 +166,7 @@ steps: []
         .map(call => call.join(' '))
         .join('\n');
       expect(output).toContain('test');
-      expect(output).toContain('central');
+      expect(output).toContain('global');
     });
   });
 
@@ -174,7 +174,7 @@ steps: []
     it('should add a workflow from a URL', async () => {
       const url = 'https://example.com/workflows/remote-workflow.yml';
 
-      mockWorkflowStoreManager.add.mockResolvedValue({
+      mockWorkflowStore.add.mockResolvedValue({
         name: 'remote-workflow',
         path: join(testDir, '.rover', 'workflows', 'remote-workflow.yml'),
         isLocal: true,
@@ -182,7 +182,7 @@ steps: []
 
       await addWorkflowCommand(url, { json: false });
 
-      expect(mockWorkflowStoreManager.add).toHaveBeenCalledWith(url, undefined);
+      expect(mockWorkflowStore.add).toHaveBeenCalledWith(url, undefined);
       expect(consoleLogSpy).toHaveBeenCalled();
       const output = consoleLogSpy.mock.calls
         .map(call => call.join(' '))
@@ -193,7 +193,7 @@ steps: []
     it('should add a workflow from URL with custom name', async () => {
       const url = 'https://example.com/workflows/original.yml';
 
-      mockWorkflowStoreManager.add.mockResolvedValue({
+      mockWorkflowStore.add.mockResolvedValue({
         name: 'my-custom-workflow',
         path: join(testDir, '.rover', 'workflows', 'my-custom-workflow.yml'),
         isLocal: true,
@@ -204,7 +204,7 @@ steps: []
         json: false,
       });
 
-      expect(mockWorkflowStoreManager.add).toHaveBeenCalledWith(
+      expect(mockWorkflowStore.add).toHaveBeenCalledWith(
         url,
         'my-custom-workflow'
       );
@@ -229,7 +229,7 @@ steps: []
 `;
       writeFileSync(workflowFile, workflowContent, 'utf8');
 
-      mockWorkflowStoreManager.add.mockResolvedValue({
+      mockWorkflowStore.add.mockResolvedValue({
         name: 'test',
         path: join(testDir, '.rover', 'workflows', 'test.yml'),
         isLocal: true,
@@ -250,9 +250,9 @@ steps: []
     });
 
     it('should output JSON error with --json flag on failure', async () => {
-      const { WorkflowStoreManagerError } = await import('rover-core');
-      mockWorkflowStoreManager.add.mockRejectedValue(
-        new WorkflowStoreManagerError('Workflow already exists')
+      const { WorkflowStoreError } = await import('rover-core');
+      mockWorkflowStore.add.mockRejectedValue(
+        new WorkflowStoreError('Workflow already exists')
       );
 
       await addWorkflowCommand('test.yml', { json: true });
@@ -269,10 +269,10 @@ steps: []
   });
 
   describe('error handling', () => {
-    it('should handle WorkflowStoreManagerError', async () => {
-      const { WorkflowStoreManagerError } = await import('rover-core');
-      mockWorkflowStoreManager.add.mockRejectedValue(
-        new WorkflowStoreManagerError('Workflow already exists in the store')
+    it('should handle WorkflowStoreError', async () => {
+      const { WorkflowStoreError } = await import('rover-core');
+      mockWorkflowStore.add.mockRejectedValue(
+        new WorkflowStoreError('Workflow already exists in the store')
       );
 
       await addWorkflowCommand('test.yml', { json: false });
@@ -285,7 +285,7 @@ steps: []
     });
 
     it('should handle generic errors', async () => {
-      mockWorkflowStoreManager.add.mockRejectedValue(
+      mockWorkflowStore.add.mockRejectedValue(
         new Error('Unknown error')
       );
 
@@ -299,9 +299,9 @@ steps: []
     });
 
     it('should handle network errors for URL sources', async () => {
-      const { WorkflowStoreManagerError } = await import('rover-core');
-      mockWorkflowStoreManager.add.mockRejectedValue(
-        new WorkflowStoreManagerError('Failed to fetch workflow from URL')
+      const { WorkflowStoreError } = await import('rover-core');
+      mockWorkflowStore.add.mockRejectedValue(
+        new WorkflowStoreError('Failed to fetch workflow from URL')
       );
 
       await addWorkflowCommand('https://example.com/missing.yml', {
@@ -316,9 +316,9 @@ steps: []
     });
 
     it('should handle file not found errors', async () => {
-      const { WorkflowStoreManagerError } = await import('rover-core');
-      mockWorkflowStoreManager.add.mockRejectedValue(
-        new WorkflowStoreManagerError(
+      const { WorkflowStoreError } = await import('rover-core');
+      mockWorkflowStore.add.mockRejectedValue(
+        new WorkflowStoreError(
           'Failed to read workflow from /path/to/missing.yml'
         )
       );
@@ -346,7 +346,7 @@ steps: []
 `;
       writeFileSync(workflowFile, workflowContent, 'utf8');
 
-      mockWorkflowStoreManager.add.mockResolvedValue({
+      mockWorkflowStore.add.mockResolvedValue({
         name: 'test',
         path: join(testDir, '.rover', 'workflows', 'test.yml'),
         isLocal: true,
@@ -362,9 +362,9 @@ steps: []
     });
 
     it('should shutdown telemetry even on error', async () => {
-      const { WorkflowStoreManagerError } = await import('rover-core');
-      mockWorkflowStoreManager.add.mockRejectedValue(
-        new WorkflowStoreManagerError('Error')
+      const { WorkflowStoreError } = await import('rover-core');
+      mockWorkflowStore.add.mockRejectedValue(
+        new WorkflowStoreError('Error')
       );
 
       const { getTelemetry } = await import('../../../lib/telemetry.js');
@@ -378,7 +378,7 @@ steps: []
 
   describe('edge cases', () => {
     it('should handle workflow names with special characters', async () => {
-      mockWorkflowStoreManager.add.mockResolvedValue({
+      mockWorkflowStore.add.mockResolvedValue({
         name: 'my-special_workflow@v2',
         path: join(
           testDir,
@@ -394,7 +394,7 @@ steps: []
         json: false,
       });
 
-      expect(mockWorkflowStoreManager.add).toHaveBeenCalledWith(
+      expect(mockWorkflowStore.add).toHaveBeenCalledWith(
         'source.yml',
         'my-special_workflow@v2'
       );
@@ -405,7 +405,7 @@ steps: []
       const longPath =
         '/very/long/path/that/might/cause/issues/' + 'a'.repeat(100) + '.yml';
 
-      mockWorkflowStoreManager.add.mockResolvedValue({
+      mockWorkflowStore.add.mockResolvedValue({
         name: 'workflow',
         path: join(testDir, '.rover', 'workflows', 'workflow.yml'),
         isLocal: true,
@@ -413,14 +413,14 @@ steps: []
 
       await addWorkflowCommand(longPath, { json: false });
 
-      expect(mockWorkflowStoreManager.add).toHaveBeenCalledWith(
+      expect(mockWorkflowStore.add).toHaveBeenCalledWith(
         longPath,
         undefined
       );
     });
 
     it('should handle empty custom name', async () => {
-      mockWorkflowStoreManager.add.mockResolvedValue({
+      mockWorkflowStore.add.mockResolvedValue({
         name: 'default-name',
         path: join(testDir, '.rover', 'workflows', 'default-name.yml'),
         isLocal: true,
@@ -428,7 +428,7 @@ steps: []
 
       await addWorkflowCommand('source.yml', { name: '', json: false });
 
-      expect(mockWorkflowStoreManager.add).toHaveBeenCalledWith(
+      expect(mockWorkflowStore.add).toHaveBeenCalledWith(
         'source.yml',
         ''
       );
@@ -447,7 +447,7 @@ steps: []
 `;
 
       mockReadFromStdin.mockResolvedValue(workflowContent);
-      mockWorkflowStoreManager.add.mockResolvedValue({
+      mockWorkflowStore.add.mockResolvedValue({
         name: 'stdin-workflow',
         path: join(testDir, '.rover', 'workflows', 'stdin-workflow.yml'),
         isLocal: true,
@@ -456,10 +456,10 @@ steps: []
       await addWorkflowCommand('-', { json: false });
 
       expect(mockReadFromStdin).toHaveBeenCalled();
-      expect(mockWorkflowStoreManager.add).toHaveBeenCalled();
+      expect(mockWorkflowStore.add).toHaveBeenCalled();
 
       // Check that a temporary file path was passed (not '-')
-      const addCallArgs = mockWorkflowStoreManager.add.mock.calls[0];
+      const addCallArgs = mockWorkflowStore.add.mock.calls[0];
       expect(addCallArgs[0]).not.toBe('-');
       expect(addCallArgs[0]).toContain('rover-workflow-stdin-');
       expect(addCallArgs[1]).toBeUndefined();
@@ -482,7 +482,7 @@ steps: []
 `;
 
       mockReadFromStdin.mockResolvedValue(workflowContent);
-      mockWorkflowStoreManager.add.mockResolvedValue({
+      mockWorkflowStore.add.mockResolvedValue({
         name: 'custom-stdin',
         path: join(testDir, '.rover', 'workflows', 'custom-stdin.yml'),
         isLocal: true,
@@ -491,10 +491,10 @@ steps: []
       await addWorkflowCommand('-', { name: 'custom-stdin', json: false });
 
       expect(mockReadFromStdin).toHaveBeenCalled();
-      expect(mockWorkflowStoreManager.add).toHaveBeenCalled();
+      expect(mockWorkflowStore.add).toHaveBeenCalled();
 
       // Check that custom name was passed
-      const addCallArgs = mockWorkflowStoreManager.add.mock.calls[0];
+      const addCallArgs = mockWorkflowStore.add.mock.calls[0];
       expect(addCallArgs[1]).toBe('custom-stdin');
 
       expect(consoleLogSpy).toHaveBeenCalled();
@@ -510,7 +510,7 @@ steps: []
       await addWorkflowCommand('-', { json: false });
 
       expect(mockReadFromStdin).toHaveBeenCalled();
-      expect(mockWorkflowStoreManager.add).not.toHaveBeenCalled();
+      expect(mockWorkflowStore.add).not.toHaveBeenCalled();
 
       expect(consoleLogSpy).toHaveBeenCalled();
       const output = consoleLogSpy.mock.calls
@@ -530,7 +530,7 @@ steps: []
 `;
 
       mockReadFromStdin.mockResolvedValue(workflowContent);
-      mockWorkflowStoreManager.add.mockResolvedValue({
+      mockWorkflowStore.add.mockResolvedValue({
         name: 'stdin-json',
         path: join(testDir, '.rover', 'workflows', 'stdin-json.yml'),
         isLocal: true,
@@ -555,9 +555,9 @@ steps: []
 
       mockReadFromStdin.mockResolvedValue(workflowContent);
 
-      const { WorkflowStoreManagerError } = await import('rover-core');
-      mockWorkflowStoreManager.add.mockRejectedValue(
-        new WorkflowStoreManagerError('Invalid workflow format')
+      const { WorkflowStoreError } = await import('rover-core');
+      mockWorkflowStore.add.mockRejectedValue(
+        new WorkflowStoreError('Invalid workflow format')
       );
 
       await addWorkflowCommand('-', { json: false });
