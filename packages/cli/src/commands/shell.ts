@@ -13,7 +13,6 @@ import {
   createSandbox,
   getAvailableSandboxBackend,
 } from '../lib/sandbox/index.js';
-import { isRoverInitialized } from '../utils/repo-checks.js';
 
 /**
  * Start an interactive shell for testing task changes
@@ -35,16 +34,6 @@ export const shellCommand = async (
   if (isNaN(numericTaskId)) {
     jsonOutput.error = `Invalid task ID '${taskId}' - must be a number`;
     await exitWithError(jsonOutput, { telemetry });
-    return;
-  }
-
-  // Check if rover is initialized
-  if (!isRoverInitialized()) {
-    jsonOutput.error = 'Rover is not initialized in this directory';
-    await exitWithError(jsonOutput, {
-      tips: ['Run ' + colors.cyan('rover init') + ' first'],
-      telemetry,
-    });
     return;
   }
 

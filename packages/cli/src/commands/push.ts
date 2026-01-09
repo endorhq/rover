@@ -10,7 +10,6 @@ import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
 import { isJsonMode, setJsonMode } from '../lib/global-state.js';
 import { showRoverChat, TIP_TITLES } from '../utils/display.js';
 import { statusColor } from '../utils/task-status.js';
-import { isRoverInitialized } from '../utils/repo-checks.js';
 
 const { prompt } = enquirer;
 
@@ -84,16 +83,6 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
 
   // Store the task ID!
   result.taskId = numericTaskId;
-
-  // Check if rover is initialized
-  if (!isRoverInitialized()) {
-    result.error = 'Rover is not initialized in this directory';
-    await exitWithError(result, {
-      tips: ['Run ' + colors.cyan('rover init') + ' first'],
-      telemetry,
-    });
-    return;
-  }
 
   let projectConfig;
 

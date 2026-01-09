@@ -32,6 +32,10 @@ import {
 import { addWorkflowCommands } from './commands/workflows/index.js';
 import { setJsonMode, isJsonMode } from './lib/global-state.js';
 
+function isWorkflowsToplevelCommand(command: Command): boolean {
+  return command.parent?.name() === 'workflows';
+}
+
 export function createProgram(
   options: { excludeRuntimeHooks?: boolean } = {}
 ): Command {
@@ -50,12 +54,121 @@ export function createProgram(
       .hook('preAction', (_thisCommand, actionCommand) => {
         const commandName = actionCommand.name();
 
+        if (
+          !isWorkflowsToplevelCommand(actionCommand) &&
+          !['init', 'mcp'].includes(commandName) &&
+          !ProjectConfigManager.exists()
+        ) {
+          console.log(
+            `Rover is not initialized in this directory. The command you requested (\`${commandName}\`) was not executed.`
+          );
+          console.log(
+            `└── ${colors.gray('Project config (does not exist):')} rover.json`
+          );
+
+          showTips(
+            [
+              'Run ' +
+                colors.cyan('rover init') +
+                ' in this directory to initialize project config and user settings',
+            ],
+            {
+              title: TIP_TITLES.NEXT_STEPS,
+            }
+          );
+
+          process.exit(1);
+        }
+      })
+      .hook('preAction', (_thisCommand, actionCommand) => {
+        if (!isWorkflowsToplevelCommand(actionCommand)) {
+          const git = new Git();
+          try {
+            git.version();
+          } catch (error) {
+            exitWithError(
+              {
+                error: 'Git is not installed',
+                success: false,
+              },
+              {
+                tips: ['Install git and try again'],
+              }
+            );
+          }
+          if (!git.isGitRepo()) {
+            exitWithError(
+              {
+                error: 'Not in a git repository',
+                success: false,
+              },
+              {
+                tips: [
+                  'Rover requires the project to be in a git repository. You can initialize a git repository by running ' +
+                    colors.cyan('git init'),
+                ],
+              }
+            );
+          }
+          if (!git.hasCommits()) {
+            exitWithError(
+              {
+                error: 'No commits found in git repository',
+                success: false,
+              },
+              {
+                tips: [
+                  'Git worktree requires at least one commit in the repository in order to have common history',
+                ],
+              }
+            );
+          }
+        }
+      })
+      .hook('preAction', (thisCommand, actionCommand) => {
+        const commandName = actionCommand.name();
+        if (
+          !isWorkflowsToplevelCommand(actionCommand) &&
+          !['init', 'mcp'].includes(commandName) &&
+          ProjectConfigManager.exists() &&
+          !UserSettingsManager.exists()
+        ) {
+          console.log(
+            `Rover is not fully initialized in this directory. The command you requested (\`${commandName}\`) was not executed.`
+          );
+          console.log(
+            `├── ${colors.gray('Project config (exists):')} rover.json`
+          );
+          console.log(
+            `└── ${colors.gray('User settings (does not exist):')} .rover/settings.json`
+          );
+
+          showTips(
+            [
+              'Run ' +
+                colors.cyan('rover init') +
+                ' in this directory to initialize user settings',
+            ],
+            {
+              title: TIP_TITLES.NEXT_STEPS,
+            }
+          );
+
+          process.exit(1);
+        }
+      })
+      .hook('preAction', (_thisCommand, actionCommand) => {
+        const commandName = actionCommand.name();
+
         if (isJsonMode()) {
           // Do not print anything for JSON
           return;
         }
 
-        if (['init', 'task'].includes(commandName)) {
+        if (
+          !isWorkflowsToplevelCommand(actionCommand) &&
+          ['init', 'task'].includes(commandName)
+        ) {
           showSplashHeader();
         } else if (commandName !== 'mcp') {
           showRegularHeader(version, process.cwd());

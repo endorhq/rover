@@ -5,7 +5,6 @@ import { TaskNotFoundError } from 'rover-schemas';
 import { getTelemetry } from '../lib/telemetry.js';
 import { Git, showList, showTitle } from 'rover-core';
 import { showTips } from '../utils/display.js';
-import { isRoverInitialized } from '../utils/repo-checks.js';
 
 export const diffCommand = async (
   taskId: string,
@@ -17,15 +16,6 @@ export const diffCommand = async (
   const numericTaskId = parseInt(taskId, 10);
   if (isNaN(numericTaskId)) {
     console.log(colors.red(`✗ Invalid task ID '${taskId}' - must be a number`));
-    return;
-  }
-
-  // Check if rover is initialized
-  if (!isRoverInitialized()) {
-    console.log(colors.red('✗ Rover is not initialized in this directory'));
-    console.log(
-      colors.gray('Run ') + colors.cyan('rover init') + colors.gray(' first')
-    );
     return;
   }
 

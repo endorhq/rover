@@ -9,7 +9,6 @@ import { exitWithError, exitWithSuccess } from '../utils/exit.js';
 import { CLIJsonOutput } from '../types.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { isJsonMode, setJsonMode } from '../lib/global-state.js';
-import { isRoverInitialized } from '../utils/repo-checks.js';
 
 /**
  * Interface for JSON output
@@ -57,16 +56,6 @@ export const stopCommand = async (
   if (isNaN(numericTaskId)) {
     jsonOutput.error = `Invalid task ID '${taskId}' - must be a number`;
     await exitWithError(jsonOutput, { telemetry });
-    return;
-  }
-
-  // Check if rover is initialized
-  if (!isRoverInitialized()) {
-    jsonOutput.error = 'Rover is not initialized in this directory';
-    await exitWithError(jsonOutput, {
-      tips: ['Run ' + colors.cyan('rover init') + ' first'],
-      telemetry,
-    });
     return;
   }
 
