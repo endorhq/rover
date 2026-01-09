@@ -39,8 +39,15 @@ vi.mock('../../lib/telemetry.js', () => ({
 describe('init command', () => {
   let testDir: string;
   let originalCwd: string;
+  let processExitSpy: any;
 
   beforeEach(() => {
+    // Mock process.exit by default to prevent test from exiting
+    // Individual tests can override this behavior if needed
+    processExitSpy = vi
+      .spyOn(process, 'exit')
+      .mockImplementation((() => {}) as any);
+
     // Create temp directory for testing
     testDir = mkdtempSync(join(tmpdir(), 'rover-init-test-'));
     originalCwd = process.cwd();
@@ -59,6 +66,9 @@ describe('init command', () => {
 
     // Clean up temp directory
     rmSync(testDir, { recursive: true, force: true });
+
+    // Restore process.exit spy
+    processExitSpy.mockRestore();
 
     // Clear all mocks
     vi.clearAllMocks();
@@ -230,17 +240,10 @@ describe('init command', () => {
     const { checkDocker } = await import('../../utils/system.js');
     vi.mocked(checkDocker).mockResolvedValueOnce(false);
 
-    // Mock process.exit to prevent test from exiting
-    const processExitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
-      throw new Error('Process exit called');
-    });
+    await initCommand('.', { yes: true });
 
-    await expect(initCommand('.', { yes: true })).rejects.toThrow(
-      'Process exit called'
-    );
-
+    // Verify process.exit was called with error code
     expect(processExitSpy).toHaveBeenCalledWith(1);
-    processExitSpy.mockRestore();
   });
 
   it('should require at least one AI agent to be installed', async () => {
@@ -252,17 +255,10 @@ describe('init command', () => {
     vi.mocked(checkQwen).mockResolvedValueOnce(false);
     vi.mocked(checkGemini).mockResolvedValueOnce(false);
 
-    // Mock process.exit to prevent test from exiting
-    const processExitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
-      throw new Error('Process exit called');
-    });
+    await initCommand('.', { yes: true });
 
-    await expect(initCommand('.', { yes: true })).rejects.toThrow(
-      'Process exit called'
-    );
-
+    // Verify process.exit was called with error code
     expect(processExitSpy).toHaveBeenCalledWith(1);
-    processExitSpy.mockRestore();
   });
 
   it('should handle multiple AI agents being available', async () => {

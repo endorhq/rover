@@ -5,6 +5,7 @@ import { TaskNotFoundError } from 'rover-schemas';
 import { getTelemetry } from '../lib/telemetry.js';
 import { Git, showList, showTitle } from 'rover-core';
 import { showTips } from '../utils/display.js';
+import { exitWithError, exitWithSuccess } from '../utils/exit.js';
 
 export const diffCommand = async (
   taskId: string,
@@ -15,7 +16,13 @@ export const diffCommand = async (
   // Convert string taskId to number
   const numericTaskId = parseInt(taskId, 10);
   if (isNaN(numericTaskId)) {
-    console.log(colors.red(`✗ Invalid task ID '${taskId}' - must be a number`));
+    await exitWithError(
+      {
+        success: false,
+        error: `Invalid task ID '${taskId}' - must be a number`,
+      },
+      { telemetry }
+    );
     return;
   }
 
@@ -27,20 +34,32 @@ export const diffCommand = async (
 
     // Check if worktree exists
     if (!task.worktreePath || !existsSync(task.worktreePath)) {
-      console.log(
-        colors.red(`✗ No workspace found for task '${numericTaskId}'`)
-      );
-      console.log(
-        colors.gray('  Run ') +
-          colors.cyan(`rover task ${numericTaskId}`) +
-          colors.gray(' first')
+      await exitWithError(
+        {
+          success: false,
+          error: `No workspace found for task '${numericTaskId}'`,
+        },
+        {
+          tips: [
+            colors.gray('  Run ') +
+              colors.cyan(`rover task ${numericTaskId}`) +
+              colors.gray(' first'),
+          ],
+          telemetry,
+        }
       );
       return;
     }
 
     // Check if we're in a git repository
     if (!git.isGitRepo()) {
-      console.log(colors.red('✗ Not in a git repository'));
+      await exitWithError(
+        {
+          success: false,
+          error: 'Not in a git repository',
+        },
+        { telemetry }
+      );
       return;
     }
 
@@ -193,13 +212,20 @@ export const diffCommand = async (
     if (tips.length > 0) {
       showTips(tips);
     }
+
+    await exitWithSuccess('', { success: true }, { telemetry });
+    return;
   } catch (error) {
     if (error instanceof TaskNotFoundError) {
-      console.log(colors.red(`✗ ${error.message}`));
+      await exitWithError(
+        { success: false, error: error.message },
+        { telemetry }
+      );
     } else {
-      console.error(colors.red('Error showing task diff:'), error);
+      await exitWithError(
+        { success: false, error: `Error showing task diff: ${error}` },
+        { telemetry }
+      );
     }
-  } finally {
-    await telemetry?.shutdown();
   }
 };

@@ -15,6 +15,7 @@ import {
 } from 'rover-core';
 import { IterationManager } from 'rover-core';
 import { isJsonMode, setJsonMode } from '../lib/global-state.js';
+import { exitWithError, exitWithSuccess } from '../utils/exit.js';
 
 const DEFAULT_FILE_CONTENTS = 'summary.md';
 
@@ -22,6 +23,8 @@ const DEFAULT_FILE_CONTENTS = 'summary.md';
  * JSON output format for task inspection containing task metadata, status, and iteration details
  */
 interface TaskInspectionOutput {
+  /** Whether the operation was successful */
+  success: boolean;
   /** Git branch name for the task worktree */
   branchName: string;
   /** ISO timestamp when task was completed */
@@ -85,6 +88,7 @@ const jsonErrorOutput = (
   task?: TaskDescriptionManager
 ): TaskInspectionOutput => {
   return {
+    success: false,
     branchName: task?.branchName || '',
     completedAt: task?.completedAt,
     createdAt: task?.createdAt || new Date().toISOString(),
@@ -116,52 +120,44 @@ export const inspectCommand = async (
     setJsonMode(options.json);
   }
 
+  const telemetry = getTelemetry();
+  telemetry?.eventInspectTask();
+
   // Convert string taskId to number
   const numericTaskId = parseInt(taskId, 10);
 
   if (isNaN(numericTaskId)) {
-    if (isJsonMode()) {
-      const errorOutput = jsonErrorOutput(
-        `Invalid task ID '${taskId}' - must be a number`
-      );
-      console.log(JSON.stringify(errorOutput, null, 2));
-    } else {
-      console.log(
-        colors.red(`✗ Invalid task ID '${taskId}' - must be a number`)
-      );
-      showTips([
+    const errorOutput = jsonErrorOutput(
+      `Invalid task ID '${taskId}' - must be a number`
+    );
+    await exitWithError(errorOutput, {
+      tips: [
         colors.gray('Run the ') +
           colors.cyan('rover inspect 1') +
           colors.gray(' to get the task details'),
-      ]);
-    }
+      ],
+      telemetry,
+    });
     return;
   }
 
   // Validate mutually exclusive options
   if (options.file && options.rawFile) {
-    if (isJsonMode()) {
-      const errorOutput = jsonErrorOutput(
-        'Cannot use both --file and --raw-file options together'
-      );
-      console.log(JSON.stringify(errorOutput, null, 2));
-    } else {
-      console.log(
-        colors.red('✗ Cannot use both --file and --raw-file options together')
-      );
-      showTips([
+    const errorOutput = jsonErrorOutput(
+      'Cannot use both --file and --raw-file options together'
+    );
+    await exitWithError(errorOutput, {
+      tips: [
         'Use ' +
           colors.cyan('--file') +
           ' for formatted output or ' +
           colors.cyan('--raw-file') +
           ' for raw output',
-      ]);
-    }
+      ],
+      telemetry,
+    });
     return;
   }
-
-  const telemetry = getTelemetry();
-  telemetry?.eventInspectTask();
 
   try {
     // Load task using TaskDescription
@@ -210,28 +206,39 @@ export const inspectCommand = async (
           }
         }
         console.log(JSON.stringify(rawFileOutput, null, 2));
+        if (rawFileOutput.success) {
+          await exitWithSuccess('', { success: true }, { telemetry });
+        } else {
+          await exitWithError(
+            { success: false, error: rawFileOutput.error },
+            { telemetry }
+          );
+        }
+        return;
       } else {
         // Output raw content without formatting
         if (rawFileContents.size === 0) {
-          console.error(
-            colors.red(
-              `✗ No files found matching: ${options.rawFile.join(', ')}`
-            )
+          const errorOutput = jsonErrorOutput(
+            `No files found matching: ${options.rawFile.join(', ')}`,
+            numericTaskId,
+            task
           );
+          await exitWithError(errorOutput, { telemetry });
+          return;
         } else {
           rawFileContents.forEach(content => {
             console.log(content);
           });
+          await exitWithSuccess('', { success: true }, { telemetry });
+          return;
         }
       }
-      await telemetry?.shutdown();
-      // Return at this point
-      return;
     }
 
     if (isJsonMode()) {
       // Output JSON format
       const jsonOutput: TaskInspectionOutput = {
+        success: true,
         branchName: task.branchName,
         completedAt: task.completedAt,
         createdAt: task.createdAt,
@@ -255,6 +262,8 @@ export const inspectCommand = async (
       };
 
       console.log(JSON.stringify(jsonOutput, null, 2));
+      await exitWithSuccess('', { success: true }, { telemetry });
+      return;
     } else {
       // Format status with user-friendly names
       const formattedStatus = formatTaskStatus(task.status);
@@ -375,25 +384,18 @@ export const inspectCommand = async (
       ]);
     }
 
-    await telemetry?.shutdown();
+    await exitWithSuccess('', { success: true }, { telemetry });
+    return;
   } catch (error) {
     if (error instanceof TaskNotFoundError) {
-      if (isJsonMode()) {
-        const errorOutput = jsonErrorOutput(error.message, numericTaskId);
-        console.log(JSON.stringify(errorOutput, null, 2));
-      } else {
-        console.log(colors.red(`✗ ${error.message}`));
-      }
+      const errorOutput = jsonErrorOutput(error.message, numericTaskId);
+      await exitWithError(errorOutput, { telemetry });
     } else {
-      if (isJsonMode()) {
-        const errorOutput = jsonErrorOutput(
-          `Error inspecting task: ${error}`,
-          numericTaskId
-        );
-        console.log(JSON.stringify(errorOutput, null, 2));
-      } else {
-        console.error(colors.red('Error inspecting task:'), error);
-      }
+      const errorOutput = jsonErrorOutput(
+        `Error inspecting task: ${error}`,
+        numericTaskId
+      );
+      await exitWithError(errorOutput, { telemetry });
     }
   }
 };
