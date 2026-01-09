@@ -165,6 +165,24 @@ export function createProgram(
       (value: string, previous: string[] | undefined) =>
         previous ? [...previous, value] : [value]
     )
+    .addOption(
+      new Option(
+        '--network-mode <mode>',
+        'Network filtering mode for the container'
+      ).choices(['allowlist', 'blocklist', 'none'])
+    )
+    .option(
+      '--network-allow <host>',
+      'Allow network access to host (domain, IP, or CIDR). Can be repeated.',
+      (value: string, previous: string[] | undefined) =>
+        previous ? [...previous, value] : [value]
+    )
+    .option(
+      '--network-block <host>',
+      'Block network access to host (domain, IP, or CIDR). Can be repeated.',
+      (value: string, previous: string[] | undefined) =>
+        previous ? [...previous, value] : [value]
+    )
     .option('--json', 'Output the result in JSON format')
     .option('--debug', 'Show debug information like running commands')
     .option(
