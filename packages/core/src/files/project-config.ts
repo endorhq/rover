@@ -18,6 +18,7 @@ import {
   type PackageManager,
   type TaskManager,
   type HooksConfig,
+  type SandboxConfig,
 } from 'rover-schemas';
 import { findProjectRoot } from '../project-root.js';
 
@@ -200,6 +201,9 @@ export class ProjectConfigManager {
   }
   get initScript(): string | undefined {
     return this.data.sandbox?.initScript;
+  }
+  get sandbox(): SandboxConfig | undefined {
+    return this.data.sandbox;
   }
   get hooks(): HooksConfig | undefined {
     return this.data.hooks;
