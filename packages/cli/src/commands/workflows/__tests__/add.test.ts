@@ -25,9 +25,7 @@ vi.mock('rover-core', async () => {
     await vi.importActual<typeof import('rover-core')>('rover-core');
   return {
     ...actual,
-    WorkflowStore: vi
-      .fn()
-      .mockImplementation(() => mockWorkflowStore),
+    WorkflowStore: vi.fn().mockImplementation(() => mockWorkflowStore),
     WorkflowStoreError: class extends Error {
       constructor(message: string) {
         super(message);
@@ -285,9 +283,7 @@ steps: []
     });
 
     it('should handle generic errors', async () => {
-      mockWorkflowStore.add.mockRejectedValue(
-        new Error('Unknown error')
-      );
+      mockWorkflowStore.add.mockRejectedValue(new Error('Unknown error'));
 
       await addWorkflowCommand('test.yml', { json: false });
 
@@ -363,9 +359,7 @@ steps: []
 
     it('should shutdown telemetry even on error', async () => {
       const { WorkflowStoreError } = await import('rover-core');
-      mockWorkflowStore.add.mockRejectedValue(
-        new WorkflowStoreError('Error')
-      );
+      mockWorkflowStore.add.mockRejectedValue(new WorkflowStoreError('Error'));
 
       const { getTelemetry } = await import('../../../lib/telemetry.js');
       const telemetry = getTelemetry();
@@ -413,10 +407,7 @@ steps: []
 
       await addWorkflowCommand(longPath, { json: false });
 
-      expect(mockWorkflowStore.add).toHaveBeenCalledWith(
-        longPath,
-        undefined
-      );
+      expect(mockWorkflowStore.add).toHaveBeenCalledWith(longPath, undefined);
     });
 
     it('should handle empty custom name', async () => {
@@ -428,10 +419,7 @@ steps: []
 
       await addWorkflowCommand('source.yml', { name: '', json: false });
 
-      expect(mockWorkflowStore.add).toHaveBeenCalledWith(
-        'source.yml',
-        ''
-      );
+      expect(mockWorkflowStore.add).toHaveBeenCalledWith('source.yml', '');
     });
   });
 
