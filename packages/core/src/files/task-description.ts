@@ -71,6 +71,7 @@ export class TaskDescriptionManager {
       agent: taskData.agent,
       agentModel: taskData.agentModel,
       sourceBranch: taskData.sourceBranch,
+      networkConfig: taskData.networkConfig,
       version: CURRENT_TASK_DESCRIPTION_SCHEMA_VERSION,
     };
 

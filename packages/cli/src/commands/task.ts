@@ -16,6 +16,7 @@ import {
   showProperties,
   Git,
 } from 'rover-core';
+import type { NetworkConfig } from 'rover-schemas';
 import {
   parseAgentString,
   formatAgentWithModel,
@@ -206,7 +207,47 @@ interface TaskOptions {
   agent?: string[];
   json?: boolean;
   debug?: boolean;
+  networkMode?: 'allowlist' | 'blocklist' | 'none';
+  networkAllow?: string[];
+  networkBlock?: string[];
 }
+
+/**
+ * Build NetworkConfig from CLI options
+ */
+const buildNetworkConfig = (options: TaskOptions): NetworkConfig | undefined => {
+  const { networkMode, networkAllow, networkBlock } = options;
+
+  // If no network options specified, return undefined (use project config)
+  if (!networkMode && !networkAllow?.length && !networkBlock?.length) {
+    return undefined;
+  }
+
+  // Determine the mode
+  let mode: 'allowlist' | 'blocklist' | 'none' = 'none';
+  if (networkMode) {
+    mode = networkMode;
+  } else if (networkAllow?.length) {
+    mode = 'allowlist';
+  } else if (networkBlock?.length) {
+    mode = 'blocklist';
+  }
+
+  // Build rules from the appropriate option
+  const rules =
+    mode === 'allowlist'
+      ? (networkAllow || []).map(host => ({ host }))
+      : mode === 'blocklist'
+        ? (networkBlock || []).map(host => ({ host }))
+        : [];
+
+  return {
+    mode,
+    rules,
+    allowDns: true,
+    allowLocalhost: true,
+  };
+};
 
 /**
  * Create a task for a specific agent
@@ -220,7 +261,8 @@ const createTaskForAgent = async (
   workflowName: string,
   baseBranch: string,
   git: Git,
-  jsonMode: boolean
+  jsonMode: boolean,
+  networkConfig?: NetworkConfig
 ): Promise<{
   taskId: number;
   title: string;
@@ -288,6 +330,7 @@ const createTaskForAgent = async (
     agent: selectedAiAgent,
     agentModel: selectedModel,
     sourceBranch: sourceBranch,
+    networkConfig: networkConfig,
   });
 
   // Setup git worktree and branch
@@ -767,6 +810,9 @@ export const taskCommand = async (
   }
 
   if (description.length > 0) {
+    // Build network config from CLI options (if provided)
+    const networkConfig = buildNetworkConfig(options);
+
     // Create tasks for each selected agent
     const createdTasks: Array<{
       taskId: number;
@@ -808,7 +854,8 @@ export const taskCommand = async (
         workflowName,
         baseBranch!,
         git,
-        json || false
+        json || false,
+        networkConfig
       );
 
       if (taskResult) {
