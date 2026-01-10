@@ -233,10 +233,16 @@ export const listCommand = async (
 
       const iterationStatus = maybeIterationStatus(lastIteration);
 
+      // Format agent with model (e.g., "claude:sonnet")
+      let agentDisplay = task.agent || '-';
+      if (task.agent && task.agentModel) {
+        agentDisplay = `${task.agent}:${task.agentModel}`;
+      }
+
       return {
         id: task.id.toString(),
         title: task.title || 'Unknown Task',
-        agent: task.agent || '-',
+        agent: agentDisplay,
         workflow: task.workflowName || '-',
         status: taskStatus,
         progress: iterationStatus?.progress || 0,
@@ -264,7 +270,9 @@ export const listCommand = async (
       {
         header: 'Agent',
         key: 'agent',
-        width: 8,
+        minWidth: 8,
+        maxWidth: 16,
+        truncate: 'ellipsis',
         format: (value: string) => colors.gray(value),
       },
       {
