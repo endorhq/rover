@@ -196,3 +196,54 @@ An example for `node:24-alpine` follows:
 ```
 
 </details>
+
+## Using a Custom Agent Image
+
+### Configuration
+
+To use a custom agent image, configure it in your `rover.json` file inside the `sandbox` section:
+
+```json
+{
+  "version": "1.2",
+  "sandbox": {
+    "agentImage": "your-custom-image:tag"
+  }
+}
+```
+
+Rover will display a warning when using a custom image:
+
+```
+⚠ Note: Using custom agent image: your-custom-image:tag
+  This might have side effects on the expected behavior of Rover if this image is incompatible
+  with the reference image: ghcr.io/endorhq/rover/agent-dev:latest
+```
+
+### Environment Variable Override
+
+You can also override the image using the `AGENT_IMAGE` environment variable (takes precedence over `rover.json`):
+
+```bash
+AGENT_IMAGE=your-custom-image:tag rover task "Your task description"
+```
+
+### Building from Source
+
+To build a custom agent image from the Rover repository:
+
+```bash
+# From the repo root
+docker build -t my-rover-agent:latest -f images/agent/Dockerfile .
+```
+
+Then configure it in your project's `rover.json`:
+
+```json
+{
+  "version": "1.2",
+  "sandbox": {
+    "agentImage": "my-rover-agent:latest"
+  }
+}
+```

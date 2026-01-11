@@ -437,26 +437,26 @@ The agent will typically:
 
 ### Can I use a custom Docker image?
 
-**Yes.** You can specify a custom agent image in several ways (in order of precedence):
+**Yes.** You can specify a custom agent image in your `rover.json`:
 
-1. **Environment variable:**
-   ```bash
-   AGENT_IMAGE=my-custom-image:latest rover task "do something"
-   # or
-   ROVER_AGENT_IMAGE=my-custom-image:latest rover task "do something"
-   ```
+```json
+{
+  "version": "1.2",
+  "sandbox": {
+    "agentImage": "my-custom-image:latest"
+  }
+}
+```
 
-2. **Project config** (`rover.json`):
-   ```json
-   {
-     "agentImage": "my-custom-image:latest"
-   }
-   ```
+Or via environment variable (takes precedence over config):
 
-**Requirements for custom images:**
-- Must be compatible with Rover's agent workflow
-- Should include the AI agent tools you want to use
-- Rover will warn you when using a non-default image
+```bash
+AGENT_IMAGE=my-custom-image:latest rover task "do something"
+```
+
+Rover will display a warning when using a custom image to alert you of potential compatibility issues.
+
+For full details on building custom images and requirements, see the [Agent Images documentation](./agent-images.md#using-a-custom-agent-image).
 
 ---
 
