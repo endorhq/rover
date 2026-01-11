@@ -45,10 +45,19 @@ export interface RunnerStepResult {
   duration: number;
   // Consumed tokens
   tokens?: number;
-  // Cost
+  // Cost in USD
   cost?: number;
+  // Model used (e.g., "claude-haiku-4-5-20251001")
+  model?: string;
   // Parsed output
   outputs: Map<string, string>;
+}
+
+/** Usage statistics extracted from agent JSON response */
+interface AgentUsageStats {
+  tokens?: number;
+  cost?: number;
+  model?: string;
 }
 
 export class Runner {
@@ -263,6 +272,9 @@ export class Runner {
       }
     }
 
+    // Track usage statistics from agent response
+    let usageStats: AgentUsageStats | undefined;
+
     // Single finalization path for successful steps (either direct or recovered)
     if (rawOutput !== undefined) {
       if (recoveryNotice) {
@@ -274,12 +286,18 @@ export class Runner {
       outputs.set('input_prompt', finalPrompt);
 
       // Parse the actual outputs based on this.step.outputs definitions
-      const { success: parseSuccess, error: parseError } =
-        await this.parseStepOutputs(rawOutput, outputs, output);
+      const {
+        success: parseSuccess,
+        error: parseError,
+        usage,
+      } = await this.parseStepOutputs(rawOutput, outputs, output);
 
       if (!parseSuccess) {
         throw new Error(parseError || 'Failed to parse step outputs');
       }
+
+      // Store usage statistics for result
+      usageStats = usage;
 
       console.log(
         colors.green(`✓ Step '${this.step.name}' completed successfully`)
@@ -320,6 +338,9 @@ export class Runner {
       success: !outputs.has('error'), // Success if no error was stored
       error: outputs.get('error'),
       duration: (performance.now() - start) / 1000, // Convert to seconds
+      tokens: usageStats?.tokens,
+      cost: usageStats?.cost,
+      model: usageStats?.model,
       outputs,
     };
 
@@ -365,13 +386,14 @@ export class Runner {
     rawOutput: string,
     outputs: Map<string, string>,
     outputDir?: string
-  ): Promise<{ success: boolean; error?: string }> {
+  ): Promise<{ success: boolean; error?: string; usage?: AgentUsageStats }> {
     try {
       // Check if this tool uses JSON output format
       const usesJsonFormat = this.toolUsesJsonFormat();
 
       let responseContent = rawOutput;
       let parsedResponse: any = null;
+      let usage: AgentUsageStats | undefined;
 
       // Parse JSON response if the tool uses JSON format
       if (usesJsonFormat) {
@@ -384,6 +406,9 @@ export class Runner {
               parsedResponse.result ||
               parsedResponse.content ||
               parsedResponse.message;
+
+            // Extract usage statistics from Claude's JSON response
+            usage = this.extractClaudeUsageStats(parsedResponse);
           } else if (this.tool === 'gemini') {
             // Currently, gemini uses "response"
             responseContent =
@@ -422,13 +447,49 @@ export class Runner {
         await this.extractFileOutputs(fileOutputs, outputs, outputDir);
       }
 
-      return { success: true };
+      return { success: true, usage };
     } catch (error) {
       return {
         success: false,
         error: `Failed to parse outputs: ${error instanceof Error ? error.message : String(error)}`,
       };
     }
+  }
+
+  /**
+   * Extract usage statistics from Claude's JSON response
+   */
+  private extractClaudeUsageStats(parsedResponse: any): AgentUsageStats {
+    const usage: AgentUsageStats = {};
+
+    // Extract cost
+    if (typeof parsedResponse.total_cost_usd === 'number') {
+      usage.cost = parsedResponse.total_cost_usd;
+    }
+
+    // Extract total tokens from usage object
+    if (parsedResponse.usage) {
+      const u = parsedResponse.usage;
+      const inputTokens = u.input_tokens || 0;
+      const outputTokens = u.output_tokens || 0;
+      const cacheReadTokens = u.cache_read_input_tokens || 0;
+      const cacheCreationTokens = u.cache_creation_input_tokens || 0;
+      usage.tokens =
+        inputTokens + outputTokens + cacheReadTokens + cacheCreationTokens;
+    }
+
+    // Extract model from modelUsage (first key is the model name)
+    if (
+      parsedResponse.modelUsage &&
+      typeof parsedResponse.modelUsage === 'object'
+    ) {
+      const models = Object.keys(parsedResponse.modelUsage);
+      if (models.length > 0) {
+        usage.model = models[0];
+      }
+    }
+
+    return usage;
   }
 
   /**

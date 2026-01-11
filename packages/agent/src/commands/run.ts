@@ -315,6 +315,9 @@ export const runCommand = async (
         );
         totalDuration += result.duration;
 
+        if (result.model) {
+          console.log(colors.gray('├── Model: ') + colors.cyan(result.model));
+        }
         if (result.tokens) {
           console.log(
             colors.gray('├── Tokens: ') + colors.cyan(result.tokens.toString())
