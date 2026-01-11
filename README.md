@@ -264,6 +264,26 @@ echo "Task $ROVER_TASK_ID ($ROVER_TASK_TITLE) finished with status: $ROVER_TASK_
 
 Hook failures are logged as warnings but do not block operations.
 
+### Telemetry
+
+Rover collects anonymous usage telemetry to help improve the product. No code, task content, or personal information is collected.
+
+**Data collected:**
+- Anonymous user ID (random UUID)
+- Command usage (which commands are run)
+- Agent and workflow names used
+- Source (CLI or extension)
+
+**To disable telemetry:**
+
+```bash
+# Option 1: Environment variable
+export ROVER_NO_TELEMETRY=1
+
+# Option 2: Create marker file
+touch ~/.config/rover/.no-telemetry
+```
+
 ### Report Issues
 
 Found a bug or have a feature request? Please [open an issue on GitHub](https://github.com/endorhq/rover/issues). We appreciate detailed bug reports and thoughtful feature suggestions.
