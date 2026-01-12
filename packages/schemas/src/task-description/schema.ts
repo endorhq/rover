@@ -3,6 +3,7 @@
  * Defines validation rules for task description data.
  */
 import { z } from 'zod';
+import { NetworkConfigSchema } from '../project-config/schema.js';
 
 // Schema version for migrations
 export const CURRENT_TASK_DESCRIPTION_SCHEMA_VERSION = '1.2';
@@ -63,6 +64,9 @@ export const TaskDescriptionSchema = z.object({
 
   // Agent Image
   agentImage: z.string().optional(),
+
+  // Network configuration override for this task
+  networkConfig: NetworkConfigSchema.optional(),
 
   // Metadata
   version: z.string(),

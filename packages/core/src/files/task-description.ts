@@ -18,6 +18,7 @@ import {
   type StatusMetadata,
   type IterationMetadata,
   type TaskStatus,
+  type NetworkConfig,
   TaskNotFoundError,
   TaskValidationError,
   TaskSchemaError,
@@ -70,6 +71,7 @@ export class TaskDescriptionManager {
       agent: taskData.agent,
       agentModel: taskData.agentModel,
       sourceBranch: taskData.sourceBranch,
+      networkConfig: taskData.networkConfig,
       version: CURRENT_TASK_DESCRIPTION_SCHEMA_VERSION,
     };
 
@@ -207,6 +209,9 @@ export class TaskDescriptionManager {
 
     // Preserve agentImage field
     migrated.agentImage = data.agentImage;
+
+    // Preserve networkConfig field
+    migrated.networkConfig = data.networkConfig;
 
     return migrated as TaskDescription;
   }
@@ -646,6 +651,9 @@ export class TaskDescriptionManager {
   }
   get agentImage(): string | undefined {
     return this.data.agentImage;
+  }
+  get networkConfig(): NetworkConfig | undefined {
+    return this.data.networkConfig;
   }
 
   // Data Modification (Setters)

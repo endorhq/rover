@@ -212,6 +212,69 @@ After an AI agent finishes the task, all code changes and output documents are a
 
 Once you are ready, you can merge changes or push the branch. That's it! 🚀
 
+## Network Filtering
+
+Rover supports network filtering for container sandboxes, allowing you to control which hosts the AI agent can access during task execution. This is useful for security, compliance, or to prevent agents from accessing unwanted resources.
+
+### Configuration via rover.json
+
+Add network configuration to your `rover.json` file:
+
+```json
+{
+  "sandbox": {
+    "network": {
+      "mode": "allowlist",
+      "rules": [
+        { "host": "api.anthropic.com", "description": "Claude API" },
+        { "host": "registry.npmjs.org", "description": "NPM registry" },
+        { "host": "10.0.0.0/8", "description": "Internal network" }
+      ],
+      "allowDns": true,
+      "allowLocalhost": true
+    }
+  }
+}
+```
+
+**Configuration options:**
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `mode` | `"allowlist"` \| `"blocklist"` \| `"none"` | `"none"` | Network filtering mode |
+| `rules` | `Array<{host, description?}>` | `[]` | List of hosts (domain, IP, or CIDR) |
+| `allowDns` | `boolean` | `true` | Allow DNS resolution (port 53) |
+| `allowLocalhost` | `boolean` | `true` | Allow localhost/loopback traffic |
+
+### CLI Options
+
+You can also configure network filtering per-task using CLI flags:
+
+```sh
+# Allowlist mode - only allow specific hosts
+rover task "implement feature" --network-mode allowlist \
+  --network-allow api.anthropic.com \
+  --network-allow registry.npmjs.org
+
+# Blocklist mode - block specific hosts
+rover task "implement feature" --network-mode blocklist \
+  --network-block malicious.com \
+  --network-block ads.example.com
+
+# Disable network filtering (default)
+rover task "implement feature" --network-mode none
+```
+
+**CLI options:**
+
+| Option | Description |
+|--------|-------------|
+| `--network-mode <mode>` | Set network filtering mode: `allowlist`, `blocklist`, or `none` |
+| `--network-allow <host>` | Allow a host (can be repeated). Implies `allowlist` mode if no mode specified |
+| `--network-block <host>` | Block a host (can be repeated). Implies `blocklist` mode if no mode specified |
+
+> **Note:** CLI options override project-level configuration in `rover.json`.
+
 ### Report Issues
 
 Found a bug or have a feature request? Please [open an issue on GitHub](https://github.com/endorhq/rover/issues). We appreciate detailed bug reports and thoughtful feature suggestions.
