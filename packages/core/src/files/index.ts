@@ -6,5 +6,12 @@ export { ProjectConfigManager } from './project-config.js';
 export { TaskDescriptionStore } from './task-description-store.js';
 export { TaskDescriptionManager } from './task-description.js';
 export { UserSettingsManager } from './user-settings.js';
-export { WorkflowStore } from './workflow-store.js';
+export {
+  WorkflowStore,
+  WorkflowStoreError,
+  WorkflowSource,
+  type WorkflowMetadata,
+  type AddWorkflowResult,
+  type WorkflowEntry,
+} from './workflow-store.js';
 export { WorkflowManager } from './workflow.js';

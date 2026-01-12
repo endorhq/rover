@@ -1,17 +1,26 @@
 import colors from 'ansi-colors';
-import { formatTaskStatus, statusColor } from '../utils/task-status.js';
-import { getTelemetry } from '../lib/telemetry.js';
 import {
-  TaskDescriptionStore,
-  IterationStatusManager,
   IterationManager,
-  VERBOSE,
+  IterationStatusManager,
+  ProjectConfigManager,
   showTips,
   Table,
   TableColumn,
+  TaskDescriptionStore,
+  UserSettingsManager,
+  VERBOSE,
 } from 'rover-core';
+import { type TaskDescription } from 'rover-schemas';
 import { isJsonMode, setJsonMode } from '../lib/global-state.js';
-import { TaskDescription } from 'rover-schemas';
+import { executeHooks } from '../lib/hooks.js';
+import { getTelemetry } from '../lib/telemetry.js';
+import { formatTaskStatus, statusColor } from '../utils/task-status.js';
+
+/**
+ * Track previous task statuses to detect transitions for onComplete hooks.
+ * Module-level to persist across watch mode polling cycles.
+ */
+const previousTaskStatuses = new Map<number, string>();
 
 /**
  * Format duration from start to now or completion
@@ -74,7 +83,7 @@ interface TaskRow {
 
 export const listCommand = async (
   options: {
-    watch?: boolean;
+    watch?: boolean | string;
     verbose?: boolean;
     json?: boolean;
     watching?: boolean;
@@ -99,19 +108,60 @@ export const listCommand = async (
       } else {
         console.log(colors.yellow('📋 No tasks found'));
 
-        showTips(
-          'Use ' +
-            colors.cyan('rover task') +
-            ' to assign a new task to an agent'
-        );
+        if (!options.watch) {
+          showTips(
+            'Use ' +
+              colors.cyan('rover task') +
+              ' to assign a new task to an agent'
+          );
+        }
       }
-      return;
+
+      // Don't return early if in watch mode - continue to watch for new tasks
+      if (!options.watch) {
+        return;
+      }
     }
 
-    // Update task status
+    // Load project config for hooks (outside loop for efficiency)
+    let projectConfig: ProjectConfigManager | undefined;
+    try {
+      projectConfig = ProjectConfigManager.load();
+    } catch {
+      // Project config is optional, continue without hooks
+    }
+
+    // Update task status and detect transitions for onComplete hooks
     tasks.forEach(task => {
       try {
+        // Get previous status before update
+        const previousStatus = previousTaskStatuses.get(task.id);
+
+        // Update status from iteration
         task.updateStatusFromIteration();
+        const currentStatus = task.status;
+
+        // Detect NEW transition to COMPLETED or FAILED
+        const isNewCompletion =
+          previousStatus !== currentStatus &&
+          (currentStatus === 'COMPLETED' || currentStatus === 'FAILED');
+
+        // Execute onComplete hooks if configured and this is a new completion
+        if (isNewCompletion && projectConfig?.hooks?.onComplete?.length) {
+          executeHooks(
+            projectConfig.hooks.onComplete,
+            {
+              taskId: task.id,
+              taskBranch: task.branchName,
+              taskTitle: task.title,
+              taskStatus: currentStatus.toLowerCase(),
+            },
+            'onComplete'
+          );
+        }
+
+        // Update tracking for next iteration
+        previousTaskStatuses.set(task.id, currentStatus);
       } catch (err) {
         if (!isJsonMode()) {
           console.log(
@@ -183,10 +233,16 @@ export const listCommand = async (
 
       const iterationStatus = maybeIterationStatus(lastIteration);
 
+      // Format agent with model (e.g., "claude:sonnet")
+      let agentDisplay = task.agent || '-';
+      if (task.agent && task.agentModel) {
+        agentDisplay = `${task.agent}:${task.agentModel}`;
+      }
+
       return {
         id: task.id.toString(),
         title: task.title || 'Unknown Task',
-        agent: task.agent || '-',
+        agent: agentDisplay,
         workflow: task.workflowName || '-',
         status: taskStatus,
         progress: iterationStatus?.progress || 0,
@@ -214,7 +270,9 @@ export const listCommand = async (
       {
         header: 'Agent',
         key: 'agent',
-        width: 8,
+        minWidth: 8,
+        maxWidth: 16,
+        truncate: 'ellipsis',
         format: (value: string) => colors.gray(value),
       },
       {
@@ -270,10 +328,32 @@ export const listCommand = async (
       });
     }
 
-    // Watch mode (simple refresh every 3 seconds)
+    // Watch mode (configurable refresh interval, default 3 seconds)
     if (options.watch) {
+      // CLI argument takes precedence, then settings, then default (3s)
+      let intervalSeconds: number;
+      if (typeof options.watch === 'string') {
+        intervalSeconds = parseInt(options.watch, 10);
+        if (
+          isNaN(intervalSeconds) ||
+          intervalSeconds < 1 ||
+          intervalSeconds > 60
+        ) {
+          console.error(
+            colors.red('Watch interval must be between 1 and 60 seconds')
+          );
+          return;
+        }
+      } else {
+        const settings = UserSettingsManager.load();
+        intervalSeconds = settings.watchIntervalSeconds;
+      }
+      const intervalMs = intervalSeconds * 1000;
+
       console.log(
-        colors.gray('\n⏱️  Watching for changes every 3s (Ctrl+C to exit)...')
+        colors.gray(
+          `\n⏱️  Watching for changes every ${intervalSeconds}s (Ctrl+C to exit)...`
+        )
       );
 
       const watchInterval = setInterval(async () => {
@@ -281,9 +361,11 @@ export const listCommand = async (
         process.stdout.write('\x1b[2J\x1b[0f');
         await listCommand({ ...options, watch: false, watching: true });
         console.log(
-          colors.gray('\n⏱️  Refreshing every 3s (Ctrl+C to exit)...')
+          colors.gray(
+            `\n⏱️  Refreshing every ${intervalSeconds}s (Ctrl+C to exit)...`
+          )
         );
-      }, 3000);
+      }, intervalMs);
 
       // Handle Ctrl+C
       process.on('SIGINT', () => {

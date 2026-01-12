@@ -1,22 +1,19 @@
 {
   "name": "rover-telemetry",
   "version": "1.0.0",
+  "private": true,
   "description": "Provide basic telemetry to the rover CLI and extension",
   "main": "dist/index.mjs",
-  "types": "dist/index.d.mts",
+  "types": "src/index.ts",
   "type": "module",
-  "files": [
-    "LICENSE.md",
-    "dist/*"
-  ],
+  "files": ["LICENSE.md", "dist/*"],
   "scripts": {
-    "build": "tsdown --env.TSUP_DEV=false",
-    "build-dev": "TSUP_DEV=true tsdown --env.TSUP_DEV=true",
+    "build": "tsdown --config-loader unrun --env.TSUP_DEV=false",
+    "build-dev": "TSUP_DEV=true tsdown --config-loader unrun --env.TSUP_DEV=true",
     "dev": "TSUP_DEV=true tsdown --env.TSUP_DEV=true --watch src/",
     "start": "echo 'Telemetry package is not a CLI'",
     "clean": "rm -rf dist",
-    "check": "tsc --noEmit",
-    "format": "prettier --write \"src/**/*.{ts,js,json}\""
+    "check": "tsc --noEmit"
   },
   "author": "The Endor team",
   "dependencies": {
@@ -24,10 +21,10 @@
     "uuid": "^11.1.0"
   },
   "devDependencies": {
-    "@types/node": "^24.1.0",
+    "@types/node": "catalog:build",
     "@types/react": "^19.1.8",
     "@types/uuid": "^10.0.0",
     "tsdown": "catalog:build",
-    "typescript": "^5.8.3"
+    "typescript": "catalog:build"
   }
 }

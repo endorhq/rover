@@ -21,6 +21,7 @@ import {
 import { showRoverChat, showTips, TIP_TITLES } from '../utils/display.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { exitWithError, exitWithWarn, exitWithSuccess } from '../utils/exit.js';
+import { isGitRepository } from '../utils/repo-checks.js';
 
 // Get the default prompt
 const { prompt } = enquirer;
@@ -91,6 +92,21 @@ export const initCommand = async (
   options: { yes?: boolean }
 ) => {
   const telemetry = getTelemetry();
+
+  // Check if we're in a git repository
+  if (!isGitRepository()) {
+    console.error(
+      colors.red('✗ Not in a git repository') +
+        '\n' +
+        colors.gray('This command must be run from within a git repository')
+    );
+    console.log(
+      colors.gray('\nTip: Run ') +
+        colors.cyan('git init') +
+        colors.gray(' to initialize a git repository')
+    );
+    process.exit(1);
+  }
 
   showRoverChat([
     "hey human! I'm Rover and I will help you manage AI agents.",

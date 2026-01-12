@@ -16,6 +16,7 @@ import {
 import { IterationManager } from 'rover-core';
 import { isJsonMode, setJsonMode } from '../lib/global-state.js';
 import { exitWithError, exitWithSuccess } from '../utils/exit.js';
+import { isRoverInitialized } from '../utils/repo-checks.js';
 
 const DEFAULT_FILE_CONTENTS = 'summary.md';
 
@@ -159,6 +160,21 @@ export const inspectCommand = async (
     return;
   }
 
+  // Check if rover is initialized
+  if (!isRoverInitialized()) {
+    const errorOutput = jsonErrorOutput(
+      'Rover is not initialized in this directory',
+      numericTaskId
+    );
+    if (isJsonMode()) {
+      console.log(JSON.stringify(errorOutput, null, 2));
+    } else {
+      console.log(colors.red('✗ Rover is not initialized in this directory'));
+      showTips(['Run ' + colors.cyan('rover init') + ' first']);
+    }
+    return;
+  }
+
   try {
     // Load task using TaskDescription
     const task = TaskDescriptionManager.load(numericTaskId);
@@ -207,7 +223,7 @@ export const inspectCommand = async (
         }
         console.log(JSON.stringify(rawFileOutput, null, 2));
         if (rawFileOutput.success) {
-          await exitWithSuccess('', { success: true }, { telemetry });
+          await exitWithSuccess(null, { success: true }, { telemetry });
         } else {
           await exitWithError(
             { success: false, error: rawFileOutput.error },
@@ -229,7 +245,7 @@ export const inspectCommand = async (
           rawFileContents.forEach(content => {
             console.log(content);
           });
-          await exitWithSuccess('', { success: true }, { telemetry });
+          await exitWithSuccess(null, { success: true }, { telemetry });
           return;
         }
       }
@@ -262,7 +278,7 @@ export const inspectCommand = async (
       };
 
       console.log(JSON.stringify(jsonOutput, null, 2));
-      await exitWithSuccess('', { success: true }, { telemetry });
+      await exitWithSuccess(null, { success: true }, { telemetry });
       return;
     } else {
       // Format status with user-friendly names
@@ -384,7 +400,7 @@ export const inspectCommand = async (
       ]);
     }
 
-    await exitWithSuccess('', { success: true }, { telemetry });
+    await exitWithSuccess(null, { success: true }, { telemetry });
     return;
   } catch (error) {
     if (error instanceof TaskNotFoundError) {

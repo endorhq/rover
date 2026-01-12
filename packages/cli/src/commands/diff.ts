@@ -6,6 +6,7 @@ import { getTelemetry } from '../lib/telemetry.js';
 import { Git, showList, showTitle } from 'rover-core';
 import { showTips } from '../utils/display.js';
 import { exitWithError, exitWithSuccess } from '../utils/exit.js';
+import { isRoverInitialized } from '../utils/repo-checks.js';
 
 export const diffCommand = async (
   taskId: string,
@@ -22,6 +23,15 @@ export const diffCommand = async (
         error: `Invalid task ID '${taskId}' - must be a number`,
       },
       { telemetry }
+    );
+    return;
+  }
+
+  // Check if rover is initialized
+  if (!isRoverInitialized()) {
+    console.log(colors.red('✗ Rover is not initialized in this directory'));
+    console.log(
+      colors.gray('Run ') + colors.cyan('rover init') + colors.gray(' first')
     );
     return;
   }
@@ -213,7 +223,7 @@ export const diffCommand = async (
       showTips(tips);
     }
 
-    await exitWithSuccess('', { success: true }, { telemetry });
+    await exitWithSuccess(null, { success: true }, { telemetry });
     return;
   } catch (error) {
     if (error instanceof TaskNotFoundError) {

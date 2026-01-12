@@ -3,22 +3,22 @@
 // Hover to view descriptions of existing attributes.
 // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
 {
-	"version": "0.2.0",
-	"configurations": [
-		{
-			"name": "Run Rover Extension",
-			"type": "extensionHost",
-			"request": "launch",
-			"args": [
-				"--extensionDevelopmentPath=${workspaceFolder}/packages/extension"
-			],
-			"outFiles": [
-				"${workspaceFolder}/packages/extension/dist/*.js",
-				"${workspaceFolder}/packages/extension/dist/*.map",
-				"${workspaceFolder}/packages/extension/dist/**/*.js",
-				"${workspaceFolder}/packages/extension/dist/**/*.map"
-			],
-			"preLaunchTask": "${defaultBuildTask}"
-		},
-	]
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run Rover Extension",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/packages/extension"
+      ],
+      "outFiles": [
+        "${workspaceFolder}/packages/extension/dist/*.js",
+        "${workspaceFolder}/packages/extension/dist/*.map",
+        "${workspaceFolder}/packages/extension/dist/**/*.js",
+        "${workspaceFolder}/packages/extension/dist/**/*.map"
+      ],
+      "preLaunchTask": "${defaultBuildTask}"
+    }
+  ]
 }

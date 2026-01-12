@@ -102,8 +102,9 @@ export class InitializationGuide extends LitElement {
                 AI agents.
               </div>
 
-              ${cliInstalled
-                ? html`
+              ${
+                cliInstalled
+                  ? html`
                     <div class="status-indicator status-success">
                       <span>✓</span>
                       <span
@@ -112,16 +113,18 @@ export class InitializationGuide extends LitElement {
                       >
                     </div>
                   `
-                : html`
+                  : html`
                     <div class="step-actions">
                       <button
                         class="action-button"
                         @click=${this.handleInstallCLI}
                         ?disabled=${this.isInstalling}
                       >
-                        ${this.isInstalling
-                          ? html`<div class="loading-spinner"></div>`
-                          : ''}
+                        ${
+                          this.isInstalling
+                            ? html`<div class="loading-spinner"></div>`
+                            : ''
+                        }
                         Install Rover CLI
                       </button>
                       <button
@@ -131,27 +134,30 @@ export class InitializationGuide extends LitElement {
                         I installed it manually
                       </button>
                     </div>
-                    ${error
-                      ? html` <div class="error-message">Error: ${error}</div> `
-                      : ''}
-                  `}
+                    ${
+                      error
+                        ? html` <div class="error-message">Error: ${error}</div> `
+                        : ''
+                    }
+                  `
+              }
             </div>
           </div>
 
           <!-- Step 2: Rover Initialization -->
           <div
-            class="setup-step ${roverInitialized
-              ? 'completed'
-              : cliInstalled
-                ? 'current'
-                : ''}"
+            class="setup-step ${
+              roverInitialized ? 'completed' : cliInstalled ? 'current' : ''
+            }"
           >
             <div
-              class="step-icon ${roverInitialized
-                ? 'completed'
-                : cliInstalled
-                  ? 'current'
-                  : 'pending'}"
+              class="step-icon ${
+                roverInitialized
+                  ? 'completed'
+                  : cliInstalled
+                    ? 'current'
+                    : 'pending'
+              }"
             >
               ${roverInitialized ? '✓' : '2'}
             </div>
@@ -162,71 +168,79 @@ export class InitializationGuide extends LitElement {
                 available tools and AI Coding Agents in your system.
               </div>
 
-              ${roverInitialized
-                ? html`
+              ${
+                roverInitialized
+                  ? html`
                     <div class="status-indicator status-success">
                       <span>✓</span>
                       <span>Rover is initialized in this workspace</span>
                     </div>
                   `
-                : cliInstalled
-                  ? workspaceOpen
-                    ? html`
+                  : cliInstalled
+                    ? workspaceOpen
+                      ? html`
                         <div class="step-actions">
                           <button
                             class="action-button"
                             @click=${this.handleInitializeRover}
                             ?disabled=${this.isInitializing}
                           >
-                            ${this.isInitializing
-                              ? html`<div class="loading-spinner"></div>`
-                              : ''}
+                            ${
+                              this.isInitializing
+                                ? html`<div class="loading-spinner"></div>`
+                                : ''
+                            }
                             Initialize Rover
                           </button>
                         </div>
                       `
-                    : html`
+                      : html`
                         <div class="step-description">
                           Please open a workspace folder to initialize Rover.
                         </div>
                       `
-                  : html`
+                    : html`
                       <div class="step-description">
                         Install the CLI first to continue with initialization.
                       </div>
-                    `}
+                    `
+              }
             </div>
           </div>
 
           <!-- Step 3: Ready to Use -->
           <div
-            class="setup-step ${cliInstalled && roverInitialized
-              ? 'completed'
-              : ''}"
+            class="setup-step ${
+              cliInstalled && roverInitialized ? 'completed' : ''
+            }"
           >
             <div
-              class="step-icon ${cliInstalled && roverInitialized
-                ? 'completed'
-                : 'pending'}"
+              class="step-icon ${
+                cliInstalled && roverInitialized ? 'completed' : 'pending'
+              }"
             >
               ${roverInitialized ? '✓' : '3'}
             </div>
             <div class="step-content">
               <div class="step-title">Ready to Go!</div>
               <div class="step-description">
-                ${roverInitialized
-                  ? 'Rover is set up and ready. You can now create tasks and collaborate with AI agents!'
-                  : "Once initialized, you'll be able to create tasks and start collaborating with AI agents."}
+                ${
+                  roverInitialized
+                    ? 'Rover is set up and ready. You can now create tasks and collaborate with AI agents!'
+                    : "Once initialized, you'll be able to create tasks and start collaborating with AI agents."
+                }
               </div>
 
-              ${cliInstalled && roverInitialized
-                ? html`
+              ${
+                cliInstalled && roverInitialized
+                  ? html`
                     <div class="status-indicator status-success">
                       <span>✓</span>
                       <span>Ready to create your first task!</span>
                     </div>
                   `
-                : ''}
+                  : ''
+              }
             </div>
           </div>
         </div>

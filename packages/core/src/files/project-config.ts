@@ -17,6 +17,7 @@ import {
   type MCP,
   type PackageManager,
   type TaskManager,
+  type HooksConfig,
 } from 'rover-schemas';
 import { findProjectRoot } from '../project-root.js';
 
@@ -139,6 +140,7 @@ export class ProjectConfigManager {
       ...(data.envs !== undefined ? { envs: data.envs } : {}),
       ...(data.envsFile !== undefined ? { envsFile: data.envsFile } : {}),
       ...(sandbox !== undefined ? { sandbox } : {}),
+      ...(data.hooks !== undefined ? { hooks: data.hooks } : {}),
     };
 
     return migrated;
@@ -198,6 +200,9 @@ export class ProjectConfigManager {
   }
   get initScript(): string | undefined {
     return this.data.sandbox?.initScript;
+  }
+  get hooks(): HooksConfig | undefined {
+    return this.data.hooks;
   }
 
   // Data Modification (Setters)

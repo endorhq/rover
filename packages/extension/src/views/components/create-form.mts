@@ -401,8 +401,9 @@ export class CreateForm extends LitElement {
                 ${input.description || input.name}
                 ${input.required ? html`<span class="required">*</span>` : ''}
               </label>
-              ${input.type === 'boolean'
-                ? html`
+              ${
+                input.type === 'boolean'
+                  ? html`
                     <label class="checkbox-container">
                       <input
                         type="checkbox"
@@ -416,8 +417,8 @@ export class CreateForm extends LitElement {
                       <span>${input.description || input.name}</span>
                     </label>
                   `
-                : input.type === 'number'
-                  ? html`
+                  : input.type === 'number'
+                    ? html`
                       <input
                         type="number"
                         class="form-input"
@@ -432,7 +433,7 @@ export class CreateForm extends LitElement {
                         }}
                       />
                     `
-                  : html`
+                    : html`
                       <input
                         type="text"
                         class="form-input"
@@ -444,7 +445,8 @@ export class CreateForm extends LitElement {
                             (e.target as HTMLInputElement).value
                           )}
                       />
-                    `}
+                    `
+              }
             </div>
           `;
         })}
@@ -465,8 +467,9 @@ export class CreateForm extends LitElement {
         </p>
 
         <!-- Workflow Dropdown or Upgrade Message -->
-        ${this.isVersionAtLeast(this.version, '1.3.0')
-          ? html`
+        ${
+          this.isVersionAtLeast(this.version, '1.3.0')
+            ? html`
               <div class="form-field">
                 <label class="form-label">Workflow</label>
                 <div class="dropdown-container">
@@ -480,40 +483,46 @@ export class CreateForm extends LitElement {
                     <i class="codicon codicon-chevron-down"></i>
                   </button>
 
-                  ${this.showWorkflowDropdown
-                    ? html`
+                  ${
+                    this.showWorkflowDropdown
+                      ? html`
                         <div
-                          class="dropdown-menu ${this
-                            .workflowDropdownDirection === 'up'
-                            ? 'dropdown-up'
-                            : ''}"
+                          class="dropdown-menu ${
+                            this.workflowDropdownDirection === 'up'
+                              ? 'dropdown-up'
+                              : ''
+                          }"
                         >
                           ${this.workflows.map(
                             workflow => html`
                               <button
-                                class="dropdown-item ${workflow.id ===
-                                this.selectedWorkflow
-                                  ? 'selected'
-                                  : ''}"
+                                class="dropdown-item ${
+                                  workflow.id === this.selectedWorkflow
+                                    ? 'selected'
+                                    : ''
+                                }"
                                 @click=${(e: Event) =>
                                   this.selectWorkflow(workflow.id, e)}
                               >
                                 <i class="codicon codicon-layout"></i>
                                 <span>${workflow.label}</span>
-                                ${workflow.id === this.selectedWorkflow
-                                  ? html`<i class="codicon codicon-check"></i>`
-                                  : ''}
+                                ${
+                                  workflow.id === this.selectedWorkflow
+                                    ? html`<i class="codicon codicon-check"></i>`
+                                    : ''
+                                }
                               </button>
                             `
                           )}
                         </div>
                       `
-                    : ''}
+                      : ''
+                  }
                 </div>
               </div>
             `
-          : this.version
-            ? html`
+            : this.version
+              ? html`
                 <div class="form-field">
                   <label class="form-label">Workflow</label>
                   <div class="upgrade-message">
@@ -529,7 +538,8 @@ export class CreateForm extends LitElement {
                   </div>
                 </div>
               `
-            : ''}
+              : ''
+        }
 
         <!-- Workflow custom inputs -->
         ${this.renderWorkflowInputs()}
@@ -545,14 +555,16 @@ export class CreateForm extends LitElement {
           ></textarea>
         </div>
 
-        ${this.errorMessage
-          ? html`
+        ${
+          this.errorMessage
+            ? html`
               <div class="error-message">
                 <i class="codicon codicon-error"></i>
                 ${this.errorMessage}
               </div>
             `
-          : ''}
+            : ''
+        }
 
         <div class="form-controls">
           <div class="form-controls-left">
@@ -568,35 +580,39 @@ export class CreateForm extends LitElement {
                 <i class="codicon codicon-chevron-down"></i>
               </button>
 
-              ${this.showAgentDropdown
-                ? html`
+              ${
+                this.showAgentDropdown
+                  ? html`
                     <div
-                      class="dropdown-menu ${this.agentDropdownDirection ===
-                      'up'
-                        ? 'dropdown-up'
-                        : ''}"
+                      class="dropdown-menu ${
+                        this.agentDropdownDirection === 'up'
+                          ? 'dropdown-up'
+                          : ''
+                      }"
                     >
                       ${this.getAgentsList().map(
                         agent => html`
                           <button
-                            class="dropdown-item ${agent.id ===
-                            this.selectedAgent
-                              ? 'selected'
-                              : ''}"
+                            class="dropdown-item ${
+                              agent.id === this.selectedAgent ? 'selected' : ''
+                            }"
                             @click=${(e: Event) =>
                               this.selectAgent(agent.id, e)}
                           >
                             <i class="codicon codicon-hubot"></i>
                             <span>${agent.name}</span>
-                            ${agent.id === this.selectedAgent
-                              ? html`<i class="codicon codicon-check"></i>`
-                              : ''}
+                            ${
+                              agent.id === this.selectedAgent
+                                ? html`<i class="codicon codicon-check"></i>`
+                                : ''
+                            }
                           </button>
                         `
                       )}
                     </div>
                   `
-                : ''}
+                  : ''
+              }
             </div>
 
             <!-- Branch Dropdown -->
@@ -611,34 +627,38 @@ export class CreateForm extends LitElement {
                 <i class="codicon codicon-chevron-down"></i>
               </button>
 
-              ${this.showBranchDropdown
-                ? html`
+              ${
+                this.showBranchDropdown
+                  ? html`
                     <div
-                      class="dropdown-menu ${this.branchDropdownDirection ===
-                      'up'
-                        ? 'dropdown-up'
-                        : ''}"
+                      class="dropdown-menu ${
+                        this.branchDropdownDirection === 'up'
+                          ? 'dropdown-up'
+                          : ''
+                      }"
                     >
                       ${this.branches.map(
                         branch => html`
                           <button
-                            class="dropdown-item ${branch ===
-                            this.selectedBranch
-                              ? 'selected'
-                              : ''}"
+                            class="dropdown-item ${
+                              branch === this.selectedBranch ? 'selected' : ''
+                            }"
                             @click=${(e: Event) => this.selectBranch(branch, e)}
                           >
                             <i class="codicon codicon-git-branch"></i>
                             <span>${branch}</span>
-                            ${branch === this.selectedBranch
-                              ? html`<i class="codicon codicon-check"></i>`
-                              : ''}
+                            ${
+                              branch === this.selectedBranch
+                                ? html`<i class="codicon codicon-check"></i>`
+                                : ''
+                            }
                           </button>
                         `
                       )}
                     </div>
                   `
-                : ''}
+                  : ''
+              }
             </div>
           </div>
 
@@ -650,9 +670,9 @@ export class CreateForm extends LitElement {
               title="Create new task (Ctrl+Enter)"
             >
               <i
-                class="codicon ${this.creatingTask
-                  ? 'codicon-loading spin'
-                  : 'codicon-add'}"
+                class="codicon ${
+                  this.creatingTask ? 'codicon-loading spin' : 'codicon-add'
+                }"
               ></i>
               ${this.creatingTask ? 'Creating...' : 'Create Task'}
             </button>

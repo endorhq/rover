@@ -150,6 +150,22 @@ npm install -g @endorhq/rover@latest
    rover ls -w
    ```
 
+   You can specify a custom refresh interval (1-60 seconds):
+
+   ```sh
+   rover ls -w 10  # Refresh every 10 seconds
+   ```
+
+   Or set a default in `.rover/settings.json`:
+
+   ```json
+   {
+     "defaults": {
+       "watchIntervalSeconds": 5
+     }
+   }
+   ```
+
 4. Keep working on your own tasks 🤓
 
 5. After finishing, check the task result:
@@ -211,6 +227,62 @@ Once you create a task, Rover creates a separate _git worktree_ (`workspace`) an
 After an AI agent finishes the task, all code changes and output documents are available in the task workspace (_git worktree_). You can inspect those documents, check changes, iterate with an AI agent, or even take full control and start applying changes manually. **Every developer has a different workflow, and Rover won't interfere with it**.
 
 Once you are ready, you can merge changes or push the branch. That's it! 🚀
+
+### Task Lifecycle Hooks
+
+Rover supports hooks that run shell commands when task lifecycle events occur. Configure hooks in your `rover.json`:
+
+```json
+{
+  "hooks": {
+    "onComplete": ["./scripts/on-complete.sh"],
+    "onMerge": ["./scripts/on-merge.sh"],
+    "onPush": ["echo 'Task $ROVER_TASK_ID pushed'"]
+  }
+}
+```
+
+**Available hooks:**
+- `onComplete` - Runs when a task completes (success or failure), detected via `rover list` or `rover list --watch`
+- `onMerge` - Runs after a task is successfully merged via `rover merge`
+- `onPush` - Runs after a task branch is pushed via `rover push`
+
+**Environment variables** passed to hook commands:
+| Variable | Description |
+|----------|-------------|
+| `ROVER_TASK_ID` | The task ID |
+| `ROVER_TASK_BRANCH` | The task branch name |
+| `ROVER_TASK_TITLE` | The task title |
+| `ROVER_TASK_STATUS` | Task status: "completed" or "failed" (onComplete only) |
+
+**Example hook script** (`scripts/on-complete.sh`):
+```bash
+#!/bin/bash
+echo "Task $ROVER_TASK_ID ($ROVER_TASK_TITLE) finished with status: $ROVER_TASK_STATUS"
+# Notify your team, trigger CI, update a dashboard, etc.
+```
+
+Hook failures are logged as warnings but do not block operations.
+
+### Telemetry
+
+Rover collects anonymous usage telemetry to help improve the product. No code, task content, or personal information is collected.
+
+**Data collected:**
+- Anonymous user ID (random UUID)
+- Command usage (which commands are run)
+- Agent and workflow names used
+- Source (CLI or extension)
+
+**To disable telemetry:**
+
+```bash
+# Option 1: Environment variable
+export ROVER_NO_TELEMETRY=1
+
+# Option 2: Create marker file
+touch ~/.config/rover/.no-telemetry
+```
 
 ### Report Issues
 
