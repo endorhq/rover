@@ -72,11 +72,11 @@ export const exitWithErrors = async (
 };
 
 /**
- * Exits the program with a warning message. By default, it just returns a 0
- * exitCode, but you can change it.
+ * Exits the program with an optional warning message. By default, it
+ * just returns a 0 exitCode, but you can change it.
  */
 export const exitWithWarn = async (
-  warnMessage: string,
+  warnMessage: string | null,
   jsonOutput: CLIJsonOutput,
   options: ExitWithWarnOpts = {}
 ) => {
@@ -90,7 +90,9 @@ export const exitWithWarn = async (
   if (isJsonMode()) {
     console.log(JSON.stringify(jsonOutput, null, 2));
   } else {
-    console.log(colors.yellow(`\n⚠ ${warnMessage}`));
+    if (warnMessage !== null) {
+      console.log(colors.yellow(`\n⚠ ${warnMessage}`));
+    }
 
     if (tips != null) showTips(tips, tipsConfig);
   }
@@ -99,11 +101,11 @@ export const exitWithWarn = async (
 };
 
 /**
- * Exits the program showing a success message and an optional
+ * Exits the program with an optional success message and an optional
  * set of tips.
  */
 export const exitWithSuccess = async (
-  successMessage: string,
+  successMessage: string | null,
   jsonOutput: CLIJsonOutput,
   options: ExitWithSuccessOpts = {}
 ) => {
@@ -117,7 +119,9 @@ export const exitWithSuccess = async (
   if (isJsonMode()) {
     console.log(JSON.stringify(jsonOutput, null, 2));
   } else {
-    console.log(colors.green(`\n✓ ${successMessage}`));
+    if (successMessage !== null) {
+      console.log(colors.green(`\n✓ ${successMessage}`));
+    }
 
     if (tips != null) showTips(tips, tipsConfig);
   }

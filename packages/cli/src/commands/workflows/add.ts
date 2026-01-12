@@ -92,7 +92,7 @@ export const addWorkflowCommand = async (
     };
 
     if (isJsonMode()) {
-      await exitWithSuccess('', output, { telemetry });
+      await exitWithSuccess(null, output, { telemetry });
     } else {
       // Format human-readable output
       const storeType = result.isLocal

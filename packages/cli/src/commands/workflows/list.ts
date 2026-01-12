@@ -70,7 +70,7 @@ export const listWorkflowsCommand = async (
         source: entry.source,
       }));
 
-      await exitWithSuccess('', output, { telemetry });
+      await exitWithSuccess(null, output, { telemetry });
     } else {
       // Define table columns
       const columns: TableColumn<WorkflowRow>[] = [

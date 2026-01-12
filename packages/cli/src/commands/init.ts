@@ -20,6 +20,7 @@ import {
 } from 'rover-core';
 import { showRoverChat, showTips, TIP_TITLES } from '../utils/display.js';
 import { getTelemetry } from '../lib/telemetry.js';
+import { exitWithError, exitWithWarn, exitWithSuccess } from '../utils/exit.js';
 import { isGitRepository } from '../utils/repo-checks.js';
 
 // Get the default prompt
@@ -182,13 +183,22 @@ export const initCommand = async (
   );
 
   if (!completeInstallation) {
-    process.exit(1);
+    await exitWithError(
+      {
+        success: false,
+        error: 'Your system misses some required tools',
+      },
+      { telemetry }
+    );
+    return;
   }
 
   // Check if already initialized
   if (ProjectConfigManager.exists() && UserSettingsManager.exists()) {
-    console.log(
-      colors.cyan('\n✓ Rover is already initialized in this directory')
+    await exitWithSuccess(
+      'Rover is already initialized in this directory',
+      { success: true },
+      { telemetry }
     );
     return;
   } else if (!UserSettingsManager.exists()) {
@@ -292,8 +302,12 @@ export const initCommand = async (
         });
         attribution = confirm;
       } catch (error) {
-        console.log('Init process cancelled');
-        process.exit(1);
+        await exitWithWarn(
+          'Init process cancelled',
+          { success: true },
+          { exitCode: 1, telemetry }
+        );
+        return;
       }
     }
 
@@ -368,15 +382,30 @@ export const initCommand = async (
         }
       );
 
-      await telemetry?.shutdown();
+      await exitWithSuccess(
+        'Rover initialization complete!',
+        { success: true },
+        { telemetry }
+      );
+      return;
     } catch (error) {
-      console.error('\n' + colors.red('Rover initialization failed!'));
-      console.error(colors.red('Error:'), error);
-      process.exit(1);
+      await exitWithError(
+        {
+          success: false,
+          error: `Rover initialization failed: ${error}`,
+        },
+        { telemetry }
+      );
+      return;
     }
   } catch (error) {
-    console.error('\n' + colors.red('Failed to detect environment'));
-    console.error(colors.red('Error:'), error);
-    process.exit(1);
+    await exitWithError(
+      {
+        success: false,
+        error: `Failed to detect environment: ${error}`,
+      },
+      { telemetry }
+    );
+    return;
   }
 };

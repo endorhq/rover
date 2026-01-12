@@ -34,8 +34,14 @@ const consoleSpy = {
 describe('diff command', () => {
   let testDir: string;
   let originalCwd: string;
+  let processExitSpy: any;
 
   beforeEach(() => {
+    // Mock process.exit to prevent test from exiting
+    processExitSpy = vi
+      .spyOn(process, 'exit')
+      .mockImplementation((() => {}) as any);
+
     // Clear project root cache to ensure tests use the correct directory
     clearProjectRootCache();
 
@@ -80,6 +86,7 @@ describe('diff command', () => {
   afterEach(() => {
     process.chdir(originalCwd);
     rmSync(testDir, { recursive: true, force: true });
+    processExitSpy.mockRestore();
     vi.clearAllMocks();
 
     // Clear project root cache after test
