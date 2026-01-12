@@ -16,6 +16,7 @@
     "useEditorconfig": true,
     "includes": [
       "**",
+      "!.direnv",
       "!**/node_modules/",
       "!**/dist/",
       "!**/build/",
@@ -46,6 +47,7 @@
     "rules": { "recommended": true },
     "includes": [
       "packages/telemetry/**",
+      "!.direnv",
       "!**/node_modules/",
       "!**/dist/",
       "!**/build/",
