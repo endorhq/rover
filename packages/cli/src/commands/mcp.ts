@@ -18,11 +18,22 @@ import { resetCommand } from '../commands/reset.js';
 import { stopCommand } from '../commands/stop.js';
 import { AI_AGENT } from 'rover-core';
 import { z } from 'zod';
+import { isRoverInitialized } from '../utils/repo-checks.js';
+import colors from 'ansi-colors';
 
 /**
  * Start an MCP server
  */
 export const mcpCommand = async () => {
+  // Check if rover is initialized
+  if (!isRoverInitialized()) {
+    console.error(colors.red('✗ Rover is not initialized in this directory'));
+    console.error(
+      colors.gray('Run ') + colors.cyan('rover init') + colors.gray(' first')
+    );
+    process.exit(1);
+  }
+
   const server = new McpServer({
     name: 'rover',
     version: '1.0.0',

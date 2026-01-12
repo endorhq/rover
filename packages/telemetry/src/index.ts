@@ -70,6 +70,8 @@ enum EVENT_IDS {
   LIST_WORKFLOWS = 'list_workflows',
   // Inspect workflow
   INSPECT_WORKFLOW = 'inspect_workflow',
+  // Add workflow
+  ADD_WORKFLOW = 'add_workflow',
   // Open a workspace in the extension
   OPEN_WORKSPACE = 'open_workspace',
 }
@@ -216,6 +218,10 @@ class Telemetry {
 
   eventInspectWorkflow() {
     this.capture(EVENT_IDS.INSPECT_WORKFLOW);
+  }
+
+  eventAddWorkflow() {
+    this.capture(EVENT_IDS.ADD_WORKFLOW);
   }
 
   eventOpenWorkspace() {
