@@ -1,7 +1,7 @@
 import { getAIAgentTool } from '../agents/index.js';
 import { join } from 'node:path';
 import { ProjectConfigManager, TaskDescriptionManager } from 'rover-core';
-import { Sandbox } from './types.js';
+import { Sandbox, SandboxOptions } from './types.js';
 import { SetupBuilder } from '../setup.js';
 import { launch, ProcessManager, VERBOSE } from 'rover-core';
 import { existsSync } from 'node:fs';
@@ -12,6 +12,7 @@ import {
   resolveAgentImage,
   warnIfCustomImage,
   tmpUserGroupFiles,
+  normalizeExtraArgs,
 } from './container-common.js';
 import { isJsonMode } from '../global-state.js';
 import colors from 'ansi-colors';
@@ -19,8 +20,12 @@ import colors from 'ansi-colors';
 export class DockerSandbox extends Sandbox {
   backend = ContainerBackend.Docker;
 
-  constructor(task: TaskDescriptionManager, processManager?: ProcessManager) {
-    super(task, processManager);
+  constructor(
+    task: TaskDescriptionManager,
+    processManager?: ProcessManager,
+    options?: SandboxOptions
+  ) {
+    super(task, processManager, options);
   }
 
   async isBackendAvailable(): Promise<boolean> {
@@ -161,12 +166,18 @@ export class DockerSandbox extends Sandbox {
       }
     }
 
+    // Get extra args from CLI options and project config, merge them
+    const configExtraArgs = normalizeExtraArgs(projectConfig?.sandboxExtraArgs);
+    const cliExtraArgs = normalizeExtraArgs(this.options?.extraArgs);
+    const extraArgs = [...configExtraArgs, ...cliExtraArgs];
+
     dockerArgs.push(
       ...envVariables,
       '-w',
       '/workspace',
       '--entrypoint',
       '/entrypoint.sh',
+      ...extraArgs,
       agentImage,
       'rover-agent',
       'run',
@@ -312,12 +323,18 @@ export class DockerSandbox extends Sandbox {
       );
     });
 
+    // Get extra args from CLI options and project config, merge them
+    const configExtraArgs = normalizeExtraArgs(projectConfig?.sandboxExtraArgs);
+    const cliExtraArgs = normalizeExtraArgs(this.options?.extraArgs);
+    const extraArgs = [...configExtraArgs, ...cliExtraArgs];
+
     dockerArgs.push(
       ...envVariables,
       '-w',
       '/workspace',
       '--entrypoint',
       '/entrypoint.sh',
+      ...extraArgs,
       agentImage,
       'rover-agent',
       'session',
@@ -391,6 +408,12 @@ export class DockerSandbox extends Sandbox {
     // Generate a unique container name for the interactive shell
     const containerName = `rover-shell-${this.task.id}-${generateRandomId()}`;
 
+    // Get extra args from CLI options and project config, merge them
+    const projectConfig = ProjectConfigManager.load();
+    const configExtraArgs = normalizeExtraArgs(projectConfig?.sandboxExtraArgs);
+    const cliExtraArgs = normalizeExtraArgs(this.options?.extraArgs);
+    const extraArgs = [...configExtraArgs, ...cliExtraArgs];
+
     // Build Docker run command for interactive shell
     const dockerArgs = [
       'run',
@@ -402,6 +425,7 @@ export class DockerSandbox extends Sandbox {
       `${this.task.worktreePath}:/workspace:Z,rw`,
       '-w',
       '/workspace',
+      ...extraArgs,
       'node:24-alpine',
       '/bin/sh',
     ];

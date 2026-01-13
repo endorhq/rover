@@ -30,26 +30,33 @@ export async function getAvailableSandboxBackend(): Promise<
   return null;
 }
 
+export interface CreateSandboxOptions {
+  /** Extra arguments to pass to Docker/Podman from CLI */
+  extraArgs?: string;
+}
+
 /**
  * Create a sandbox instance using the first available backend
  * Prioritizes Docker, then falls back to Podman
  * @param task The task description
  * @param processManager Optional process manager for progress tracking
+ * @param options Optional sandbox creation options
  * @returns A Sandbox instance (DockerSandbox or PodmanSandbox)
  * @throws Error if neither Docker nor Podman are available
  */
 export async function createSandbox(
   task: TaskDescriptionManager,
-  processManager?: ProcessManager
+  processManager?: ProcessManager,
+  options?: CreateSandboxOptions
 ): Promise<Sandbox> {
   // Try Docker first (priority)
-  const dockerSandbox = new DockerSandbox(task, processManager);
+  const dockerSandbox = new DockerSandbox(task, processManager, options);
   if (await dockerSandbox.isBackendAvailable()) {
     return dockerSandbox;
   }
 
   // Try Podman as fallback
-  const podmanSandbox = new PodmanSandbox(task, processManager);
+  const podmanSandbox = new PodmanSandbox(task, processManager, options);
   if (await podmanSandbox.isBackendAvailable()) {
     return podmanSandbox;
   }
