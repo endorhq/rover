@@ -10,6 +10,11 @@ import {
   parseCustomEnvironmentVariables,
 } from '../../utils/env-variables.js';
 
+export interface SandboxOptions {
+  /** Extra arguments to pass to Docker/Podman from CLI */
+  extraArgs?: string;
+}
+
 export abstract class SandboxPackage {
   abstract name: string;
 
@@ -22,10 +27,16 @@ export abstract class Sandbox {
 
   processManager?: ProcessManager;
   task: TaskDescriptionManager;
+  options?: SandboxOptions;
 
-  constructor(task: TaskDescriptionManager, processManager?: ProcessManager) {
+  constructor(
+    task: TaskDescriptionManager,
+    processManager?: ProcessManager,
+    options?: SandboxOptions
+  ) {
     this.task = task;
     this.processManager = processManager;
+    this.options = options;
   }
 
   abstract isBackendAvailable(): Promise<boolean>;
