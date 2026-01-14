@@ -59,6 +59,13 @@ export class ClaudeAgent extends BaseAgent {
       });
     }
 
+    // Claude settings.json for user preferences (optional)
+    requiredCredentials.push({
+      path: '/.settings.json',
+      description: 'Claude settings',
+      required: false,
+    });
+
     return requiredCredentials;
   }
 
@@ -100,6 +107,12 @@ export class ClaudeAgent extends BaseAgent {
             recursive: true,
           });
           console.log(colors.gray('├── Copied: ') + colors.cyan(cred.path));
+        } else if (cred.path.includes('.settings.json')) {
+          // Copy settings.json to .claude directory
+          copyFileSync(cred.path, join(targetClaudeDir, 'settings.json'));
+          console.log(
+            colors.gray('├── Copied: ') + colors.cyan('settings.json')
+          );
         } else {
           // Copy file right away
           copyFileSync(cred.path, join(targetClaudeDir, filename));
