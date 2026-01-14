@@ -18,6 +18,7 @@ import {
 } from 'rover-core';
 import type { PreviousIteration } from 'rover-schemas';
 import sweWorkflow from './workflows/swe.yml';
+import sweWorkflowACP from './workflows/swe-acp.yml';
 import techWriterWorkflow from './workflows/tech-writer.yml';
 import entrypointScript from './entrypoint.sh';
 import pupa from 'pupa';
@@ -417,6 +418,10 @@ echo "======================================="
     switch (workflowName) {
       case 'tech-writer': {
         workflowPath = join(distDir, techWriterWorkflow);
+        break;
+      }
+      case 'swe-acp': {
+        workflowPath = join(distDir, sweWorkflowACP);
         break;
       }
       default: {

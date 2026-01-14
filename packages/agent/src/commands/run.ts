@@ -6,8 +6,78 @@ import {
   PreContextDataManager,
 } from 'rover-core';
 import { parseCollectOptions } from '../lib/options.js';
-import { Runner } from '../lib/runner.js';
+import { Runner, RunnerStepResult } from '../lib/runner.js';
+import { ACPRunner, ACPRunnerStepResult, isACPWorkflow } from '../lib/acp-runner.js';
 import { existsSync, readFileSync } from 'node:fs';
+
+/**
+ * Helper function to display step results consistently for both ACP and standard runners
+ */
+function displayStepResults(
+  stepName: string,
+  result: RunnerStepResult | ACPRunnerStepResult,
+  _totalDuration: number
+): void {
+  console.log(colors.bold(`\n📊 Step Results: ${stepName}`));
+  console.log(colors.gray('├── ID: ') + colors.cyan(result.id));
+  console.log(
+    colors.gray('├── Status: ') +
+    (result.success
+      ? colors.green('✓ Success')
+      : colors.red('✗ Failed'))
+  );
+  console.log(
+    colors.gray('├── Duration: ') +
+    colors.yellow(`${result.duration.toFixed(2)}s`)
+  );
+
+  // Check for tokens and cost (only in RunnerStepResult)
+  if ('tokens' in result && result.tokens) {
+    console.log(
+      colors.gray('├── Tokens: ') + colors.cyan(result.tokens.toString())
+    );
+  }
+  if ('cost' in result && result.cost) {
+    console.log(
+      colors.gray('├── Cost: ') +
+      colors.cyan(`$${result.cost.toFixed(4)}`)
+    );
+  }
+  if (result.error) {
+    console.log(colors.gray('├── Error: ') + colors.red(result.error));
+  }
+
+  // Display outputs
+  const outputEntries = Array.from(result.outputs.entries()).filter(
+    ([key]) =>
+      !key.startsWith('raw_') &&
+      !key.startsWith('input_') &&
+      key !== 'error' &&
+      key !== 'error_code' &&
+      key !== 'error_retryable'
+  );
+
+  if (outputEntries.length > 0) {
+    console.log(colors.gray('└── Outputs:'));
+    outputEntries.forEach(([key, value], idx) => {
+      const prefix =
+        idx === outputEntries.length - 1 ? '    └──' : '    ├──';
+      // Truncate long values for display
+      let displayValue =
+        value.length > 100 ? value.substring(0, 100) + '...' : value;
+
+      if (displayValue.includes('\n')) {
+        displayValue = displayValue.split('\n')[0] + '...';
+      }
+
+      console.log(
+        colors.gray(`${prefix} ${key}: `) + colors.cyan(displayValue)
+      );
+    });
+  } else {
+    console.log(colors.gray('└── No outputs extracted'));
+  }
+}
 
 interface RunCommandOptions {
   // Inputs. Take precedence over files
@@ -28,7 +98,7 @@ interface RunCommandOptions {
   preContextFile: string[];
 }
 
-interface RunCommandOutput extends CommandOutput {}
+interface RunCommandOutput extends CommandOutput { }
 
 /**
  * Handles pre-context file loading, validation, and injection into workflow steps.
@@ -277,112 +347,126 @@ export const runCommand = async (
       let runSteps = 0;
       const totalSteps = workflowManager.steps.length;
 
-      for (
-        let stepIndex = 0;
-        stepIndex < workflowManager.steps.length;
-        stepIndex++
-      ) {
-        const step = workflowManager.steps[stepIndex];
-        const runner = new Runner(
-          workflowManager,
-          step.id,
+      // Detect if this is an ACP workflow based on filename
+      const useACPMode = isACPWorkflow(workflowManager.name);
+
+      if (useACPMode) {
+        console.log(
+          colors.cyan('\n🔗 ACP Mode detected - using session-based execution')
+        );
+
+        // Create ACPRunner once for the entire workflow
+        const acpRunner = new ACPRunner({
+          workflow: workflowManager,
           inputs,
-          stepsOutput,
-          options.agentTool,
-          options.agentModel,
+          defaultTool: options.agentTool,
+          defaultModel: options.agentModel,
           statusManager,
-          totalSteps,
-          stepIndex
-        );
+          outputDir: options.output,
+        });
 
-        runSteps++;
+        try {
+          // Initialize the ACP session
+          await acpRunner.initialize();
 
-        // Run it
-        const result = await runner.run(options.output);
+          // Run all steps through the persistent session
+          for (
+            let stepIndex = 0;
+            stepIndex < workflowManager.steps.length;
+            stepIndex++
+          ) {
+            const step = workflowManager.steps[stepIndex];
+            runSteps++;
 
-        // Display step results
-        console.log(colors.bold(`\n📊 Step Results: ${step.name}`));
-        console.log(colors.gray('├── ID: ') + colors.cyan(result.id));
-        console.log(
-          colors.gray('├── Status: ') +
-            (result.success
-              ? colors.green('✓ Success')
-              : colors.red('✗ Failed'))
-        );
-        console.log(
-          colors.gray('├── Duration: ') +
-            colors.yellow(`${result.duration.toFixed(2)}s`)
-        );
-        totalDuration += result.duration;
+            const result = await acpRunner.runStep(step.id);
 
-        if (result.tokens) {
-          console.log(
-            colors.gray('├── Tokens: ') + colors.cyan(result.tokens.toString())
-          );
-        }
-        if (result.cost) {
-          console.log(
-            colors.gray('├── Cost: ') +
-              colors.cyan(`$${result.cost.toFixed(4)}`)
-          );
-        }
-        if (result.error) {
-          console.log(colors.gray('├── Error: ') + colors.red(result.error));
-        }
+            // Display step results
+            displayStepResults(step.name, result, totalDuration);
+            totalDuration += result.duration;
 
-        // Display outputs
-        const outputEntries = Array.from(result.outputs.entries()).filter(
-          ([key]) =>
-            !key.startsWith('raw_') &&
-            !key.startsWith('input_') &&
-            key !== 'error'
-        );
-
-        if (outputEntries.length > 0) {
-          console.log(colors.gray('└── Outputs:'));
-          outputEntries.forEach(([key, value], idx) => {
-            const prefix =
-              idx === outputEntries.length - 1 ? '    └──' : '    ├──';
-            // Truncate long values for display
-            let displayValue =
-              value.length > 100 ? value.substring(0, 100) + '...' : value;
-
-            if (displayValue.includes('\n')) {
-              displayValue = displayValue.split('\n')[0] + '...';
+            // Store step outputs for tracking
+            if (result.success) {
+              stepsOutput.set(step.id, result.outputs);
+            } else {
+              const continueOnError =
+                workflowManager.config?.continueOnError || false;
+              if (!continueOnError) {
+                console.log(
+                  colors.red(
+                    `\n✗ Step '${step.name}' failed and continueOnError is false. Stopping workflow execution.`
+                  )
+                );
+                output.success = false;
+                output.error = `Workflow stopped due to step failure: ${result.error}`;
+                break;
+              } else {
+                console.log(
+                  colors.yellow(
+                    `\n⚠ Step '${step.name}' failed but continueOnError is true. Continuing with next step.`
+                  )
+                );
+                stepsOutput.set(step.id, new Map());
+              }
             }
-
-            console.log(
-              colors.gray(`${prefix} ${key}: `) + colors.cyan(displayValue)
-            );
-          });
-        } else {
-          console.log(colors.gray('└── No outputs extracted'));
+          }
+        } finally {
+          // Always close the ACP session
+          acpRunner.close();
         }
+      } else {
+        // Standard subprocess-based execution (existing behavior)
+        for (
+          let stepIndex = 0;
+          stepIndex < workflowManager.steps.length;
+          stepIndex++
+        ) {
+          const step = workflowManager.steps[stepIndex];
+          const runner = new Runner(
+            workflowManager,
+            step.id,
+            inputs,
+            stepsOutput,
+            options.agentTool,
+            options.agentModel,
+            statusManager,
+            totalSteps,
+            stepIndex
+          );
 
-        // Store step outputs for next steps to use
-        if (result.success) {
-          stepsOutput.set(step.id, result.outputs);
-        } else {
-          // If step failed, decide whether to continue based on workflow config
-          const continueOnError =
-            workflowManager.config?.continueOnError || false;
-          if (!continueOnError) {
-            console.log(
-              colors.red(
-                `\n✗ Step '${step.name}' failed and continueOnError is false. Stopping workflow execution.`
-              )
-            );
-            output.success = false;
-            output.error = `Workflow stopped due to step failure: ${result.error}`;
-            break;
+          runSteps++;
+
+          // Run it
+          const result = await runner.run(options.output);
+
+          // Display step results
+          displayStepResults(step.name, result, totalDuration);
+          totalDuration += result.duration;
+
+          // Store step outputs for next steps to use
+          if (result.success) {
+            stepsOutput.set(step.id, result.outputs);
           } else {
-            console.log(
-              colors.yellow(
-                `\n⚠ Step '${step.name}' failed but continueOnError is true. Continuing with next step.`
-              )
-            );
-            // Store empty outputs for failed step
-            stepsOutput.set(step.id, new Map());
+            // If step failed, decide whether to continue based on workflow config
+            const continueOnError =
+              workflowManager.config?.continueOnError || false;
+            if (!continueOnError) {
+              console.log(
+                colors.red(
+                  `\n✗ Step '${step.name}' failed and continueOnError is false. Stopping workflow execution.`
+                )
+              );
+              output.success = false;
+              output.error = `Workflow stopped due to step failure: ${result.error}`;
+              break;
+            } else {
+              console.log(
+                colors.yellow(
+                  `\n⚠ Step '${step.name}' failed but continueOnError is true. Continuing with next step.`
+                )
+              );
+              // Store empty outputs for failed step
+              stepsOutput.set(step.id, new Map());
+            }
           }
         }
       }
@@ -391,17 +475,17 @@ export const runCommand = async (
       console.log(colors.bold('\n🎉 Workflow Execution Summary'));
       console.log(
         colors.gray('├── Duration: ') +
-          colors.cyan(totalDuration.toFixed(2) + 's')
+        colors.cyan(totalDuration.toFixed(2) + 's')
       );
       console.log(
         colors.gray('├── Total Steps: ') +
-          colors.cyan(workflowManager.steps.length.toString())
+        colors.cyan(workflowManager.steps.length.toString())
       );
 
       const successfulSteps = Array.from(stepsOutput.keys()).length;
       console.log(
         colors.gray('├── Successful Steps: ') +
-          colors.green(successfulSteps.toString())
+        colors.green(successfulSteps.toString())
       );
 
       const failedSteps = runSteps - successfulSteps;
@@ -412,7 +496,7 @@ export const runCommand = async (
       const skippedSteps = workflowManager.steps.length - runSteps;
       console.log(
         colors.gray('├── Skipped Steps: ') +
-          colors.yellow(failedSteps.toString())
+        colors.yellow(failedSteps.toString())
       );
 
       let status = colors.green('✓ Workflow Completed Successfully');
