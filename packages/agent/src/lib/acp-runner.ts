@@ -15,8 +15,8 @@ import {
 import colors from 'ansi-colors';
 import { existsSync, readFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
-import type { WorkflowAgentStep, WorkflowOutput } from 'rover-schemas';
-import { WorkflowManager, IterationStatusManager } from 'rover-schemas';
+import type { WorkflowAgentStep, WorkflowOutput, WorkflowStep } from 'rover-schemas';
+import { WorkflowManager, IterationStatusManager } from 'rover-core';
 import { ACPClient } from './acp-client.js';
 import { copyFileSync, rmSync } from 'node:fs';
 
@@ -182,7 +182,7 @@ export class ACPRunner {
     const step = this.workflow.getStep(stepId);
 
     // Calculate current progress
-    const stepIndex = this.workflow.steps.findIndex((s) => s.id === stepId);
+    const stepIndex = this.workflow.steps.findIndex((s: WorkflowStep) => s.id === stepId);
     const totalSteps = this.workflow.steps.length;
     const currentProgress = Math.floor((stepIndex / totalSteps) * 100);
     const nextProgress = Math.floor(((stepIndex + 1) / totalSteps) * 100);
@@ -306,7 +306,7 @@ export class ACPRunner {
           const outputValue = stepOutputs.get(outputName) || '';
 
           // Find the output definition
-          const stepDef = this.workflow.steps.find((s) => s.id === stepId);
+          const stepDef = this.workflow.steps.find((s: WorkflowStep) => s.id === stepId);
           const outputDef = stepDef?.outputs?.find(
             (o: WorkflowOutput) => o.name === outputName
           );

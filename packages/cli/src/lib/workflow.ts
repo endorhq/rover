@@ -75,7 +75,7 @@ export const initWorkflowStore = (): WorkflowStore => {
   store.addWorkflow(swe, WorkflowSource.BuiltIn);
 
   const sweAcp = loadBuiltInWorkflow(sweWorkflowACP);
-  store.addWorkflow(sweAcp);
+  store.addWorkflow(sweAcp, WorkflowSource.BuiltIn);
 
   const techWriter = loadBuiltInWorkflow(techWriterWorkflow);
   store.addWorkflow(techWriter, WorkflowSource.BuiltIn);
