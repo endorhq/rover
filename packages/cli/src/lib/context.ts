@@ -3,8 +3,7 @@
  * This module provides a cohesive context object for CLI state management.
  */
 
-import type { ProjectManager } from 'rover-core';
-import { ProjectStore, findProjectRoot } from 'rover-core';
+import { findProjectRoot, ProjectStore, type ProjectManager } from 'rover-core';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -53,55 +52,35 @@ export function resetCLIContext(): void {
   _context = null;
 }
 
-// Standalone JSON mode flag for backwards compatibility with tests
-// that don't initialize the full context
-let _standaloneJsonMode = false;
-
 // Convenience accessors
 
 /**
  * Check if the CLI is running in JSON output mode.
  * When in JSON mode, human-readable console output should be suppressed.
- * Returns standalone JSON mode if context not initialized (for backwards compatibility).
  */
 export function isJsonMode(): boolean {
-  if (_context) {
-    return _context.jsonMode;
-  }
-  return _standaloneJsonMode;
+  return getCLIContext().jsonMode;
 }
 
 /**
- * Set JSON mode (for backward compatibility with commands that set it directly).
- * Sets both standalone flag and context (if initialized).
+ * Set JSON mode.
  */
 export function setJsonMode(value: boolean): void {
-  _standaloneJsonMode = value;
-  if (_context) {
-    _context.jsonMode = value;
-  }
+  getCLIContext().jsonMode = value;
 }
 
 /**
  * Check if the CLI is in project mode (vs global mode).
- * Returns false if context not initialized.
  */
 export function isProjectMode(): boolean {
-  if (!_context) {
-    return false;
-  }
-  return _context.project !== null;
+  return getCLIContext().project !== null;
 }
 
 /**
  * Get the default project from context (null if in global mode).
- * Returns null if context not initialized.
  */
 export function getDefaultProject(): ProjectManager | null {
-  if (!_context) {
-    return null;
-  }
-  return _context.project;
+  return getCLIContext().project;
 }
 
 /**
@@ -126,15 +105,17 @@ export async function resolveProjectContext(
   }
 
   // Otherwise, use the default context from pre-action hook
-  // If context is not initialized, return null (global mode)
   return getDefaultProject();
 }
 
 /**
  * Check if we're in a Rover project directory (has .rover folder).
- * This is used as a fallback when context isn't initialized (e.g., in tests).
+ *
+ * @deprecated Legacy check for backward compatibility with tests that don't
+ * initialize a full project context. Will be removed once all code paths
+ * properly use ProjectManager.
  */
-function isInRoverProject(): boolean {
+function legacy_isInRoverProject(): boolean {
   try {
     const roverPath = join(findProjectRoot(), '.rover');
     return existsSync(roverPath);
@@ -148,12 +129,13 @@ function isInRoverProject(): boolean {
  * Require a project context for a command.
  * Use this for commands that cannot operate in global mode.
  *
- * For backward compatibility with tests that don't initialize context,
- * this function also checks for the presence of a .rover directory.
+ * When project is null but we're in a directory with .rover,
+ * returns null (typed as ProjectManager) to allow commands to proceed.
+ * Commands should use findProjectRoot() to locate project files.
  *
  * @param projectOption - Value from --project flag (future)
- * @returns ProjectManager (never null)
- * @throws If no project context available
+ * @returns ProjectManager (may be null if in .rover directory)
+ * @throws If no project context available and not in .rover directory
  */
 export async function requireProjectContext(
   projectOption?: string
@@ -163,12 +145,9 @@ export async function requireProjectContext(
     return project;
   }
 
-  // Fallback for backward compatibility: if context isn't initialized but
-  // we're in a Rover project directory (.rover exists), don't error.
-  // This allows tests that don't go through program.ts to still work.
-  if (!_context && isInRoverProject()) {
-    // Return a minimal project-like object for backward compatibility
-    // In practice, commands will use findProjectRoot() to locate project files
+  // @DEPRECATED: Legacy fallback for backward compatibility.
+  // Remove this once all code paths properly use ProjectManager.
+  if (legacy_isInRoverProject()) {
     return null as unknown as ProjectManager;
   }
 
