@@ -270,7 +270,8 @@ const createTaskForAgent = async (
   baseBranch: string,
   git: Git,
   jsonMode: boolean,
-  networkConfig?: NetworkConfig
+  networkConfig?: NetworkConfig,
+  githubIssue?: { number: number; repository: string }
 ): Promise<{
   taskId: number;
   title: string;
@@ -319,6 +320,7 @@ const createTaskForAgent = async (
     agentModel: selectedModel,
     sourceBranch: sourceBranch,
     networkConfig: networkConfig,
+    githubIssue: githubIssue,
   });
 
   const taskId = task.id;
@@ -550,6 +552,9 @@ export const taskCommand = async (
     requiredInputs.length === 1 && requiredInputs[0] === 'description';
   const inputsData: Map<string, string> = new Map();
 
+  // GitHub issue reference (populated when --from-github is used)
+  let githubIssueRef: { number: number; repository: string } | undefined;
+
   // Validate branch option and check for uncommitted changes
   const git = new Git({ cwd: project.path });
   let baseBranch = sourceBranch;
@@ -603,48 +608,22 @@ export const taskCommand = async (
   // We need to process the workflow inputs. We will ask users to provide this
   // information or load it as a JSON from the stdin.
   if (inputs && inputs.length > 0) {
-    if (stdinIsAvailable()) {
-      const stdinInput = await readFromStdin();
-      if (stdinInput) {
-        try {
-          const parsed = JSON.parse(stdinInput);
-
-          for (const key in parsed) {
-            inputsData.set(key, parsed[key]);
-
-            if (key == 'description') {
-              description = parsed[key];
-            }
-          }
-
-          if (!json) {
-            console.log(colors.gray('✓ Read task description from stdin'));
-          }
-        } catch (err) {
-          // Assume the text is just the description
-          description = stdinInput;
-          inputsData.set('description', description);
-          if (!json) {
-            showProperties(
-              {
-                Description: description,
-              },
-              { addLineBreak: false }
-            );
-          }
-        }
-      } else if (description != null && description.length > 0) {
-        // There are cases like running the CLI from the extension that might
-        // configure an empty stdin, while passing the `description` as argument.
-        // In that case, we also load the description
-        inputsData.set('description', description);
-      }
-    } else if (fromGithub != null) {
+    if (fromGithub != null) {
       // Load the inputs from GitHub
       const github = new GitHub({ cwd: project.path });
+      const remoteUrl = git.remoteUrl();
+
+      // Extract repo info for storing with the task
+      const repoInfo = github.getGitHubRepoInfo(remoteUrl);
+      if (repoInfo) {
+        githubIssueRef = {
+          number: parseInt(fromGithub, 10),
+          repository: `${repoInfo.owner}/${repoInfo.repo}`,
+        };
+      }
 
       try {
-        const issueData = await github.fetchIssue(fromGithub, git.remoteUrl());
+        const issueData = await github.fetchIssue(fromGithub, remoteUrl);
         if (issueData) {
           description = issueData.body;
           inputsData.set('description', description);
@@ -724,6 +703,42 @@ export const taskCommand = async (
 
         await exitWithError(jsonOutput, { telemetry });
         return;
+      }
+    } else if (stdinIsAvailable()) {
+      const stdinInput = await readFromStdin();
+      if (stdinInput) {
+        try {
+          const parsed = JSON.parse(stdinInput);
+
+          for (const key in parsed) {
+            inputsData.set(key, parsed[key]);
+
+            if (key == 'description') {
+              description = parsed[key];
+            }
+          }
+
+          if (!json) {
+            console.log(colors.gray('✓ Read task description from stdin'));
+          }
+        } catch (err) {
+          // Assume the text is just the description
+          description = stdinInput;
+          inputsData.set('description', description);
+          if (!json) {
+            showProperties(
+              {
+                Description: description,
+              },
+              { addLineBreak: false }
+            );
+          }
+        }
+      } else if (description != null && description.length > 0) {
+        // There are cases like running the CLI from the extension that might
+        // configure an empty stdin, while passing the `description` as argument.
+        // In that case, we also load the description
+        inputsData.set('description', description);
       }
     } else {
       const questions = [];
@@ -856,7 +871,8 @@ export const taskCommand = async (
         baseBranch!,
         git,
         json || false,
-        networkConfig
+        networkConfig,
+        githubIssueRef
       );
 
       if (taskResult) {

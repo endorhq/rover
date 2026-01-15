@@ -3,7 +3,10 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { TaskDescriptionManager } from '../task-description.js';
-import { TaskStatus } from 'rover-schemas';
+import {
+  TaskStatus,
+  CURRENT_TASK_DESCRIPTION_SCHEMA_VERSION,
+} from 'rover-schemas';
 
 describe('TaskDescriptionManager', () => {
   let testDir: string;
@@ -296,7 +299,9 @@ describe('TaskDescriptionManager', () => {
       expect(migratedTask.lastRestartAt).toBeUndefined();
 
       // Verify that the task was migrated to current version
-      expect(migratedTask.version).toBe('1.2');
+      expect(migratedTask.version).toBe(
+        CURRENT_TASK_DESCRIPTION_SCHEMA_VERSION
+      );
 
       // Ensure task can be saved without validation errors
       expect(() => migratedTask.save()).not.toThrow();
