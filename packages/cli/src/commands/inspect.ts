@@ -66,6 +66,11 @@ interface TaskInspectionOutput {
   workflowName: string;
   /** Path to the git worktree for this task */
   worktreePath: string;
+  /** GitHub issue reference (if task was created from --from-github) */
+  githubIssue?: {
+    number: number;
+    repository: string;
+  };
 }
 
 /**
@@ -275,6 +280,7 @@ export const inspectCommand = async (
         uuid: task.uuid,
         workflowName: task.workflowName,
         worktreePath: task.worktreePath,
+        githubIssue: task.githubIssue,
       };
 
       console.log(JSON.stringify(jsonOutput, null, 2));
@@ -296,6 +302,12 @@ export const inspectCommand = async (
         Workflow: task.workflowName,
         'Created At': new Date(task.createdAt).toLocaleString(),
       };
+
+      // Show GitHub issue if task was created from --from-github
+      if (task.githubIssue) {
+        const issueUrl = `https://github.com/${task.githubIssue.repository}/issues/${task.githubIssue.number}`;
+        properties['GitHub Issue'] = colors.cyan(issueUrl);
+      }
 
       if (task.completedAt) {
         properties['Completed At'] = new Date(

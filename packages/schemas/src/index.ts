@@ -92,6 +92,7 @@ export {
   type CreateTaskData,
   type StatusMetadata,
   type IterationMetadata,
+  type GitHubIssueRef,
 } from './task-description/types.js';
 
 export {

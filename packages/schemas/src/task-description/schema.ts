@@ -5,7 +5,7 @@
 import { z } from 'zod';
 
 // Schema version for migrations
-export const CURRENT_TASK_DESCRIPTION_SCHEMA_VERSION = '1.2';
+export const CURRENT_TASK_DESCRIPTION_SCHEMA_VERSION = '1.3';
 
 // Task status schema
 export const TaskStatusSchema = z.enum([
@@ -63,6 +63,14 @@ export const TaskDescriptionSchema = z.object({
 
   // Agent Image
   agentImage: z.string().optional(),
+
+  // GitHub Issue (when task created via --from-github)
+  githubIssue: z
+    .object({
+      number: z.number().int().positive(),
+      repository: z.string().min(1), // "owner/repo" format
+    })
+    .optional(),
 
   // Metadata
   version: z.string(),
