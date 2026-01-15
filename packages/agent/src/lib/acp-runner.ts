@@ -93,8 +93,11 @@ export class ACPRunner {
     this.statusManager = config.statusManager;
     this.outputDir = config.outputDir;
 
+    console.log('ereslibre: workflow', JSON.stringify(this.workflow));
+
     // Determine which tool to use
-    this.tool = this.workflow.defaults?.tool || config.defaultTool || 'claude';
+    // Priority: CLI flag > workflow defaults > fallback to claude
+    this.tool = config.defaultTool || this.workflow.defaults?.tool || 'claude';
   }
 
   /**
