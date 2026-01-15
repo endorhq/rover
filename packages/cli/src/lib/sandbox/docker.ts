@@ -199,6 +199,11 @@ export class DockerSandbox extends Sandbox {
       dockerArgs.push('--agent-model', this.task.agentModel);
     }
 
+    // Pass step agents configuration if specified
+    if (this.task.stepAgents && Object.keys(this.task.stepAgents).length > 0) {
+      dockerArgs.push('--step-agents', JSON.stringify(this.task.stepAgents));
+    }
+
     // Forward verbose flag to rover-agent if enabled
     if (VERBOSE) {
       dockerArgs.push('-v');
