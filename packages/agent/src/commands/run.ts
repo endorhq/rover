@@ -6,7 +6,7 @@ import {
   PreContextDataManager,
 } from 'rover-core';
 import { parseCollectOptions } from '../lib/options.js';
-import { Runner } from '../lib/runner.js';
+import { Runner, RunnerStepResult } from '../lib/runner.js';
 import { existsSync, readFileSync } from 'node:fs';
 
 interface RunCommandOptions {
@@ -276,6 +276,7 @@ export const runCommand = async (
 
       let runSteps = 0;
       const totalSteps = workflowManager.steps.length;
+      const stepResults: RunnerStepResult[] = [];
 
       for (
         let stepIndex = 0;
@@ -299,6 +300,7 @@ export const runCommand = async (
 
         // Run it
         const result = await runner.run(options.output);
+        stepResults.push(result);
 
         // Display step results
         console.log(colors.bold(`\n📊 Step Results: ${step.name}`));
@@ -387,6 +389,13 @@ export const runCommand = async (
         }
       }
 
+      // Calculate total workflow cost and tokens
+      const totalCost = stepResults.reduce((sum, r) => sum + (r.cost ?? 0), 0);
+      const totalTokens = stepResults.reduce(
+        (sum, r) => sum + (r.tokens ?? 0),
+        0
+      );
+
       // Display workflow completion summary
       console.log(colors.bold('\n🎉 Workflow Execution Summary'));
       console.log(
@@ -397,6 +406,18 @@ export const runCommand = async (
         colors.gray('├── Total Steps: ') +
           colors.cyan(workflowManager.steps.length.toString())
       );
+      if (totalTokens > 0) {
+        console.log(
+          colors.gray('├── Total Tokens: ') +
+            colors.cyan(totalTokens.toLocaleString())
+        );
+      }
+      if (totalCost > 0) {
+        console.log(
+          colors.gray('├── Total Cost: ') +
+            colors.cyan('$' + totalCost.toFixed(4))
+        );
+      }
 
       const successfulSteps = Array.from(stepsOutput.keys()).length;
       console.log(
