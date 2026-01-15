@@ -41,8 +41,9 @@ export function createProgram(
 
   if (!options.excludeRuntimeHooks) {
     program
-      .hook('preAction', async (_thisCommand, actionCommand) => {
+      .hook('preAction', async (thisCommand, actionCommand) => {
         const commandName = actionCommand.name();
+        const cliOptions = thisCommand.opts();
         const options = actionCommand.opts();
 
         // Set verbose mode
@@ -64,23 +65,18 @@ export function createProgram(
           try {
             project = await findOrRegisterProject();
           } catch (error) {
-            if (error instanceof ProjectLoaderNotGitRepoError) {
-              // Shouldn't happen since we checked, but handle gracefully
-              project = null;
-            } else {
-              // Config/registration errors - exit
-              exitWithError({
-                error: error instanceof Error ? error.message : String(error),
-                success: false,
-              });
-            }
+            // Config/registration errors - exit
+            exitWithError({
+              error: error instanceof Error ? error.message : String(error),
+              success: false,
+            });
           }
         }
 
         // Initialize context
         initCLIContext({
           jsonMode: options.json === true,
-          verbose: options.verbose === true,
+          verbose: cliOptions.verbose === true,
           project,
           inGitRepo,
         });
