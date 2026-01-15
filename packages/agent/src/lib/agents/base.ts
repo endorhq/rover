@@ -1,7 +1,12 @@
 import { existsSync, mkdirSync } from 'node:fs';
 import colors from 'ansi-colors';
 import { launch, launchSync } from 'rover-core';
-import { Agent, AgentCredentialFile, ValidationResult } from './types.js';
+import {
+  Agent,
+  AgentCredentialFile,
+  AgentUsageStats,
+  ValidationResult,
+} from './types.js';
 
 export abstract class BaseAgent implements Agent {
   abstract name: string;
@@ -105,5 +110,15 @@ export abstract class BaseAgent implements Agent {
     const result = await launch(this.binary, ['--version']);
 
     return result.exitCode === 0;
+  }
+
+  /**
+   * Extract usage statistics from the agent's JSON response.
+   * Override in subclasses to implement agent-specific parsing.
+   * @param _parsedResponse The parsed JSON response from the agent
+   * @returns Usage statistics or undefined if not supported
+   */
+  extractUsageStats(_parsedResponse: unknown): AgentUsageStats | undefined {
+    return undefined;
   }
 }

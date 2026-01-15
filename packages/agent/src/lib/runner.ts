@@ -32,7 +32,7 @@ import {
   TimeoutError,
 } from './errors.js';
 import { basename, join } from 'node:path';
-import { createAgent, Agent } from './agents/index.js';
+import { createAgent, Agent, AgentUsageStats } from './agents/index.js';
 
 export interface RunnerStepResult {
   // Step ID
@@ -51,13 +51,6 @@ export interface RunnerStepResult {
   model?: string;
   // Parsed output
   outputs: Map<string, string>;
-}
-
-/** Usage statistics extracted from agent JSON response */
-interface AgentUsageStats {
-  tokens?: number;
-  cost?: number;
-  model?: string;
 }
 
 export class Runner {
@@ -406,9 +399,6 @@ export class Runner {
               parsedResponse.result ||
               parsedResponse.content ||
               parsedResponse.message;
-
-            // Extract usage statistics from Claude's JSON response
-            usage = this.extractClaudeUsageStats(parsedResponse);
           } else if (this.tool === 'gemini') {
             // Currently, gemini uses "response"
             responseContent =
@@ -416,6 +406,9 @@ export class Runner {
               parsedResponse.content ||
               parsedResponse.text;
           }
+
+          // Extract usage statistics via the agent's implementation
+          usage = this.agent.extractUsageStats?.(parsedResponse);
         } catch (jsonError) {
           console.log(
             colors.yellow(
@@ -454,42 +447,6 @@ export class Runner {
         error: `Failed to parse outputs: ${error instanceof Error ? error.message : String(error)}`,
       };
     }
-  }
-
-  /**
-   * Extract usage statistics from Claude's JSON response
-   */
-  private extractClaudeUsageStats(parsedResponse: any): AgentUsageStats {
-    const usage: AgentUsageStats = {};
-
-    // Extract cost
-    if (typeof parsedResponse.total_cost_usd === 'number') {
-      usage.cost = parsedResponse.total_cost_usd;
-    }
-
-    // Extract total tokens from usage object
-    if (parsedResponse.usage) {
-      const u = parsedResponse.usage;
-      const inputTokens = u.input_tokens || 0;
-      const outputTokens = u.output_tokens || 0;
-      const cacheReadTokens = u.cache_read_input_tokens || 0;
-      const cacheCreationTokens = u.cache_creation_input_tokens || 0;
-      usage.tokens =
-        inputTokens + outputTokens + cacheReadTokens + cacheCreationTokens;
-    }
-
-    // Extract model from modelUsage (first key is the model name)
-    if (
-      parsedResponse.modelUsage &&
-      typeof parsedResponse.modelUsage === 'object'
-    ) {
-      const models = Object.keys(parsedResponse.modelUsage);
-      if (models.length > 0) {
-        usage.model = models[0];
-      }
-    }
-
-    return usage;
   }
 
   /**
