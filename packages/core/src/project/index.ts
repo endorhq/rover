@@ -1,7 +1,14 @@
 export { detectEnvironment, type EnvironmentResult } from './environment.js';
-
 export {
-  ProjectManagerLoadError,
-  ProjectManagerRegistrationError,
-  ProjectManager,
-} from './project.js';
+  type FindOrRegisterProjectOptions,
+  findOrRegisterProject,
+  ProjectLoaderNotGitRepoError,
+  ProjectLoaderRegistrationError,
+  ProjectLoaderStoreError,
+} from './loader.js';
+export { ProjectManager } from './project.js';
+export {
+  ProjectStore,
+  ProjectStoreLoadError,
+  ProjectStoreRegistrationError,
+} from './project-store.js';
