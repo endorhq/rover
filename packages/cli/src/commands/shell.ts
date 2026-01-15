@@ -8,12 +8,11 @@ import { TaskNotFoundError } from 'rover-schemas';
 import { getTelemetry } from '../lib/telemetry.js';
 import { CLIJsonOutput } from '../types.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
-import { isJsonMode, setJsonMode } from '../lib/global-state.js';
+import { requireProjectContext } from '../lib/context.js';
 import {
   createSandbox,
   getAvailableSandboxBackend,
 } from '../lib/sandbox/index.js';
-import { isRoverInitialized } from '../utils/repo-checks.js';
 
 /**
  * Start an interactive shell for testing task changes
@@ -38,13 +37,12 @@ export const shellCommand = async (
     return;
   }
 
-  // Check if rover is initialized
-  if (!isRoverInitialized()) {
-    jsonOutput.error = 'Rover is not initialized in this directory';
-    await exitWithError(jsonOutput, {
-      tips: ['Run ' + colors.cyan('rover init') + ' first'],
-      telemetry,
-    });
+  // Require project context
+  try {
+    await requireProjectContext();
+  } catch (error) {
+    jsonOutput.error = error instanceof Error ? error.message : String(error);
+    await exitWithError(jsonOutput, { telemetry });
     return;
   }
 

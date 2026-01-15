@@ -1,8 +1,13 @@
 import { Command, Option } from 'commander';
 import {
-  ProjectConfigManager,
-  UserSettingsManager,
   AI_AGENT,
+  Git,
+  setVerbose,
+  getVersion,
+  showSplashHeader,
+  showRegularHeader,
+  findOrRegisterProject,
+  ProjectLoaderNotGitRepoError,
 } from 'rover-core';
 import { initCommand } from './commands/init.js';
 import { listCommand } from './commands/list.js';
@@ -21,16 +26,8 @@ import colors from 'ansi-colors';
 import { pushCommand } from './commands/push.js';
 import { stopCommand } from './commands/stop.js';
 import { mcpCommand } from './commands/mcp.js';
-import { showTips, TIP_TITLES } from './utils/display.js';
-import {
-  Git,
-  setVerbose,
-  getVersion,
-  showSplashHeader,
-  showRegularHeader,
-} from 'rover-core';
 import { addWorkflowCommands } from './commands/workflows/index.js';
-import { setJsonMode, isJsonMode } from './lib/global-state.js';
+import { initCLIContext, isJsonMode, setJsonMode } from './lib/context.js';
 
 function isWorkflowsToplevelCommand(command: Command): boolean {
   return command.parent?.name() === 'workflows';
@@ -44,118 +41,49 @@ export function createProgram(
 
   if (!options.excludeRuntimeHooks) {
     program
-      .hook('preAction', (_thisCommand, actionCommand) => {
-        // Set global JSON mode flag based on command options
-        setJsonMode(actionCommand.opts().json === true);
-      })
-      .hook('preAction', (thisCommand, _actionCommand) => {
-        setVerbose(thisCommand.opts().verbose);
-      })
-      .hook('preAction', (_thisCommand, actionCommand) => {
+      .hook('preAction', async (_thisCommand, actionCommand) => {
         const commandName = actionCommand.name();
+        const options = actionCommand.opts();
 
+        // Set verbose mode
+        setVerbose(options.verbose === true);
+
+        // Build context
+        const git = new Git();
+        const inGitRepo = git.isGitRepo();
+
+        let project = null;
+
+        // Skip project resolution for init (it creates the project),
+        // mcp (adapts to context), and workflow commands
         if (
           !isWorkflowsToplevelCommand(actionCommand) &&
-          !['init', 'mcp'].includes(commandName) &&
-          !ProjectConfigManager.exists()
+          commandName !== 'init' &&
+          inGitRepo
         ) {
-          console.log(
-            `Rover is not initialized in this directory. The command you requested (\`${commandName}\`) was not executed.`
-          );
-          console.log(
-            `└── ${colors.gray('Project config (does not exist):')} rover.json`
-          );
-
-          showTips(
-            [
-              'Run ' +
-                colors.cyan('rover init') +
-                ' in this directory to initialize project config and user settings',
-            ],
-            {
-              title: TIP_TITLES.NEXT_STEPS,
-            }
-          );
-
-          process.exit(1);
-        }
-      })
-      .hook('preAction', (_thisCommand, actionCommand) => {
-        if (!isWorkflowsToplevelCommand(actionCommand)) {
-          const git = new Git();
           try {
-            git.version();
+            project = await findOrRegisterProject();
           } catch (error) {
-            exitWithError(
-              {
-                error: 'Git is not installed',
+            if (error instanceof ProjectLoaderNotGitRepoError) {
+              // Shouldn't happen since we checked, but handle gracefully
+              project = null;
+            } else {
+              // Config/registration errors - exit
+              exitWithError({
+                error: error instanceof Error ? error.message : String(error),
                 success: false,
-              },
-              {
-                tips: ['Install git and try again'],
-              }
-            );
-          }
-          if (!git.isGitRepo()) {
-            exitWithError(
-              {
-                error: 'Not in a git repository',
-                success: false,
-              },
-              {
-                tips: [
-                  'Rover requires the project to be in a git repository. You can initialize a git repository by running ' +
-                    colors.cyan('git init'),
-                ],
-              }
-            );
-          }
-          if (!git.hasCommits()) {
-            exitWithError(
-              {
-                error: 'No commits found in git repository',
-                success: false,
-              },
-              {
-                tips: [
-                  'Git worktree requires at least one commit in the repository in order to have common history',
-                ],
-              }
-            );
-          }
-        }
-      })
-      .hook('preAction', (thisCommand, actionCommand) => {
-        const commandName = actionCommand.name();
-        if (
-          !isWorkflowsToplevelCommand(actionCommand) &&
-          !['init', 'mcp'].includes(commandName) &&
-          ProjectConfigManager.exists() &&
-          !UserSettingsManager.exists()
-        ) {
-          console.log(
-            `Rover is not fully initialized in this directory. The command you requested (\`${commandName}\`) was not executed.`
-          );
-          console.log(
-            `├── ${colors.gray('Project config (exists):')} rover.json`
-          );
-          console.log(
-            `└── ${colors.gray('User settings (does not exist):')} .rover/settings.json`
-          );
-
-          showTips(
-            [
-              'Run ' +
-                colors.cyan('rover init') +
-                ' in this directory to initialize user settings',
-            ],
-            {
-              title: TIP_TITLES.NEXT_STEPS,
+              });
             }
-          );
-
-          process.exit(1);
+          }
         }
+
+        // Initialize context
+        initCLIContext({
+          jsonMode: options.json === true,
+          verbose: options.verbose === true,
+          project,
+          inGitRepo,
+        });
       })
       .hook('preAction', (_thisCommand, actionCommand) => {
         const commandName = actionCommand.name();

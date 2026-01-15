@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { clearProjectRootCache } from 'rover-core';
 import { logsCommand } from '../logs.js';
 import { TaskDescriptionManager } from 'rover-core';
-import { setJsonMode } from '../../lib/global-state.js';
+import { setJsonMode } from '../../lib/context.js';
 
 // Mock external dependencies
 vi.mock('../../lib/telemetry.js', () => ({

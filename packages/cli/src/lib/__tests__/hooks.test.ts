@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import * as globalState from '../global-state.js';
+import * as context from '../context.js';
 
 // Mock rover-core with importActual pattern
 vi.mock('rover-core', async () => {
@@ -10,8 +10,8 @@ vi.mock('rover-core', async () => {
   };
 });
 
-// Mock global-state
-vi.mock('../global-state.js', () => ({
+// Mock context
+vi.mock('../context.js', () => ({
   isJsonMode: vi.fn(() => false),
 }));
 
@@ -20,7 +20,7 @@ import { launchSync } from 'rover-core';
 import { executeHook, executeHooks, HookContext } from '../hooks.js';
 
 const mockedLaunchSync = vi.mocked(launchSync);
-const mockedIsJsonMode = vi.mocked(globalState.isJsonMode);
+const mockedIsJsonMode = vi.mocked(context.isJsonMode);
 
 describe('hooks library', () => {
   const defaultContext: HookContext = {

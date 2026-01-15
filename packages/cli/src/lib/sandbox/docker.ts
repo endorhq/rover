@@ -13,7 +13,7 @@ import {
   warnIfCustomImage,
   tmpUserGroupFiles,
 } from './container-common.js';
-import { isJsonMode } from '../global-state.js';
+import { isJsonMode } from '../context.js';
 import colors from 'ansi-colors';
 
 export class DockerSandbox extends Sandbox {

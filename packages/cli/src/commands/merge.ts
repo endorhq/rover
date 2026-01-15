@@ -17,9 +17,12 @@ import { getTelemetry } from '../lib/telemetry.js';
 import { showRoverChat, showTips } from '../utils/display.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
 import { CLIJsonOutput } from '../types.js';
-import { isJsonMode, setJsonMode } from '../lib/global-state.js';
+import {
+  isJsonMode,
+  setJsonMode,
+  requireProjectContext,
+} from '../lib/context.js';
 import { findProjectRoot } from 'rover-core';
-import { isRoverInitialized } from '../utils/repo-checks.js';
 
 const { prompt } = enquirer;
 
@@ -239,13 +242,12 @@ export const mergeCommand = async (
     return;
   }
 
-  // Check if rover is initialized
-  if (!isRoverInitialized()) {
-    jsonOutput.error = 'Rover is not initialized in this directory';
-    await exitWithError(jsonOutput, {
-      tips: ['Run ' + colors.cyan('rover init') + ' first'],
-      telemetry,
-    });
+  // Require project context
+  try {
+    await requireProjectContext();
+  } catch (error) {
+    jsonOutput.error = error instanceof Error ? error.message : String(error);
+    await exitWithError(jsonOutput, { telemetry });
     return;
   }
 

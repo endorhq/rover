@@ -8,7 +8,7 @@ import { CLIJsonOutput } from '../../types.js';
 import { exitWithError, exitWithSuccess } from '../../utils/exit.js';
 import { Workflow } from 'rover-schemas';
 import { getTelemetry } from '../../lib/telemetry.js';
-import { isJsonMode, setJsonMode } from '../../lib/global-state.js';
+import { isJsonMode, setJsonMode } from '../../lib/context.js';
 
 interface ListWorkflowsCommandOptions {
   // Output format
