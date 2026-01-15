@@ -4,6 +4,13 @@ export interface AgentCredentialFile {
   required: boolean;
 }
 
+/** Usage statistics extracted from agent JSON response */
+export interface AgentUsageStats {
+  tokens?: number;
+  cost?: number;
+  model?: string;
+}
+
 export interface ValidationResult {
   valid: boolean;
   missing: string[];
@@ -45,4 +52,5 @@ export interface Agent {
   recoverFromError?(
     context: AgentErrorRecoveryContext
   ): Promise<AgentRecoveryResult | null> | AgentRecoveryResult | null;
+  extractUsageStats?(parsedResponse: unknown): AgentUsageStats | undefined;
 }
