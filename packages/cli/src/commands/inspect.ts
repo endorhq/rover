@@ -21,6 +21,18 @@ import { isRoverInitialized } from '../utils/repo-checks.js';
 const DEFAULT_FILE_CONTENTS = 'summary.md';
 
 /**
+ * File change statistics for a single file
+ */
+interface FileChangeStat {
+  /** File path relative to worktree */
+  path: string;
+  /** Number of lines added */
+  insertions: number;
+  /** Number of lines deleted */
+  deletions: number;
+}
+
+/**
  * JSON output format for task inspection containing task metadata, status, and iteration details
  */
 interface TaskInspectionOutput {
@@ -38,6 +50,8 @@ interface TaskInspectionOutput {
   error?: string;
   /** ISO timestamp when task failed */
   failedAt?: string;
+  /** List of file changes with insertions/deletions stats */
+  fileChanges?: FileChangeStat[];
   /** List of files in the current iteration directory */
   files?: string[];
   /** Human-readable status string */
@@ -50,12 +64,16 @@ interface TaskInspectionOutput {
   iterations: number;
   /** ISO timestamp of the most recent iteration */
   lastIterationAt?: string;
+  /** The source branch from which this task was created */
+  sourceBranch?: string;
   /** ISO timestamp when task execution started */
   startedAt?: string;
   /** Current task status */
   status: TaskStatus;
   /** Whether the task status has been updated */
   statusUpdated: boolean;
+  /** Content of summary.md file if available */
+  summary?: string;
   /** Path to task directory in .rover/tasks */
   taskDirectory: string;
   /** Short title of the task */
@@ -96,11 +114,13 @@ const jsonErrorOutput = (
     description: task?.description || '',
     error: error,
     failedAt: task?.failedAt,
+    fileChanges: [],
     files: [],
     formattedStatus: task ? formatTaskStatus(task.status) : 'Failed',
     id: task?.id || taskId || 0,
     iterations: task?.iterations || 0,
     lastIterationAt: task?.lastIterationAt,
+    sourceBranch: task?.sourceBranch,
     startedAt: task?.startedAt,
     status: task?.status || 'FAILED',
     statusUpdated: false,
@@ -252,6 +272,25 @@ export const inspectCommand = async (
     }
 
     if (isJsonMode()) {
+      // Get summary content if available
+      const summaryFiles = iteration.getMarkdownFiles([DEFAULT_FILE_CONTENTS]);
+      const summaryContent = summaryFiles.get(DEFAULT_FILE_CONTENTS)?.trim();
+
+      // Get file changes for non-active tasks
+      let fileChanges: FileChangeStat[] | undefined;
+      if (!task.isActive()) {
+        const git = new Git();
+        const stats = await git.diffStats({
+          worktreePath: task.worktreePath,
+          includeUntracked: true,
+        });
+        fileChanges = stats.files.map(fileStat => ({
+          path: fileStat.path,
+          insertions: fileStat.insertions,
+          deletions: fileStat.deletions,
+        }));
+      }
+
       // Output JSON format
       const jsonOutput: TaskInspectionOutput = {
         success: true,
@@ -261,15 +300,18 @@ export const inspectCommand = async (
         description: task.description,
         error: task.error,
         failedAt: task.failedAt,
+        fileChanges,
         files: iteration.listMarkdownFiles(),
         formattedStatus: formatTaskStatus(task.status),
         id: task.id,
         iterationFiles: iteration.listMarkdownFiles(),
         iterations: task.iterations,
         lastIterationAt: task.lastIterationAt,
+        sourceBranch: task.sourceBranch,
         startedAt: task.startedAt,
         status: task.status,
         statusUpdated: false, // TODO: Implement status checking in TaskDescription
+        summary: summaryContent,
         taskDirectory: `.rover/tasks/${numericTaskId}/`,
         title: task.title,
         uuid: task.uuid,
