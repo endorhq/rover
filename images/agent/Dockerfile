@@ -1,4 +1,4 @@
-ARG NIX_AI_TOOLS_REV=ea213e13fde802090a4cdec57631e3374d67d78f
+ARG NIX_AI_TOOLS_REV=765ba8f934426582f38b6adfc1da6d57942f83f4
 FROM node:24-alpine AS agent-builder
 COPY . /app
 WORKDIR /app
@@ -40,3 +40,7 @@ COPY ./images/agent/assets/2-sudoers-cleanup /etc/sudoers.d/2-agent-cleanup
 # Install agents with special requirements
 COPY ./images/agent/assets/nix/nix.conf /etc/nix/nix.conf
 COPY ./images/agent/assets/nix/ai-tool-wrapper /usr/local/bin/cursor-agent
+COPY ./images/agent/assets/nix/ai-tool-wrapper /usr/local/bin/claude-code-acp
+COPY ./images/agent/assets/nix/ai-tool-wrapper /usr/local/bin/codex-acp
+COPY ./images/agent/assets/nix/ai-tool-wrapper /usr/local/bin/gemini-cli
+COPY ./images/agent/assets/nix/ai-tool-wrapper /usr/local/bin/qwen-code

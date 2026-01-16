@@ -14,22 +14,24 @@ import {
  */
 const AGENT_CONFIGS = {
   claude: {
-    command: 'npx',
-    args: ['-y', '@zed-industries/claude-code-acp'],
+    // This command is implemented by a wrapper installed by the agent Dockerfile in `/usr/local/bin`.
+    command: 'claude-code-acp',
     client: () => new ClaudeACP(),
   },
   codex: {
-    command: 'npx',
-    args: ['-y', '@zed-industries/codex-acp'],
+    // This command is implemented by a wrapper installed by the agent Dockerfile in `/usr/local/bin`.
+    command: 'codex-acp',
     client: () => new CodexACP(),
   },
   gemini: {
-    command: 'npx',
-    args: ['-y', '@google/gemini-cli@0.17.1', '--experimental-acp'],
+    // This command is implemented by a wrapper installed by the agent Dockerfile in `/usr/local/bin`.
+    command: 'gemini-cli',
+    args: ['--experimental-acp'],
     client: () => new ClaudeACP(), // Reuse ClaudeACP for now
   },
   qwen: {
-    command: 'qwen',
+    // This command is implemented by a wrapper installed by the agent Dockerfile in `/usr/local/bin`.
+    command: 'qwen-code',
     args: ['--experimental-acp'],
     client: () => new ClaudeACP(), // Reuse ClaudeACP for now
   },
