@@ -15,7 +15,11 @@ import {
 import colors from 'ansi-colors';
 import { existsSync, readFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
-import type { WorkflowAgentStep, WorkflowOutput, WorkflowStep } from 'rover-schemas';
+import type {
+  WorkflowAgentStep,
+  WorkflowOutput,
+  WorkflowStep,
+} from 'rover-schemas';
 import { WorkflowManager, IterationStatusManager } from 'rover-core';
 import { ACPClient } from './acp-client.js';
 import { copyFileSync, rmSync } from 'node:fs';
@@ -83,7 +87,8 @@ export class ACPRunner {
   private agentProcess: ChildProcess | null = null;
   private connection: ClientSideConnection | null = null;
   private sessionId: string | null = null;
-  private isInitialized: boolean = false;
+  private isConnectionInitialized: boolean = false;
+  private isSessionCreated: boolean = false;
   private tool: string;
 
   constructor(config: ACPRunnerConfig) {
@@ -101,10 +106,11 @@ export class ACPRunner {
   }
 
   /**
-   * Initialize the ACP connection and session
+   * Initialize the ACP connection (protocol handshake)
+   * Maps to the ACP initialize method
    */
-  async initialize(): Promise<void> {
-    if (this.isInitialized) {
+  async initializeConnection(): Promise<void> {
+    if (this.isConnectionInitialized) {
       return;
     }
 
@@ -134,10 +140,10 @@ export class ACPRunner {
     // Create the client connection
     const client = new ACPClient();
     const stream = ndJsonStream(input, output);
-    this.connection = new ClientSideConnection((_agent) => client, stream);
+    this.connection = new ClientSideConnection(_agent => client, stream);
 
     try {
-      // Initialize the connection
+      // Initialize the connection (protocol handshake)
       const initResult = await this.connection.initialize({
         protocolVersion: PROTOCOL_VERSION,
         clientCapabilities: {
@@ -148,22 +154,13 @@ export class ACPRunner {
         },
       });
 
+      this.isConnectionInitialized = true;
+
       console.log(
         colors.green(
           `✅ Connected to agent (protocol v${initResult.protocolVersion})`
         )
       );
-
-      // Create a new session
-      const sessionResult = await this.connection.newSession({
-        cwd: process.cwd(),
-        mcpServers: [],
-      });
-
-      this.sessionId = sessionResult.sessionId;
-      this.isInitialized = true;
-
-      console.log(colors.gray(`📝 Created session: ${this.sessionId}`));
     } catch (error) {
       this.close();
       throw new Error(
@@ -173,11 +170,91 @@ export class ACPRunner {
   }
 
   /**
+   * Create a new session
+   * Maps to the ACP session/new method
+   */
+  async createSession(
+    cwd?: string,
+    mcpServers: Array<unknown> = []
+  ): Promise<string> {
+    if (!this.isConnectionInitialized || !this.connection) {
+      throw new Error(
+        'Connection not initialized. Call initializeConnection() first.'
+      );
+    }
+
+    if (this.isSessionCreated) {
+      throw new Error(
+        'Session already created. Use the existing session or close it first.'
+      );
+    }
+
+    try {
+      // Create a new session
+      const sessionResult = await this.connection.newSession({
+        cwd: cwd || process.cwd(),
+        mcpServers,
+      });
+
+      this.sessionId = sessionResult.sessionId;
+      this.isSessionCreated = true;
+
+      console.log(colors.gray(`📝 Created session: ${this.sessionId}`));
+
+      return sessionResult.sessionId;
+    } catch (error) {
+      throw new Error(
+        `Failed to create session: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
+  /**
+   * Send a prompt to the current session
+   * Maps to the ACP session/prompt method
+   */
+  async sendPrompt(prompt: string): Promise<{ stopReason: string }> {
+    if (!this.isConnectionInitialized || !this.connection) {
+      throw new Error(
+        'Connection not initialized. Call initializeConnection() first.'
+      );
+    }
+
+    if (!this.isSessionCreated || !this.sessionId) {
+      throw new Error('No active session. Call createSession() first.');
+    }
+
+    try {
+      const promptResult = await this.connection.prompt({
+        sessionId: this.sessionId,
+        prompt: [
+          {
+            type: 'text',
+            text: prompt,
+          },
+        ],
+      });
+
+      return { stopReason: promptResult.stopReason };
+    } catch (error) {
+      throw new Error(
+        `Failed to send prompt: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
+  /**
    * Run a single workflow step using the ACP session
    */
   async runStep(stepId: string): Promise<ACPRunnerStepResult> {
-    if (!this.isInitialized || !this.connection || !this.sessionId) {
-      throw new Error('ACP runner not initialized. Call initialize() first.');
+    if (!this.isConnectionInitialized || !this.connection) {
+      throw new Error(
+        'Connection not initialized. Call initializeConnection() first.'
+      );
+    }
+
+    if (!this.isSessionCreated || !this.sessionId) {
+      throw new Error('No active session. Call createSession() first.');
     }
 
     const start = performance.now();
@@ -185,7 +262,9 @@ export class ACPRunner {
     const step = this.workflow.getStep(stepId);
 
     // Calculate current progress
-    const stepIndex = this.workflow.steps.findIndex((s: WorkflowStep) => s.id === stepId);
+    const stepIndex = this.workflow.steps.findIndex(
+      (s: WorkflowStep) => s.id === stepId
+    );
     const totalSteps = this.workflow.steps.length;
     const currentProgress = Math.floor((stepIndex / totalSteps) * 100);
     const nextProgress = Math.floor(((stepIndex + 1) / totalSteps) * 100);
@@ -208,15 +287,7 @@ export class ACPRunner {
       console.log(colors.gray('\n--- Prompt End ---\n'));
 
       // Send the prompt via ACP session
-      const promptResult = await this.connection.prompt({
-        sessionId: this.sessionId,
-        prompt: [
-          {
-            type: 'text',
-            text: prompt,
-          },
-        ],
-      });
+      const promptResult = await this.sendPrompt(prompt);
 
       console.log(
         colors.gray(`\n✅ Agent completed with: ${promptResult.stopReason}`)
@@ -234,9 +305,7 @@ export class ACPRunner {
         throw new Error(parseError || 'Failed to parse step outputs');
       }
 
-      console.log(
-        colors.green(`✓ Step '${step.name}' completed successfully`)
-      );
+      console.log(colors.green(`✓ Step '${step.name}' completed successfully`));
 
       // Update status after successful completion
       this.statusManager?.update('running', step.name, nextProgress);
@@ -309,7 +378,9 @@ export class ACPRunner {
           const outputValue = stepOutputs.get(outputName) || '';
 
           // Find the output definition
-          const stepDef = this.workflow.steps.find((s: WorkflowStep) => s.id === stepId);
+          const stepDef = this.workflow.steps.find(
+            (s: WorkflowStep) => s.id === stepId
+          );
           const outputDef = stepDef?.outputs?.find(
             (o: WorkflowOutput) => o.name === outputName
           );
@@ -361,9 +432,9 @@ export class ACPRunner {
     }
 
     const stringOutputs = stepOutputs.filter(
-      (output) => output.type === 'string'
+      output => output.type === 'string'
     );
-    const fileOutputs = stepOutputs.filter((output) => output.type === 'file');
+    const fileOutputs = stepOutputs.filter(output => output.type === 'file');
 
     let instructions = '\n\n## OUTPUT REQUIREMENTS\n\n';
     instructions +=
@@ -382,7 +453,7 @@ export class ACPRunner {
       instructions += '}\n```\n\n';
 
       instructions += 'Where:\n';
-      stringOutputs.forEach((output) => {
+      stringOutputs.forEach(output => {
         instructions += `- \`${output.name}\`: ${output.description}\n`;
       });
       instructions += '\n';
@@ -393,7 +464,7 @@ export class ACPRunner {
       instructions +=
         'You MUST create the following files with the exact content needed and print their content in the current session:\n\n';
 
-      fileOutputs.forEach((output) => {
+      fileOutputs.forEach(output => {
         instructions += `- **${output.name}**: ${output.description}\n`;
         instructions += `  - Create this file in the current working directory\n`;
         instructions += `  - Filename: \`${output.filename}\`\n\n`;
@@ -423,17 +494,22 @@ export class ACPRunner {
       const stepOutputs = step.outputs || [];
 
       // Extract file outputs by reading created files
-      const fileOutputs = stepOutputs.filter((output) => output.type === 'file');
+      const fileOutputs = stepOutputs.filter(output => output.type === 'file');
       if (fileOutputs.length > 0) {
         await this.extractFileOutputs(fileOutputs, outputs);
       }
 
       // Extract string outputs from files or conventional JSON output
       const stringOutputs = stepOutputs.filter(
-        (output) => output.type === 'string'
+        output => output.type === 'string'
       );
       if (stringOutputs.length > 0) {
-        await this.extractStringOutputs(step.id, stringOutputs, fileOutputs, outputs);
+        await this.extractStringOutputs(
+          step.id,
+          stringOutputs,
+          fileOutputs,
+          outputs
+        );
       }
 
       return { success: true };
@@ -454,7 +530,11 @@ export class ACPRunner {
   private async extractStringOutputs(
     stepId: string,
     stringOutputs: Array<{ name: string; description: string }>,
-    fileOutputs: Array<{ name: string; description: string; filename?: string }>,
+    fileOutputs: Array<{
+      name: string;
+      description: string;
+      filename?: string;
+    }>,
     outputs: Map<string, string>
   ): Promise<void> {
     // First, try to read from a conventional step outputs JSON file
@@ -524,7 +604,9 @@ export class ACPRunner {
   /**
    * Try to extract JSON data from content (looks for JSON blocks or raw JSON)
    */
-  private extractJsonFromContent(content: string): Record<string, unknown> | null {
+  private extractJsonFromContent(
+    content: string
+  ): Record<string, unknown> | null {
     // Try to find a JSON code block
     const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/);
     if (jsonMatch) {
@@ -657,7 +739,8 @@ export class ACPRunner {
     }
     this.connection = null;
     this.sessionId = null;
-    this.isInitialized = false;
+    this.isConnectionInitialized = false;
+    this.isSessionCreated = false;
   }
 }
 

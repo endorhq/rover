@@ -20,7 +20,6 @@ const AGENT_CONFIGS = {
   },
 };
 
-
 type AgentType = keyof typeof AGENT_CONFIGS;
 
 /**

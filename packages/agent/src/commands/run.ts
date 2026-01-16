@@ -7,7 +7,11 @@ import {
 } from 'rover-core';
 import { parseCollectOptions } from '../lib/options.js';
 import { Runner, RunnerStepResult } from '../lib/runner.js';
-import { ACPRunner, ACPRunnerStepResult, isACPWorkflow } from '../lib/acp-runner.js';
+import {
+  ACPRunner,
+  ACPRunnerStepResult,
+  isACPWorkflow,
+} from '../lib/acp-runner.js';
 import { existsSync, readFileSync } from 'node:fs';
 
 /**
@@ -22,13 +26,11 @@ function displayStepResults(
   console.log(colors.gray('├── ID: ') + colors.cyan(result.id));
   console.log(
     colors.gray('├── Status: ') +
-    (result.success
-      ? colors.green('✓ Success')
-      : colors.red('✗ Failed'))
+      (result.success ? colors.green('✓ Success') : colors.red('✗ Failed'))
   );
   console.log(
     colors.gray('├── Duration: ') +
-    colors.yellow(`${result.duration.toFixed(2)}s`)
+      colors.yellow(`${result.duration.toFixed(2)}s`)
   );
 
   // Check for tokens and cost (only in RunnerStepResult)
@@ -39,8 +41,7 @@ function displayStepResults(
   }
   if ('cost' in result && result.cost) {
     console.log(
-      colors.gray('├── Cost: ') +
-      colors.cyan(`$${result.cost.toFixed(4)}`)
+      colors.gray('├── Cost: ') + colors.cyan(`$${result.cost.toFixed(4)}`)
     );
   }
   if (result.error) {
@@ -60,8 +61,7 @@ function displayStepResults(
   if (outputEntries.length > 0) {
     console.log(colors.gray('└── Outputs:'));
     outputEntries.forEach(([key, value], idx) => {
-      const prefix =
-        idx === outputEntries.length - 1 ? '    └──' : '    ├──';
+      const prefix = idx === outputEntries.length - 1 ? '    └──' : '    ├──';
       // Truncate long values for display
       let displayValue =
         value.length > 100 ? value.substring(0, 100) + '...' : value;
@@ -98,7 +98,7 @@ interface RunCommandOptions {
   preContextFile: string[];
 }
 
-interface RunCommandOutput extends CommandOutput { }
+interface RunCommandOutput extends CommandOutput {}
 
 /**
  * Handles pre-context file loading, validation, and injection into workflow steps.
@@ -366,8 +366,11 @@ export const runCommand = async (
         });
 
         try {
-          // Initialize the ACP session
-          await acpRunner.initialize();
+          // Initialize the ACP connection (protocol handshake)
+          await acpRunner.initializeConnection();
+
+          // Create a new session
+          await acpRunner.createSession();
 
           // Run all steps through the persistent session
           for (
@@ -475,17 +478,17 @@ export const runCommand = async (
       console.log(colors.bold('\n🎉 Workflow Execution Summary'));
       console.log(
         colors.gray('├── Duration: ') +
-        colors.cyan(totalDuration.toFixed(2) + 's')
+          colors.cyan(totalDuration.toFixed(2) + 's')
       );
       console.log(
         colors.gray('├── Total Steps: ') +
-        colors.cyan(workflowManager.steps.length.toString())
+          colors.cyan(workflowManager.steps.length.toString())
       );
 
       const successfulSteps = Array.from(stepsOutput.keys()).length;
       console.log(
         colors.gray('├── Successful Steps: ') +
-        colors.green(successfulSteps.toString())
+          colors.green(successfulSteps.toString())
       );
 
       const failedSteps = runSteps - successfulSteps;
@@ -496,7 +499,7 @@ export const runCommand = async (
       const skippedSteps = workflowManager.steps.length - runSteps;
       console.log(
         colors.gray('├── Skipped Steps: ') +
-        colors.yellow(failedSteps.toString())
+          colors.yellow(failedSteps.toString())
       );
 
       let status = colors.green('✓ Workflow Completed Successfully');

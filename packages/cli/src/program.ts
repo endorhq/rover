@@ -69,8 +69,8 @@ export function createProgram(
           showTips(
             [
               'Run ' +
-              colors.cyan('rover init') +
-              ' in this directory to initialize project config and user settings',
+                colors.cyan('rover init') +
+                ' in this directory to initialize project config and user settings',
             ],
             {
               title: TIP_TITLES.NEXT_STEPS,
@@ -146,8 +146,8 @@ export function createProgram(
           showTips(
             [
               'Run ' +
-              colors.cyan('rover init') +
-              ' in this directory to initialize user settings',
+                colors.cyan('rover init') +
+                ' in this directory to initialize user settings',
             ],
             {
               title: TIP_TITLES.NEXT_STEPS,
