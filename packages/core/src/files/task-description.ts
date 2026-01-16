@@ -70,6 +70,7 @@ export class TaskDescriptionManager {
       agent: taskData.agent,
       agentModel: taskData.agentModel,
       sourceBranch: taskData.sourceBranch,
+      githubIssue: taskData.githubIssue,
       version: CURRENT_TASK_DESCRIPTION_SCHEMA_VERSION,
     };
 
@@ -207,6 +208,9 @@ export class TaskDescriptionManager {
 
     // Preserve agentImage field
     migrated.agentImage = data.agentImage;
+
+    // Preserve GitHub issue reference
+    migrated.githubIssue = data.githubIssue;
 
     return migrated as TaskDescription;
   }
@@ -646,6 +650,9 @@ export class TaskDescriptionManager {
   }
   get agentImage(): string | undefined {
     return this.data.agentImage;
+  }
+  get githubIssue(): { number: number; repository: string } | undefined {
+    return this.data.githubIssue;
   }
 
   // Data Modification (Setters)
