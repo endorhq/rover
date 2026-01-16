@@ -3,6 +3,7 @@ import {
   IterationManager,
   IterationStatusManager,
   ProjectConfigManager,
+  ProjectStore,
   showTips,
   Table,
   TableColumn,
@@ -11,7 +12,11 @@ import {
   VERBOSE,
 } from 'rover-core';
 import { type TaskDescription } from 'rover-schemas';
-import { isJsonMode, setJsonMode } from '../lib/global-state.js';
+import {
+  isJsonMode,
+  setJsonMode,
+  resolveProjectContext,
+} from '../lib/context.js';
 import { executeHooks } from '../lib/hooks.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { formatTaskStatus, statusColor } from '../utils/task-status.js';

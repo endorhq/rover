@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import * as globalState from '../global-state.js';
+import { initCLIContext } from '../context.js';
 
 // Mock rover-core with importActual pattern
 vi.mock('rover-core', async () => {
@@ -10,17 +10,11 @@ vi.mock('rover-core', async () => {
   };
 });
 
-// Mock global-state
-vi.mock('../global-state.js', () => ({
-  isJsonMode: vi.fn(() => false),
-}));
-
 import { launchSync } from 'rover-core';
 // Import hooks after mocks are set up
 import { executeHook, executeHooks, HookContext } from '../hooks.js';
 
 const mockedLaunchSync = vi.mocked(launchSync);
-const mockedIsJsonMode = vi.mocked(globalState.isJsonMode);
 
 describe('hooks library', () => {
   const defaultContext: HookContext = {
@@ -31,7 +25,7 @@ describe('hooks library', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockedIsJsonMode.mockReturnValue(false);
+    // Context is auto-initialized by test-setup.ts with jsonMode: false
   });
 
   afterEach(() => {
@@ -217,7 +211,7 @@ describe('hooks library', () => {
 
     it('should log warnings for failed hooks in non-JSON mode', () => {
       const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      mockedIsJsonMode.mockReturnValue(false);
+      // Context is initialized with jsonMode: false by test-setup.ts
       mockedLaunchSync.mockImplementation(() => {
         throw new Error('Hook failed');
       });
@@ -232,7 +226,13 @@ describe('hooks library', () => {
 
     it('should not log warnings for failed hooks in JSON mode', () => {
       const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      mockedIsJsonMode.mockReturnValue(true);
+      // Override context to enable JSON mode for this test
+      initCLIContext({
+        jsonMode: true,
+        verbose: false,
+        project: null,
+        inGitRepo: true,
+      });
       mockedLaunchSync.mockImplementation(() => {
         throw new Error('Hook failed');
       });

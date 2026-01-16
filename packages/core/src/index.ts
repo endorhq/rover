@@ -62,10 +62,16 @@ export {
 
 export {
   detectEnvironment,
-  ProjectManagerLoadError,
-  ProjectManagerRegistrationError,
   ProjectManager,
+  ProjectStore,
+  ProjectStoreLoadError,
+  ProjectStoreRegistrationError,
+  ProjectLoaderNotGitRepoError,
+  ProjectLoaderRegistrationError,
+  ProjectLoaderStoreError,
+  findOrRegisterProject,
   type EnvironmentResult,
+  type FindOrRegisterProjectOptions,
 } from './project/index.js';
 
 export {

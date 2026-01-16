@@ -14,7 +14,7 @@ import {
   tmpUserGroupFiles,
   normalizeExtraArgs,
 } from './container-common.js';
-import { isJsonMode } from '../global-state.js';
+import { isJsonMode } from '../context.js';
 import colors from 'ansi-colors';
 
 export class PodmanSandbox extends Sandbox {

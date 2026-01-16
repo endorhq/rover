@@ -6,7 +6,7 @@ import { getTelemetry } from '../lib/telemetry.js';
 import { Git, showList, showTitle } from 'rover-core';
 import { showTips } from '../utils/display.js';
 import { exitWithError, exitWithSuccess } from '../utils/exit.js';
-import { isRoverInitialized } from '../utils/repo-checks.js';
+import { requireProjectContext } from '../lib/context.js';
 
 export const diffCommand = async (
   taskId: string,
@@ -27,11 +27,16 @@ export const diffCommand = async (
     return;
   }
 
-  // Check if rover is initialized
-  if (!isRoverInitialized()) {
-    console.log(colors.red('✗ Rover is not initialized in this directory'));
-    console.log(
-      colors.gray('Run ') + colors.cyan('rover init') + colors.gray(' first')
+  // Require project context
+  try {
+    await requireProjectContext();
+  } catch (error) {
+    await exitWithError(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      { telemetry }
     );
     return;
   }

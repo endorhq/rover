@@ -2,7 +2,7 @@ import colors from 'ansi-colors';
 import { CLIJsonOutput, CLIJsonOutputWithErrors } from '../types.js';
 import { showTips, TipsConfig } from './display.js';
 import Telemetry from 'rover-telemetry';
-import { isJsonMode } from '../lib/global-state.js';
+import { isJsonMode } from '../lib/context.js';
 
 type ExitWithErrorOpts = {
   exitCode?: number;

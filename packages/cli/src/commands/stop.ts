@@ -8,8 +8,11 @@ import { findProjectRoot, launch, ProcessManager } from 'rover-core';
 import { exitWithError, exitWithSuccess } from '../utils/exit.js';
 import { CLIJsonOutput } from '../types.js';
 import { getTelemetry } from '../lib/telemetry.js';
-import { isJsonMode, setJsonMode } from '../lib/global-state.js';
-import { isRoverInitialized } from '../utils/repo-checks.js';
+import {
+  isJsonMode,
+  setJsonMode,
+  requireProjectContext,
+} from '../lib/context.js';
 
 /**
  * Interface for JSON output
@@ -60,13 +63,12 @@ export const stopCommand = async (
     return;
   }
 
-  // Check if rover is initialized
-  if (!isRoverInitialized()) {
-    jsonOutput.error = 'Rover is not initialized in this directory';
-    await exitWithError(jsonOutput, {
-      tips: ['Run ' + colors.cyan('rover init') + ' first'],
-      telemetry,
-    });
+  // Require project context
+  try {
+    await requireProjectContext();
+  } catch (error) {
+    jsonOutput.error = error instanceof Error ? error.message : String(error);
+    await exitWithError(jsonOutput, { telemetry });
     return;
   }
 

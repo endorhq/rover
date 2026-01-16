@@ -47,6 +47,7 @@
     "rules": { "recommended": true },
     "includes": [
       "packages/telemetry/**",
+      "packages/core/src/project/**",
       "!.direnv",
       "!**/node_modules/",
       "!**/dist/",

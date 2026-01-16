@@ -1,8 +1,13 @@
 import { Command, Option } from 'commander';
 import {
-  ProjectConfigManager,
-  UserSettingsManager,
   AI_AGENT,
+  Git,
+  setVerbose,
+  getVersion,
+  showSplashHeader,
+  showRegularHeader,
+  findOrRegisterProject,
+  ProjectLoaderNotGitRepoError,
 } from 'rover-core';
 import { initCommand } from './commands/init.js';
 import { listCommand } from './commands/list.js';
@@ -21,16 +26,8 @@ import colors from 'ansi-colors';
 import { pushCommand } from './commands/push.js';
 import { stopCommand } from './commands/stop.js';
 import { mcpCommand } from './commands/mcp.js';
-import { showTips, TIP_TITLES } from './utils/display.js';
-import {
-  Git,
-  setVerbose,
-  getVersion,
-  showSplashHeader,
-  showRegularHeader,
-} from 'rover-core';
 import { addWorkflowCommands } from './commands/workflows/index.js';
-import { setJsonMode, isJsonMode } from './lib/global-state.js';
+import { initCLIContext, isJsonMode, setJsonMode } from './lib/context.js';
 
 function isWorkflowsToplevelCommand(command: Command): boolean {
   return command.parent?.name() === 'workflows';
@@ -44,118 +41,45 @@ export function createProgram(
 
   if (!options.excludeRuntimeHooks) {
     program
-      .hook('preAction', (_thisCommand, actionCommand) => {
-        // Set global JSON mode flag based on command options
-        setJsonMode(actionCommand.opts().json === true);
-      })
-      .hook('preAction', (thisCommand, _actionCommand) => {
-        setVerbose(thisCommand.opts().verbose);
-      })
-      .hook('preAction', (_thisCommand, actionCommand) => {
+      .hook('preAction', async (thisCommand, actionCommand) => {
         const commandName = actionCommand.name();
+        const cliOptions = thisCommand.opts();
+        const options = actionCommand.opts();
 
+        // Set verbose mode
+        setVerbose(options.verbose === true);
+
+        // Build context
+        const git = new Git();
+        const inGitRepo = git.isGitRepo();
+
+        let project = null;
+
+        // Skip project resolution for init (it creates the project),
+        // mcp (adapts to context), and workflow commands
         if (
           !isWorkflowsToplevelCommand(actionCommand) &&
-          !['init', 'mcp'].includes(commandName) &&
-          !ProjectConfigManager.exists()
+          commandName !== 'init' &&
+          inGitRepo
         ) {
-          console.log(
-            `Rover is not initialized in this directory. The command you requested (\`${commandName}\`) was not executed.`
-          );
-          console.log(
-            `└── ${colors.gray('Project config (does not exist):')} rover.json`
-          );
-
-          showTips(
-            [
-              'Run ' +
-                colors.cyan('rover init') +
-                ' in this directory to initialize project config and user settings',
-            ],
-            {
-              title: TIP_TITLES.NEXT_STEPS,
-            }
-          );
-
-          process.exit(1);
-        }
-      })
-      .hook('preAction', (_thisCommand, actionCommand) => {
-        if (!isWorkflowsToplevelCommand(actionCommand)) {
-          const git = new Git();
           try {
-            git.version();
+            project = await findOrRegisterProject();
           } catch (error) {
-            exitWithError(
-              {
-                error: 'Git is not installed',
-                success: false,
-              },
-              {
-                tips: ['Install git and try again'],
-              }
-            );
-          }
-          if (!git.isGitRepo()) {
-            exitWithError(
-              {
-                error: 'Not in a git repository',
-                success: false,
-              },
-              {
-                tips: [
-                  'Rover requires the project to be in a git repository. You can initialize a git repository by running ' +
-                    colors.cyan('git init'),
-                ],
-              }
-            );
-          }
-          if (!git.hasCommits()) {
-            exitWithError(
-              {
-                error: 'No commits found in git repository',
-                success: false,
-              },
-              {
-                tips: [
-                  'Git worktree requires at least one commit in the repository in order to have common history',
-                ],
-              }
-            );
+            // Config/registration errors - exit
+            exitWithError({
+              error: error instanceof Error ? error.message : String(error),
+              success: false,
+            });
           }
         }
-      })
-      .hook('preAction', (thisCommand, actionCommand) => {
-        const commandName = actionCommand.name();
-        if (
-          !isWorkflowsToplevelCommand(actionCommand) &&
-          !['init', 'mcp'].includes(commandName) &&
-          ProjectConfigManager.exists() &&
-          !UserSettingsManager.exists()
-        ) {
-          console.log(
-            `Rover is not fully initialized in this directory. The command you requested (\`${commandName}\`) was not executed.`
-          );
-          console.log(
-            `├── ${colors.gray('Project config (exists):')} rover.json`
-          );
-          console.log(
-            `└── ${colors.gray('User settings (does not exist):')} .rover/settings.json`
-          );
 
-          showTips(
-            [
-              'Run ' +
-                colors.cyan('rover init') +
-                ' in this directory to initialize user settings',
-            ],
-            {
-              title: TIP_TITLES.NEXT_STEPS,
-            }
-          );
-
-          process.exit(1);
-        }
+        // Initialize context
+        initCLIContext({
+          jsonMode: options.json === true,
+          verbose: cliOptions.verbose === true,
+          project,
+          inGitRepo,
+        });
       })
       .hook('preAction', (_thisCommand, actionCommand) => {
         const commandName = actionCommand.name();
@@ -192,19 +116,30 @@ export function createProgram(
 
   program
     .command('init')
-    .description('Initialize your project')
+    .description('Create a shared configuration for this project')
     .option('-y, --yes', 'Skip all confirmations and run non-interactively')
     .argument('[path]', 'Project path', process.cwd())
     .action(initCommand);
 
-  program.commandsGroup(colors.cyan('Create and manage tasks:'));
+  program.commandsGroup(colors.cyan('Current tasks:'));
+  // Add the ps command for monitoring tasks
+  program
+    .command('list')
+    .alias('ls')
+    .description('Show the tasks from current project or all projects')
+    .option(
+      '-w, --watch [seconds]',
+      'Watch for changes (default 3s, or specify interval)'
+    )
+    .option('--json', 'Output in JSON format')
+    .action(listCommand);
+
+  program.commandsGroup(colors.cyan('Manage tasks in a project:'));
 
   // Add a new task
   program
     .command('task')
-    .description(
-      'Start a new task for an AI Agent. It will spawn a new environment to complete it.'
-    )
+    .description('Create and assign task to an AI Agent to complete it')
     .option(
       '--from-github <issue>',
       'Fetch task description from a GitHub issue number'
@@ -269,18 +204,6 @@ export function createProgram(
     .option('--json', 'Output the result in JSON format')
     .action(stopCommand);
 
-  // Add the ps command for monitoring tasks
-  program
-    .command('list')
-    .alias('ls')
-    .description('Show tasks and their status')
-    .option(
-      '-w, --watch [seconds]',
-      'Watch for changes (default 3s, or specify interval)'
-    )
-    .option('--json', 'Output in JSON format')
-    .action(listCommand);
-
   program
     .command('inspect')
     .description('Inspect a task')
@@ -342,8 +265,6 @@ export function createProgram(
     )
     .option('--json', 'Output JSON and skip confirmation prompts')
     .action(iterateCommand);
-
-  program.commandsGroup(colors.cyan('Debug a task:'));
 
   program
     .command('shell')
