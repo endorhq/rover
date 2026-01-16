@@ -759,9 +759,9 @@ export class ACPRunner {
 
   private async getAgentsResponse(): Promise<unknown | undefined> {
     const connection = this.connection as unknown as {
-      agents?: () => Promise<unknown>;
-      getAgents?: () => Promise<unknown>;
-      listAgents?: () => Promise<unknown>;
+      agents?: (params?: { sessionId?: string }) => Promise<unknown>;
+      getAgents?: (params?: { sessionId?: string }) => Promise<unknown>;
+      listAgents?: (params?: { sessionId?: string }) => Promise<unknown>;
     };
     const fetchAgents =
       connection.getAgents ?? connection.listAgents ?? connection.agents;
