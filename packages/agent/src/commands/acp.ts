@@ -14,28 +14,12 @@ import {
  */
 const AGENT_CONFIGS = {
   claude: {
-    // This command is implemented by a wrapper installed by the agent Dockerfile in `/usr/local/bin`.
-    command: 'claude-code-acp',
+    command: 'npx',
+    args: ['-y', '@zed-industries/claude-code-acp'],
     client: () => new ClaudeACP(),
   },
-  codex: {
-    // This command is implemented by a wrapper installed by the agent Dockerfile in `/usr/local/bin`.
-    command: 'codex-acp',
-    client: () => new CodexACP(),
-  },
-  gemini: {
-    // This command is implemented by a wrapper installed by the agent Dockerfile in `/usr/local/bin`.
-    command: 'gemini-cli',
-    args: ['--experimental-acp'],
-    client: () => new ClaudeACP(), // Reuse ClaudeACP for now
-  },
-  qwen: {
-    // This command is implemented by a wrapper installed by the agent Dockerfile in `/usr/local/bin`.
-    command: 'qwen-code',
-    args: ['--experimental-acp'],
-    client: () => new ClaudeACP(), // Reuse ClaudeACP for now
-  },
 };
+
 
 type AgentType = keyof typeof AGENT_CONFIGS;
 
