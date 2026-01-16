@@ -22,7 +22,6 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { VERBOSE } from 'rover-core';
 
 export class ACPClient implements Client {
-
   requestPermission(
     params: RequestPermissionRequest
   ): Promise<RequestPermissionResponse> {
