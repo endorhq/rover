@@ -1,12 +1,10 @@
 import colors from 'ansi-colors';
-import { join } from 'node:path';
 import { rmSync } from 'node:fs';
 import { createSandbox } from '../lib/sandbox/index.js';
-import { TaskDescriptionManager } from 'rover-core';
 import { TaskNotFoundError } from 'rover-schemas';
-import { findProjectRoot, launch, ProcessManager } from 'rover-core';
+import { launch, ProcessManager } from 'rover-core';
 import { exitWithError, exitWithSuccess } from '../utils/exit.js';
-import { CLIJsonOutput } from '../types.js';
+import type { CLIJsonOutput } from '../types.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import {
   isJsonMode,
@@ -64,8 +62,9 @@ export const stopCommand = async (
   }
 
   // Require project context
+  let project;
   try {
-    await requireProjectContext();
+    project = await requireProjectContext();
   } catch (error) {
     jsonOutput.error = error instanceof Error ? error.message : String(error);
     await exitWithError(jsonOutput, { telemetry });
@@ -73,8 +72,11 @@ export const stopCommand = async (
   }
 
   try {
-    // Load task using TaskDescription
-    const task = TaskDescriptionManager.load(numericTaskId);
+    // Load task using ProjectManager
+    const task = project.getTask(numericTaskId);
+    if (!task) {
+      throw new TaskNotFoundError(numericTaskId);
+    }
 
     processManager?.addItem(`Stopping Task`);
 
@@ -154,13 +156,7 @@ export const stopCommand = async (
     }
 
     // Delete the iterations
-    const taskPath = join(
-      findProjectRoot(),
-      '.rover',
-      'tasks',
-      numericTaskId.toString()
-    );
-    const iterationPath = join(taskPath, 'iterations');
+    const iterationPath = task.iterationsPath();
     rmSync(iterationPath, { recursive: true, force: true });
 
     // Clear workspace information

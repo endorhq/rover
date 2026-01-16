@@ -51,6 +51,8 @@ export const GlobalProjectSchema = z.object({
   packageManagers: z.array(PackageManagerSchema),
   /** Task managers used in the project */
   taskManagers: z.array(TaskManagerSchema),
+  /** Next task ID counter for this project (per-project sequential IDs) */
+  nextTaskId: z.number().optional().default(1),
 });
 
 /**

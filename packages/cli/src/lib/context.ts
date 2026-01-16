@@ -3,9 +3,8 @@
  * This module provides a cohesive context object for CLI state management.
  */
 
-import { findProjectRoot, ProjectStore, type ProjectManager } from 'rover-core';
-import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { resolve } from 'node:path';
+import { type ProjectManager, ProjectStore } from 'rover-core';
 
 /**
  * CLI execution context
@@ -86,56 +85,51 @@ export function getDefaultProject(): ProjectManager | null {
 /**
  * Resolve the effective project for a command.
  *
- * @param projectOption - Value from --project flag (future)
+ * Resolution order:
+ * 1. If context.project is already set (from preAction), return it
+ * 2. If projectOption is provided, look it up
+ * 3. If ROVER_PROJECT env is set, look it up
+ * 4. Fall back to default project from context
+ *
+ * @param projectOption - Value from --project flag
  * @returns ProjectManager or null (global mode)
- * @throws If --project specified but not found
+ * @throws If project override specified but not found
  */
 export async function resolveProjectContext(
   projectOption?: string
 ): Promise<ProjectManager | null> {
-  // If --project is provided, resolve that specific project
-  if (projectOption) {
+  // If context already has a project (set by preAction), return it
+  // This avoids double resolution
+  const contextProject = getDefaultProject();
+  if (contextProject) {
+    return contextProject;
+  }
+
+  // Determine the override value (flag takes precedence over env)
+  const override = projectOption || process.env.ROVER_PROJECT;
+
+  // If an override is provided, resolve that specific project
+  if (override) {
     const store = new ProjectStore();
-    // Try by ID first, then by path
-    const project = store.get(projectOption) ?? store.getByPath(projectOption);
+    // Try by ID first, then by normalized path
+    const project = store.get(override) ?? store.getByPath(resolve(override));
     if (!project) {
-      throw new Error(`Project "${projectOption}" not found`);
+      throw new Error(`Project "${override}" not found`);
     }
     return project;
   }
 
-  // Otherwise, use the default context from pre-action hook
-  return getDefaultProject();
-}
-
-/**
- * Check if we're in a Rover project directory (has .rover folder).
- *
- * @deprecated Legacy check for backward compatibility with tests that don't
- * initialize a full project context. Will be removed once all code paths
- * properly use ProjectManager.
- */
-function legacy_isInRoverProject(): boolean {
-  try {
-    const roverPath = join(findProjectRoot(), '.rover');
-    return existsSync(roverPath);
-  } catch {
-    // findProjectRoot throws if .rover directory is not found
-    return false;
-  }
+  // No override and no context project - return null (global mode)
+  return null;
 }
 
 /**
  * Require a project context for a command.
  * Use this for commands that cannot operate in global mode.
  *
- * When project is null but we're in a directory with .rover,
- * returns null (typed as ProjectManager) to allow commands to proceed.
- * Commands should use findProjectRoot() to locate project files.
- *
- * @param projectOption - Value from --project flag (future)
- * @returns ProjectManager (may be null if in .rover directory)
- * @throws If no project context available and not in .rover directory
+ * @param projectOption - Value from --project flag
+ * @returns ProjectManager
+ * @throws If no project context available
  */
 export async function requireProjectContext(
   projectOption?: string
@@ -145,13 +139,7 @@ export async function requireProjectContext(
     return project;
   }
 
-  // @DEPRECATED: Legacy fallback for backward compatibility.
-  // Remove this once all code paths properly use ProjectManager.
-  if (legacy_isInRoverProject()) {
-    return null as unknown as ProjectManager;
-  }
-
   throw new Error(
-    'Not in a project. Run from a git repository or use --project option.'
+    'Not in a project. Run from a git repository, use --project <name|path>, or set ROVER_PROJECT env var.'
   );
 }
