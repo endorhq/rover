@@ -247,6 +247,22 @@ export class GlobalConfigManager {
   }
 
   /**
+   * Update an existing project in the configuration.
+   * Use this when ProjectManager needs to persist changes (e.g., nextTaskId).
+   * @throws Error if project doesn't exist
+   */
+  updateProject(project: GlobalProject): void {
+    const existingIndex = this.data.projects.findIndex(
+      p => p.id === project.id
+    );
+    if (existingIndex === -1) {
+      throw new Error(`Project ${project.id} not found`);
+    }
+    this.data.projects[existingIndex] = project;
+    this.save();
+  }
+
+  /**
    * Remove a project from the configuration
    */
   removeProject(projectId: string): void {

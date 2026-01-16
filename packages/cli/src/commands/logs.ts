@@ -1,12 +1,11 @@
 import colors from 'ansi-colors';
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { findProjectRoot, launch, launchSync } from 'rover-core';
-import { TaskDescriptionManager } from 'rover-core';
+import { launch, launchSync, type TaskDescriptionManager } from 'rover-core';
 import { TaskNotFoundError } from 'rover-schemas';
 import { getTelemetry } from '../lib/telemetry.js';
 import { showTips } from '../utils/display.js';
-import { CLIJsonOutput } from '../types.js';
+import type { CLIJsonOutput } from '../types.js';
 import { exitWithError, exitWithWarn } from '../utils/exit.js';
 import {
   isJsonMode,
@@ -24,11 +23,9 @@ interface TaskLogsOutput extends CLIJsonOutput {
 /**
  * Get available iterations for a task
  */
-const getAvailableIterations = (taskId: string): number[] => {
+const getAvailableIterations = (task: TaskDescriptionManager): number[] => {
   try {
-    const roverPath = join(findProjectRoot(), '.rover');
-    const taskPath = join(roverPath, 'tasks', taskId);
-    const iterationsPath = join(taskPath, 'iterations');
+    const iterationsPath = task.iterationsPath();
 
     if (!existsSync(iterationsPath)) {
       return [];
@@ -37,7 +34,7 @@ const getAvailableIterations = (taskId: string): number[] => {
     return readdirSync(iterationsPath, { withFileTypes: true })
       .filter(dirent => dirent.isDirectory())
       .map(dirent => parseInt(dirent.name, 10))
-      .filter(num => !isNaN(num))
+      .filter(num => !Number.isNaN(num))
       .sort((a, b) => a - b); // Sort ascending
   } catch (error) {
     console.error('Error getting available iterations:', error);
@@ -73,8 +70,9 @@ export const logsCommand = async (
   }
 
   // Require project context
+  let project;
   try {
-    await requireProjectContext();
+    project = await requireProjectContext();
   } catch (error) {
     jsonOutput.error = error instanceof Error ? error.message : String(error);
     await exitWithError(jsonOutput, { telemetry });
@@ -82,14 +80,17 @@ export const logsCommand = async (
   }
 
   try {
-    // Load task using TaskDescription
-    const task = TaskDescriptionManager.load(numericTaskId);
+    // Load task using ProjectManager
+    const task = project.getTask(numericTaskId);
+    if (!task) {
+      throw new TaskNotFoundError(numericTaskId);
+    }
 
     // Parse iteration number if provided
     let targetIteration: number | undefined;
     if (iterationNumber) {
       targetIteration = parseInt(iterationNumber, 10);
-      if (isNaN(targetIteration)) {
+      if (Number.isNaN(targetIteration)) {
         jsonOutput.error = `Invalid iteration number: '${iterationNumber}'`;
         await exitWithError(jsonOutput, { telemetry });
         return;
@@ -97,9 +98,7 @@ export const logsCommand = async (
     }
 
     // Get available iterations for context
-    const availableIterations = getAvailableIterations(
-      numericTaskId.toString()
-    );
+    const availableIterations = getAvailableIterations(task);
 
     if (availableIterations.length === 0) {
       await exitWithWarn(

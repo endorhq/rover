@@ -15,6 +15,33 @@ import {
 } from 'rover-core';
 import { deleteCommand } from '../delete.js';
 
+// Store testDir for context mock
+let testDir: string;
+
+// Mock context to return a mock ProjectManager
+vi.mock('../../lib/context.js', () => ({
+  requireProjectContext: vi.fn().mockImplementation(() => {
+    return Promise.resolve({
+      getTask: (taskId: number) => {
+        const taskPath = join(testDir, '.rover', 'tasks', taskId.toString());
+        if (TaskDescriptionManager.exists(taskPath)) {
+          return TaskDescriptionManager.load(taskPath, taskId);
+        }
+        return undefined;
+      },
+      deleteTask: (taskId: number) => {
+        // Actually delete the task directory to match real behavior
+        const taskPath = join(testDir, '.rover', 'tasks', taskId.toString());
+        if (existsSync(taskPath)) {
+          rmSync(taskPath, { recursive: true, force: true });
+        }
+      },
+    });
+  }),
+  isJsonMode: vi.fn().mockReturnValue(false),
+  setJsonMode: vi.fn(),
+}));
+
 // Mock external dependencies
 vi.mock('../../lib/telemetry.js', () => ({
   getTelemetry: vi.fn().mockReturnValue({
@@ -43,14 +70,13 @@ vi.mock('../../utils/display.js', () => ({
 }));
 
 describe('delete command', () => {
-  let testDir: string;
   let originalCwd: string;
 
   beforeEach(() => {
     // Clear project root cache to ensure tests use the correct directory
     clearProjectRootCache();
 
-    // Create temp directory with git repo
+    // Create temp directory with git repo (update module-level testDir for mock)
     testDir = mkdtempSync(join(tmpdir(), 'rover-delete-test-'));
     originalCwd = process.cwd();
     process.chdir(testDir);
@@ -92,7 +118,8 @@ describe('delete command', () => {
 
   // Helper to create a test task
   const createTestTask = (id: number, title: string = 'Test Task') => {
-    const task = TaskDescriptionManager.create({
+    const taskPath = join(testDir, '.rover', 'tasks', id.toString());
+    const task = TaskDescriptionManager.create(taskPath, {
       id,
       title,
       description: 'Test task description',
@@ -204,7 +231,7 @@ describe('delete command', () => {
 
       // Verify task exists before deletion
       expect(existsSync(taskPath)).toBe(true);
-      expect(TaskDescriptionManager.exists(1)).toBe(true);
+      expect(TaskDescriptionManager.exists(join(testDir, taskPath))).toBe(true);
 
       const { exitWithSuccess } = await import('../../utils/exit.js');
 

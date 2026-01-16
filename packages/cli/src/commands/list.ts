@@ -1,17 +1,16 @@
 import colors from 'ansi-colors';
 import {
-  IterationManager,
-  IterationStatusManager,
+  type IterationManager,
+  type IterationStatusManager,
   ProjectConfigManager,
-  ProjectStore,
   showTips,
   Table,
-  TableColumn,
-  TaskDescriptionStore,
+  type TableColumn,
+  type TaskDescriptionManager,
   UserSettingsManager,
   VERBOSE,
 } from 'rover-core';
-import { type TaskDescription } from 'rover-schemas';
+import type { TaskDescription } from 'rover-schemas';
 import {
   isJsonMode,
   setJsonMode,
@@ -101,7 +100,14 @@ export const listCommand = async (
   const telemetry = getTelemetry();
 
   try {
-    const tasks = TaskDescriptionStore.getAllDescriptions();
+    // Get project context (may be null in global mode)
+    const project = await resolveProjectContext();
+
+    // Get tasks from project (or empty array if no project context)
+    let tasks: TaskDescriptionManager[] = [];
+    if (project) {
+      tasks = project.listTasks();
+    }
 
     if (!options.watching) {
       telemetry?.eventListTasks();
