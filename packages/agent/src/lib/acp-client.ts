@@ -61,8 +61,11 @@ export class ACPClient implements Client {
         break;
       case 'tool_call_update':
         if (VERBOSE) {
+          const statusStr = update.status ? `status: ${update.status}` : '';
+          const titleStr = update.title ? `title: ${update.title}` : '';
+          const parts = [statusStr, titleStr].filter(Boolean).join(', ');
           console.log(
-            `🔧 Update: \`${update.toolCallId}\` updated: ${update.status} title: ${update.title}\n`
+            `🔧 Update: \`${update.toolCallId}\`${parts ? ` - ${parts}` : ''}\n`
           );
         }
         break;
