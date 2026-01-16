@@ -20,9 +20,10 @@ import type {
   WorkflowOutput,
   WorkflowStep,
 } from 'rover-schemas';
-import { WorkflowManager, IterationStatusManager } from 'rover-core';
+import { WorkflowManager, IterationStatusManager, VERBOSE } from 'rover-core';
 import { ACPClient } from './acp-client.js';
 import { copyFileSync, rmSync } from 'node:fs';
+import type { AgentUsageStats } from './agents/types.js';
 
 export interface ACPRunnerStepResult {
   id: string;
@@ -30,6 +31,9 @@ export interface ACPRunnerStepResult {
   error?: string;
   duration: number;
   outputs: Map<string, string>;
+  tokens?: number;
+  cost?: number;
+  model?: string;
 }
 
 export interface ACPRunnerConfig {
@@ -90,6 +94,7 @@ export class ACPRunner {
   private isConnectionInitialized: boolean = false;
   private isSessionCreated: boolean = false;
   private tool: string;
+  private lastUsage?: AgentUsageStats;
 
   constructor(config: ACPRunnerConfig) {
     this.workflow = config.workflow;
@@ -257,6 +262,7 @@ export class ACPRunner {
 
     const start = performance.now();
     const outputs = new Map<string, string>();
+    let usage: AgentUsageStats | undefined;
     const step = this.workflow.getStep(stepId);
 
     // Calculate current progress
@@ -286,6 +292,7 @@ export class ACPRunner {
 
       // Send the prompt via ACP session
       const promptResult = await this.sendPrompt(prompt);
+      usage = await this.fetchUsageStats();
 
       console.log(
         colors.gray(`\n✅ Agent completed with: ${promptResult.stopReason}`)
@@ -316,6 +323,9 @@ export class ACPRunner {
         success: true,
         duration: (performance.now() - start) / 1000,
         outputs,
+        tokens: usage?.tokens,
+        cost: usage?.cost,
+        model: usage?.model,
       };
     } catch (error) {
       const errorMessage =
@@ -331,6 +341,9 @@ export class ACPRunner {
         error: errorMessage,
         duration: (performance.now() - start) / 1000,
         outputs,
+        tokens: usage?.tokens,
+        cost: usage?.cost,
+        model: usage?.model,
       };
     }
   }
@@ -724,6 +737,185 @@ export class ACPRunner {
    */
   getStepOutputs(stepId: string): Map<string, string> | undefined {
     return this.stepsOutput.get(stepId);
+  }
+
+  private async fetchUsageStats(): Promise<AgentUsageStats | undefined> {
+    if (!this.connection) {
+      return undefined;
+    }
+
+    const response = await this.getAgentsResponse();
+    if (!response) {
+      return this.lastUsage;
+    }
+
+    const usage = this.extractUsageStatsFromAgents(response);
+    if (usage) {
+      this.lastUsage = usage;
+    }
+
+    return usage ?? this.lastUsage;
+  }
+
+  private async getAgentsResponse(): Promise<unknown | undefined> {
+    const connection = this.connection as unknown as {
+      agents?: () => Promise<unknown>;
+      getAgents?: () => Promise<unknown>;
+      listAgents?: () => Promise<unknown>;
+    };
+    const fetchAgents =
+      connection.getAgents ?? connection.listAgents ?? connection.agents;
+
+    if (!fetchAgents) {
+      return undefined;
+    }
+
+    try {
+      if (fetchAgents.length > 0) {
+        const params = this.sessionId ? { sessionId: this.sessionId } : {};
+        return await fetchAgents.call(connection, params);
+      }
+      return await fetchAgents.call(connection);
+    } catch (error) {
+      if (VERBOSE) {
+        console.log(
+          colors.yellow(
+            `⚠️  Failed to fetch ACP usage stats: ${error instanceof Error ? error.message : String(error)}`
+          )
+        );
+      }
+      return undefined;
+    }
+  }
+
+  private extractUsageStatsFromAgents(
+    response: unknown
+  ): AgentUsageStats | undefined {
+    if (!response || typeof response !== 'object') {
+      return undefined;
+    }
+
+    const agents = (response as { agents?: unknown[] }).agents;
+    if (!Array.isArray(agents) || agents.length === 0) {
+      return undefined;
+    }
+
+    const agent = agents[0] as Record<string, unknown>;
+    const usage = (agent.usage ?? agent.usageStats ?? agent.stats) as
+      | Record<string, unknown>
+      | undefined;
+
+    const tokens =
+      this.pickNumber(
+        usage,
+        'total_tokens',
+        'totalTokens',
+        'tokens',
+        'token_count'
+      ) ??
+      this.pickNumber(
+        agent,
+        'total_tokens',
+        'totalTokens',
+        'tokens',
+        'token_count'
+      ) ??
+      this.sumNumbers(usage, [
+        'input_tokens',
+        'output_tokens',
+        'cache_read_input_tokens',
+        'cache_creation_input_tokens',
+      ]);
+
+    const cost =
+      this.pickNumber(
+        usage,
+        'total_cost_usd',
+        'totalCostUsd',
+        'cost_usd',
+        'cost',
+        'totalCost'
+      ) ??
+      this.pickNumber(
+        agent,
+        'total_cost_usd',
+        'totalCostUsd',
+        'cost_usd',
+        'cost',
+        'totalCost'
+      );
+
+    const model =
+      this.pickString(agent, 'model', 'modelName', 'model_id') ??
+      this.pickString(usage, 'model', 'modelName', 'model_id');
+
+    if (tokens === undefined && cost === undefined && !model) {
+      return undefined;
+    }
+
+    return {
+      tokens,
+      cost,
+      model: model || undefined,
+    };
+  }
+
+  private pickNumber(
+    source: Record<string, unknown> | undefined,
+    ...keys: string[]
+  ): number | undefined {
+    if (!source) {
+      return undefined;
+    }
+
+    for (const key of keys) {
+      const value = source[key];
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        return value;
+      }
+    }
+
+    return undefined;
+  }
+
+  private sumNumbers(
+    source: Record<string, unknown> | undefined,
+    keys: string[]
+  ): number | undefined {
+    if (!source) {
+      return undefined;
+    }
+
+    let total = 0;
+    let found = false;
+
+    for (const key of keys) {
+      const value = source[key];
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        total += value;
+        found = true;
+      }
+    }
+
+    return found ? total : undefined;
+  }
+
+  private pickString(
+    source: Record<string, unknown> | undefined,
+    ...keys: string[]
+  ): string | undefined {
+    if (!source) {
+      return undefined;
+    }
+
+    for (const key of keys) {
+      const value = source[key];
+      if (typeof value === 'string' && value.trim().length > 0) {
+        return value.trim();
+      }
+    }
+
+    return undefined;
   }
 
   /**

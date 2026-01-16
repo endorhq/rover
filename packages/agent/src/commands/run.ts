@@ -484,11 +484,6 @@ export const runCommand = async (
         }
       }
 
-      // TODO: ACP mode doesn't currently provide token/cost metrics
-      // These metrics can be retrieved from GET /agents endpoint in ACP
-      // See: https://github.com/agentclientprotocol/spec
-      // Once implemented, add tokens/cost/model fields to ACPRunnerStepResult interface
-
       // Calculate total workflow cost and tokens
       const totalCost = stepResults.reduce((sum, r) => sum + (r.cost ?? 0), 0);
       const totalTokens = stepResults.reduce(
