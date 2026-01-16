@@ -7,11 +7,7 @@ import {
 } from 'rover-core';
 import { parseCollectOptions } from '../lib/options.js';
 import { Runner, RunnerStepResult } from '../lib/runner.js';
-import {
-  ACPRunner,
-  ACPRunnerStepResult,
-  isACPWorkflow,
-} from '../lib/acp-runner.js';
+import { ACPRunner, ACPRunnerStepResult } from '../lib/acp-runner.js';
 import { existsSync, readFileSync } from 'node:fs';
 
 /**
@@ -347,12 +343,18 @@ export const runCommand = async (
       let runSteps = 0;
       const totalSteps = workflowManager.steps.length;
 
-      // Detect if this is an ACP workflow based on filename
-      const useACPMode = isACPWorkflow(workflowManager.name);
+      // Determine which tool to use (same priority as ACPRunner)
+      // Priority: CLI flag > workflow defaults > fallback to claude
+      const tool =
+        options.agentTool || workflowManager.defaults?.tool || 'claude';
+
+      // Temporarily ACP usage decision during ACP migration process:
+      // force Claude to always use ACP mode
+      const useACPMode = tool.toLowerCase() === 'claude';
 
       if (useACPMode) {
         console.log(
-          colors.cyan('\n🔗 ACP Mode detected - using session-based execution')
+          colors.cyan('\n🔗 ACP Mode enabled - using session-based execution')
         );
 
         // Create ACPRunner once for the entire workflow

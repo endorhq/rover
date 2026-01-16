@@ -743,11 +743,3 @@ export class ACPRunner {
     this.isSessionCreated = false;
   }
 }
-
-/**
- * Utility function to detect if a workflow should use ACP mode
- * based on filename suffix (e.g., 'swe-acp.yml')
- */
-export function isACPWorkflow(name: string): boolean {
-  return name.endsWith('-acp');
-}

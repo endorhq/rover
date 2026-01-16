@@ -214,7 +214,7 @@ export function createProgram(
         '--workflow, -w <name>',
         'Use a specific workflow to complete this task'
       )
-        .choices(['swe', 'swe-acp', 'tech-writer'])
+        .choices(['swe', 'tech-writer'])
         .default('swe')
     )
     .option('-y, --yes', 'Skip all confirmations and run non-interactively')
