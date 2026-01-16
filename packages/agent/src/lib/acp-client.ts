@@ -19,15 +19,19 @@ import {
   WriteTextFileResponse,
 } from '@agentclientprotocol/sdk';
 import { readFileSync, writeFileSync } from 'node:fs';
+import { VERBOSE } from 'rover-core';
 
 export class ACPClient implements Client {
+
   requestPermission(
     params: RequestPermissionRequest
   ): Promise<RequestPermissionResponse> {
-    console.log(
-      '[Client] Request permission called with:',
-      JSON.stringify(params, null, 2)
-    );
+    if (VERBOSE) {
+      console.log(
+        '[Client] Request permission called with:',
+        JSON.stringify(params, null, 2)
+      );
+    }
 
     // Allow for now
     return Promise.resolve({
@@ -49,14 +53,18 @@ export class ACPClient implements Client {
         }
         break;
       case 'tool_call':
-        console.log(
-          `🔧 ${update.title} (${update.status}) ID: ${update.toolCallId}`
-        );
+        if (VERBOSE) {
+          console.log(
+            `🔧 ${update.title} (${update.status}) ID: ${update.toolCallId}`
+          );
+        }
         break;
       case 'tool_call_update':
-        console.log(
-          `🔧 Update: \`${update.toolCallId}\` updated: ${update.status} title: ${update.title}\n`
-        );
+        if (VERBOSE) {
+          console.log(
+            `🔧 Update: \`${update.toolCallId}\` updated: ${update.status} title: ${update.title}\n`
+          );
+        }
         break;
       case 'agent_thought_chunk':
         if (update.content.type === 'text') {
@@ -77,18 +85,22 @@ export class ACPClient implements Client {
     }
   }
   writeTextFile?(params: WriteTextFileRequest): Promise<WriteTextFileResponse> {
-    console.log(
-      '[Client] Write text file called with:',
-      JSON.stringify(params, null, 2)
-    );
+    if (VERBOSE) {
+      console.log(
+        '[Client] Write text file called with:',
+        JSON.stringify(params, null, 2)
+      );
+    }
     writeFileSync(params.path, params.content);
     return Promise.resolve({});
   }
   readTextFile?(params: ReadTextFileRequest): Promise<ReadTextFileResponse> {
-    console.log(
-      '[Client] Read text file called with:',
-      JSON.stringify(params, null, 2)
-    );
+    if (VERBOSE) {
+      console.log(
+        '[Client] Read text file called with:',
+        JSON.stringify(params, null, 2)
+      );
+    }
 
     let content = readFileSync(params.path, 'utf-8');
 
