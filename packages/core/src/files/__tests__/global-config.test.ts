@@ -211,7 +211,8 @@ describe('GlobalConfigManager', () => {
       const config = GlobalConfigManager.load();
 
       expect(config.projects).toHaveLength(1);
-      expect(config.projects[0]).toEqual(project);
+      // nextTaskId defaults to 1 when loaded from schema
+      expect(config.projects[0]).toEqual({ ...project, nextTaskId: 1 });
     });
 
     it('should not re-save config when version is current', () => {
@@ -496,6 +497,7 @@ describe('GlobalConfigManager', () => {
       languages: ['typescript'] as Language[],
       packageManagers: ['npm'] as PackageManager[],
       taskManagers: [] as TaskManager[],
+      nextTaskId: 1,
     });
 
     it('should add a new project', () => {
@@ -560,6 +562,7 @@ describe('GlobalConfigManager', () => {
       languages: ['typescript'] as Language[],
       packageManagers: ['npm'] as PackageManager[],
       taskManagers: [] as TaskManager[],
+      nextTaskId: 1,
     });
 
     it('should remove project by id', () => {
@@ -625,6 +628,7 @@ describe('GlobalConfigManager', () => {
       languages: ['typescript'] as Language[],
       packageManagers: ['npm'] as PackageManager[],
       taskManagers: [] as TaskManager[],
+      nextTaskId: 1,
     });
 
     it('should find project by id', () => {
@@ -664,6 +668,7 @@ describe('GlobalConfigManager', () => {
       languages: ['typescript'] as Language[],
       packageManagers: ['npm'] as PackageManager[],
       taskManagers: [] as TaskManager[],
+      nextTaskId: 1,
     });
 
     it('should find project by path', () => {
@@ -721,6 +726,7 @@ describe('GlobalConfigManager', () => {
         languages: [],
         packageManagers: [],
         taskManagers: [],
+        nextTaskId: 1,
       });
 
       // Original should be unchanged
@@ -948,6 +954,7 @@ describe('GlobalConfigManager', () => {
         languages: ['typescript', 'python', 'rust', 'go'] as Language[],
         packageManagers: ['npm', 'pip', 'cargo', 'maven'] as PackageManager[],
         taskManagers: ['make', 'just'] as TaskManager[],
+        nextTaskId: 1,
       };
 
       config.addProject(project);

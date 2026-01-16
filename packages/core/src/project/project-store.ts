@@ -90,6 +90,7 @@ export class ProjectStore {
       languages: [],
       packageManagers: [],
       taskManagers: [],
+      nextTaskId: 1,
     };
 
     if (autodetect) {
@@ -116,7 +117,7 @@ export class ProjectStore {
     }
 
     this.config.addProject(project);
-    return new ProjectManager(project, this.projectsPath);
+    return new ProjectManager(project, this.projectsPath, this.config);
   }
 
   /**
@@ -130,7 +131,7 @@ export class ProjectStore {
     if (!project) {
       return undefined;
     }
-    return new ProjectManager(project, this.projectsPath);
+    return new ProjectManager(project, this.projectsPath, this.config);
   }
 
   /**
@@ -145,7 +146,7 @@ export class ProjectStore {
     if (!project) {
       return undefined;
     }
-    return new ProjectManager(project, this.projectsPath);
+    return new ProjectManager(project, this.projectsPath, this.config);
   }
 
   /**

@@ -12,6 +12,28 @@ import { execSync } from 'node:child_process';
 import { restartCommand } from '../restart.js';
 import { TaskDescriptionManager, clearProjectRootCache } from 'rover-core';
 
+// Store testDir for context mock
+let testDir: string;
+
+// Mock context to return a mock ProjectManager
+vi.mock('../../lib/context.js', () => ({
+  requireProjectContext: vi.fn().mockImplementation(() => {
+    return Promise.resolve({
+      getTask: (taskId: number) => {
+        const taskPath = join(testDir, '.rover', 'tasks', taskId.toString());
+        if (TaskDescriptionManager.exists(taskPath)) {
+          return TaskDescriptionManager.load(taskPath, taskId);
+        }
+        return undefined;
+      },
+      getWorkspacePath: (taskId: number) =>
+        join(testDir, '.rover', 'tasks', taskId.toString(), 'workspace'),
+    });
+  }),
+  isJsonMode: vi.fn().mockReturnValue(false),
+  setJsonMode: vi.fn(),
+}));
+
 // Mock external dependencies
 vi.mock('../../lib/telemetry.js', () => ({
   getTelemetry: vi.fn().mockReturnValue({
@@ -35,14 +57,13 @@ vi.mock('../../lib/sandbox/index.js', () => ({
 }));
 
 describe('restart command', async () => {
-  let testDir: string;
   let originalCwd: string;
 
   beforeEach(() => {
     // Clear project root cache to ensure tests use the correct directory
     clearProjectRootCache();
 
-    // Create temporary directory for test
+    // Create temporary directory for test (update module-level testDir for mock)
     testDir = mkdtempSync(join(tmpdir(), 'rover-test-'));
     originalCwd = process.cwd();
     process.chdir(testDir);
@@ -103,9 +124,8 @@ describe('restart command', async () => {
       // Create a failed task
       const taskId = 123;
       const taskDir = join(testDir, '.rover', 'tasks', taskId.toString());
-      mkdirSync(taskDir, { recursive: true });
 
-      const task = TaskDescriptionManager.create({
+      const task = TaskDescriptionManager.create(taskDir, {
         id: taskId,
         title: 'Test Task',
         description: 'A test task',
@@ -121,7 +141,7 @@ describe('restart command', async () => {
       await restartCommand(taskId.toString(), { json: true });
 
       // Verify task was restarted
-      const reloadedTask = TaskDescriptionManager.load(taskId);
+      const reloadedTask = TaskDescriptionManager.load(taskDir, taskId);
       expect(reloadedTask.status).toBe('IN_PROGRESS');
       expect(reloadedTask.restartCount).toBe(1);
       expect(reloadedTask.lastRestartAt).toBeDefined();
@@ -131,9 +151,8 @@ describe('restart command', async () => {
       // Create a failed task
       const taskId = 456;
       const taskDir = join(testDir, '.rover', 'tasks', taskId.toString());
-      mkdirSync(taskDir, { recursive: true });
 
-      const task = TaskDescriptionManager.create({
+      const task = TaskDescriptionManager.create(taskDir, {
         id: taskId,
         title: 'Test Task',
         description: 'A test task',
@@ -145,14 +164,14 @@ describe('restart command', async () => {
       task.markFailed('This task failed');
       await restartCommand(taskId.toString(), { json: true });
 
-      const firstRestart = TaskDescriptionManager.load(taskId);
+      const firstRestart = TaskDescriptionManager.load(taskDir, taskId);
       expect(firstRestart.restartCount).toBe(1);
 
       // Set back to failed and restart again
       firstRestart.markFailed('This task failed');
       await restartCommand(taskId.toString(), { json: true });
 
-      const secondRestart = TaskDescriptionManager.load(taskId);
+      const secondRestart = TaskDescriptionManager.load(taskDir, taskId);
       expect(secondRestart.restartCount).toBe(2);
     });
 
@@ -160,9 +179,8 @@ describe('restart command', async () => {
       // Create a task with a specific agent image
       const taskId = 555;
       const taskDir = join(testDir, '.rover', 'tasks', taskId.toString());
-      mkdirSync(taskDir, { recursive: true });
 
-      const task = TaskDescriptionManager.create({
+      const task = TaskDescriptionManager.create(taskDir, {
         id: taskId,
         title: 'Test Task',
         description: 'A test task',
@@ -182,7 +200,7 @@ describe('restart command', async () => {
       await restartCommand(taskId.toString(), { json: true });
 
       // Reload and verify the agent image is still stored
-      const reloadedTask = TaskDescriptionManager.load(taskId);
+      const reloadedTask = TaskDescriptionManager.load(taskDir, taskId);
       expect(reloadedTask.agentImage).toBe(customImage);
       expect(reloadedTask.status).toBe('IN_PROGRESS');
     });
@@ -193,9 +211,8 @@ describe('restart command', async () => {
       // Create a task in NEW status
       const taskId = 789;
       const taskDir = join(testDir, '.rover', 'tasks', taskId.toString());
-      mkdirSync(taskDir, { recursive: true });
 
-      const task = TaskDescriptionManager.create({
+      const task = TaskDescriptionManager.create(taskDir, {
         id: taskId,
         title: 'Test Task',
         description: 'A test task',
@@ -209,7 +226,7 @@ describe('restart command', async () => {
       await restartCommand(taskId.toString(), { json: true });
 
       // Verify task was restarted successfully
-      const reloadedTask = TaskDescriptionManager.load(taskId);
+      const reloadedTask = TaskDescriptionManager.load(taskDir, taskId);
       expect(reloadedTask.status).toBe('IN_PROGRESS');
       expect(reloadedTask.restartCount).toBe(1);
     });
@@ -221,9 +238,8 @@ describe('restart command', async () => {
       // Create a task and set it to IN_PROGRESS status
       const taskId = 790;
       const taskDir = join(testDir, '.rover', 'tasks', taskId.toString());
-      mkdirSync(taskDir, { recursive: true });
 
-      const task = TaskDescriptionManager.create({
+      const task = TaskDescriptionManager.create(taskDir, {
         id: taskId,
         title: 'Test Task',
         description: 'A test task',

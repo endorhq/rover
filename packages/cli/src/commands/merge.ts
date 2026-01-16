@@ -5,39 +5,30 @@ import { join } from 'node:path';
 import yoctoSpinner from 'yocto-spinner';
 import { getAIAgentTool, type AIAgentTool } from '../lib/agents/index.js';
 import {
-  TaskDescriptionManager,
-  UserSettingsManager,
-  ProjectConfigManager,
   AI_AGENT,
   Git,
+  ProjectConfigManager,
+  UserSettingsManager,
 } from 'rover-core';
 import { TaskNotFoundError } from 'rover-schemas';
 import { executeHooks } from '../lib/hooks.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { showRoverChat, showTips } from '../utils/display.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
-import { CLIJsonOutput } from '../types.js';
+import type { CLIJsonOutput } from '../types.js';
 import {
   isJsonMode,
   setJsonMode,
   requireProjectContext,
 } from '../lib/context.js';
-import { findProjectRoot } from 'rover-core';
 
 const { prompt } = enquirer;
 
 /**
  * Get summaries from all iterations of a task
  */
-const getTaskIterationSummaries = (
-  taskId: string,
-  options: { json?: boolean } = {}
-): string[] => {
+const getTaskIterationSummaries = (iterationsPath: string): string[] => {
   try {
-    const roverPath = join(findProjectRoot(), '.rover');
-    const taskPath = join(roverPath, 'tasks', taskId);
-    const iterationsPath = join(taskPath, 'iterations');
-
     if (!existsSync(iterationsPath)) {
       return [];
     }
@@ -45,7 +36,7 @@ const getTaskIterationSummaries = (
     const iterations = readdirSync(iterationsPath, { withFileTypes: true })
       .filter(dirent => dirent.isDirectory())
       .map(dirent => parseInt(dirent.name, 10))
-      .filter(num => !isNaN(num))
+      .filter(num => !Number.isNaN(num))
       .sort((a, b) => a - b); // Sort ascending
 
     const summaries: string[] = [];
@@ -243,8 +234,9 @@ export const mergeCommand = async (
   }
 
   // Require project context
+  let project;
   try {
-    await requireProjectContext();
+    project = await requireProjectContext();
   } catch (error) {
     jsonOutput.error = error instanceof Error ? error.message : String(error);
     await exitWithError(jsonOutput, { telemetry });
@@ -301,8 +293,11 @@ export const mergeCommand = async (
   const aiAgent = getAIAgentTool(selectedAiAgent);
 
   try {
-    // Load task using TaskDescription
-    const task = TaskDescriptionManager.load(numericTaskId);
+    // Load task using ProjectManager
+    const task = project.getTask(numericTaskId);
+    if (!task) {
+      throw new TaskNotFoundError(numericTaskId);
+    }
 
     jsonOutput.taskTitle = task.title;
     jsonOutput.branchName = task.branchName;
@@ -442,10 +437,7 @@ export const mergeCommand = async (
       // Only commit if there are worktree changes
       if (hasWorktreeChanges) {
         // Get iteration summaries
-        const summaries = getTaskIterationSummaries(
-          numericTaskId.toString(),
-          options
-        );
+        const summaries = getTaskIterationSummaries(task.iterationsPath());
 
         // Generate AI commit message
         if (spinner) spinner.text = 'Generating commit message with AI...';

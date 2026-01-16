@@ -1,22 +1,28 @@
-import enquirer from 'enquirer';
 import colors from 'ansi-colors';
+import enquirer from 'enquirer';
 import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { ProcessManager, showProperties, showTitle } from 'rover-core';
-import { createSandbox } from '../lib/sandbox/index.js';
+import {
+  AI_AGENT,
+  IterationManager,
+  ProcessManager,
+  showProperties,
+  showTitle,
+  type TaskDescriptionManager,
+} from 'rover-core';
+import { TaskNotFoundError } from 'rover-schemas';
 import {
   getAIAgentTool,
   getUserAIAgent,
   type AIAgentTool,
 } from '../lib/agents/index.js';
-import type { IPromptTask } from '../lib/prompts/index.js';
-import { TaskDescriptionManager, IterationManager, AI_AGENT } from 'rover-core';
-import { TaskNotFoundError } from 'rover-schemas';
-import { getTelemetry } from '../lib/telemetry.js';
-import { readFromStdin, stdinIsAvailable } from '../utils/stdin.js';
-import { CLIJsonOutput } from '../types.js';
-import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
 import { isJsonMode, requireProjectContext } from '../lib/context.js';
+import type { IPromptTask } from '../lib/prompts/index.js';
+import { createSandbox } from '../lib/sandbox/index.js';
+import { getTelemetry } from '../lib/telemetry.js';
+import type { CLIJsonOutput } from '../types.js';
+import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
+import { readFromStdin, stdinIsAvailable } from '../utils/stdin.js';
 
 const { prompt } = enquirer;
 
@@ -104,19 +110,23 @@ export const iterateCommand = async (
   result.taskId = numericTaskId;
 
   // Require project context
+  let project;
   try {
-    await requireProjectContext();
+    project = await requireProjectContext();
   } catch (error) {
     result.error = error instanceof Error ? error.message : String(error);
     exitWithError(result, { telemetry });
     return;
   }
 
-  // Load the task first.
-  let task: TaskDescriptionManager;
+  // Load the task using ProjectManager
+  let task: TaskDescriptionManager | undefined;
 
   try {
-    task = TaskDescriptionManager.load(numericTaskId);
+    task = project.getTask(numericTaskId);
+    if (!task) {
+      throw new TaskNotFoundError(numericTaskId);
+    }
   } catch (error) {
     if (error instanceof TaskNotFoundError) {
       result.error = error.message;

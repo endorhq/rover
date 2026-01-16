@@ -2,6 +2,7 @@ import { join } from 'node:path';
 import type { GlobalProject } from 'rover-schemas';
 import { describe, expect, it } from 'vitest';
 import { ProjectManager } from '../project.js';
+import type { GlobalConfigManager } from '../../files/global-config.js';
 
 describe('ProjectManager', () => {
   const basePath = '/data/projects';
@@ -12,57 +13,63 @@ describe('ProjectManager', () => {
     languages: ['typescript', 'javascript'],
     packageManagers: ['npm', 'pnpm'],
     taskManagers: ['make'],
+    nextTaskId: 1,
   };
+
+  // Mock GlobalConfigManager for tests that don't need it
+  const mockConfig = {
+    updateProject: () => {},
+  } as unknown as GlobalConfigManager;
 
   describe('getters', () => {
     it('should return project id', () => {
-      const manager = new ProjectManager(sampleProject, basePath);
+      const manager = new ProjectManager(sampleProject, basePath, mockConfig);
       expect(manager.id).toBe('my-project-abc12345');
     });
 
     it('should return project path', () => {
-      const manager = new ProjectManager(sampleProject, basePath);
+      const manager = new ProjectManager(sampleProject, basePath, mockConfig);
       expect(manager.path).toBe('/home/user/projects/my-project');
     });
 
     it('should return project name (repositoryName)', () => {
-      const manager = new ProjectManager(sampleProject, basePath);
+      const manager = new ProjectManager(sampleProject, basePath, mockConfig);
       expect(manager.name).toBe('my-project');
     });
 
     it('should return languages', () => {
-      const manager = new ProjectManager(sampleProject, basePath);
+      const manager = new ProjectManager(sampleProject, basePath, mockConfig);
       expect(manager.languages).toEqual(['typescript', 'javascript']);
     });
 
     it('should return package managers', () => {
-      const manager = new ProjectManager(sampleProject, basePath);
+      const manager = new ProjectManager(sampleProject, basePath, mockConfig);
       expect(manager.packageManagers).toEqual(['npm', 'pnpm']);
     });
 
     it('should return task managers', () => {
-      const manager = new ProjectManager(sampleProject, basePath);
+      const manager = new ProjectManager(sampleProject, basePath, mockConfig);
       expect(manager.taskManagers).toEqual(['make']);
     });
   });
 
   describe('path getters', () => {
     it('should return correct tasks path', () => {
-      const manager = new ProjectManager(sampleProject, basePath);
+      const manager = new ProjectManager(sampleProject, basePath, mockConfig);
       expect(manager.tasksPath).toBe(
         join(basePath, 'my-project-abc12345', 'tasks')
       );
     });
 
     it('should return correct workspaces path', () => {
-      const manager = new ProjectManager(sampleProject, basePath);
+      const manager = new ProjectManager(sampleProject, basePath, mockConfig);
       expect(manager.workspacesPath).toBe(
         join(basePath, 'my-project-abc12345', 'workspaces')
       );
     });
 
     it('should return correct logs path', () => {
-      const manager = new ProjectManager(sampleProject, basePath);
+      const manager = new ProjectManager(sampleProject, basePath, mockConfig);
       expect(manager.logsPath).toBe(
         join(basePath, 'my-project-abc12345', 'logs')
       );
@@ -71,7 +78,7 @@ describe('ProjectManager', () => {
 
   describe('toJSON', () => {
     it('should return a copy of the project data', () => {
-      const manager = new ProjectManager(sampleProject, basePath);
+      const manager = new ProjectManager(sampleProject, basePath, mockConfig);
       const json = manager.toJSON();
 
       expect(json).toEqual(sampleProject);
@@ -79,7 +86,7 @@ describe('ProjectManager', () => {
     });
 
     it('should not expose internal references', () => {
-      const manager = new ProjectManager(sampleProject, basePath);
+      const manager = new ProjectManager(sampleProject, basePath, mockConfig);
       const json = manager.toJSON();
 
       // Modifying the returned object should not affect the manager
@@ -97,9 +104,10 @@ describe('ProjectManager', () => {
         languages: [],
         packageManagers: [],
         taskManagers: [],
+        nextTaskId: 1,
       };
 
-      const manager = new ProjectManager(emptyProject, basePath);
+      const manager = new ProjectManager(emptyProject, basePath, mockConfig);
 
       expect(manager.languages).toEqual([]);
       expect(manager.packageManagers).toEqual([]);

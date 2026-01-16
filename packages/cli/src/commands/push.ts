@@ -2,12 +2,16 @@ import colors from 'ansi-colors';
 import enquirer from 'enquirer';
 import yoctoSpinner from 'yocto-spinner';
 import { existsSync } from 'node:fs';
-import { TaskDescriptionManager, ProjectConfigManager, Git } from 'rover-core';
+import { ProjectConfigManager, Git } from 'rover-core';
 import { TaskNotFoundError } from 'rover-schemas';
 import { getTelemetry } from '../lib/telemetry.js';
-import { CLIJsonOutput } from '../types.js';
+import type { CLIJsonOutput } from '../types.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
-import { isJsonMode, setJsonMode } from '../lib/context.js';
+import {
+  isJsonMode,
+  setJsonMode,
+  requireProjectContext,
+} from '../lib/context.js';
 import { showRoverChat, TIP_TITLES } from '../utils/display.js';
 import { statusColor } from '../utils/task-status.js';
 import { executeHooks } from '../lib/hooks.js';
@@ -96,9 +100,22 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
     }
   }
 
+  // Get project context
+  let project;
   try {
-    // Load task using TaskDescription
-    const task = TaskDescriptionManager.load(numericTaskId);
+    project = await requireProjectContext();
+  } catch (error) {
+    result.error = error instanceof Error ? error.message : String(error);
+    await exitWithError(result, { telemetry });
+    return;
+  }
+
+  try {
+    // Load task using ProjectManager
+    const task = project.getTask(numericTaskId);
+    if (!task) {
+      throw new TaskNotFoundError(numericTaskId);
+    }
 
     result.taskTitle = task.title;
     result.branchName = task.branchName;

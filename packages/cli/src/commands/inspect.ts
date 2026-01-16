@@ -1,19 +1,18 @@
 import colors from 'ansi-colors';
 import { formatTaskStatus, statusColor } from '../utils/task-status.js';
-import { TaskDescriptionManager } from 'rover-core';
-import { TaskNotFoundError, type TaskStatus } from 'rover-schemas';
-import { join } from 'node:path';
-import { getTelemetry } from '../lib/telemetry.js';
 import {
-  findProjectRoot,
   Git,
+  IterationManager,
   showFile,
   showList,
   showProperties,
   showTips,
   showTitle,
+  type TaskDescriptionManager,
 } from 'rover-core';
-import { IterationManager } from 'rover-core';
+import { TaskNotFoundError, type TaskStatus } from 'rover-schemas';
+import { join } from 'node:path';
+import { getTelemetry } from '../lib/telemetry.js';
 import {
   isJsonMode,
   setJsonMode,
@@ -184,8 +183,9 @@ export const inspectCommand = async (
   }
 
   // Require project context
+  let project;
   try {
-    await requireProjectContext();
+    project = await requireProjectContext();
   } catch (error) {
     const errorOutput = jsonErrorOutput(
       error instanceof Error ? error.message : String(error),
@@ -196,8 +196,11 @@ export const inspectCommand = async (
   }
 
   try {
-    // Load task using TaskDescription
-    const task = TaskDescriptionManager.load(numericTaskId);
+    // Load task using ProjectManager
+    const task = project.getTask(numericTaskId);
+    if (!task) {
+      throw new TaskNotFoundError(numericTaskId);
+    }
 
     if (iterationNumber === undefined) {
       iterationNumber = task.iterations;
@@ -205,11 +208,7 @@ export const inspectCommand = async (
 
     // Load the iteration config
     const iterationPath = join(
-      findProjectRoot(),
-      '.rover',
-      'tasks',
-      numericTaskId.toString(),
-      'iterations',
+      task.iterationsPath(),
       iterationNumber.toString()
     );
     const iteration = IterationManager.load(iterationPath);
@@ -312,7 +311,7 @@ export const inspectCommand = async (
         status: task.status,
         statusUpdated: false, // TODO: Implement status checking in TaskDescription
         summary: summaryContent,
-        taskDirectory: `.rover/tasks/${numericTaskId}/`,
+        taskDirectory: task.getBasePath(),
         title: task.title,
         uuid: task.uuid,
         workflowName: task.workflowName,

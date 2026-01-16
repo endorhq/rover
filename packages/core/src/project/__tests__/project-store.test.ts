@@ -139,6 +139,7 @@ describe('ProjectStore', () => {
           languages: ['typescript'],
           packageManagers: ['npm'],
           taskManagers: [],
+          nextTaskId: 1,
         },
       ];
       mockConfig.projects = existingProjects;
@@ -160,6 +161,7 @@ describe('ProjectStore', () => {
           languages: [],
           packageManagers: [],
           taskManagers: [],
+          nextTaskId: 1,
         },
         {
           id: 'project-2',
@@ -168,6 +170,7 @@ describe('ProjectStore', () => {
           languages: [],
           packageManagers: [],
           taskManagers: [],
+          nextTaskId: 1,
         },
       ];
       mockConfig.projects = existingProjects;
@@ -295,6 +298,7 @@ describe('ProjectStore', () => {
         languages: ['typescript'],
         packageManagers: ['npm'],
         taskManagers: [],
+        nextTaskId: 1,
       };
       mockConfig.projects = [existingProject];
 
@@ -330,6 +334,7 @@ describe('ProjectStore', () => {
         languages: [],
         packageManagers: [],
         taskManagers: [],
+        nextTaskId: 1,
       };
       mockConfig.projects = [existingProject];
 
@@ -364,6 +369,7 @@ describe('ProjectStore', () => {
         languages: [],
         packageManagers: [],
         taskManagers: [],
+        nextTaskId: 1,
       };
       mockConfig.projects = [existingProject];
 

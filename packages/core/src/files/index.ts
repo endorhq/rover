@@ -3,7 +3,6 @@ export { IterationStatusManager } from './iteration-status.js';
 export { IterationManager } from './iteration.js';
 export { PreContextDataManager } from './pre-context-data.js';
 export { ProjectConfigManager } from './project-config.js';
-export { TaskDescriptionStore } from './task-description-store.js';
 export { TaskDescriptionManager } from './task-description.js';
 export { UserSettingsManager } from './user-settings.js';
 export {

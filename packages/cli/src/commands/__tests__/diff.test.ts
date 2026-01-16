@@ -8,9 +8,33 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { launchSync, clearProjectRootCache } from 'rover-core';
+import {
+  launchSync,
+  clearProjectRootCache,
+  TaskDescriptionManager,
+} from 'rover-core';
 import { diffCommand } from '../diff.js';
-import { TaskDescriptionManager } from 'rover-core';
+
+// Store testDir for context mock
+let testDir: string;
+
+// Mock context to return a mock ProjectManager
+vi.mock('../../lib/context.js', () => ({
+  requireProjectContext: vi.fn().mockImplementation(() => {
+    // Create a mock ProjectManager that loads tasks from testDir
+    return Promise.resolve({
+      getTask: (taskId: number) => {
+        const taskPath = join(testDir, '.rover', 'tasks', taskId.toString());
+        if (TaskDescriptionManager.exists(taskPath)) {
+          return TaskDescriptionManager.load(taskPath, taskId);
+        }
+        return undefined;
+      },
+    });
+  }),
+  isJsonMode: vi.fn().mockReturnValue(false),
+  setJsonMode: vi.fn(),
+}));
 
 // Mock external dependencies
 vi.mock('../../lib/telemetry.js', () => ({
@@ -32,7 +56,6 @@ const consoleSpy = {
 };
 
 describe('diff command', () => {
-  let testDir: string;
   let originalCwd: string;
   let processExitSpy: any;
 
@@ -45,7 +68,7 @@ describe('diff command', () => {
     // Clear project root cache to ensure tests use the correct directory
     clearProjectRootCache();
 
-    // Create temp directory with git repo
+    // Create temp directory with git repo (update module-level testDir for mock)
     testDir = mkdtempSync(join(tmpdir(), 'rover-diff-test-'));
     originalCwd = process.cwd();
     process.chdir(testDir);
@@ -95,7 +118,8 @@ describe('diff command', () => {
 
   // Helper to create a test task with a worktree
   const createTestTask = (id: number, title: string = 'Test Task') => {
-    const task = TaskDescriptionManager.create({
+    const taskPath = join(testDir, '.rover', 'tasks', id.toString());
+    const task = TaskDescriptionManager.create(taskPath, {
       id,
       title,
       description: 'Test task description',
@@ -134,7 +158,8 @@ describe('diff command', () => {
 
     it('should handle task without workspace', async () => {
       // Create task without workspace
-      const task = TaskDescriptionManager.create({
+      const taskPath = join(testDir, '.rover', 'tasks', '1');
+      const task = TaskDescriptionManager.create(taskPath, {
         id: 1,
         title: 'No Workspace Task',
         description: 'Test',
@@ -595,6 +620,9 @@ describe('diff command', () => {
       // Create a new temp dir with empty git repo
       const emptyDir = mkdtempSync(join(tmpdir(), 'rover-empty-diff-'));
 
+      // Update testDir so the mock works correctly
+      testDir = emptyDir;
+
       // Clear cache before changing directory
       clearProjectRootCache();
       process.chdir(emptyDir);
@@ -618,7 +646,8 @@ describe('diff command', () => {
         })
       );
 
-      const task = TaskDescriptionManager.create({
+      const taskPath = join(emptyDir, '.rover', 'tasks', '1');
+      const task = TaskDescriptionManager.create(taskPath, {
         id: 1,
         title: 'Empty Repo Task',
         description: 'Test',

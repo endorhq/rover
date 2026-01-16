@@ -1,9 +1,10 @@
 import colors from 'ansi-colors';
 import enquirer from 'enquirer';
-import { rmSync } from 'node:fs';
-import { join } from 'node:path';
-import { TaskDescriptionManager, findProjectRoot, Git } from 'rover-core';
-import { TaskNotFoundError } from 'rover-schemas';
+import {
+  Git,
+  type TaskDescriptionManager,
+  type ProjectManager,
+} from 'rover-core';
 import { getTelemetry } from '../lib/telemetry.js';
 import { showRoverChat } from '../utils/display.js';
 import { statusColor } from '../utils/task-status.js';
@@ -12,7 +13,7 @@ import {
   exitWithSuccess,
   exitWithWarn,
 } from '../utils/exit.js';
-import { CLIJsonOutputWithErrors } from '../types.js';
+import type { CLIJsonOutputWithErrors } from '../types.js';
 import {
   isJsonMode,
   setJsonMode,
@@ -48,7 +49,7 @@ export const deleteCommand = async (
   const numericTaskIds: number[] = [];
   for (const taskId of taskIds) {
     const numericTaskId = parseInt(taskId, 10);
-    if (isNaN(numericTaskId)) {
+    if (Number.isNaN(numericTaskId)) {
       jsonOutput.errors?.push(`Invalid task ID '${taskId}' - must be a number`);
     } else {
       numericTaskIds.push(numericTaskId);
@@ -61,8 +62,9 @@ export const deleteCommand = async (
   }
 
   // Require project context
+  let project: ProjectManager;
   try {
-    await requireProjectContext();
+    project = await requireProjectContext();
   } catch (error) {
     jsonOutput.errors?.push(
       error instanceof Error ? error.message : String(error)
@@ -76,17 +78,11 @@ export const deleteCommand = async (
   const invalidTaskIds: number[] = [];
 
   for (const numericTaskId of numericTaskIds) {
-    try {
-      const task = TaskDescriptionManager.load(numericTaskId);
+    const task = project.getTask(numericTaskId);
+    if (task) {
       tasksToDelete.push(task);
-    } catch (error) {
-      if (error instanceof TaskNotFoundError) {
-        invalidTaskIds.push(numericTaskId);
-      } else {
-        jsonOutput.errors?.push(
-          `There was an error loading task ${numericTaskId}: ${error}`
-        );
-      }
+    } else {
+      invalidTaskIds.push(numericTaskId);
     }
   }
 
@@ -172,17 +168,9 @@ export const deleteCommand = async (
   try {
     for (const task of tasksToDelete) {
       try {
-        const taskPath = join(
-          findProjectRoot(),
-          '.rover',
-          'tasks',
-          task.id.toString()
-        );
-
-        // Delete the task
+        // Delete the task using ProjectManager
         telemetry?.eventDeleteTask();
-        task.delete();
-        rmSync(taskPath, { recursive: true, force: true });
+        project.deleteTask(task.id);
 
         // Prune the git workspace
         const prune = git.pruneWorktree();
