@@ -14,9 +14,12 @@ import {
   showTitle,
 } from 'rover-core';
 import { IterationManager } from 'rover-core';
-import { isJsonMode, setJsonMode } from '../lib/global-state.js';
+import {
+  isJsonMode,
+  setJsonMode,
+  requireProjectContext,
+} from '../lib/context.js';
 import { exitWithError, exitWithSuccess } from '../utils/exit.js';
-import { isRoverInitialized } from '../utils/repo-checks.js';
 
 const DEFAULT_FILE_CONTENTS = 'summary.md';
 
@@ -180,18 +183,15 @@ export const inspectCommand = async (
     return;
   }
 
-  // Check if rover is initialized
-  if (!isRoverInitialized()) {
+  // Require project context
+  try {
+    await requireProjectContext();
+  } catch (error) {
     const errorOutput = jsonErrorOutput(
-      'Rover is not initialized in this directory',
+      error instanceof Error ? error.message : String(error),
       numericTaskId
     );
-    if (isJsonMode()) {
-      console.log(JSON.stringify(errorOutput, null, 2));
-    } else {
-      console.log(colors.red('✗ Rover is not initialized in this directory'));
-      showTips(['Run ' + colors.cyan('rover init') + ' first']);
-    }
+    await exitWithError(errorOutput, { telemetry });
     return;
   }
 

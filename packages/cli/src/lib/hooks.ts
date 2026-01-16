@@ -5,7 +5,7 @@
 
 import colors from 'ansi-colors';
 import { launchSync } from 'rover-core';
-import { isJsonMode } from './global-state.js';
+import { isJsonMode } from './context.js';
 
 /**
  * Context passed to hooks via environment variables

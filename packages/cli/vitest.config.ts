@@ -28,6 +28,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    setupFiles: ['./src/test-setup.ts'],
     // Exclude e2e tests from regular test runs
     exclude: ['**/*.e2e.test.ts', '**/e2e/**/*.test.ts', 'node_modules/**'],
     coverage: {

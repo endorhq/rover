@@ -7,7 +7,7 @@ import { TaskNotFoundError } from 'rover-schemas';
 import { getTelemetry } from '../lib/telemetry.js';
 import { CLIJsonOutput } from '../types.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
-import { isJsonMode, setJsonMode } from '../lib/global-state.js';
+import { isJsonMode, setJsonMode } from '../lib/context.js';
 import { showRoverChat, TIP_TITLES } from '../utils/display.js';
 import { statusColor } from '../utils/task-status.js';
 import { executeHooks } from '../lib/hooks.js';

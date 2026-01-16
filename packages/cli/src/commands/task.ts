@@ -32,7 +32,7 @@ import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
 import { GitHub, GitHubError } from '../lib/github.js';
 import { copyEnvironmentFiles } from '../utils/env-files.js';
 import { initWorkflowStore } from '../lib/workflow.js';
-import { setJsonMode, isJsonMode } from '../lib/global-state.js';
+import { setJsonMode, isJsonMode } from '../lib/context.js';
 
 const { prompt } = enquirer;
 

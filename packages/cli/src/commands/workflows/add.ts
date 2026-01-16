@@ -6,7 +6,7 @@ import { WorkflowStore, WorkflowStoreError } from 'rover-core';
 import { CLIJsonOutput } from '../../types.js';
 import { exitWithError, exitWithSuccess } from '../../utils/exit.js';
 import { getTelemetry } from '../../lib/telemetry.js';
-import { isJsonMode, setJsonMode } from '../../lib/global-state.js';
+import { isJsonMode, setJsonMode } from '../../lib/context.js';
 import { readFromStdin } from '../../utils/stdin.js';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

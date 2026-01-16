@@ -5,7 +5,6 @@ import { join } from 'node:path';
 import { clearProjectRootCache } from 'rover-core';
 import { logsCommand } from '../logs.js';
 import { TaskDescriptionManager } from 'rover-core';
-import { setJsonMode } from '../../lib/global-state.js';
 
 // Mock external dependencies
 vi.mock('../../lib/telemetry.js', () => ({
@@ -97,7 +96,6 @@ describe('logs command', () => {
     rmSync(testDir, { recursive: true, force: true });
     vi.clearAllMocks();
     clearProjectRootCache();
-    setJsonMode(false);
   });
 
   // Helper to create a test task with container ID
