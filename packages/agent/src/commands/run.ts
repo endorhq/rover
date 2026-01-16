@@ -342,6 +342,7 @@ export const runCommand = async (
 
       let runSteps = 0;
       const totalSteps = workflowManager.steps.length;
+      const stepResults: RunnerStepResult[] = [];
 
       // Determine which tool to use (same priority as ACPRunner)
       // Priority: CLI flag > workflow defaults > fallback to claude
@@ -384,6 +385,7 @@ export const runCommand = async (
             runSteps++;
 
             const result = await acpRunner.runStep(step.id);
+            stepResults.push(result);
 
             // Display step results
             displayStepResults(step.name, result, totalDuration);
@@ -476,6 +478,18 @@ export const runCommand = async (
         }
       }
 
+      // TODO: ACP mode doesn't currently provide token/cost metrics
+      // These metrics can be retrieved from GET /agents endpoint in ACP
+      // See: https://github.com/agentclientprotocol/spec
+      // Once implemented, add tokens/cost/model fields to ACPRunnerStepResult interface
+
+      // Calculate total workflow cost and tokens
+      const totalCost = stepResults.reduce((sum, r) => sum + (r.cost ?? 0), 0);
+      const totalTokens = stepResults.reduce(
+        (sum, r) => sum + (r.tokens ?? 0),
+        0
+      );
+
       // Display workflow completion summary
       console.log(colors.bold('\n🎉 Workflow Execution Summary'));
       console.log(
@@ -486,6 +500,18 @@ export const runCommand = async (
         colors.gray('├── Total Steps: ') +
           colors.cyan(workflowManager.steps.length.toString())
       );
+      if (totalTokens > 0) {
+        console.log(
+          colors.gray('├── Total Tokens: ') +
+            colors.cyan(totalTokens.toLocaleString())
+        );
+      }
+      if (totalCost > 0) {
+        console.log(
+          colors.gray('├── Total Cost: ') +
+            colors.cyan('$' + totalCost.toFixed(4))
+        );
+      }
 
       const successfulSteps = Array.from(stepsOutput.keys()).length;
       console.log(

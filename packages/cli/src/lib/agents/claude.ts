@@ -265,6 +265,12 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
       // TODO: mount bedrock credentials
     }
 
+    // Mount Claude settings.json if it exists (optional - for user preferences like default model)
+    const claudeSettings = join(homedir(), '.claude', 'settings.json');
+    if (existsSync(claudeSettings)) {
+      dockerMounts.push(`-v`, `${claudeSettings}:/.settings.json:Z,ro`);
+    }
+
     return dockerMounts;
   }
 

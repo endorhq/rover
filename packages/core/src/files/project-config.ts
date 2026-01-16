@@ -201,6 +201,9 @@ export class ProjectConfigManager {
   get initScript(): string | undefined {
     return this.data.sandbox?.initScript;
   }
+  get sandboxExtraArgs(): string | string[] | undefined {
+    return this.data.sandbox?.extraArgs;
+  }
   get hooks(): HooksConfig | undefined {
     return this.data.hooks;
   }

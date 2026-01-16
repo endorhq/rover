@@ -206,6 +206,7 @@ interface TaskOptions {
   agent?: string[];
   json?: boolean;
   debug?: boolean;
+  sandboxExtraArgs?: string;
 }
 
 /**
@@ -340,7 +341,9 @@ const createTaskForAgent = async (
 
   // Start sandbox container for task execution
   try {
-    const sandbox = await createSandbox(task, processManager);
+    const sandbox = await createSandbox(task, processManager, {
+      extraArgs: options.sandboxExtraArgs,
+    });
     const containerId = await sandbox.createAndStart();
 
     updateTaskMetadata(

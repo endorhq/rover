@@ -254,3 +254,21 @@ export async function tmpUserGroupFiles(
 
   return [etcPasswd, etcGroup];
 }
+
+/**
+ * Normalize extra args from string or array format to a flat array of arguments.
+ * Handles both:
+ * - String format: "--network mynet --memory 512m" (splits by whitespace, respecting quotes)
+ * - Array format: ["--network", "mynet", "--memory", "512m"]
+ *
+ * @param extraArgs - String or array of extra arguments
+ * @returns Flat array of arguments
+ */
+export function normalizeExtraArgs(
+  extraArgs: string | string[] | undefined
+): string[] {
+  if (!extraArgs) return [];
+  if (Array.isArray(extraArgs)) return extraArgs;
+  // Split string by whitespace, respecting quoted strings
+  return extraArgs.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || [];
+}

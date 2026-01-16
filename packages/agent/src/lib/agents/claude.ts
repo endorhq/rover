@@ -8,7 +8,7 @@ import {
 } from 'node:fs';
 import path, { basename, join } from 'node:path';
 import colors from 'ansi-colors';
-import { AgentCredentialFile } from './types.js';
+import { AgentCredentialFile, AgentUsageStats } from './types.js';
 import { BaseAgent } from './base.js';
 import {
   launch,
@@ -59,6 +59,13 @@ export class ClaudeAgent extends BaseAgent {
       });
     }
 
+    // Claude settings.json for user preferences (optional)
+    requiredCredentials.push({
+      path: '/.settings.json',
+      description: 'Claude settings',
+      required: false,
+    });
+
     return requiredCredentials;
   }
 
@@ -100,6 +107,12 @@ export class ClaudeAgent extends BaseAgent {
             recursive: true,
           });
           console.log(colors.gray('├── Copied: ') + colors.cyan(cred.path));
+        } else if (cred.path.includes('.settings.json')) {
+          // Copy settings.json to .claude directory
+          copyFileSync(cred.path, join(targetClaudeDir, 'settings.json'));
+          console.log(
+            colors.gray('├── Copied: ') + colors.cyan('settings.json')
+          );
         } else {
           // Copy file right away
           copyFileSync(cred.path, join(targetClaudeDir, filename));
@@ -187,5 +200,54 @@ export class ClaudeAgent extends BaseAgent {
     }
 
     return args;
+  }
+
+  /**
+   * Extract usage statistics from Claude's JSON response.
+   * Parses total_cost_usd, usage tokens, and modelUsage.
+   */
+  override extractUsageStats(
+    parsedResponse: unknown
+  ): AgentUsageStats | undefined {
+    if (!parsedResponse || typeof parsedResponse !== 'object') {
+      return undefined;
+    }
+
+    const response = parsedResponse as Record<string, unknown>;
+    const usage: AgentUsageStats = {};
+
+    // Extract cost
+    if (typeof response.total_cost_usd === 'number') {
+      usage.cost = response.total_cost_usd;
+    }
+
+    // Extract total tokens from usage object
+    if (response.usage && typeof response.usage === 'object') {
+      const u = response.usage as Record<string, unknown>;
+      const inputTokens =
+        typeof u.input_tokens === 'number' ? u.input_tokens : 0;
+      const outputTokens =
+        typeof u.output_tokens === 'number' ? u.output_tokens : 0;
+      const cacheReadTokens =
+        typeof u.cache_read_input_tokens === 'number'
+          ? u.cache_read_input_tokens
+          : 0;
+      const cacheCreationTokens =
+        typeof u.cache_creation_input_tokens === 'number'
+          ? u.cache_creation_input_tokens
+          : 0;
+      usage.tokens =
+        inputTokens + outputTokens + cacheReadTokens + cacheCreationTokens;
+    }
+
+    // Extract model from modelUsage (first key is the model name)
+    if (response.modelUsage && typeof response.modelUsage === 'object') {
+      const models = Object.keys(response.modelUsage as object);
+      if (models.length > 0) {
+        usage.model = models[0];
+      }
+    }
+
+    return usage;
   }
 }
