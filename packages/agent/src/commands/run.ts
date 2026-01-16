@@ -355,35 +355,41 @@ export const runCommand = async (
 
       if (useACPMode) {
         console.log(
-          colors.cyan('\n🔗 ACP Mode enabled - using session-based execution')
+          colors.cyan('\n🔗 ACP Mode enabled - using fresh session per step')
         );
 
-        // Create ACPRunner once for the entire workflow
-        const acpRunner = new ACPRunner({
-          workflow: workflowManager,
-          inputs,
-          defaultTool: options.agentTool,
-          defaultModel: options.agentModel,
-          statusManager,
-          outputDir: options.output,
-        });
+        // Run each step with a fresh ACPRunner session
+        for (
+          let stepIndex = 0;
+          stepIndex < workflowManager.steps.length;
+          stepIndex++
+        ) {
+          const step = workflowManager.steps[stepIndex];
+          runSteps++;
 
-        try {
-          // Initialize the ACP connection (protocol handshake)
-          await acpRunner.initializeConnection();
+          // Create a new ACPRunner for this step with current stepsOutput
+          const acpRunner = new ACPRunner({
+            workflow: workflowManager,
+            inputs,
+            defaultTool: options.agentTool,
+            defaultModel: options.agentModel,
+            statusManager,
+            outputDir: options.output,
+          });
 
-          // Create a new session
-          await acpRunner.createSession();
+          try {
+            // Initialize a fresh ACP connection (protocol handshake)
+            await acpRunner.initializeConnection();
 
-          // Run all steps through the persistent session
-          for (
-            let stepIndex = 0;
-            stepIndex < workflowManager.steps.length;
-            stepIndex++
-          ) {
-            const step = workflowManager.steps[stepIndex];
-            runSteps++;
+            // Create a new session for this step
+            await acpRunner.createSession();
 
+            // Inject previous step outputs before running
+            for (const [prevStepId, prevOutputs] of stepsOutput.entries()) {
+              acpRunner.stepsOutput.set(prevStepId, prevOutputs);
+            }
+
+            // Run this single step in its fresh session
             const result = await acpRunner.runStep(step.id);
             stepResults.push(result);
 
@@ -391,7 +397,7 @@ export const runCommand = async (
             displayStepResults(step.name, result, totalDuration);
             totalDuration += result.duration;
 
-            // Store step outputs for tracking
+            // Store step outputs for next steps
             if (result.success) {
               stepsOutput.set(step.id, result.outputs);
             } else {
@@ -415,10 +421,10 @@ export const runCommand = async (
                 stepsOutput.set(step.id, new Map());
               }
             }
+          } finally {
+            // Always close the ACP session for this step
+            acpRunner.close();
           }
-        } finally {
-          // Always close the ACP session
-          acpRunner.close();
         }
       } else {
         // Standard subprocess-based execution (existing behavior)

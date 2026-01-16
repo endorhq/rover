@@ -78,7 +78,7 @@ function getACPSpawnCommand(tool: string): { command: string; args: string[] } {
 export class ACPRunner {
   private workflow: WorkflowManager;
   private inputs: Map<string, string>;
-  private stepsOutput: Map<string, Map<string, string>> = new Map();
+  public stepsOutput: Map<string, Map<string, string>> = new Map();
   private defaultTool: string | undefined;
   private statusManager?: IterationStatusManager;
   private outputDir?: string;
@@ -97,8 +97,6 @@ export class ACPRunner {
     this.defaultTool = config.defaultTool;
     this.statusManager = config.statusManager;
     this.outputDir = config.outputDir;
-
-    console.log('ereslibre: workflow', JSON.stringify(this.workflow));
 
     // Determine which tool to use
     // Priority: CLI flag > workflow defaults > fallback to claude
