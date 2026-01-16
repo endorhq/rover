@@ -16,7 +16,7 @@ export class CursorAgent extends BaseAgent {
   }
 
   getInstallCommand(): string {
-    return `nix build --no-link --accept-flake-config github:numtide/nix-ai-tools/${process.env.NIX_AI_TOOLS_REV}#cursor-agent`;
+    return `nix build --no-link --accept-flake-config github:numtide/llm-agents.nix/${process.env.NIX_AI_TOOLS_REV}#cursor-agent`;
   }
 
   getRequiredCredentials(): AgentCredentialFile[] {

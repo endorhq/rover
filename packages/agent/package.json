@@ -24,11 +24,12 @@
   },
   "author": "The Endor team",
   "dependencies": {
-    "yaml": "^2.8.1",
+    "@agentclientprotocol/sdk": "^0.7.0",
     "ansi-colors": "catalog:runtime",
     "commander": "catalog:runtime",
     "execa": "catalog:runtime",
     "ora": "^8.2.0",
+    "yaml": "^2.8.1",
     "zod": "catalog:runtime"
   },
   "devDependencies": {

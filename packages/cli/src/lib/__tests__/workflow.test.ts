@@ -57,16 +57,21 @@ describe('workflow utilities', () => {
 
     it('should load all expected built-in workflows', () => {
       const store = initWorkflowStore();
-      const workflows = store.getAllWorkflows();
+      const allEntries = store.getAllWorkflowEntries();
 
-      const workflowNames = workflows.map(w => w.name);
+      // Filter for built-in workflows only
+      const builtInWorkflows = allEntries
+        .filter(entry => entry.source === 'built-in')
+        .map(entry => entry.workflow);
+
+      const workflowNames = builtInWorkflows.map(w => w.name);
 
       // Check that expected workflows are present
       expect(workflowNames).toContain('swe');
       expect(workflowNames).toContain('tech-writer');
 
       // Should have exactly 2 built-in workflows
-      expect(workflows).toHaveLength(2);
+      expect(builtInWorkflows).toHaveLength(2);
     });
 
     it('should return workflows with proper structure', () => {
