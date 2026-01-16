@@ -7,7 +7,6 @@ import {
   showSplashHeader,
   showRegularHeader,
   findOrRegisterProject,
-  ProjectLoaderNotGitRepoError,
 } from 'rover-core';
 import { initCommand } from './commands/init.js';
 import { listCommand } from './commands/list.js';
@@ -27,7 +26,11 @@ import { pushCommand } from './commands/push.js';
 import { stopCommand } from './commands/stop.js';
 import { mcpCommand } from './commands/mcp.js';
 import { addWorkflowCommands } from './commands/workflows/index.js';
-import { initCLIContext, isJsonMode, setJsonMode } from './lib/context.js';
+import {
+  initCLIContext,
+  isJsonMode,
+  resolveProjectContext,
+} from './lib/context.js';
 
 function isWorkflowsToplevelCommand(command: Command): boolean {
   return command.parent?.name() === 'workflows';
@@ -55,13 +58,35 @@ export function createProgram(
 
         let project = null;
 
-        // Skip project resolution for init (it creates the project),
-        // mcp (adapts to context), and workflow commands
-        if (
-          !isWorkflowsToplevelCommand(actionCommand) &&
-          commandName !== 'init' &&
-          inGitRepo
-        ) {
+        // Check for project override (flag takes precedence over env)
+        const projectOption = cliOptions.project as string | undefined;
+        const projectEnv = process.env.ROVER_PROJECT;
+        const projectOverride = projectOption || projectEnv;
+
+        // Determine if this command should skip project override logic
+        const isExcludedCommand =
+          isWorkflowsToplevelCommand(actionCommand) ||
+          commandName === 'init' ||
+          commandName === 'mcp';
+
+        if (!isExcludedCommand && projectOverride) {
+          // Project override provided - resolve without auto-registration
+          try {
+            project = await resolveProjectContext(projectOverride);
+            if (!project) {
+              exitWithError({
+                error: `Project "${projectOverride}" not found`,
+                success: false,
+              });
+            }
+          } catch (error) {
+            exitWithError({
+              error: error instanceof Error ? error.message : String(error),
+              success: false,
+            });
+          }
+        } else if (!isExcludedCommand && inGitRepo) {
+          // No override - use existing behavior (auto-register from cwd)
           try {
             project = await findOrRegisterProject();
           } catch (error) {
@@ -71,6 +96,17 @@ export function createProgram(
               success: false,
             });
           }
+        } else if (isExcludedCommand && projectOverride) {
+          // Warn if project override is provided for excluded commands
+          const overrideSource = projectOption ? '--project' : 'ROVER_PROJECT';
+          const excludedCommandName = isWorkflowsToplevelCommand(actionCommand)
+            ? 'workflows'
+            : commandName;
+          console.error(
+            colors.yellow(
+              `Warning: ${overrideSource} is ignored for the '${excludedCommandName}' command`
+            )
+          );
         }
 
         // Initialize context
@@ -103,6 +139,11 @@ export function createProgram(
   program.option(
     '-v, --verbose',
     'Log verbose information like running commands'
+  );
+
+  program.option(
+    '-p, --project <name|path>',
+    'Project name or path to operate on (overrides current directory)'
   );
 
   program
