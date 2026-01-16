@@ -116,19 +116,30 @@ export function createProgram(
 
   program
     .command('init')
-    .description('Initialize your project')
+    .description('Create a shared configuration for this project')
     .option('-y, --yes', 'Skip all confirmations and run non-interactively')
     .argument('[path]', 'Project path', process.cwd())
     .action(initCommand);
 
-  program.commandsGroup(colors.cyan('Create and manage tasks:'));
+  program.commandsGroup(colors.cyan('Current tasks:'));
+  // Add the ps command for monitoring tasks
+  program
+    .command('list')
+    .alias('ls')
+    .description('Show the tasks from current project or all projects')
+    .option(
+      '-w, --watch [seconds]',
+      'Watch for changes (default 3s, or specify interval)'
+    )
+    .option('--json', 'Output in JSON format')
+    .action(listCommand);
+
+  program.commandsGroup(colors.cyan('Manage tasks in a project:'));
 
   // Add a new task
   program
     .command('task')
-    .description(
-      'Start a new task for an AI Agent. It will spawn a new environment to complete it.'
-    )
+    .description('Create and assign task to an AI Agent to complete it')
     .option(
       '--from-github <issue>',
       'Fetch task description from a GitHub issue number'
@@ -188,18 +199,6 @@ export function createProgram(
     )
     .option('--json', 'Output the result in JSON format')
     .action(stopCommand);
-
-  // Add the ps command for monitoring tasks
-  program
-    .command('list')
-    .alias('ls')
-    .description('Show tasks and their status')
-    .option(
-      '-w, --watch [seconds]',
-      'Watch for changes (default 3s, or specify interval)'
-    )
-    .option('--json', 'Output in JSON format')
-    .action(listCommand);
 
   program
     .command('inspect')
@@ -262,8 +261,6 @@ export function createProgram(
     )
     .option('--json', 'Output JSON and skip confirmation prompts')
     .action(iterateCommand);
-
-  program.commandsGroup(colors.cyan('Debug a task:'));
 
   program
     .command('shell')
