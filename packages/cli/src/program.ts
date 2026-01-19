@@ -148,9 +148,7 @@ export function createProgram(
       new Option(
         '--workflow, -w <name>',
         'Use a specific workflow to complete this task'
-      )
-        .choices(['swe', 'tech-writer'])
-        .default('swe')
+      ).default('swe')
     )
     .option('-y, --yes', 'Skip all confirmations and run non-interactively')
     .option(
