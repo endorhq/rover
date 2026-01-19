@@ -29,9 +29,9 @@ vi.mock('../../lib/context.js', () => ({
         }
         return undefined;
       },
-      deleteTask: (taskId: number) => {
+      deleteTask: (task: TaskDescriptionManager) => {
         // Actually delete the task directory to match real behavior
-        const taskPath = join(testDir, '.rover', 'tasks', taskId.toString());
+        const taskPath = task.getBasePath();
         if (existsSync(taskPath)) {
           rmSync(taskPath, { recursive: true, force: true });
         }

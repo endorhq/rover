@@ -14,6 +14,7 @@ import {
   showProperties,
   Git,
   type ProjectManager,
+  VERBOSE,
 } from 'rover-core';
 import {
   parseAgentString,
@@ -35,6 +36,7 @@ import {
   setJsonMode,
   isJsonMode,
   requireProjectContext,
+  isVerbose,
 } from '../lib/context.js';
 
 const { prompt } = enquirer;
@@ -345,7 +347,10 @@ const createTaskForAgent = async (
     processManager?.addItem('Task started in background');
     processManager?.completeLastItem();
     processManager?.finish();
-  } catch (_err) {
+  } catch (err) {
+    if (isVerbose()) {
+      console.log('ERROR:', err);
+    }
     // If Docker execution fails to start, reset task to NEW status
     task.resetToNew();
 

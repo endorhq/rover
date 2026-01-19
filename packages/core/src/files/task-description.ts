@@ -572,6 +572,13 @@ export class TaskDescriptionManager {
   }
 
   /**
+   * Get path to the current iteration directory
+   */
+  getIterationPath(): string {
+    return join(this.iterationsPath(), this.data.iterations.toString());
+  }
+
+  /**
    * Get the base path for this task
    */
   getBasePath(): string {

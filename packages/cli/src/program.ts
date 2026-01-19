@@ -47,7 +47,7 @@ export function createProgram(
         const options = actionCommand.opts();
 
         // Set verbose mode
-        setVerbose(options.verbose === true);
+        setVerbose(cliOptions.verbose === true);
 
         // Build context
         const git = new Git();

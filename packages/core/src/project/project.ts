@@ -153,25 +153,34 @@ export class ProjectManager {
    * Delete a task from storage.
    * Checks central store first, then legacy location.
    *
-   * @param taskId - Task ID to delete
+   * @param task - TaskDescriptionManager to delete
    * @returns true if task was deleted, false if not found
    */
-  deleteTask(taskId: number): boolean {
+  deleteTask(task: TaskDescriptionManager): boolean {
+    let deletedTask = false;
+
     // Check central store first
-    const centralPath = this.getTaskPath(taskId);
+    const centralPath = this.getTaskPath(task.id);
     if (TaskDescriptionManager.exists(centralPath)) {
       rmSync(centralPath, { recursive: true });
-      return true;
+      deletedTask = true;
     }
 
     // Legacy fallback (to be removed in future version)
-    const legacyPath = this.getLegacyTaskPath(taskId);
+    // @legacy
+    const legacyPath = this.getLegacyTaskPath(task.id);
     if (TaskDescriptionManager.exists(legacyPath)) {
       rmSync(legacyPath, { recursive: true });
-      return true;
+      deletedTask = true;
     }
 
-    return false;
+    // Cleanup the workspace if it exists
+    const workspacePath = task.worktreePath;
+    if (existsSync(workspacePath)) {
+      rmSync(workspacePath, { recursive: true });
+    }
+
+    return deletedTask;
   }
 
   // ============================================================

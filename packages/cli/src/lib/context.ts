@@ -61,6 +61,14 @@ export function isJsonMode(): boolean {
 }
 
 /**
+ * Check if the CLI is running in Verbose mode.
+ * When in JSON mode, human-readable console output should be suppressed.
+ */
+export function isVerbose(): boolean {
+  return getCLIContext().verbose;
+}
+
+/**
  * Set JSON mode.
  */
 export function setJsonMode(value: boolean): void {

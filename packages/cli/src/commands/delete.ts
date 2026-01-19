@@ -170,7 +170,7 @@ export const deleteCommand = async (
       try {
         // Delete the task using ProjectManager
         telemetry?.eventDeleteTask();
-        project.deleteTask(task.id);
+        project.deleteTask(task);
 
         // Prune the git workspace
         const prune = git.pruneWorktree();
