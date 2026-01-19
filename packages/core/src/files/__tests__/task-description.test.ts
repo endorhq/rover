@@ -4,30 +4,28 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { TaskDescriptionManager } from '../task-description.js';
 import { TaskStatus } from 'rover-schemas';
-import { clearProjectRootCache } from '../../project-root.js';
 
 describe('TaskDescriptionManager', () => {
   let testDir: string;
-  let originalCwd: string;
+
+  // Helper to get task path
+  const getTaskPath = (taskId: number) =>
+    join(testDir, 'tasks', taskId.toString());
 
   beforeEach(() => {
     // Create temp directory
     testDir = mkdtempSync(join(tmpdir(), 'rover-description-test-'));
-    originalCwd = process.cwd();
-    process.chdir(testDir);
-    clearProjectRootCache();
   });
 
   afterEach(() => {
-    // Restore original working directory
-    process.chdir(originalCwd);
     // Clean up temp directory
     rmSync(testDir, { recursive: true, force: true });
   });
 
   describe('agent and sourceBranch fields', () => {
     it('should store agent and sourceBranch when creating task', () => {
-      const task = TaskDescriptionManager.create({
+      const taskPath = getTaskPath(1);
+      const task = TaskDescriptionManager.create(taskPath, {
         id: 1,
         title: 'Test Task',
         description: 'Test description',
@@ -41,13 +39,14 @@ describe('TaskDescriptionManager', () => {
       expect(task.sourceBranch).toBe('main');
 
       // Verify persistence
-      const reloaded = TaskDescriptionManager.load(1);
+      const reloaded = TaskDescriptionManager.load(taskPath, 1);
       expect(reloaded.agent).toBe('claude');
       expect(reloaded.sourceBranch).toBe('main');
     });
 
     it('should handle tasks without agent and sourceBranch fields', () => {
-      const task = TaskDescriptionManager.create({
+      const taskPath = getTaskPath(2);
+      const task = TaskDescriptionManager.create(taskPath, {
         id: 2,
         title: 'Test Task',
         description: 'Test description',
@@ -62,7 +61,8 @@ describe('TaskDescriptionManager', () => {
 
   describe('agentImage field', () => {
     it('should store and retrieve agentImage', () => {
-      const task = TaskDescriptionManager.create({
+      const taskPath = getTaskPath(1);
+      const task = TaskDescriptionManager.create(taskPath, {
         id: 1,
         title: 'Test Task',
         description: 'Test description',
@@ -79,12 +79,13 @@ describe('TaskDescriptionManager', () => {
       expect(task.agentImage).toBe(customImage);
 
       // Verify persistence
-      const reloaded = TaskDescriptionManager.load(1);
+      const reloaded = TaskDescriptionManager.load(taskPath, 1);
       expect(reloaded.agentImage).toBe(customImage);
     });
 
     it('should preserve agentImage during migration', () => {
-      const task = TaskDescriptionManager.create({
+      const taskPath = getTaskPath(2);
+      const task = TaskDescriptionManager.create(taskPath, {
         id: 2,
         title: 'Test Task',
         description: 'Test description',
@@ -96,12 +97,13 @@ describe('TaskDescriptionManager', () => {
       task.setAgentImage(customImage);
 
       // Reload to trigger migration path
-      const reloaded = TaskDescriptionManager.load(2);
+      const reloaded = TaskDescriptionManager.load(taskPath, 2);
       expect(reloaded.agentImage).toBe(customImage);
     });
 
     it('should handle tasks without agentImage field', () => {
-      const task = TaskDescriptionManager.create({
+      const taskPath = getTaskPath(3);
+      const task = TaskDescriptionManager.create(taskPath, {
         id: 3,
         title: 'Test Task',
         description: 'Test description',
@@ -112,14 +114,15 @@ describe('TaskDescriptionManager', () => {
       expect(task.agentImage).toBeUndefined();
 
       // Verify persistence of undefined value
-      const reloaded = TaskDescriptionManager.load(3);
+      const reloaded = TaskDescriptionManager.load(taskPath, 3);
       expect(reloaded.agentImage).toBeUndefined();
     });
   });
 
   describe('new status types', () => {
     it('should support MERGED status', () => {
-      const task = TaskDescriptionManager.create({
+      const taskPath = getTaskPath(1);
+      const task = TaskDescriptionManager.create(taskPath, {
         id: 1,
         title: 'Test Task',
         description: 'Test description',
@@ -135,7 +138,8 @@ describe('TaskDescriptionManager', () => {
     });
 
     it('should support PUSHED status', () => {
-      const task = TaskDescriptionManager.create({
+      const taskPath = getTaskPath(2);
+      const task = TaskDescriptionManager.create(taskPath, {
         id: 2,
         title: 'Test Task',
         description: 'Test description',
@@ -151,7 +155,8 @@ describe('TaskDescriptionManager', () => {
     });
 
     it('should support resetting to NEW status', () => {
-      const task = TaskDescriptionManager.create({
+      const taskPath = getTaskPath(3);
+      const task = TaskDescriptionManager.create(taskPath, {
         id: 3,
         title: 'Test Task',
         description: 'Test description',
@@ -170,7 +175,8 @@ describe('TaskDescriptionManager', () => {
     });
 
     it('should handle MERGED and PUSHED in status validation', () => {
-      const task = TaskDescriptionManager.create({
+      const taskPath = getTaskPath(4);
+      const task = TaskDescriptionManager.create(taskPath, {
         id: 4,
         title: 'Test Task',
         description: 'Test description',
@@ -191,7 +197,8 @@ describe('TaskDescriptionManager', () => {
     });
 
     it('should not set completedAt when marking as MERGED', () => {
-      const task = TaskDescriptionManager.create({
+      const taskPath = getTaskPath(5);
+      const task = TaskDescriptionManager.create(taskPath, {
         id: 5,
         title: 'Test Task',
         description: 'Test description',
@@ -209,8 +216,9 @@ describe('TaskDescriptionManager', () => {
   });
 
   it('should not set completedAt when marking as PUSHED', () => {
-    const task = TaskDescriptionManager.create({
-      id: 5,
+    const taskPath = getTaskPath(6);
+    const task = TaskDescriptionManager.create(taskPath, {
+      id: 6,
       title: 'Test Task',
       description: 'Test description',
       inputs: new Map(),
@@ -228,9 +236,10 @@ describe('TaskDescriptionManager', () => {
 
   describe('status migration', () => {
     it('should migrate old status values to new enum including MERGED and PUSHED', () => {
+      const taskPath = getTaskPath(7);
       // Test the static migration method indirectly by loading tasks with old data
-      const task = TaskDescriptionManager.create({
-        id: 6,
+      const task = TaskDescriptionManager.create(taskPath, {
+        id: 7,
         title: 'Migration Test',
         description: 'Test description',
         inputs: new Map(),
@@ -241,7 +250,7 @@ describe('TaskDescriptionManager', () => {
       task.setStatus('MERGED' as TaskStatus);
       task.save();
 
-      const reloadedTask = TaskDescriptionManager.load(6);
+      const reloadedTask = TaskDescriptionManager.load(taskPath, 7);
       expect(reloadedTask.status).toBe('MERGED');
       expect(reloadedTask.isMerged()).toBe(true);
     });
@@ -250,9 +259,10 @@ describe('TaskDescriptionManager', () => {
       // Import necessary modules
       const { readFileSync, writeFileSync } = require('node:fs');
 
+      const taskPath = getTaskPath(8);
       // Create a task (this automatically saves it)
-      TaskDescriptionManager.create({
-        id: 7,
+      TaskDescriptionManager.create(taskPath, {
+        id: 8,
         title: 'Migration DateTime Test',
         description: 'Test missing datetime fields',
         inputs: new Map(),
@@ -260,14 +270,8 @@ describe('TaskDescriptionManager', () => {
       });
 
       // Manually modify the task file to simulate v1.1 schema with missing optional datetime fields
-      const taskPath = join(
-        process.cwd(),
-        '.rover',
-        'tasks',
-        '7',
-        'description.json'
-      );
-      const taskData = JSON.parse(readFileSync(taskPath, 'utf8'));
+      const descriptionPath = join(taskPath, 'description.json');
+      const taskData = JSON.parse(readFileSync(descriptionPath, 'utf8'));
 
       // Simulate v1.1 schema by removing version and optional datetime fields
       delete taskData.version;
@@ -278,10 +282,10 @@ describe('TaskDescriptionManager', () => {
       delete taskData.lastStatusCheck;
       delete taskData.lastRestartAt;
 
-      writeFileSync(taskPath, JSON.stringify(taskData, null, 2), 'utf8');
+      writeFileSync(descriptionPath, JSON.stringify(taskData, null, 2), 'utf8');
 
       // Reload the task - should trigger migration
-      const migratedTask = TaskDescriptionManager.load(7);
+      const migratedTask = TaskDescriptionManager.load(taskPath, 8);
 
       // Verify that optional datetime fields are undefined (not empty strings)
       expect(migratedTask.startedAt).toBeUndefined();
@@ -301,8 +305,9 @@ describe('TaskDescriptionManager', () => {
 
   describe('utility methods', () => {
     it('should provide correct utility methods for new statuses', () => {
-      const task = TaskDescriptionManager.create({
-        id: 7,
+      const taskPath = getTaskPath(9);
+      const task = TaskDescriptionManager.create(taskPath, {
+        id: 9,
         title: 'Utility Test',
         description: 'Test description',
         inputs: new Map(),

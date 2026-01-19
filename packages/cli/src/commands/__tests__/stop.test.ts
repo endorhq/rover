@@ -8,9 +8,32 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { clearProjectRootCache, launchSync } from 'rover-core';
+import {
+  clearProjectRootCache,
+  launchSync,
+  TaskDescriptionManager,
+} from 'rover-core';
 import { stopCommand } from '../stop.js';
-import { TaskDescriptionManager } from 'rover-core';
+
+// Store testDir for context mock
+let testDir: string;
+
+// Mock context to return a mock ProjectManager
+vi.mock('../../lib/context.js', () => ({
+  requireProjectContext: vi.fn().mockImplementation(() => {
+    return Promise.resolve({
+      getTask: (taskId: number) => {
+        const taskPath = join(testDir, '.rover', 'tasks', taskId.toString());
+        if (TaskDescriptionManager.exists(taskPath)) {
+          return TaskDescriptionManager.load(taskPath, taskId);
+        }
+        return undefined;
+      },
+    });
+  }),
+  isJsonMode: vi.fn().mockReturnValue(false),
+  setJsonMode: vi.fn(),
+}));
 
 // Mock external dependencies
 vi.mock('../../lib/telemetry.js', () => ({
@@ -34,11 +57,10 @@ vi.mock('../../lib/sandbox/index.js', () => ({
 }));
 
 describe('stop command', () => {
-  let testDir: string;
   let originalCwd: string;
 
   beforeEach(() => {
-    // Create temp directory with git repo
+    // Create temp directory with git repo (update module-level testDir for mock)
     testDir = mkdtempSync(join(tmpdir(), 'rover-stop-test-'));
     originalCwd = process.cwd();
     process.chdir(testDir);
@@ -76,7 +98,8 @@ describe('stop command', () => {
 
   // Helper to create a test task
   const createTestTask = (id: number, title: string = 'Test Task') => {
-    const task = TaskDescriptionManager.create({
+    const taskPath = join(testDir, '.rover', 'tasks', id.toString());
+    const task = TaskDescriptionManager.create(taskPath, {
       id,
       title,
       description: 'Test task description',
@@ -141,7 +164,10 @@ describe('stop command', () => {
       await stopCommand('1', { json: true });
 
       // Verify task was reset to NEW and container info cleared
-      const reloadedTask = TaskDescriptionManager.load(1);
+      const reloadedTask = TaskDescriptionManager.load(
+        join(testDir, '.rover', 'tasks', '1'),
+        1
+      );
       expect(reloadedTask.status).toBe('NEW');
       expect(reloadedTask.containerId).toBe('');
     });
@@ -157,7 +183,10 @@ describe('stop command', () => {
       await stopCommand('2', { json: true });
 
       // Verify task was reset to NEW
-      const reloadedTask = TaskDescriptionManager.load(2);
+      const reloadedTask = TaskDescriptionManager.load(
+        join(testDir, '.rover', 'tasks', '2'),
+        2
+      );
       expect(reloadedTask.status).toBe('NEW');
     });
 
@@ -172,7 +201,10 @@ describe('stop command', () => {
       await stopCommand('3', { json: true });
 
       // Verify task is in NEW status and can be restarted
-      const reloadedTask = TaskDescriptionManager.load(3);
+      const reloadedTask = TaskDescriptionManager.load(
+        join(testDir, '.rover', 'tasks', '3'),
+        3
+      );
       expect(reloadedTask.status).toBe('NEW');
 
       // The task should be able to transition to IN_PROGRESS again
@@ -220,7 +252,10 @@ describe('stop command', () => {
 
       await stopCommand('6', { json: true });
 
-      const reloadedTask = TaskDescriptionManager.load(6);
+      const reloadedTask = TaskDescriptionManager.load(
+        join(testDir, '.rover', 'tasks', '6'),
+        6
+      );
       expect(reloadedTask.worktreePath).toBe('');
       expect(reloadedTask.branchName).toBe('');
     });

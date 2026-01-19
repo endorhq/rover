@@ -1,9 +1,8 @@
 import colors from 'ansi-colors';
 import { existsSync } from 'node:fs';
-import { TaskDescriptionManager } from 'rover-core';
+import { Git, showList, showTitle } from 'rover-core';
 import { TaskNotFoundError } from 'rover-schemas';
 import { getTelemetry } from '../lib/telemetry.js';
-import { Git, showList, showTitle } from 'rover-core';
 import { showTips } from '../utils/display.js';
 import { exitWithError, exitWithSuccess } from '../utils/exit.js';
 import { requireProjectContext } from '../lib/context.js';
@@ -28,8 +27,9 @@ export const diffCommand = async (
   }
 
   // Require project context
+  let project;
   try {
-    await requireProjectContext();
+    project = await requireProjectContext();
   } catch (error) {
     await exitWithError(
       {
@@ -44,8 +44,11 @@ export const diffCommand = async (
   try {
     const git = new Git();
 
-    // Load task using TaskDescription
-    const task = TaskDescriptionManager.load(numericTaskId);
+    // Load task using ProjectManager
+    const task = project.getTask(numericTaskId);
+    if (!task) {
+      throw new TaskNotFoundError(numericTaskId);
+    }
 
     // Check if worktree exists
     if (!task.worktreePath || !existsSync(task.worktreePath)) {

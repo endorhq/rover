@@ -1,6 +1,10 @@
 import { getAIAgentTool } from '../agents/index.js';
 import { join } from 'node:path';
-import { ProjectConfigManager, TaskDescriptionManager } from 'rover-core';
+import {
+  getDataDir,
+  ProjectConfigManager,
+  TaskDescriptionManager,
+} from 'rover-core';
 import { Sandbox, SandboxOptions } from './types.js';
 import { SetupBuilder } from '../setup.js';
 import { launch, ProcessManager, VERBOSE } from 'rover-core';
@@ -52,10 +56,11 @@ export class DockerSandbox extends Sandbox {
     const projectConfig = ProjectConfigManager.load();
     const worktreePath = this.task.worktreePath;
 
-    if (
-      worktreePath.length === 0 ||
-      !worktreePath.startsWith(projectConfig.projectRoot)
-    ) {
+    const worktreeKnownLocation =
+      worktreePath.startsWith(projectConfig.projectRoot) ||
+      worktreePath.startsWith(getDataDir());
+
+    if (worktreePath.length === 0 || !worktreeKnownLocation) {
       throw new Error(
         `Invalid worktree path for this project (${worktreePath})`
       );
@@ -237,10 +242,11 @@ export class DockerSandbox extends Sandbox {
     const projectConfig = ProjectConfigManager.load();
     const worktreePath = this.task.worktreePath;
 
-    if (
-      worktreePath.length === 0 ||
-      !worktreePath.startsWith(projectConfig.projectRoot)
-    ) {
+    const worktreeKnownLocation =
+      worktreePath.startsWith(projectConfig.projectRoot) ||
+      worktreePath.startsWith(getDataDir());
+
+    if (worktreePath.length === 0 || !worktreeKnownLocation) {
       throw new Error(
         `Invalid worktree path for this project (${worktreePath})`
       );

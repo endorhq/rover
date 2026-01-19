@@ -139,6 +139,7 @@ describe('ProjectStore', () => {
           languages: ['typescript'],
           packageManagers: ['npm'],
           taskManagers: [],
+          nextTaskId: 1,
         },
       ];
       mockConfig.projects = existingProjects;
@@ -160,6 +161,7 @@ describe('ProjectStore', () => {
           languages: [],
           packageManagers: [],
           taskManagers: [],
+          nextTaskId: 1,
         },
         {
           id: 'project-2',
@@ -168,6 +170,7 @@ describe('ProjectStore', () => {
           languages: [],
           packageManagers: [],
           taskManagers: [],
+          nextTaskId: 1,
         },
       ];
       mockConfig.projects = existingProjects;
@@ -188,7 +191,7 @@ describe('ProjectStore', () => {
       const { ProjectStore } = await import('../project-store.js');
 
       const store = new ProjectStore();
-      await store.add('my-project', testProjectDir, false);
+      await store.add('my-project', testProjectDir, { autodetect: false });
 
       expect(mockConfig.addProject).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -201,7 +204,7 @@ describe('ProjectStore', () => {
       const { ProjectStore } = await import('../project-store.js');
 
       const store = new ProjectStore();
-      await store.add('test', testProjectDir, false);
+      await store.add('test', testProjectDir, { autodetect: false });
 
       expect(mockConfig.addProject).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -214,7 +217,7 @@ describe('ProjectStore', () => {
       const { ProjectStore } = await import('../project-store.js');
 
       const store = new ProjectStore();
-      await store.add('test', testProjectDir, false);
+      await store.add('test', testProjectDir, { autodetect: false });
 
       expect(mockConfig.addProject).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -235,7 +238,7 @@ describe('ProjectStore', () => {
       const { ProjectStore } = await import('../project-store.js');
 
       const store = new ProjectStore();
-      await store.add('ts-project', testProjectDir, true);
+      await store.add('ts-project', testProjectDir, { autodetect: true });
 
       expect(mockConfig.addProject).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -250,7 +253,7 @@ describe('ProjectStore', () => {
       const { ProjectStore } = await import('../project-store.js');
 
       const store = new ProjectStore();
-      await store.add('new-project', testProjectDir, false);
+      await store.add('new-project', testProjectDir, { autodetect: false });
 
       expect(mockConfig.addProject).toHaveBeenCalledTimes(1);
       expect(mockConfig.addProject).toHaveBeenCalledWith(
@@ -265,7 +268,9 @@ describe('ProjectStore', () => {
       const { ProjectManager } = await import('../project.js');
 
       const store = new ProjectStore();
-      const result = await store.add('test-project', testProjectDir, false);
+      const result = await store.add('test-project', testProjectDir, {
+        autodetect: false,
+      });
 
       expect(result).toBeInstanceOf(ProjectManager);
       expect(result.name).toBe('test-project');
@@ -276,7 +281,7 @@ describe('ProjectStore', () => {
       const { ProjectStore } = await import('../project-store.js');
 
       const store = new ProjectStore();
-      await store.add('my/project:name', testProjectDir, false);
+      await store.add('my/project:name', testProjectDir, { autodetect: false });
 
       expect(mockConfig.addProject).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -295,6 +300,7 @@ describe('ProjectStore', () => {
         languages: ['typescript'],
         packageManagers: ['npm'],
         taskManagers: [],
+        nextTaskId: 1,
       };
       mockConfig.projects = [existingProject];
 
@@ -330,6 +336,7 @@ describe('ProjectStore', () => {
         languages: [],
         packageManagers: [],
         taskManagers: [],
+        nextTaskId: 1,
       };
       mockConfig.projects = [existingProject];
 
@@ -364,6 +371,7 @@ describe('ProjectStore', () => {
         languages: [],
         packageManagers: [],
         taskManagers: [],
+        nextTaskId: 1,
       };
       mockConfig.projects = [existingProject];
 

@@ -2,12 +2,12 @@ import colors from 'ansi-colors';
 import enquirer from 'enquirer';
 import { existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { findProjectRoot, launchSync } from 'rover-core';
+import { launchSync, type ProjectManager } from 'rover-core';
 import yoctoSpinner from 'yocto-spinner';
-import { TaskDescriptionManager } from 'rover-core';
 import { TaskNotFoundError } from 'rover-schemas';
 import { getTelemetry } from '../lib/telemetry.js';
 import { exitWithError, exitWithWarn, exitWithSuccess } from '../utils/exit.js';
+import { requireProjectContext } from '../lib/context.js';
 
 const { prompt } = enquirer;
 
@@ -29,15 +29,28 @@ export const resetCommand = async (
     return;
   }
 
+  // Require project context
+  let project: ProjectManager;
   try {
-    // Load task using TaskDescription
-    const task = TaskDescriptionManager.load(numericTaskId);
-    const taskPath = join(
-      findProjectRoot(),
-      '.rover',
-      'tasks',
-      numericTaskId.toString()
+    project = await requireProjectContext();
+  } catch (error) {
+    await exitWithError(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      { telemetry }
     );
+    return;
+  }
+
+  try {
+    // Load task using ProjectManager
+    const task = project.getTask(numericTaskId);
+    if (!task) {
+      throw new TaskNotFoundError(numericTaskId);
+    }
+    const taskPath = project.getTaskPath(numericTaskId);
 
     console.log(colors.bold('\n🔄 Reset Task\n'));
     console.log(colors.gray('ID: ') + colors.cyan(taskId));

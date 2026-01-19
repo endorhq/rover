@@ -3,9 +3,7 @@
  * This module provides a cohesive context object for CLI state management.
  */
 
-import { findProjectRoot, ProjectStore, type ProjectManager } from 'rover-core';
-import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { type ProjectManager, ProjectStore } from 'rover-core';
 
 /**
  * CLI execution context
@@ -63,6 +61,14 @@ export function isJsonMode(): boolean {
 }
 
 /**
+ * Check if the CLI is running in Verbose mode.
+ * When in JSON mode, human-readable console output should be suppressed.
+ */
+export function isVerbose(): boolean {
+  return getCLIContext().verbose;
+}
+
+/**
  * Set JSON mode.
  */
 export function setJsonMode(value: boolean): void {
@@ -109,33 +115,12 @@ export async function resolveProjectContext(
 }
 
 /**
- * Check if we're in a Rover project directory (has .rover folder).
- *
- * @deprecated Legacy check for backward compatibility with tests that don't
- * initialize a full project context. Will be removed once all code paths
- * properly use ProjectManager.
- */
-function legacy_isInRoverProject(): boolean {
-  try {
-    const roverPath = join(findProjectRoot(), '.rover');
-    return existsSync(roverPath);
-  } catch {
-    // findProjectRoot throws if .rover directory is not found
-    return false;
-  }
-}
-
-/**
  * Require a project context for a command.
  * Use this for commands that cannot operate in global mode.
  *
- * When project is null but we're in a directory with .rover,
- * returns null (typed as ProjectManager) to allow commands to proceed.
- * Commands should use findProjectRoot() to locate project files.
- *
  * @param projectOption - Value from --project flag (future)
- * @returns ProjectManager (may be null if in .rover directory)
- * @throws If no project context available and not in .rover directory
+ * @returns ProjectManager
+ * @throws If no project context available
  */
 export async function requireProjectContext(
   projectOption?: string
@@ -143,12 +128,6 @@ export async function requireProjectContext(
   const project = await resolveProjectContext(projectOption);
   if (project) {
     return project;
-  }
-
-  // @DEPRECATED: Legacy fallback for backward compatibility.
-  // Remove this once all code paths properly use ProjectManager.
-  if (legacy_isInRoverProject()) {
-    return null as unknown as ProjectManager;
   }
 
   throw new Error(

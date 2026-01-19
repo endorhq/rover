@@ -18,6 +18,24 @@ vi.mock('../../paths.js', () => ({
   getConfigDir: () => mockConfigDir,
 }));
 
+// Mock ProjectConfigManager to prevent loading real project config
+vi.mock('../project-config.js', () => ({
+  ProjectConfigManager: {
+    load: () => {
+      throw new Error('No project config in test');
+    },
+  },
+}));
+
+// Mock UserSettingsManager to prevent loading real user settings
+vi.mock('../user-settings.js', () => ({
+  UserSettingsManager: {
+    load: () => {
+      throw new Error('No user settings in test');
+    },
+  },
+}));
+
 // Mock rover-telemetry to avoid side effects
 vi.mock('rover-telemetry', () => ({
   default: {
@@ -136,6 +154,45 @@ describe('GlobalConfigManager', () => {
       vi.doUnmock('rover-telemetry');
       vi.resetModules();
     });
+
+    it('should derive attribution and agents from existing project config and user settings', async () => {
+      // Re-mock ProjectConfigManager to return valid config with attribution enabled
+      vi.doMock('../project-config.js', () => ({
+        ProjectConfigManager: {
+          load: () => ({
+            attribution: true,
+          }),
+        },
+      }));
+
+      // Re-mock UserSettingsManager to return valid settings with agents
+      vi.doMock('../user-settings.js', () => ({
+        UserSettingsManager: {
+          load: () => ({
+            aiAgents: [AI_AGENT.Claude, AI_AGENT.Gemini],
+          }),
+        },
+      }));
+
+      // Reset modules to pick up new mocks
+      vi.resetModules();
+
+      const { GlobalConfigManager: FreshManager } = await import(
+        '../global-config.js'
+      );
+      const config = FreshManager.createDefault();
+
+      // Should derive attribution from ProjectConfigManager
+      expect(config.attribution).toBe('enabled');
+
+      // Should derive agents from UserSettingsManager
+      expect(config.agents).toEqual([AI_AGENT.Claude, AI_AGENT.Gemini]);
+
+      // Restore original mocks
+      vi.doUnmock('../project-config.js');
+      vi.doUnmock('../user-settings.js');
+      vi.resetModules();
+    });
   });
 
   describe('load', () => {
@@ -211,7 +268,8 @@ describe('GlobalConfigManager', () => {
       const config = GlobalConfigManager.load();
 
       expect(config.projects).toHaveLength(1);
-      expect(config.projects[0]).toEqual(project);
+      // nextTaskId defaults to 1 when loaded from schema
+      expect(config.projects[0]).toEqual({ ...project, nextTaskId: 1 });
     });
 
     it('should not re-save config when version is current', () => {
@@ -496,6 +554,7 @@ describe('GlobalConfigManager', () => {
       languages: ['typescript'] as Language[],
       packageManagers: ['npm'] as PackageManager[],
       taskManagers: [] as TaskManager[],
+      nextTaskId: 1,
     });
 
     it('should add a new project', () => {
@@ -560,6 +619,7 @@ describe('GlobalConfigManager', () => {
       languages: ['typescript'] as Language[],
       packageManagers: ['npm'] as PackageManager[],
       taskManagers: [] as TaskManager[],
+      nextTaskId: 1,
     });
 
     it('should remove project by id', () => {
@@ -625,6 +685,7 @@ describe('GlobalConfigManager', () => {
       languages: ['typescript'] as Language[],
       packageManagers: ['npm'] as PackageManager[],
       taskManagers: [] as TaskManager[],
+      nextTaskId: 1,
     });
 
     it('should find project by id', () => {
@@ -664,6 +725,7 @@ describe('GlobalConfigManager', () => {
       languages: ['typescript'] as Language[],
       packageManagers: ['npm'] as PackageManager[],
       taskManagers: [] as TaskManager[],
+      nextTaskId: 1,
     });
 
     it('should find project by path', () => {
@@ -721,6 +783,7 @@ describe('GlobalConfigManager', () => {
         languages: [],
         packageManagers: [],
         taskManagers: [],
+        nextTaskId: 1,
       });
 
       // Original should be unchanged
@@ -948,6 +1011,7 @@ describe('GlobalConfigManager', () => {
         languages: ['typescript', 'python', 'rust', 'go'] as Language[],
         packageManagers: ['npm', 'pip', 'cargo', 'maven'] as PackageManager[],
         taskManagers: ['make', 'just'] as TaskManager[],
+        nextTaskId: 1,
       };
 
       config.addProject(project);

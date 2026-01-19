@@ -1,7 +1,8 @@
-import { basename } from 'node:path';
+import { basename, join } from 'node:path';
 import { Git } from '../git.js';
 import type { ProjectManager } from './project.js';
 import { ProjectStore, ProjectStoreLoadError } from './project-store.js';
+import { readFileSync } from 'node:fs';
 
 /**
  * Error thrown when not inside a git repository
@@ -97,8 +98,25 @@ export async function findOrRegisterProject(
   // Auto-register new project
   const projectName = deriveProjectName(git, projectRoot);
 
+  // Try to load the nextTaskID if available!
+  // @legacy
+  let initialTaskId = 1;
+
   try {
-    return await store.add(projectName, projectRoot, true);
+    const nextTaskId = readFileSync(
+      join(projectRoot, '.rover', 'task-counter.json'),
+      'utf-8'
+    );
+    initialTaskId = parseInt(JSON.parse(nextTaskId).nextId, 10) ?? 1;
+  } catch {
+    // Just keep the default value to 1
+  }
+
+  try {
+    return await store.add(projectName, projectRoot, {
+      autodetect: true,
+      initialTaskId: Number.isNaN(initialTaskId) ? 1 : initialTaskId,
+    });
   } catch (error) {
     throw new ProjectLoaderRegistrationError(
       `Failed to register project "${projectName}".`,

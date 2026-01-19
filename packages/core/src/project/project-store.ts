@@ -35,6 +35,13 @@ export class ProjectStoreRegistrationError extends Error {
   }
 }
 
+export interface AddProjectOptions {
+  /** Whether to autodetect languages and package managers */
+  autodetect?: boolean;
+  /** Initial Task ID */
+  initialTaskId?: number;
+}
+
 /**
  * Store for managing multiple projects in Rover.
  * Handles loading, adding, listing, and removing projects.
@@ -78,7 +85,7 @@ export class ProjectStore {
   async add(
     name: string,
     path: string,
-    autodetect: boolean = true
+    options: AddProjectOptions = {}
   ): Promise<ProjectManager> {
     const id = this.generateProjectID(name, path);
     const realPath = isAbsolute(path) ? path : resolve(path);
@@ -90,9 +97,10 @@ export class ProjectStore {
       languages: [],
       packageManagers: [],
       taskManagers: [],
+      nextTaskId: options.initialTaskId ?? 1,
     };
 
-    if (autodetect) {
+    if (options.autodetect) {
       try {
         const result = await detectEnvironment(realPath);
         project.languages = result.languages;
@@ -116,7 +124,7 @@ export class ProjectStore {
     }
 
     this.config.addProject(project);
-    return new ProjectManager(project, this.projectsPath);
+    return new ProjectManager(project, this.projectsPath, this.config);
   }
 
   /**
@@ -130,7 +138,7 @@ export class ProjectStore {
     if (!project) {
       return undefined;
     }
-    return new ProjectManager(project, this.projectsPath);
+    return new ProjectManager(project, this.projectsPath, this.config);
   }
 
   /**
@@ -145,7 +153,7 @@ export class ProjectStore {
     if (!project) {
       return undefined;
     }
-    return new ProjectManager(project, this.projectsPath);
+    return new ProjectManager(project, this.projectsPath, this.config);
   }
 
   /**

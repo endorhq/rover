@@ -3,16 +3,17 @@ import { join } from 'node:path';
 import { existsSync, mkdirSync } from 'node:fs';
 import { generateBranchName } from '../utils/branch-name.js';
 import {
-  TaskDescriptionManager,
   UserSettingsManager,
   IterationManager,
   AI_AGENT,
   Git,
+  findProjectRoot,
+  type ProjectManager,
 } from 'rover-core';
 import { TaskNotFoundError } from 'rover-schemas';
 import { exitWithError, exitWithSuccess } from '../utils/exit.js';
 import { createSandbox } from '../lib/sandbox/index.js';
-import { CLIJsonOutput } from '../types.js';
+import type { CLIJsonOutput } from '../types.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import {
   isJsonMode,
@@ -21,7 +22,6 @@ import {
 } from '../lib/context.js';
 import yoctoSpinner from 'yocto-spinner';
 import { copyEnvironmentFiles } from '../utils/env-files.js';
-import { findProjectRoot } from 'rover-core';
 
 /**
  * Interface for JSON output
@@ -61,8 +61,9 @@ export const restartCommand = async (
   }
 
   // Require project context
+  let project: ProjectManager;
   try {
-    await requireProjectContext();
+    project = await requireProjectContext();
   } catch (error) {
     jsonOutput.error = error instanceof Error ? error.message : String(error);
     await exitWithError(jsonOutput, { telemetry });
@@ -70,8 +71,11 @@ export const restartCommand = async (
   }
 
   try {
-    // Load task using TaskDescription
-    const task = TaskDescriptionManager.load(numericTaskId);
+    // Load task using ProjectManager
+    const task = project.getTask(numericTaskId);
+    if (!task) {
+      throw new TaskNotFoundError(numericTaskId);
+    }
 
     // Check if task is in NEW or FAILED status
     if (!task.isNew() && !task.isFailed()) {
@@ -109,19 +113,12 @@ export const restartCommand = async (
       selectedAiAgent = AI_AGENT.Claude;
     }
 
-    const taskPath = join(
-      findProjectRoot(),
-      '.rover',
-      'tasks',
-      numericTaskId.toString()
-    );
-
     // Setup git worktree and branch if not already set
     let worktreePath = task.worktreePath;
     let branchName = task.branchName;
 
     if (!worktreePath || !branchName) {
-      worktreePath = join(taskPath, 'workspace');
+      worktreePath = project.getWorkspacePath(numericTaskId);
       branchName = generateBranchName(numericTaskId);
 
       const spinner = !json
@@ -144,8 +141,7 @@ export const restartCommand = async (
 
     // Ensure iterations directory exists
     const iterationPath = join(
-      taskPath,
-      'iterations',
+      task.iterationsPath(),
       task.iterations.toString()
     );
     mkdirSync(iterationPath, { recursive: true });

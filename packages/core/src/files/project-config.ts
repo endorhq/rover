@@ -23,6 +23,7 @@ import { findProjectRoot } from '../project-root.js';
 
 /**
  * Manager class for project configuration (rover.json)
+ * @legacy
  */
 export class ProjectConfigManager {
   constructor(

@@ -4,7 +4,6 @@ import {
   mkdirSync,
   cpSync,
   existsSync,
-  readFileSync,
 } from 'node:fs';
 import { dirname, join } from 'node:path';
 import {
@@ -12,7 +11,6 @@ import {
   IterationManager,
   PreContextDataManager,
   ProjectConfigManager,
-  findProjectRoot,
   launchSync,
   VERBOSE,
 } from 'rover-core';
@@ -57,7 +55,8 @@ import { TaskSandboxPackage } from './sandbox/task-managers/task.js';
 export class SetupBuilder {
   private agent: string;
   private task: TaskDescriptionManager;
-  private taskDir: string;
+  private taskBasePath: string;
+  private iterationPath: string;
   private isDockerRootless: boolean;
   private projectConfig: ProjectConfigManager;
 
@@ -82,16 +81,12 @@ export class SetupBuilder {
 
     this.isDockerRootless = isDockerRootless;
 
-    // Ensures the task directory exists
-    const taskDir = join(
-      findProjectRoot(),
-      '.rover',
-      'tasks',
-      this.task.id.toString()
-    );
-    mkdirSync(taskDir, { recursive: true });
+    // Set up paths using TaskDescriptionManager methods
+    this.taskBasePath = this.task.getBasePath();
+    this.iterationPath = this.task.getIterationPath();
 
-    this.taskDir = taskDir;
+    // Ensures the directories exist
+    mkdirSync(this.iterationPath, { recursive: true });
   }
 
   /**
@@ -380,7 +375,7 @@ echo "======================================="
     });
 
     // Write script to file
-    const scriptPath = join(this.taskDir, entrypointFilename);
+    const scriptPath = join(this.iterationPath, entrypointFilename);
     writeFileSync(scriptPath, scriptContent.replace(/\r\n/g, '\n'), 'utf8');
 
     // Make script executable
@@ -399,7 +394,7 @@ echo "======================================="
       description: this.task.description,
     };
 
-    const inputsPath = join(this.taskDir, 'inputs.json');
+    const inputsPath = join(this.iterationPath, 'inputs.json');
     writeFileSync(inputsPath, JSON.stringify(inputs, null, 2), 'utf-8');
 
     return inputsPath;
@@ -409,8 +404,8 @@ echo "======================================="
    * Save the workflow file into the target task.
    */
   saveWorkflow(workflowName: string): string {
-    // Write script to file
-    const workflowTaskPath = join(this.taskDir, 'workflow.yml');
+    // Write workflow file to task base path (workflow cannot change between iterations)
+    const workflowTaskPath = join(this.taskBasePath, 'workflow.yml');
     const distDir = dirname(fileURLToPath(import.meta.url));
     let workflowPath;
 
@@ -543,7 +538,7 @@ echo "======================================="
 
     // Build pre-context data using PreContextDataManager
     const preContextManager = PreContextDataManager.create(
-      this.taskDir,
+      this.iterationPath,
       this.task.id.toString(),
       initialTask,
       previousIterations.length > 0 ? previousIterations : undefined,
@@ -552,21 +547,22 @@ echo "======================================="
 
     // Return array with the single pre-context file
     // This allows for future expansion to support multiple files
-    const preContextPath = join(this.taskDir, '__pre_context__.json');
+    const preContextPath = join(this.iterationPath, '__pre_context__.json');
     return [preContextPath];
   }
 
   /**
-   * Get the path where the setup script will be saved
+   * Get the path for an iteration-specific script file
    */
   getScriptPath(script: string): string {
-    return join(
-      findProjectRoot(),
-      '.rover',
-      'tasks',
-      this.task.id.toString(),
-      script
-    );
+    return join(this.iterationPath, script);
+  }
+
+  /**
+   * Get the path for a task-level file (not iteration-specific)
+   */
+  getTaskFilePath(filename: string): string {
+    return join(this.taskBasePath, filename);
   }
 
   /**

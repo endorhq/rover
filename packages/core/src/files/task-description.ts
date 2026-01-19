@@ -1,33 +1,35 @@
 /**
  * TaskDescriptionManager class - Centralized management of task metadata
+ *
+ * This class is path-agnostic: it receives the task's base path from the caller.
+ * Path resolution is handled by ProjectManager, which knows about central and legacy locations.
  */
-import {
-  readFileSync,
-  writeFileSync,
-  existsSync,
-  copyFileSync,
-  mkdirSync,
-  rmSync,
-  readdirSync,
-} from 'node:fs';
-import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import {
-  type TaskDescription,
-  type CreateTaskData,
-  type StatusMetadata,
-  type IterationMetadata,
-  type TaskStatus,
-  TaskNotFoundError,
-  TaskValidationError,
-  TaskSchemaError,
-  TaskFileError,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { join } from 'node:path';
+import {
   CURRENT_TASK_DESCRIPTION_SCHEMA_VERSION,
   TaskDescriptionSchema,
+  TaskFileError,
+  TaskNotFoundError,
+  TaskSchemaError,
+  TaskValidationError,
+  type CreateTaskData,
+  type IterationMetadata,
+  type StatusMetadata,
+  type TaskDescription,
+  type TaskStatus,
 } from 'rover-schemas';
-import { IterationManager } from './iteration.js';
-import { findProjectRoot } from '../project-root.js';
 import { VERBOSE } from '../verbose.js';
+import { IterationManager } from './iteration.js';
 
 /**
  * TaskDescriptionManager class - Centralized management of task metadata
@@ -35,21 +37,32 @@ import { VERBOSE } from '../verbose.js';
 export class TaskDescriptionManager {
   private data: TaskDescription;
   private taskId: number;
+  private basePath: string;
   private filePath: string;
 
-  constructor(data: TaskDescription, taskId: number) {
+  constructor(data: TaskDescription, taskId: number, basePath: string) {
     this.data = data;
     this.taskId = taskId;
-    this.filePath = this.getTaskDescriptionPath(taskId);
+    this.basePath = basePath;
+    this.filePath = join(basePath, 'description.json');
     this.validate();
   }
 
-  // Static factory methods
+  // ============================================================
+  // Static Factory Methods
+  // ============================================================
 
   /**
    * Create a new task with initial metadata
+   *
+   * @param basePath - Base path for the task directory
+   * @param taskData - Task creation data
+   * @returns TaskDescriptionManager instance
    */
-  static create(taskData: CreateTaskData): TaskDescriptionManager {
+  static create(
+    basePath: string,
+    taskData: CreateTaskData
+  ): TaskDescriptionManager {
     const now = new Date().toISOString();
     const uuid = taskData.uuid || randomUUID();
 
@@ -73,27 +86,24 @@ export class TaskDescriptionManager {
       version: CURRENT_TASK_DESCRIPTION_SCHEMA_VERSION,
     };
 
-    const instance = new TaskDescriptionManager(schema, taskData.id);
-
     // Ensure task directory exists
-    const taskDir = join(
-      findProjectRoot(),
-      '.rover',
-      'tasks',
-      taskData.id.toString()
-    );
-    mkdirSync(taskDir, { recursive: true });
+    mkdirSync(basePath, { recursive: true });
 
-    // Save the initial task
+    const instance = new TaskDescriptionManager(schema, taskData.id, basePath);
     instance.save();
     return instance;
   }
 
   /**
    * Load an existing task from disk
+   *
+   * @param basePath - Base path for the task directory
+   * @param taskId - Task ID
+   * @returns TaskDescriptionManager instance
+   * @throws TaskNotFoundError if task doesn't exist
    */
-  static load(taskId: number): TaskDescriptionManager {
-    const filePath = TaskDescriptionManager.getTaskDescriptionPath(taskId);
+  static load(basePath: string, taskId: number): TaskDescriptionManager {
+    const filePath = join(basePath, 'description.json');
 
     if (!existsSync(filePath)) {
       throw new TaskNotFoundError(taskId);
@@ -106,7 +116,11 @@ export class TaskDescriptionManager {
       // Migrate if necessary
       const migratedData = TaskDescriptionManager.migrate(parsedData, taskId);
 
-      const instance = new TaskDescriptionManager(migratedData, taskId);
+      const instance = new TaskDescriptionManager(
+        migratedData,
+        taskId,
+        basePath
+      );
 
       // If migration occurred, save the updated data
       if (migratedData.version !== parsedData.version) {
@@ -116,6 +130,9 @@ export class TaskDescriptionManager {
 
       return instance;
     } catch (error) {
+      if (error instanceof TaskNotFoundError) {
+        throw error;
+      }
       if (error instanceof SyntaxError) {
         throw new TaskSchemaError(
           `Invalid JSON in task ${taskId}: ${error.message}`
@@ -126,24 +143,19 @@ export class TaskDescriptionManager {
   }
 
   /**
-   * Check if a task exists
+   * Check if a task exists at the given path
+   *
+   * @param basePath - Base path for the task directory
+   * @returns true if task exists
    */
-  static exists(taskId: number): boolean {
-    const filePath = TaskDescriptionManager.getTaskDescriptionPath(taskId);
+  static exists(basePath: string): boolean {
+    const filePath = join(basePath, 'description.json');
     return existsSync(filePath);
   }
 
-  // Private static helper methods
-
-  private static getTaskDescriptionPath(taskId: number): string {
-    return join(
-      findProjectRoot(),
-      '.rover',
-      'tasks',
-      taskId.toString(),
-      'description.json'
-    );
-  }
+  // ============================================================
+  // Private Static Helper Methods
+  // ============================================================
 
   private static createBackup(filePath: string): void {
     const backupPath = `${filePath}.backup`;
@@ -236,11 +248,9 @@ export class TaskDescriptionManager {
     }
   }
 
-  private getTaskDescriptionPath(taskId: number): string {
-    return TaskDescriptionManager.getTaskDescriptionPath(taskId);
-  }
-
+  // ============================================================
   // CRUD Operations
+  // ============================================================
 
   /**
    * Save current data to disk
@@ -259,7 +269,7 @@ export class TaskDescriptionManager {
    * Reload data from disk
    */
   reload(): void {
-    const reloaded = TaskDescriptionManager.load(this.taskId);
+    const reloaded = TaskDescriptionManager.load(this.basePath, this.taskId);
     this.data = reloaded.data;
   }
 
@@ -276,7 +286,9 @@ export class TaskDescriptionManager {
     }
   }
 
+  // ============================================================
   // Status Management
+  // ============================================================
 
   /**
    * Set task status with optional metadata
@@ -380,7 +392,9 @@ export class TaskDescriptionManager {
     this.setStatus('IN_PROGRESS', { timestamp: restartTimestamp });
   }
 
+  // ============================================================
   // Iteration Management
+  // ============================================================
 
   /**
    * Increment iteration counter
@@ -416,7 +430,7 @@ export class TaskDescriptionManager {
         })
           .filter(dirent => dirent.isDirectory())
           .map(dirent => parseInt(dirent.name, 10))
-          .filter(num => !isNaN(num))
+          .filter(num => !Number.isNaN(num))
           .sort((a, b) => b - a); // Sort descending to get latest first
 
         iterationsIds.forEach(id => {
@@ -462,7 +476,7 @@ export class TaskDescriptionManager {
         })
           .filter(dirent => dirent.isDirectory())
           .map(dirent => parseInt(dirent.name, 10))
-          .filter(num => !isNaN(num))
+          .filter(num => !Number.isNaN(num))
           .sort((a, b) => b - a); // Sort descending to get latest first
 
         if (iterationsIds.length > 0) {
@@ -533,7 +547,9 @@ export class TaskDescriptionManager {
     }
   }
 
+  // ============================================================
   // Workspace Management
+  // ============================================================
 
   /**
    * Set workspace information
@@ -544,18 +560,34 @@ export class TaskDescriptionManager {
     this.save();
   }
 
-  // Other helpers
+  // ============================================================
+  // Path Helpers
+  // ============================================================
+
+  /**
+   * Get path to this task's iterations directory
+   */
   iterationsPath(): string {
-    return join(
-      findProjectRoot(),
-      '.rover',
-      'tasks',
-      this.taskId.toString(),
-      'iterations'
-    );
+    return join(this.basePath, 'iterations');
   }
 
+  /**
+   * Get path to the current iteration directory
+   */
+  getIterationPath(): string {
+    return join(this.iterationsPath(), this.data.iterations.toString());
+  }
+
+  /**
+   * Get the base path for this task
+   */
+  getBasePath(): string {
+    return this.basePath;
+  }
+
+  // ============================================================
   // Data Access (Getters)
+  // ============================================================
 
   get id(): number {
     return this.data.id;
@@ -648,7 +680,9 @@ export class TaskDescriptionManager {
     return this.data.agentImage;
   }
 
+  // ============================================================
   // Data Modification (Setters)
+  // ============================================================
 
   /**
    * Update task title
@@ -674,7 +708,9 @@ export class TaskDescriptionManager {
     this.save();
   }
 
+  // ============================================================
   // Docker Execution Management
+  // ============================================================
 
   /**
    * Set container execution information
@@ -715,7 +751,9 @@ export class TaskDescriptionManager {
     this.save();
   }
 
+  // ============================================================
   // Utility Methods
+  // ============================================================
 
   /**
    * Get raw JSON data
@@ -795,7 +833,9 @@ export class TaskDescriptionManager {
     return end.getTime() - start.getTime();
   }
 
+  // ============================================================
   // Validation
+  // ============================================================
 
   /**
    * Validate the task data using Zod schema

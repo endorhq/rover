@@ -3,10 +3,9 @@ import { existsSync } from 'node:fs';
 import { launch, launchSync } from 'rover-core';
 import yoctoSpinner from 'yocto-spinner';
 import { statusColor } from '../utils/task-status.js';
-import { TaskDescriptionManager } from 'rover-core';
 import { TaskNotFoundError } from 'rover-schemas';
 import { getTelemetry } from '../lib/telemetry.js';
-import { CLIJsonOutput } from '../types.js';
+import type { CLIJsonOutput } from '../types.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
 import { requireProjectContext } from '../lib/context.js';
 import {
@@ -38,8 +37,9 @@ export const shellCommand = async (
   }
 
   // Require project context
+  let project;
   try {
-    await requireProjectContext();
+    project = await requireProjectContext();
   } catch (error) {
     jsonOutput.error = error instanceof Error ? error.message : String(error);
     await exitWithError(jsonOutput, { telemetry });
@@ -47,8 +47,11 @@ export const shellCommand = async (
   }
 
   try {
-    // Load task using TaskDescription
-    const task = TaskDescriptionManager.load(numericTaskId);
+    // Load task using ProjectManager
+    const task = project.getTask(numericTaskId);
+    if (!task) {
+      throw new TaskNotFoundError(numericTaskId);
+    }
 
     const colorFunc = statusColor(task.status);
 

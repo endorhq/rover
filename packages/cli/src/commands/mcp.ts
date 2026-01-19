@@ -38,7 +38,7 @@ export const mcpCommand = async () => {
     const oldProcessExit = process.exit;
     let commandOutput = '';
 
-    console.log = function (...args) {
+    console.log = (...args) => {
       commandOutput +=
         args
           .map(arg => (typeof arg === 'string' ? arg : JSON.stringify(arg)))
@@ -56,10 +56,10 @@ export const mcpCommand = async () => {
     }
 
     // Intercept process.exit calls to prevent actual exit
-    process.exit = function (code?: number) {
+    process.exit = ((code?: number) => {
       // Don't actually exit, just throw an exception that we catch
       throw new ExceptionAsProcessExit(code);
-    } as any;
+    }) as any;
 
     try {
       await command(...args, { ...options, json: true });

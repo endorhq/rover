@@ -2,9 +2,28 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { clearProjectRootCache } from 'rover-core';
+import { clearProjectRootCache, TaskDescriptionManager } from 'rover-core';
 import { logsCommand } from '../logs.js';
-import { TaskDescriptionManager } from 'rover-core';
+
+// Store testDir for context mock
+let testDir: string;
+
+// Mock context to return a mock ProjectManager
+vi.mock('../../lib/context.js', () => ({
+  requireProjectContext: vi.fn().mockImplementation(() => {
+    return Promise.resolve({
+      getTask: (taskId: number) => {
+        const taskPath = join(testDir, '.rover', 'tasks', taskId.toString());
+        if (TaskDescriptionManager.exists(taskPath)) {
+          return TaskDescriptionManager.load(taskPath, taskId);
+        }
+        return undefined;
+      },
+    });
+  }),
+  isJsonMode: vi.fn().mockReturnValue(false),
+  setJsonMode: vi.fn(),
+}));
 
 // Mock external dependencies
 vi.mock('../../lib/telemetry.js', () => ({
@@ -46,14 +65,13 @@ vi.mock('rover-core', async () => {
 });
 
 describe('logs command', () => {
-  let testDir: string;
   let originalCwd: string;
 
   beforeEach(async () => {
     // Clear project root cache to ensure tests use the correct directory
     clearProjectRootCache();
 
-    // Create temp directory with git repo
+    // Create temp directory with git repo (update module-level testDir for mock)
     testDir = mkdtempSync(join(tmpdir(), 'rover-logs-test-'));
     originalCwd = process.cwd();
     process.chdir(testDir);
@@ -104,7 +122,8 @@ describe('logs command', () => {
     title: string = 'Test Task',
     containerId?: string
   ) => {
-    const task = TaskDescriptionManager.create({
+    const taskPath = join(testDir, '.rover', 'tasks', id.toString());
+    const task = TaskDescriptionManager.create(taskPath, {
       id,
       title,
       description: 'Test task description',

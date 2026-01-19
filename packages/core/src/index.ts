@@ -80,7 +80,6 @@ export {
   IterationManager,
   PreContextDataManager,
   ProjectConfigManager,
-  TaskDescriptionStore,
   TaskDescriptionManager,
   UserSettingsManager,
   WorkflowStore,
