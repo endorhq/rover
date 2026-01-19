@@ -241,7 +241,7 @@ Add network configuration to your `rover.json` file:
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `mode` | `"allowlist"` \| `"blocklist"` \| `"none"` | `"none"` | Network filtering mode |
+| `mode` | `"allowlist"` \| `"blocklist"` \| `"allowall"` | `"allowall"` | Network filtering mode |
 | `rules` | `Array<{host, description?}>` | `[]` | List of hosts (domain, IP, or CIDR) |
 | `allowDns` | `boolean` | `true` | Allow DNS resolution (port 53) |
 | `allowLocalhost` | `boolean` | `true` | Allow localhost/loopback traffic |
@@ -262,14 +262,14 @@ rover task "implement feature" --network-mode blocklist \
   --network-block ads.example.com
 
 # Disable network filtering (default)
-rover task "implement feature" --network-mode none
+rover task "implement feature" --network-mode allowall
 ```
 
 **CLI options:**
 
 | Option | Description |
 |--------|-------------|
-| `--network-mode <mode>` | Set network filtering mode: `allowlist`, `blocklist`, or `none` |
+| `--network-mode <mode>` | Set network filtering mode: `allowlist`, `blocklist`, or `allowall` |
 | `--network-allow <host>` | Allow a host (can be repeated). Implies `allowlist` mode if no mode specified |
 | `--network-block <host>` | Block a host (can be repeated). Implies `blocklist` mode if no mode specified |
 

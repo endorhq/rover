@@ -110,7 +110,7 @@ export class PodmanSandbox extends Sandbox {
       projectConfig.network,
       this.task.networkConfig
     );
-    if (effectiveNetworkConfig && effectiveNetworkConfig.mode !== 'none') {
+    if (effectiveNetworkConfig && effectiveNetworkConfig.mode !== 'allowall') {
       podmanArgs.push('--cap-add=NET_ADMIN');
     }
 

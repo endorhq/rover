@@ -3,6 +3,7 @@
  * Handles generation of iptables rules for network filtering.
  */
 
+import { isIPv4 as nodeIsIPv4, isIPv6 as nodeIsIPv6, isIP } from 'node:net';
 import type { NetworkConfig, NetworkRule } from 'rover-schemas';
 
 /**
@@ -23,19 +24,59 @@ export function mergeNetworkConfig(
 }
 
 /**
- * Check if a string is a valid IPv4 address.
+ * Check if a string is a valid CIDR notation.
+ * Returns { valid: boolean, isV6: boolean } for valid CIDRs.
  */
-function isIPv4(host: string): boolean {
-  const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}(\/\d{1,2})?$/;
-  return ipv4Regex.test(host);
+function parseCIDR(host: string): { valid: boolean; isV6: boolean } | null {
+  if (!host.includes('/')) {
+    return null;
+  }
+
+  const parts = host.split('/');
+  if (parts.length !== 2) {
+    return null;
+  }
+
+  const [ip, prefixStr] = parts;
+  const ipVersion = isIP(ip);
+
+  if (ipVersion === 0) {
+    return null;
+  }
+
+  const prefix = parseInt(prefixStr, 10);
+  if (isNaN(prefix) || prefix < 0) {
+    return null;
+  }
+
+  const maxPrefix = ipVersion === 6 ? 128 : 32;
+  if (prefix > maxPrefix) {
+    return null;
+  }
+
+  return { valid: true, isV6: ipVersion === 6 };
 }
 
 /**
- * Check if a string is a valid IPv6 address.
+ * Check if a string is an IPv4 address (with optional CIDR).
+ */
+function isIPv4(host: string): boolean {
+  if (host.includes('/')) {
+    const cidr = parseCIDR(host);
+    return cidr !== null && !cidr.isV6;
+  }
+  return nodeIsIPv4(host);
+}
+
+/**
+ * Check if a string is an IPv6 address (with optional CIDR).
  */
 function isIPv6(host: string): boolean {
-  // Simple check for IPv6 - contains colons
-  return host.includes(':') && !host.includes('://');
+  if (host.includes('/')) {
+    const cidr = parseCIDR(host);
+    return cidr !== null && cidr.isV6;
+  }
+  return nodeIsIPv6(host);
 }
 
 /**
@@ -52,7 +93,7 @@ function isIPOrCIDR(host: string): boolean {
 export function generateNetworkScript(
   config: NetworkConfig | undefined
 ): string {
-  if (!config || config.mode === 'none') {
+  if (!config || config.mode === 'allowall') {
     return '';
   }
 
@@ -263,23 +304,9 @@ export function validateNetworkRules(
 
     // Validate CIDR notation if present
     if (host.includes('/')) {
-      const parts = host.split('/');
-      if (parts.length !== 2) {
+      const cidr = parseCIDR(host);
+      if (cidr === null) {
         errors.push(`Invalid CIDR notation: ${host}`);
-        continue;
-      }
-
-      const prefix = parseInt(parts[1], 10);
-      if (isNaN(prefix)) {
-        errors.push(`Invalid CIDR prefix: ${host}`);
-        continue;
-      }
-
-      // IPv4 prefix should be 0-32, IPv6 prefix should be 0-128
-      const isV6 = host.includes(':');
-      const maxPrefix = isV6 ? 128 : 32;
-      if (prefix < 0 || prefix > maxPrefix) {
-        errors.push(`CIDR prefix out of range: ${host}`);
       }
     }
   }

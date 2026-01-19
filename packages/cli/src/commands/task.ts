@@ -16,7 +16,7 @@ import {
   type ProjectManager,
   VERBOSE,
 } from 'rover-core';
-import type { NetworkConfig } from 'rover-schemas';
+import type { NetworkConfig, NetworkMode } from 'rover-schemas';
 import {
   parseAgentString,
   formatAgentWithModel,
@@ -213,7 +213,7 @@ interface TaskOptions {
   json?: boolean;
   debug?: boolean;
   sandboxExtraArgs?: string;
-  networkMode?: 'allowlist' | 'blocklist' | 'none';
+  networkMode?: NetworkMode;
   networkAllow?: string[];
   networkBlock?: string[];
 }
@@ -232,7 +232,7 @@ const buildNetworkConfig = (
   }
 
   // Determine the mode
-  let mode: 'allowlist' | 'blocklist' | 'none' = 'none';
+  let mode: NetworkMode = 'allowall';
   if (networkMode) {
     mode = networkMode;
   } else if (networkAllow?.length) {

@@ -130,7 +130,7 @@ export class DockerSandbox extends Sandbox {
       projectConfig.network,
       this.task.networkConfig
     );
-    if (effectiveNetworkConfig && effectiveNetworkConfig.mode !== 'none') {
+    if (effectiveNetworkConfig && effectiveNetworkConfig.mode !== 'allowall') {
       dockerArgs.push('--cap-add=NET_ADMIN');
     }
 

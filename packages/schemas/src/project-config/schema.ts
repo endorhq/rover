@@ -63,7 +63,12 @@ export const TaskManagerSchema = z.enum(['just', 'make', 'task']);
 /**
  * Network filtering mode
  */
-export const NetworkModeSchema = z.enum(['allowlist', 'blocklist', 'none']);
+export const NetworkModeSchema = z.enum(['allowlist', 'blocklist', 'allowall']);
+
+/**
+ * Network mode values as an array for CLI choices
+ */
+export const NETWORK_MODE_VALUES = NetworkModeSchema.options;
 
 /**
  * Network rule entry - can be domain name, IP, or CIDR
@@ -79,8 +84,8 @@ export const NetworkRuleSchema = z.object({
  * Network filtering configuration for container sandboxes
  */
 export const NetworkConfigSchema = z.object({
-  /** Filtering mode: allowlist (deny all except), blocklist (allow all except), or none */
-  mode: NetworkModeSchema.default('none'),
+  /** Filtering mode: allowlist (deny all except), blocklist (allow all except), or allowall (no filtering) */
+  mode: NetworkModeSchema.default('allowall'),
   /** List of network rules (domains, IPs, or CIDRs) */
   rules: z.array(NetworkRuleSchema).default([]),
   /** Allow DNS resolution (always recommended, defaults to true) */

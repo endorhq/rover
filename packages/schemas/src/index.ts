@@ -130,6 +130,7 @@ export {
   CURRENT_PROJECT_SCHEMA_VERSION,
   PROJECT_CONFIG_FILENAME,
   ProjectConfigSchema,
+  NETWORK_MODE_VALUES,
 } from './project-config/schema.js';
 
 // User Settings library

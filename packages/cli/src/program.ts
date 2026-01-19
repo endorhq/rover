@@ -9,6 +9,7 @@ import {
   findOrRegisterProject,
   ProjectLoaderNotGitRepoError,
 } from 'rover-core';
+import { NETWORK_MODE_VALUES } from 'rover-schemas';
 import { initCommand } from './commands/init.js';
 import { listCommand } from './commands/list.js';
 import { exitWithError } from './utils/exit.js';
@@ -169,7 +170,7 @@ export function createProgram(
       new Option(
         '--network-mode <mode>',
         'Network filtering mode for the container'
-      ).choices(['allowlist', 'blocklist', 'none'])
+      ).choices(NETWORK_MODE_VALUES)
     )
     .option(
       '--network-allow <host>',
