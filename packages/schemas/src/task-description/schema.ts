@@ -19,6 +19,18 @@ export const TaskStatusSchema = z.enum([
   'PUSHED',
 ]);
 
+// Source type schema for task origin tracking
+export const SourceTypeSchema = z.enum(['github', 'manual']);
+
+// Task source schema - tracks where a task originated from
+export const TaskSourceSchema = z.object({
+  type: SourceTypeSchema,
+  id: z.string().optional(),
+  url: z.string().url().optional(),
+  title: z.string().optional(),
+  ref: z.record(z.unknown()).optional(),
+});
+
 // Task description schema
 export const TaskDescriptionSchema = z.object({
   // Core Identity
@@ -68,13 +80,8 @@ export const TaskDescriptionSchema = z.object({
   // Network configuration override for this task
   networkConfig: NetworkConfigSchema.optional(),
 
-  // GitHub Issue (when task created via --from-github)
-  githubIssue: z
-    .object({
-      number: z.number().int().positive(),
-      repository: z.string().min(1), // "owner/repo" format
-    })
-    .optional(),
+  // Task source (origin tracking - github, manual, etc.)
+  source: TaskSourceSchema.optional(),
 
   // Metadata
   version: z.string(),

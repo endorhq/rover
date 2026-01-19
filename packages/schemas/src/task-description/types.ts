@@ -12,10 +12,16 @@ export type TaskStatus = z.infer<typeof TaskStatusSchema>;
 // Infer TaskDescriptionSchema type from Zod schema
 export type TaskDescription = z.infer<typeof TaskDescriptionSchema>;
 
-// GitHub issue reference for tasks created via --from-github
-export interface GitHubIssueRef {
-  number: number; // Issue number (e.g., 123)
-  repository: string; // "owner/repo" format
+// Source types for task origin tracking
+export type SourceType = 'github' | 'manual';
+
+// Task source - tracks where a task originated from
+export interface TaskSource {
+  type: SourceType; // Source type: 'github', 'manual', etc.
+  id?: string; // Source-specific identifier (e.g., "123", "ENG-123")
+  url?: string; // Human-readable URL for the source
+  title?: string; // Human-readable title/context
+  ref?: Record<string, unknown>; // Source-specific data for API calls
 }
 
 // Data required to create a new task
@@ -30,7 +36,7 @@ export interface CreateTaskData {
   agentModel?: string; // AI model to use (e.g., opus, sonnet, flash)
   sourceBranch?: string; // Source branch task was created from
   networkConfig?: NetworkConfig; // Network filtering config (overrides project config)
-  githubIssue?: GitHubIssueRef; // GitHub issue this task was created from
+  source?: TaskSource; // Source of the task (github, manual, etc.)
 }
 
 // Metadata for status updates

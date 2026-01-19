@@ -92,7 +92,8 @@ export {
   type CreateTaskData,
   type StatusMetadata,
   type IterationMetadata,
-  type GitHubIssueRef,
+  type TaskSource,
+  type SourceType,
 } from './task-description/types.js';
 
 export {
@@ -105,6 +106,8 @@ export {
 export {
   CURRENT_TASK_DESCRIPTION_SCHEMA_VERSION,
   TaskDescriptionSchema,
+  SourceTypeSchema,
+  TaskSourceSchema,
 } from './task-description/schema.js';
 
 // Project Config library

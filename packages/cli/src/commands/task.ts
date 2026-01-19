@@ -271,7 +271,13 @@ const createTaskForAgent = async (
   git: Git,
   jsonMode: boolean,
   networkConfig?: NetworkConfig,
-  githubIssue?: { number: number; repository: string }
+  source?: {
+    type: 'github' | 'manual';
+    id?: string;
+    url?: string;
+    title?: string;
+    ref?: Record<string, unknown>;
+  }
 ): Promise<{
   taskId: number;
   title: string;
@@ -320,7 +326,7 @@ const createTaskForAgent = async (
     agentModel: selectedModel,
     sourceBranch: sourceBranch,
     networkConfig: networkConfig,
-    githubIssue: githubIssue,
+    source: source,
   });
 
   const taskId = task.id;
@@ -552,8 +558,16 @@ export const taskCommand = async (
     requiredInputs.length === 1 && requiredInputs[0] === 'description';
   const inputsData: Map<string, string> = new Map();
 
-  // GitHub issue reference (populated when --from-github is used)
-  let githubIssueRef: { number: number; repository: string } | undefined;
+  // Task source (populated when --from-github is used)
+  let taskSource:
+    | {
+        type: 'github' | 'manual';
+        id?: string;
+        url?: string;
+        title?: string;
+        ref?: Record<string, unknown>;
+      }
+    | undefined;
 
   // Validate branch option and check for uncommitted changes
   const git = new Git({ cwd: project.path });
@@ -616,9 +630,16 @@ export const taskCommand = async (
       // Extract repo info for storing with the task
       const repoInfo = github.getGitHubRepoInfo(remoteUrl);
       if (repoInfo) {
-        githubIssueRef = {
-          number: parseInt(fromGithub, 10),
-          repository: `${repoInfo.owner}/${repoInfo.repo}`,
+        const issueNumber = parseInt(fromGithub, 10);
+        taskSource = {
+          type: 'github',
+          id: fromGithub,
+          url: `https://github.com/${repoInfo.owner}/${repoInfo.repo}/issues/${issueNumber}`,
+          ref: {
+            owner: repoInfo.owner,
+            repo: repoInfo.repo,
+            number: issueNumber,
+          },
         };
       }
 
@@ -872,7 +893,7 @@ export const taskCommand = async (
         git,
         json || false,
         networkConfig,
-        githubIssueRef
+        taskSource
       );
 
       if (taskResult) {
