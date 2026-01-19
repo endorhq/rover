@@ -11,6 +11,7 @@ import {
   RequestPermissionRequest,
   RequestPermissionResponse,
   SessionNotification,
+  TerminalExitStatus,
   TerminalOutputRequest,
   TerminalOutputResponse,
   WaitForTerminalExitRequest,
@@ -18,17 +19,59 @@ import {
   WriteTextFileRequest,
   WriteTextFileResponse,
 } from '@agentclientprotocol/sdk';
+import colors from 'ansi-colors';
+import { execa, parseCommandString, type ResultPromise } from 'execa';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { VERBOSE } from 'rover-core';
 
+// Custom JSON replacer to handle BigInt values
+function jsonReplacer(_key: string, value: unknown): unknown {
+  if (typeof value === 'bigint') {
+    return Number(value);
+  }
+  return value;
+}
+
+interface TerminalState {
+  process: ResultPromise;
+  output: string;
+  outputByteLimit: number | null;
+  truncated: boolean;
+  exitStatus: TerminalExitStatus | null;
+  exitPromise: Promise<void>;
+}
+
+const terminals = new Map<string, TerminalState>();
+let terminalCounter = 0;
+
 export class ACPClient implements Client {
+  private capturedMessages: string = '';
+  private isCapturing: boolean = false;
+
+  /**
+   * Start capturing agent messages from session updates
+   */
+  startCapturing(): void {
+    this.capturedMessages = '';
+    this.isCapturing = true;
+  }
+
+  /**
+   * Stop capturing and return accumulated messages
+   */
+  stopCapturing(): string {
+    this.isCapturing = false;
+    const messages = this.capturedMessages;
+    this.capturedMessages = '';
+    return messages;
+  }
   requestPermission(
     params: RequestPermissionRequest
   ): Promise<RequestPermissionResponse> {
     if (VERBOSE) {
       console.log(
-        '[Client] Request permission called with:',
-        JSON.stringify(params, null, 2)
+        colors.gray('[Client] Request permission called with:'),
+        colors.cyan(JSON.stringify(params, jsonReplacer, 2))
       );
     }
 
@@ -46,16 +89,27 @@ export class ACPClient implements Client {
     switch (update.sessionUpdate) {
       case 'agent_message_chunk':
         if (update.content.type === 'text') {
-          process.stdout.write(update.content.text);
+          // Capture agent messages when capturing is enabled
+          if (this.isCapturing) {
+            this.capturedMessages += update.content.text;
+          }
+          if (VERBOSE) {
+            process.stdout.write(update.content.text);
+          }
         } else {
-          console.log(`[${update.content.type}]`);
+          if (VERBOSE) {
+            console.log(colors.gray(`[${update.content.type}]`));
+          }
         }
         break;
       case 'tool_call':
         if (VERBOSE) {
           console.log(
-            `🔧 ${update.title} (${update.status}) ID: ${update.toolCallId}`
+            colors.gray(`🔧 ${update.title} (${update.status}) ID: `) +
+              colors.cyan(update.toolCallId)
           );
+        } else if (update.status === 'in_progress') {
+          process.stdout.write(colors.gray(`⚙️  ${update.title}`));
         }
         break;
       case 'tool_call_update':
@@ -64,33 +118,53 @@ export class ACPClient implements Client {
           const titleStr = update.title ? `title: ${update.title}` : '';
           const parts = [statusStr, titleStr].filter(Boolean).join(', ');
           console.log(
-            `🔧 Update: \`${update.toolCallId}\`${parts ? ` - ${parts}` : ''}\n`
+            colors.gray(`🔧 Update: `) +
+              colors.cyan(update.toolCallId) +
+              colors.gray(parts ? ` - ${parts}` : '')
           );
+        } else if (update.status === 'completed') {
+          process.stdout.write(colors.green('.'));
+        } else if (update.status === 'failed') {
+          process.stdout.write(colors.red('.'));
         }
         break;
       case 'agent_thought_chunk':
-        if (update.content.type === 'text') {
-          console.log('[thinking...]', update.content.text);
-        } else {
-          console.log(`[${update.content.type}]`);
+        if (VERBOSE) {
+          if (update.content.type === 'text') {
+            console.log(colors.gray('[thinking...]'), update.content.text);
+          } else {
+            console.log(colors.gray(`[${update.content.type}]`));
+          }
         }
         break;
+      case 'available_commands_update':
       case 'plan':
       case 'user_message_chunk':
-        console.log(`[${update.sessionUpdate}]`);
+      case 'current_mode_update':
+      case 'config_option_update':
+      case 'session_info_update':
+        if (VERBOSE) {
+          console.log(colors.gray(`[${update.sessionUpdate}]`));
+        }
         break;
-      default:
-        console.log(
-          `[Unknown session update: ${JSON.stringify(update, null, 2)}]`
-        );
+      default: {
+        const exhaustiveCheck: never = update;
+        if (VERBOSE) {
+          console.log(
+            colors.yellow(
+              `[Unknown session update: ${JSON.stringify(exhaustiveCheck, jsonReplacer, 2)}]`
+            )
+          );
+        }
         break;
+      }
     }
   }
   writeTextFile?(params: WriteTextFileRequest): Promise<WriteTextFileResponse> {
     if (VERBOSE) {
       console.log(
-        '[Client] Write text file called with:',
-        JSON.stringify(params, null, 2)
+        colors.gray('[Client] Write text file called with:'),
+        colors.cyan(JSON.stringify(params, jsonReplacer, 2))
       );
     }
     writeFileSync(params.path, params.content);
@@ -99,8 +173,8 @@ export class ACPClient implements Client {
   readTextFile?(params: ReadTextFileRequest): Promise<ReadTextFileResponse> {
     if (VERBOSE) {
       console.log(
-        '[Client] Read text file called with:',
-        JSON.stringify(params, null, 2)
+        colors.gray('[Client] Read text file called with:'),
+        colors.cyan(JSON.stringify(params, jsonReplacer, 2))
       );
     }
 
@@ -121,56 +195,202 @@ export class ACPClient implements Client {
   createTerminal?(
     params: CreateTerminalRequest
   ): Promise<CreateTerminalResponse> {
-    console.error(
-      '[Client] Create terminal called with:',
-      JSON.stringify(params, null, 2)
-    );
-    throw new Error('Method not implemented.');
+    if (VERBOSE) {
+      console.log(
+        colors.gray('[Client] Create terminal called with:'),
+        colors.cyan(JSON.stringify(params, jsonReplacer, 2))
+      );
+    }
+
+    const terminalId = `terminal-${++terminalCounter}`;
+
+    // Convert env array to object, filtering out undefined values
+    const envObj: Record<string, string> = {};
+    for (const [key, value] of Object.entries(process.env)) {
+      if (value !== undefined) {
+        envObj[key] = value;
+      }
+    }
+    if (params.env) {
+      for (const { name, value } of params.env) {
+        envObj[name] = value;
+      }
+    }
+
+    // Split command into executable and arguments if args not provided
+    let command: string;
+    let args: string[];
+
+    if (params.args && params.args.length > 0) {
+      // Args explicitly provided, use command as-is
+      command = params.command;
+      args = params.args;
+    } else {
+      // No args provided, split the command string using execa's parser
+      const [parsedCommand, ...parsedArgs] = parseCommandString(params.command);
+      command = parsedCommand;
+      args = parsedArgs;
+    }
+
+    const childProcess = execa(command, args, {
+      cwd: params.cwd ?? undefined,
+      env: envObj,
+      reject: false,
+      all: true,
+    });
+
+    const state: TerminalState = {
+      process: childProcess,
+      output: '',
+      outputByteLimit:
+        params.outputByteLimit !== undefined
+          ? Number(params.outputByteLimit)
+          : null,
+      truncated: false,
+      exitStatus: null,
+      exitPromise: Promise.resolve(),
+    };
+
+    // Capture combined stdout/stderr
+    if (childProcess.all) {
+      childProcess.all.on('data', (chunk: Buffer) => {
+        const text = chunk.toString();
+        state.output += text;
+
+        // Apply byte limit with truncation from the beginning
+        if (
+          state.outputByteLimit !== null &&
+          Buffer.byteLength(state.output, 'utf-8') > state.outputByteLimit
+        ) {
+          state.truncated = true;
+          // Truncate from the beginning to stay within limit
+          while (
+            Buffer.byteLength(state.output, 'utf-8') > state.outputByteLimit
+          ) {
+            // Remove characters from the beginning until we're under the limit
+            // Find a character boundary to avoid breaking multi-byte characters
+            const idx = state.output.indexOf('\n');
+            if (idx !== -1 && idx < state.output.length / 2) {
+              // Remove up to the first newline for cleaner truncation
+              state.output = state.output.slice(idx + 1);
+            } else {
+              // Remove one character at a time
+              state.output = state.output.slice(1);
+            }
+          }
+        }
+      });
+    }
+
+    // Set up exit promise
+    state.exitPromise = childProcess.then(result => {
+      state.exitStatus = {
+        exitCode: result.exitCode ?? null,
+        signal: result.signal ?? null,
+      };
+    });
+
+    terminals.set(terminalId, state);
+
+    return Promise.resolve({ terminalId });
   }
   terminalOutput?(
     params: TerminalOutputRequest
   ): Promise<TerminalOutputResponse> {
-    console.error(
-      '[Client] Terminal output called with:',
-      JSON.stringify(params, null, 2)
-    );
-    throw new Error('Method not implemented.');
+    if (VERBOSE) {
+      console.log(
+        colors.gray('[Client] Terminal output called with:'),
+        colors.cyan(JSON.stringify(params, jsonReplacer, 2))
+      );
+    }
+
+    const state = terminals.get(params.terminalId);
+    if (!state) {
+      throw new Error(`Terminal not found: ${params.terminalId}`);
+    }
+
+    return Promise.resolve({
+      output: state.output,
+      truncated: state.truncated,
+      exitStatus: state.exitStatus,
+    });
   }
   releaseTerminal?(
     params: ReleaseTerminalRequest
   ): Promise<ReleaseTerminalResponse | void> {
-    console.error(
-      '[Client] Release terminal called with:',
-      JSON.stringify(params, null, 2)
-    );
-    throw new Error('Method not implemented.');
+    if (VERBOSE) {
+      console.log(
+        colors.gray('[Client] Release terminal called with:'),
+        colors.cyan(JSON.stringify(params, jsonReplacer, 2))
+      );
+    }
+
+    const state = terminals.get(params.terminalId);
+    if (!state) {
+      throw new Error(`Terminal not found: ${params.terminalId}`);
+    }
+
+    // Kill the process if still running
+    if (state.exitStatus === null) {
+      state.process.kill();
+    }
+
+    // Remove from tracking
+    terminals.delete(params.terminalId);
+
+    return Promise.resolve({});
   }
-  waitForTerminalExit?(
+  async waitForTerminalExit?(
     params: WaitForTerminalExitRequest
   ): Promise<WaitForTerminalExitResponse> {
-    console.error(
-      '[Client] Wait for terminal exit called with:',
-      JSON.stringify(params, null, 2)
-    );
-    throw new Error('Method not implemented.');
+    if (VERBOSE) {
+      console.log(
+        colors.gray('[Client] Wait for terminal exit called with:'),
+        colors.cyan(JSON.stringify(params, jsonReplacer, 2))
+      );
+    }
+
+    const state = terminals.get(params.terminalId);
+    if (!state) {
+      throw new Error(`Terminal not found: ${params.terminalId}`);
+    }
+
+    // Wait for the process to exit
+    await state.exitPromise;
+
+    return {
+      exitCode: state.exitStatus?.exitCode ?? null,
+      signal: state.exitStatus?.signal ?? null,
+    };
   }
   killTerminal?(
     params: KillTerminalCommandRequest
   ): Promise<KillTerminalCommandResponse | void> {
-    console.error(
-      '[Client] Kill terminal called with:',
-      JSON.stringify(params, null, 2)
-    );
-    throw new Error('Method not implemented.');
+    if (VERBOSE) {
+      console.log(
+        colors.gray('[Client] Kill terminal called with:'),
+        colors.cyan(JSON.stringify(params, jsonReplacer, 2))
+      );
+    }
+
+    const state = terminals.get(params.terminalId);
+    if (!state) {
+      throw new Error(`Terminal not found: ${params.terminalId}`);
+    }
+
+    // Kill the process (sends SIGTERM by default)
+    state.process.kill();
+
+    return Promise.resolve({});
   }
   extMethod?(
     method: string,
     params: Record<string, unknown>
   ): Promise<Record<string, unknown>> {
     console.error(
-      '[Client] Ext method called with:',
-      method,
-      JSON.stringify(params, null, 2)
+      colors.red('[Client] Ext method called with:'),
+      colors.cyan(method),
+      colors.cyan(JSON.stringify(params, jsonReplacer, 2))
     );
     throw new Error('Method not implemented.');
   }
@@ -179,9 +399,9 @@ export class ACPClient implements Client {
     params: Record<string, unknown>
   ): Promise<void> {
     console.error(
-      '[Client] Ext notification called with:',
-      method,
-      JSON.stringify(params, null, 2)
+      colors.red('[Client] Ext notification called with:'),
+      colors.cyan(method),
+      colors.cyan(JSON.stringify(params, jsonReplacer, 2))
     );
     throw new Error('Method not implemented.');
   }

@@ -51,27 +51,8 @@ function getACPSpawnCommand(tool: string): { command: string; args: string[] } {
         command: 'npx',
         args: ['-y', '@zed-industries/claude-code-acp'],
       };
-    case 'gemini':
-      return {
-        command: 'npx',
-        args: ['-y', '@google/gemini-cli@0.17.1', '--experimental-acp'],
-      };
-    case 'qwen':
-      return {
-        command: 'npx',
-        args: ['-y', '@qwen-code/qwen-code@latest', '--experimental-acp'],
-      };
-    case 'codex':
-      return {
-        command: 'npx',
-        args: ['-y', '@zed-industries/codex-acp'],
-      };
     default:
-      // Default to claude-code-acp as it's the most common
-      return {
-        command: 'npx',
-        args: ['-y', '@zed-industries/claude-code-acp'],
-      };
+      throw new Error(`No ACP available for tool ${tool}`);
   }
 }
 
@@ -86,6 +67,7 @@ export class ACPRunner {
   // ACP connection state
   private agentProcess: ChildProcess | null = null;
   private connection: ClientSideConnection | null = null;
+  private client: ACPClient | null = null;
   private sessionId: string | null = null;
   private isConnectionInitialized: boolean = false;
   private isSessionCreated: boolean = false;
@@ -121,9 +103,18 @@ export class ACPRunner {
 
     // Spawn the agent as a subprocess
     this.agentProcess = spawn(spawnConfig.command, spawnConfig.args, {
-      stdio: ['pipe', 'pipe', 'inherit'],
+      stdio: ['pipe', 'pipe', 'pipe'],
       env: process.env,
     });
+
+    // Forward stderr only in verbose mode
+    if (this.agentProcess.stderr) {
+      this.agentProcess.stderr.on('data', (chunk: Buffer) => {
+        if (VERBOSE) {
+          process.stderr.write(chunk);
+        }
+      });
+    }
 
     if (!this.agentProcess.stdin || !this.agentProcess.stdout) {
       throw new Error('Failed to spawn agent process with proper I/O streams');
@@ -136,9 +127,9 @@ export class ACPRunner {
     ) as ReadableStream<Uint8Array>;
 
     // Create the client connection
-    const client = new ACPClient();
+    this.client = new ACPClient();
     const stream = ndJsonStream(input, output);
-    this.connection = new ClientSideConnection(_agent => client, stream);
+    this.connection = new ClientSideConnection(_agent => this.client!, stream);
 
     try {
       // Initialize the connection (protocol handshake)
@@ -149,6 +140,7 @@ export class ACPRunner {
             readTextFile: true,
             writeTextFile: true,
           },
+          terminal: true,
         },
       });
 
@@ -211,7 +203,9 @@ export class ACPRunner {
    * Send a prompt to the current session
    * Maps to the ACP session/prompt method
    */
-  async sendPrompt(prompt: string): Promise<{ stopReason: string }> {
+  async sendPrompt(
+    prompt: string
+  ): Promise<{ stopReason: string; response: string }> {
     if (!this.isConnectionInitialized || !this.connection) {
       throw new Error(
         'Connection not initialized. Call initializeConnection() first.'
@@ -222,7 +216,14 @@ export class ACPRunner {
       throw new Error('No active session. Call createSession() first.');
     }
 
+    if (!this.client) {
+      throw new Error('Client not initialized.');
+    }
+
     try {
+      // Start capturing agent messages
+      this.client.startCapturing();
+
       const promptResult = await this.connection.prompt({
         sessionId: this.sessionId,
         prompt: [
@@ -233,8 +234,13 @@ export class ACPRunner {
         ],
       });
 
-      return { stopReason: promptResult.stopReason };
+      // Stop capturing and get the accumulated response
+      const response = this.client.stopCapturing();
+
+      return { stopReason: promptResult.stopReason, response };
     } catch (error) {
+      // Stop capturing on error too
+      this.client.stopCapturing();
       throw new Error(
         `Failed to send prompt: ${error instanceof Error ? error.message : String(error)}`
       );
@@ -280,9 +286,11 @@ export class ACPRunner {
         )
       );
 
-      console.log(colors.gray('\n--- Prompt Start ---\n'));
-      console.log(colors.gray(prompt));
-      console.log(colors.gray('\n--- Prompt End ---\n'));
+      if (VERBOSE) {
+        console.log(colors.gray('\n--- Prompt Start ---\n'));
+        console.log(colors.gray(prompt));
+        console.log(colors.gray('\n--- Prompt End ---\n'));
+      }
 
       // Send the prompt via ACP session
       const promptResult = await this.sendPrompt(prompt);
@@ -295,9 +303,9 @@ export class ACPRunner {
       outputs.set('raw_output', `Stop reason: ${promptResult.stopReason}`);
       outputs.set('input_prompt', prompt);
 
-      // Parse the step outputs
+      // Parse the step outputs (pass agent response for output extraction)
       const { success: parseSuccess, error: parseError } =
-        await this.parseStepOutputs(step, outputs);
+        await this.parseStepOutputs(step, outputs, promptResult.response);
 
       if (!parseSuccess) {
         throw new Error(parseError || 'Failed to parse step outputs');
@@ -336,7 +344,9 @@ export class ACPRunner {
   }
 
   /**
-   * Build the prompt for an ACP step (simplified - no file content injection)
+   * Build the prompt for an ACP step.
+   * Like the non-ACP runner, file contents are injected directly into the prompt
+   * to avoid the agent trying to read from stale file locations.
    */
   private buildACPPrompt(step: WorkflowAgentStep): string {
     let prompt = step.prompt;
@@ -367,14 +377,11 @@ export class ACPRunner {
         parts[2] === 'outputs'
       ) {
         // Format: {{steps.step_id.outputs.output_name}}
-        // For ACP mode, we reference the file path instead of injecting content
         const stepId = parts[1];
         const outputName = parts[3];
         const stepOutputs = this.stepsOutput.get(stepId);
 
         if (stepOutputs && stepOutputs.has(outputName)) {
-          const outputValue = stepOutputs.get(outputName) || '';
-
           // Find the output definition
           const stepDef = this.workflow.steps.find(
             (s: WorkflowStep) => s.id === stepId
@@ -383,12 +390,21 @@ export class ACPRunner {
             (o: WorkflowOutput) => o.name === outputName
           );
 
-          if (outputDef?.type === 'file' && outputDef.filename) {
-            // For file outputs in ACP mode, reference the file path
-            // The agent has context from the session and can read the file
-            replacementValue = `[File: ${this.outputDir}/${outputDef.filename}]`;
+          if (outputDef?.type === 'file') {
+            // For file outputs, inject the file content directly into the prompt.
+            // The content is stored as `${outputName}_content` by extractFileOutputs().
+            // This ensures the agent doesn't try to read from stale file locations.
+            const contentKey = `${outputName}_content`;
+            const fileContent = stepOutputs.get(contentKey);
+            if (fileContent) {
+              replacementValue = fileContent;
+            } else {
+              warnings.push(
+                `File content for '${outputName}' not found in step '${stepId}'`
+              );
+            }
           } else {
-            replacementValue = outputValue;
+            replacementValue = stepOutputs.get(outputName) || '';
           }
         } else if (!stepOutputs) {
           warnings.push(`Step '${stepId}' has not been executed yet`);
@@ -465,7 +481,7 @@ export class ACPRunner {
       fileOutputs.forEach(output => {
         instructions += `- **${output.name}**: ${output.description}\n`;
         instructions += `  - Create this file in the current working directory\n`;
-        instructions += `  - Filename: \`${this.outputDir}/${output.filename}\`\n\n`;
+        instructions += `  - Filename: \`${output.filename}\`\n\n`;
       });
 
       instructions +=
@@ -486,7 +502,8 @@ export class ACPRunner {
    */
   private async parseStepOutputs(
     step: WorkflowAgentStep,
-    outputs: Map<string, string>
+    outputs: Map<string, string>,
+    agentResponse: string
   ): Promise<{ success: boolean; error?: string }> {
     try {
       const stepOutputs = step.outputs || [];
@@ -506,7 +523,8 @@ export class ACPRunner {
           step.id,
           stringOutputs,
           fileOutputs,
-          outputs
+          outputs,
+          agentResponse
         );
       }
 
@@ -524,6 +542,7 @@ export class ACPRunner {
    * In ACP mode, string outputs can be extracted from:
    * 1. A conventional step outputs JSON file (_step_outputs.json)
    * 2. Corresponding file output content (e.g., context.md may contain "## Task complexity\nsimple")
+   * 3. The raw agent response text (for JSON outputs like {"skipped": "true"})
    */
   private async extractStringOutputs(
     stepId: string,
@@ -533,7 +552,8 @@ export class ACPRunner {
       description: string;
       filename?: string;
     }>,
-    outputs: Map<string, string>
+    outputs: Map<string, string>,
+    agentResponse: string
   ): Promise<void> {
     // First, try to read from a conventional step outputs JSON file
     const outputsFile = `_${stepId}_outputs.json`;
@@ -545,7 +565,6 @@ export class ACPRunner {
         jsonData = JSON.parse(content);
         // Clean up the temporary file
         rmSync(outputsFile);
-        console.log(colors.gray(`📄 Read string outputs from ${outputsFile}`));
       } catch (error) {
         console.log(
           colors.yellow(`⚠️  Found ${outputsFile} but failed to parse it`)
@@ -570,6 +589,14 @@ export class ACPRunner {
       }
     }
 
+    // If still no JSON data, try to extract from the raw agent response
+    if (!jsonData && agentResponse) {
+      const extracted = this.extractJsonFromContent(agentResponse);
+      if (extracted) {
+        jsonData = extracted;
+      }
+    }
+
     // Extract each string output
     for (const output of stringOutputs) {
       let value: string | undefined;
@@ -589,7 +616,9 @@ export class ACPRunner {
 
       if (value !== undefined) {
         outputs.set(output.name, value);
-        console.log(colors.gray(`  ✓ Extracted ${output.name}: ${value}`));
+        if (VERBOSE) {
+          console.log(colors.gray(`  ✓ Extracted ${output.name}: ${value}`));
+        }
       } else {
         console.log(
           colors.yellow(`⚠️  Output '${output.name}' not found in response`)
@@ -693,8 +722,7 @@ export class ACPRunner {
           if (this.outputDir) {
             filePath = join(this.outputDir, basename(output.filename));
             copyFileSync(output.filename, filePath);
-            // Do not delete for testing!
-            // rmSync(output.filename);
+            rmSync(output.filename);
           }
 
           const fileContent = readFileSync(filePath, 'utf-8');

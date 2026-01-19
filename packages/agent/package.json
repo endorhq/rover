@@ -24,7 +24,7 @@
   },
   "author": "The Endor team",
   "dependencies": {
-    "@agentclientprotocol/sdk": "^0.7.0",
+    "@agentclientprotocol/sdk": "^0.13.0",
     "ansi-colors": "catalog:runtime",
     "commander": "catalog:runtime",
     "execa": "catalog:runtime",
@@ -33,10 +33,10 @@
     "zod": "catalog:runtime"
   },
   "devDependencies": {
-    "rover-core": "workspace:*",
-    "rover-schemas": "workspace:*",
     "@types/node": "catalog:build",
     "@vitest/ui": "catalog:build",
+    "rover-core": "workspace:*",
+    "rover-schemas": "workspace:*",
     "tsdown": "catalog:build",
     "typescript": "catalog:build",
     "vitest": "catalog:build"

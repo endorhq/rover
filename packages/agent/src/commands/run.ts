@@ -29,17 +29,6 @@ function displayStepResults(
       colors.yellow(`${result.duration.toFixed(2)}s`)
   );
 
-  // Check for tokens and cost (only in RunnerStepResult)
-  if ('tokens' in result && result.tokens) {
-    console.log(
-      colors.gray('├── Tokens: ') + colors.cyan(result.tokens.toString())
-    );
-  }
-  if ('cost' in result && result.cost) {
-    console.log(
-      colors.gray('├── Cost: ') + colors.cyan(`$${result.cost.toFixed(4)}`)
-    );
-  }
   if (result.error) {
     console.log(colors.gray('├── Error: ') + colors.red(result.error));
   }
@@ -344,10 +333,11 @@ export const runCommand = async (
       const totalSteps = workflowManager.steps.length;
       const stepResults: RunnerStepResult[] = [];
 
-      // Determine which tool to use (same priority as ACPRunner)
-      // Priority: CLI flag > workflow defaults > fallback to claude
+      // Determine which tool to use
+      // Priority: workflow defaults > CLI flag > fallback to claude
+      // (per-step tool configuration takes precedence, handled in Runner/ACPRunner)
       const tool =
-        options.agentTool || workflowManager.defaults?.tool || 'claude';
+        workflowManager.defaults?.tool || options.agentTool || 'claude';
 
       // Temporarily ACP usage decision during ACP migration process:
       // force Claude to always use ACP mode
@@ -487,13 +477,6 @@ export const runCommand = async (
         }
       }
 
-      // Calculate total workflow cost and tokens
-      const totalCost = stepResults.reduce((sum, r) => sum + (r.cost ?? 0), 0);
-      const totalTokens = stepResults.reduce(
-        (sum, r) => sum + (r.tokens ?? 0),
-        0
-      );
-
       // Display workflow completion summary
       console.log(colors.bold('\n🎉 Workflow Execution Summary'));
       console.log(
@@ -504,18 +487,6 @@ export const runCommand = async (
         colors.gray('├── Total Steps: ') +
           colors.cyan(workflowManager.steps.length.toString())
       );
-      if (totalTokens > 0) {
-        console.log(
-          colors.gray('├── Total Tokens: ') +
-            colors.cyan(totalTokens.toLocaleString())
-        );
-      }
-      if (totalCost > 0) {
-        console.log(
-          colors.gray('├── Total Cost: ') +
-            colors.cyan('$' + totalCost.toFixed(4))
-        );
-      }
 
       const successfulSteps = Array.from(stepsOutput.keys()).length;
       console.log(
