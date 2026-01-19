@@ -20,6 +20,8 @@ import {
   type TelemetryStatus,
 } from 'rover-schemas';
 import { getConfigDir } from '../paths.js';
+import { ProjectConfigManager } from './project-config.js';
+import { UserSettingsManager } from './user-settings.js';
 
 /**
  * Manager class for global configuration
@@ -79,17 +81,40 @@ export class GlobalConfigManager {
    */
   static createDefault(): GlobalConfigManager {
     const now = new Date().toISOString();
+    console.log(
+      `Global configuration not found. Creating default at ${GlobalConfigManager.getConfigPath()}`
+    );
 
     // Try to read the existing information if possible
     // In the future, the telemetry will use these values.
     const telemetry = Telemetry.load(TELEMETRY_FROM.CLI);
 
+    // Try to derive attribution from the project settings
+    let attribution: AttributionStatus = 'unknown';
+
+    // Try to derive agents from user settings
+    let agents: AI_AGENT[] = [];
+
+    try {
+      const projectConfig = ProjectConfigManager.load();
+      attribution = projectConfig.attribution ? 'enabled' : 'disabled';
+    } catch (error) {
+      // Ignore errors and keep attribution as 'unknown'
+    }
+
+    try {
+      const userSettings = UserSettingsManager.load();
+      agents = userSettings.aiAgents ? userSettings.aiAgents : [];
+    } catch (error) {
+      // Ignore errors and keep agents as empty
+    }
+
     const schema: GlobalConfig = {
       version: CURRENT_GLOBAL_CONFIG_VERSION,
-      agents: [],
+      agents,
       userId: telemetry.getUserId(),
       telemetry: telemetry.isDisabled() ? 'disabled' : 'enabled',
-      attribution: 'unknown',
+      attribution,
       createdAt: now,
       updatedAt: now,
       projects: [],
