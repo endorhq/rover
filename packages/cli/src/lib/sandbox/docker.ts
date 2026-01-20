@@ -322,7 +322,7 @@ export class DockerSandbox extends Sandbox {
     );
     if (
       effectiveNetworkConfigInteractive &&
-      effectiveNetworkConfigInteractive.mode !== 'none'
+      effectiveNetworkConfigInteractive.mode !== 'allowall'
     ) {
       dockerArgs.push('--cap-add=NET_ADMIN');
     }

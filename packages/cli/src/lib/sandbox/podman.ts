@@ -287,7 +287,7 @@ export class PodmanSandbox extends Sandbox {
     );
     if (
       effectiveNetworkConfigInteractive &&
-      effectiveNetworkConfigInteractive.mode !== 'none'
+      effectiveNetworkConfigInteractive.mode !== 'allowall'
     ) {
       podmanArgs.push('--cap-add=NET_ADMIN');
     }
