@@ -3,6 +3,7 @@
  * This module provides a cohesive context object for CLI state management.
  */
 
+import path from 'node:path';
 import { type ProjectManager, ProjectStore } from 'rover-core';
 
 /**
@@ -20,6 +21,9 @@ export interface CLIContext {
 
   /** Whether cwd is inside a git repository */
   inGitRepo: boolean;
+
+  /** Value from --project flag or ROVER_PROJECT env variable (for later resolution) */
+  projectOption?: string;
 }
 
 let _context: CLIContext | null = null;
@@ -83,6 +87,14 @@ export function isProjectMode(): boolean {
 }
 
 /**
+ * Sets the default project in context.
+ * @param project ProjectManager instance
+ */
+export function setProject(project: ProjectManager): void {
+  getCLIContext().project = project;
+}
+
+/**
  * Get the default project from context (null if in global mode).
  */
 export function getDefaultProject(): ProjectManager | null {
@@ -97,52 +109,103 @@ export function getProjectPath(): string | null {
 }
 
 /**
+ * Resolve a project by identifier (ID, name, or path).
+ *
+ * @param store - ProjectStore instance
+ * @param identifier - Project ID, repository name, or filesystem path
+ * @returns ProjectManager or undefined if not found
+ */
+function resolveProjectByIdentifier(
+  store: ProjectStore,
+  identifier: string
+): ProjectManager | undefined {
+  // Try by ID first
+  let project = store.get(identifier);
+  if (project) return project;
+
+  // Try by repository name
+  project = store.getByName(identifier);
+  if (project) return project;
+
+  // Try by path
+  try {
+    // Check it's a valid path. It will throw an error
+    // @see https://nodejs.org/api/path.html#pathparsepath
+    path.parse(identifier);
+
+    let fullPath = identifier;
+
+    if (!path.isAbsolute(identifier)) {
+      fullPath = path.resolve(process.cwd(), identifier);
+    }
+
+    project = store.getByPath(fullPath);
+    if (project) return project;
+  } catch (error) {
+    if (error instanceof TypeError) {
+      // Not a valid path. Skip
+    } else {
+      throw error;
+    }
+  }
+
+  return undefined;
+}
+
+/**
  * Resolve the effective project for a command.
  *
- * @param projectOption - Value from --project flag (future)
- * @returns ProjectManager and projectPath or null (global mode)
- * @throws If --project specified but not found
+ * Resolution order:
+ * 1. `--project` flag (stored in context)
+ * 2. `ROVER_PROJECT` environment variable
+ * 3. cwd-based project (from preAction hook)
+ *
+ * @param projectOverride - Optional project identifier to override context
+ * @returns ProjectManager or null (global mode)
+ * @throws If --project or ROVER_PROJECT specified but not found
  */
 export async function resolveProjectContext(
-  projectOption?: string
+  projectOverride?: string
 ): Promise<ProjectManager | null> {
-  // If --project is provided, resolve that specific project
-  if (projectOption) {
+  const ctx = getCLIContext();
+
+  // Always return the pre-resolved project if available
+  if (ctx.project) {
+    return ctx.project;
+  }
+
+  // Use the id from the override or context
+  const projectId = projectOverride ?? ctx.projectOption;
+
+  // If a project identifier is provided, resolve it
+  if (projectId) {
     const store = new ProjectStore();
-    // Try by ID first, then by path
-    const project = store.get(projectOption) ?? store.getByPath(projectOption);
-    if (!project) {
-      throw new Error(`Project "${projectOption}" not found`);
+    const project = resolveProjectByIdentifier(store, projectId);
+
+    if (project) {
+      return project;
     }
-    return project;
   }
 
-  // Otherwise, use the default context from pre-action hook
-  const project = getDefaultProject();
-
-  if (project) {
-    return project;
-  }
-
+  // No project available, return null (global mode)
   return null;
 }
 
 /**
- * Require a project context for a command. It returns the project and projectPath
- * as an object. If it cannot initialize the project, it will throw an error.
+ * Require a project context for a command.
  *
  * Use this for commands that cannot operate in global mode and require
  * either a project in the current working directory (cwd) or the
  * `--project` flag.
  *
- * @param projectOption - Value from --project flag (future)
+ * @param projectOverride - Optional project identifier to override context
  * @returns ProjectManager
  * @throws If no project context available
  */
 export async function requireProjectContext(
-  projectOption?: string
+  projectOverride?: string
 ): Promise<ProjectManager> {
-  const project = await resolveProjectContext(projectOption);
+  const project = await resolveProjectContext(projectOverride);
   if (project) {
     return project;
   }

@@ -157,6 +157,20 @@ export class ProjectStore {
   }
 
   /**
+   * Get a project by repository name (e.g., "user/repo")
+   *
+   * @param name - Repository name
+   * @returns ProjectManager or undefined if not found
+   */
+  getByName(name: string): ProjectManager | undefined {
+    const project = this.config.projects.find(p => p.repositoryName === name);
+    if (!project) {
+      return undefined;
+    }
+    return new ProjectManager(project, this.projectsPath, this.config);
+  }
+
+  /**
    * Remove a project from the Rover system
    *
    * @param id - Project ID to remove
