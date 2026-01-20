@@ -21,17 +21,16 @@ let testDir: string;
 // Mock context to return a mock ProjectManager
 vi.mock('../../lib/context.js', () => ({
   requireProjectContext: vi.fn().mockImplementation(() => {
+    // Return a ProjectManager-like object directly (not wrapped in { project, projectPath })
     return Promise.resolve({
-      project: {
-        getTask: (taskId: number) => {
-          const taskPath = join(testDir, '.rover', 'tasks', taskId.toString());
-          if (TaskDescriptionManager.exists(taskPath)) {
-            return TaskDescriptionManager.load(taskPath, taskId);
-          }
-          return undefined;
-        },
+      path: testDir,
+      getTask: (taskId: number) => {
+        const taskPath = join(testDir, '.rover', 'tasks', taskId.toString());
+        if (TaskDescriptionManager.exists(taskPath)) {
+          return TaskDescriptionManager.load(taskPath, taskId);
+        }
+        return undefined;
       },
-      projectPath: testDir,
     });
   }),
   isJsonMode: vi.fn().mockReturnValue(false),
