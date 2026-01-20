@@ -11,7 +11,9 @@ describe('isPathWithin', () => {
     });
 
     it('should return true for a nested child file', () => {
-      expect(isPathWithin(`${testDir}/src/components/file.txt`, testDir)).toBe(true);
+      expect(isPathWithin(`${testDir}/src/components/file.txt`, testDir)).toBe(
+        true
+      );
     });
 
     it('should return true for a child directory', () => {
@@ -47,15 +49,21 @@ describe('isPathWithin', () => {
     });
 
     it('should return false for path with multiple .. that escapes parent', () => {
-      expect(isPathWithin(`${testDir}/src/../../other/file.txt`, testDir)).toBe(false);
+      expect(isPathWithin(`${testDir}/src/../../other/file.txt`, testDir)).toBe(
+        false
+      );
     });
 
     it('should return true for path with .. that stays within parent', () => {
-      expect(isPathWithin(`${testDir}/src/../lib/file.txt`, testDir)).toBe(true);
+      expect(isPathWithin(`${testDir}/src/../lib/file.txt`, testDir)).toBe(
+        true
+      );
     });
 
     it('should return false for path trying to traverse above root', () => {
-      expect(isPathWithin(`${testDir}/../../../../etc/passwd`, testDir)).toBe(false);
+      expect(isPathWithin(`${testDir}/../../../../etc/passwd`, testDir)).toBe(
+        false
+      );
     });
   });
 
@@ -104,7 +112,9 @@ describe('isPathWithin', () => {
     it('should return false for prefix match that is not a parent', () => {
       // /home/user/project-other is NOT within /home/user/project
       // This is a key security case that startsWith() would fail
-      expect(isPathWithin('/home/user/project-other/file.txt', testDir)).toBe(false);
+      expect(isPathWithin('/home/user/project-other/file.txt', testDir)).toBe(
+        false
+      );
     });
 
     it('should handle empty relative path components', () => {
