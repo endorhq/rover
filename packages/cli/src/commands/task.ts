@@ -211,7 +211,6 @@ interface TaskOptions {
   targetBranch?: string;
   agent?: string[];
   json?: boolean;
-  debug?: boolean;
   sandboxExtraArgs?: string;
   networkMode?: NetworkMode;
   networkAllow?: string[];
@@ -437,8 +436,7 @@ export const taskCommand = async (
 ) => {
   const telemetry = getTelemetry();
   // Extract options
-  const { yes, json, fromGithub, debug, sourceBranch, targetBranch, agent } =
-    options;
+  const { yes, json, fromGithub, sourceBranch, targetBranch, agent } = options;
 
   // Set global JSON mode for tests and backwards compatibility
   if (json !== undefined) {

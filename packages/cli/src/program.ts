@@ -47,7 +47,7 @@ export function createProgram(
         const cliOptions = thisCommand.opts();
         const options = actionCommand.opts();
 
-        // Set verbose mode
+        // Set verbose mode from global -v option
         setVerbose(cliOptions.verbose === true);
 
         // Build context
@@ -185,7 +185,6 @@ export function createProgram(
         previous ? [...previous, value] : [value]
     )
     .option('--json', 'Output the result in JSON format')
-    .option('--debug', 'Show debug information like running commands')
     .option(
       '--sandbox-extra-args <args>',
       'Extra arguments to pass to the Docker/Podman container (e.g., "--network mynet")'
