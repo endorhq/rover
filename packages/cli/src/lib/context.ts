@@ -136,15 +136,15 @@ export async function resolveProjectContext(
  * `--project` flag.
  *
  * @param projectOption - Value from --project flag (future)
- * @returns ProjectManager and projectPath
+ * @returns ProjectManager
  * @throws If no project context available
  */
 export async function requireProjectContext(
   projectOption?: string
 ): Promise<ProjectManager> {
-  const resolved = await resolveProjectContext(projectOption);
-  if (resolved) {
-    return resolved;
+  const project = await resolveProjectContext(projectOption);
+  if (project) {
+    return project;
   }
 
   throw new Error(

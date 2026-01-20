@@ -214,7 +214,6 @@ export const mergeCommand = async (
   }
 
   const telemetry = getTelemetry();
-  let git: Git;
   const jsonOutput: TaskMergeOutput = {
     success: false,
   };
@@ -237,7 +236,7 @@ export const mergeCommand = async (
     return;
   }
 
-  git = new Git({ cwd: project.path });
+  const git = new Git({ cwd: project.path });
 
   if (!git.isGitRepo()) {
     jsonOutput.error = 'No worktree found for this task';

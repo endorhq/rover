@@ -36,7 +36,6 @@ export const deleteCommand = async (
   }
 
   const telemetry = getTelemetry();
-  let git: Git;
 
   const json = options.json === true;
   const skipConfirmation = options.yes === true || json;
@@ -161,7 +160,7 @@ export const deleteCommand = async (
   }
 
   // Initialize Git with project path
-  git = new Git({ cwd: project.path });
+  const git = new Git({ cwd: project.path });
 
   // Process deletions
   const succeededTasks: number[] = [];

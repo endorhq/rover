@@ -1,9 +1,9 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import colors from 'ansi-colors';
 import ora from 'ora';
 import enquirer from 'enquirer';
-import { detectEnvironment, type EnvironmentResult } from 'rover-core';
+import { detectEnvironment, Git, type EnvironmentResult } from 'rover-core';
 import {
   checkClaude,
   checkCodex,
@@ -21,7 +21,6 @@ import {
 import { showRoverChat, showTips, TIP_TITLES } from '../utils/display.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { exitWithError, exitWithWarn, exitWithSuccess } from '../utils/exit.js';
-import { isGitRepository } from '../utils/repo-checks.js';
 
 // Get the default prompt
 const { prompt } = enquirer;
@@ -92,9 +91,11 @@ export const initCommand = async (
   options: { yes?: boolean }
 ) => {
   const telemetry = getTelemetry();
+  const resolvedPath = resolve(path);
+  const git = new Git({ cwd: resolvedPath });
 
   // Check if we're in a git repository
-  if (!isGitRepository()) {
+  if (!git.isGitRepo()) {
     console.error(
       colors.red('✗ Not in a git repository') +
         '\n' +
@@ -107,6 +108,8 @@ export const initCommand = async (
     );
     process.exit(1);
   }
+
+  const projectRoot = git.getRepositoryRoot() || resolvedPath;
 
   showRoverChat([
     "hey human! I'm Rover and I will help you manage AI agents.",
@@ -194,14 +197,17 @@ export const initCommand = async (
   }
 
   // Check if already initialized
-  if (ProjectConfigManager.exists(path) && UserSettingsManager.exists(path)) {
+  if (
+    ProjectConfigManager.exists(projectRoot) &&
+    UserSettingsManager.exists(projectRoot)
+  ) {
     await exitWithSuccess(
       'Rover is already initialized in this directory',
       { success: true },
       { telemetry }
     );
     return;
-  } else if (!UserSettingsManager.exists(path)) {
+  } else if (!UserSettingsManager.exists(projectRoot)) {
     console.log(
       colors.green(
         '\n✓ Rover is initialized in this directory. User settings will be initialized now.'
@@ -211,7 +217,7 @@ export const initCommand = async (
 
   // Ensure .rover/ is in .gitignore
   try {
-    await ensureGitignore(path);
+    await ensureGitignore(projectRoot);
   } catch (error) {
     console.log(colors.bold('\n.gitignore'));
     console.log(
@@ -224,7 +230,7 @@ export const initCommand = async (
   console.log('');
 
   try {
-    const environment: EnvironmentResult = await detectEnvironment(path);
+    const environment: EnvironmentResult = await detectEnvironment(projectRoot);
     let defaultAIAgent: AI_AGENT = AI_AGENT.Claude;
 
     const availableAgents: AI_AGENT[] = [];
@@ -326,8 +332,8 @@ export const initCommand = async (
       // Save Project Configuration (rover.json)
       let projectConfig: ProjectConfigManager;
 
-      if (ProjectConfigManager.exists(path)) {
-        projectConfig = ProjectConfigManager.load(path);
+      if (ProjectConfigManager.exists(projectRoot)) {
+        projectConfig = ProjectConfigManager.load(projectRoot);
         // Update with detected values
         environment.languages.forEach(lang => projectConfig.addLanguage(lang));
         environment.packageManagers.forEach(pm =>
@@ -338,7 +344,7 @@ export const initCommand = async (
         );
         projectConfig.setAttribution(attribution);
       } else {
-        projectConfig = ProjectConfigManager.create(path);
+        projectConfig = ProjectConfigManager.create(projectRoot);
         projectConfig.setAttribution(attribution);
         // Set detected values
         environment.languages.forEach(lang => projectConfig.addLanguage(lang));
@@ -352,13 +358,13 @@ export const initCommand = async (
 
       // Save User Settings (.rover/settings.json)
       let userSettings: UserSettingsManager;
-      if (UserSettingsManager.exists(path)) {
-        userSettings = UserSettingsManager.load(path);
+      if (UserSettingsManager.exists(projectRoot)) {
+        userSettings = UserSettingsManager.load(projectRoot);
         // Update AI agents
         availableAgents.forEach(agent => userSettings.addAiAgent(agent));
         userSettings.setDefaultAiAgent(defaultAIAgent);
       } else {
-        userSettings = UserSettingsManager.createDefault(path);
+        userSettings = UserSettingsManager.createDefault(projectRoot);
         // Set available AI agents and default
         availableAgents.forEach(agent => userSettings.addAiAgent(agent));
         userSettings.setDefaultAiAgent(defaultAIAgent);
