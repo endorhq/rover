@@ -12,22 +12,29 @@ type GitHubIssueResult = {
   body: string;
 };
 
+export type GitHubOptions = {
+  /** Working directory for gh CLI commands */
+  cwd?: string;
+  /** Check if gh CLI is present and throw if not */
+  requireGitHubCli?: boolean;
+};
+
 /**
  * Generic class to interact with GitHub projects. It uses the git repository data
  * and the gh tool.
  */
 export class GitHub {
+  private readonly cwd?: string;
+
   /**
    * Initialize the GitHub class.
    *
-   * @param requireGitHubCli Check if gh CLI is present
+   * @param options Configuration options
    */
-  constructor(requireGitHubCli = false) {
-    if (!requireGitHubCli) {
-      return;
-    }
+  constructor(options: GitHubOptions = {}) {
+    this.cwd = options.cwd;
 
-    if (GitHub.isGhCLIAvailable()) {
+    if (options.requireGitHubCli && !GitHub.isGhCLIAvailable()) {
       throw new GitHubError('GitHub CLI (gh) is not installed');
     }
   }
@@ -35,7 +42,7 @@ export class GitHub {
   // Check if the gh CLI is availbe on the system.
   static isGhCLIAvailable(): boolean {
     const result = launchSync('gh', ['--version']);
-    return result.failed;
+    return result.failed === false;
   }
 
   /**
@@ -114,13 +121,11 @@ export class GitHub {
         );
       }
 
-      const result = await launch('gh', [
-        'issue',
-        'view',
-        number.toString(),
-        '--json',
-        'title,body',
-      ]);
+      const result = await launch(
+        'gh',
+        ['issue', 'view', number.toString(), '--json', 'title,body'],
+        { cwd: this.cwd }
+      );
 
       if (result.failed || result.stdout == null) {
         throw new GitHubError('The GitHub CLI failed to retrieve the issue');

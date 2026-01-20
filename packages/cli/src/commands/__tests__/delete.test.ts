@@ -22,20 +22,23 @@ let testDir: string;
 vi.mock('../../lib/context.js', () => ({
   requireProjectContext: vi.fn().mockImplementation(() => {
     return Promise.resolve({
-      getTask: (taskId: number) => {
-        const taskPath = join(testDir, '.rover', 'tasks', taskId.toString());
-        if (TaskDescriptionManager.exists(taskPath)) {
-          return TaskDescriptionManager.load(taskPath, taskId);
-        }
-        return undefined;
+      project: {
+        getTask: (taskId: number) => {
+          const taskPath = join(testDir, '.rover', 'tasks', taskId.toString());
+          if (TaskDescriptionManager.exists(taskPath)) {
+            return TaskDescriptionManager.load(taskPath, taskId);
+          }
+          return undefined;
+        },
+        deleteTask: (task: TaskDescriptionManager) => {
+          // Actually delete the task directory to match real behavior
+          const taskPath = task.getBasePath();
+          if (existsSync(taskPath)) {
+            rmSync(taskPath, { recursive: true, force: true });
+          }
+        },
       },
-      deleteTask: (task: TaskDescriptionManager) => {
-        // Actually delete the task directory to match real behavior
-        const taskPath = task.getBasePath();
-        if (existsSync(taskPath)) {
-          rmSync(taskPath, { recursive: true, force: true });
-        }
-      },
+      projectPath: testDir,
     });
   }),
   isJsonMode: vi.fn().mockReturnValue(false),

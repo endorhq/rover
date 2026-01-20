@@ -570,9 +570,10 @@ echo "======================================="
    */
   static generate(
     taskDescription: TaskDescriptionManager,
-    agent: string
+    agent: string,
+    projectPath: string
   ): string {
-    const projectConfig = ProjectConfigManager.load();
+    const projectConfig = ProjectConfigManager.load(projectPath);
     const builder = new SetupBuilder(taskDescription, agent, projectConfig);
     return builder.generateEntrypoint();
   }

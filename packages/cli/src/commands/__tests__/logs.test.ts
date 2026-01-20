@@ -12,13 +12,16 @@ let testDir: string;
 vi.mock('../../lib/context.js', () => ({
   requireProjectContext: vi.fn().mockImplementation(() => {
     return Promise.resolve({
-      getTask: (taskId: number) => {
-        const taskPath = join(testDir, '.rover', 'tasks', taskId.toString());
-        if (TaskDescriptionManager.exists(taskPath)) {
-          return TaskDescriptionManager.load(taskPath, taskId);
-        }
-        return undefined;
+      project: {
+        getTask: (taskId: number) => {
+          const taskPath = join(testDir, '.rover', 'tasks', taskId.toString());
+          if (TaskDescriptionManager.exists(taskPath)) {
+            return TaskDescriptionManager.load(taskPath, taskId);
+          }
+          return undefined;
+        },
       },
+      projectPath: testDir,
     });
   }),
   isJsonMode: vi.fn().mockReturnValue(false),

@@ -4,7 +4,6 @@ import {
   WorkflowStore,
   WorkflowSource,
   getConfigDir,
-  findProjectRoot,
 } from 'rover-core';
 import sweWorkflow from './workflows/swe.yml';
 import techWriterWorkflow from './workflows/tech-writer.yml';
@@ -64,10 +63,11 @@ const scanWorkflowDirectory = (dir: string): string[] => {
  * - Global workflows (~/.rover/config/workflows/)
  * - Project workflows (<project>/.rover/workflows/)
  *
+ * @param projectPath - Optional project root path. If provided, loads project workflows.
  * @returns A WorkflowStore containing all loaded workflows
  */
-export const initWorkflowStore = (): WorkflowStore => {
-  const store = new WorkflowStore();
+export const initWorkflowStore = (projectPath?: string): WorkflowStore => {
+  const store = new WorkflowStore(projectPath);
 
   // Load built-in workflows
   const swe = loadBuiltInWorkflow(sweWorkflow);
@@ -91,10 +91,9 @@ export const initWorkflowStore = (): WorkflowStore => {
     }
   }
 
-  // Load project workflows from <project>/.rover/workflows/
-  try {
-    const projectRoot = findProjectRoot();
-    const projectWorkflowsDir = join(projectRoot, '.rover', 'workflows');
+  // Load project workflows from <project>/.rover/workflows/ if projectPath is provided
+  if (projectPath) {
+    const projectWorkflowsDir = join(projectPath, '.rover', 'workflows');
     const projectWorkflows = scanWorkflowDirectory(projectWorkflowsDir);
 
     for (const workflowPath of projectWorkflows) {
@@ -107,8 +106,6 @@ export const initWorkflowStore = (): WorkflowStore => {
         );
       }
     }
-  } catch (error) {
-    // If we can't find a project root, that's fine - just skip project workflows
   }
 
   return store;

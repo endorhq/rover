@@ -96,7 +96,9 @@ export const shellCommand = async (
 
     if (options.container) {
       try {
-        const sandbox = await createSandbox(task);
+        const sandbox = await createSandbox(task, undefined, {
+          projectPath: project.path,
+        });
 
         spinner.success('Shell started');
 

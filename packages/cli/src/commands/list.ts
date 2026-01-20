@@ -136,10 +136,12 @@ export const listCommand = async (
 
     // Load project config for hooks (outside loop for efficiency)
     let projectConfig: ProjectConfigManager | undefined;
-    try {
-      projectConfig = ProjectConfigManager.load();
-    } catch {
-      // Project config is optional, continue without hooks
+    if (project?.path) {
+      try {
+        projectConfig = ProjectConfigManager.load(project.path);
+      } catch {
+        // Project config is optional, continue without hooks
+      }
     }
 
     // Update task status and detect transitions for onComplete hooks
@@ -158,7 +160,11 @@ export const listCommand = async (
           (currentStatus === 'COMPLETED' || currentStatus === 'FAILED');
 
         // Execute onComplete hooks if configured and this is a new completion
-        if (isNewCompletion && projectConfig?.hooks?.onComplete?.length) {
+        if (
+          isNewCompletion &&
+          projectConfig?.hooks?.onComplete?.length &&
+          project?.path
+        ) {
           executeHooks(
             projectConfig.hooks.onComplete,
             {
@@ -166,6 +172,7 @@ export const listCommand = async (
               taskBranch: task.branchName,
               taskTitle: task.title,
               taskStatus: currentStatus.toLowerCase(),
+              projectPath: project.path,
             },
             'onComplete'
           );
@@ -356,8 +363,18 @@ export const listCommand = async (
           return;
         }
       } else {
-        const settings = UserSettingsManager.load();
-        intervalSeconds = settings.watchIntervalSeconds;
+        // Default watch interval (3 seconds) if no project context
+        const DEFAULT_WATCH_INTERVAL = 3;
+        if (project?.path) {
+          try {
+            const settings = UserSettingsManager.load(project.path);
+            intervalSeconds = settings.watchIntervalSeconds;
+          } catch {
+            intervalSeconds = DEFAULT_WATCH_INTERVAL;
+          }
+        } else {
+          intervalSeconds = DEFAULT_WATCH_INTERVAL;
+        }
       }
       const intervalMs = intervalSeconds * 1000;
 

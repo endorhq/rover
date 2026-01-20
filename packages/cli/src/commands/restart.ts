@@ -7,7 +7,6 @@ import {
   IterationManager,
   AI_AGENT,
   Git,
-  findProjectRoot,
   type ProjectManager,
 } from 'rover-core';
 import { TaskNotFoundError } from 'rover-schemas';
@@ -61,7 +60,7 @@ export const restartCommand = async (
   }
 
   // Require project context
-  let project: ProjectManager;
+  let project;
   try {
     project = await requireProjectContext();
   } catch (error) {
@@ -100,8 +99,8 @@ export const restartCommand = async (
     let selectedAiAgent = AI_AGENT.Claude; // default
 
     try {
-      if (UserSettingsManager.exists()) {
-        const userSettings = UserSettingsManager.load();
+      if (UserSettingsManager.exists(project.path)) {
+        const userSettings = UserSettingsManager.load(project.path);
         selectedAiAgent = userSettings.defaultAiAgent || AI_AGENT.Claude;
       }
     } catch (error) {
@@ -126,11 +125,11 @@ export const restartCommand = async (
         : null;
 
       try {
-        const git = new Git();
+        const git = new Git({ cwd: project.path });
         git.createWorktree(worktreePath, branchName);
 
         // Copy user .env development files
-        copyEnvironmentFiles(findProjectRoot(), worktreePath);
+        copyEnvironmentFiles(project.path, worktreePath);
 
         // Update task with workspace information
         task.setWorkspace(worktreePath, branchName);
@@ -190,7 +189,9 @@ export const restartCommand = async (
 
     // Start sandbox container for task execution
     try {
-      const sandbox = await createSandbox(task);
+      const sandbox = await createSandbox(task, undefined, {
+        projectPath: project.path,
+      });
       const containerId = await sandbox.createAndStart();
 
       // Update task metadata with new container ID

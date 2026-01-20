@@ -9,7 +9,6 @@ import {
   IterationManager,
   type WorkflowManager,
   AI_AGENT,
-  findProjectRoot,
   ProcessManager,
   showProperties,
   Git,
@@ -219,6 +218,7 @@ interface TaskOptions {
  */
 const createTaskForAgent = async (
   project: ProjectManager,
+  projectPath: string,
   selectedAiAgent: string,
   selectedModel: string | undefined,
   options: TaskOptions,
@@ -251,10 +251,7 @@ const createTaskForAgent = async (
   // Extract the title and description based on current data.
   const agentTool = getAIAgentTool(selectedAiAgent);
   await agentTool.checkAgent();
-  const expandedTask = await agentTool.expandTask(
-    description,
-    findProjectRoot()
-  );
+  const expandedTask = await agentTool.expandTask(description, projectPath);
 
   if (!expandedTask) {
     processManager?.failLastItem();
@@ -290,7 +287,7 @@ const createTaskForAgent = async (
     git.createWorktree(worktreePath, branchName, baseBranch);
 
     // Copy user .env development files
-    copyEnvironmentFiles(findProjectRoot(), worktreePath);
+    copyEnvironmentFiles(projectPath, worktreePath);
   } catch (error) {
     processManager?.failLastItem();
     console.error(colors.red('Error creating git workspace: ' + error));
@@ -322,7 +319,7 @@ const createTaskForAgent = async (
   processManager?.completeLastItem();
 
   // Resolve and store the agent image that will be used for this task
-  const projectConfig = ProjectConfigManager.load();
+  const projectConfig = ProjectConfigManager.load(projectPath);
   const agentImage = resolveAgentImage(projectConfig);
   task.setAgentImage(agentImage);
 
@@ -330,6 +327,7 @@ const createTaskForAgent = async (
   try {
     const sandbox = await createSandbox(task, processManager, {
       extraArgs: options.sandboxExtraArgs,
+      projectPath,
     });
     const containerId = await sandbox.createAndStart();
 
@@ -406,8 +404,8 @@ export const taskCommand = async (
     success: false,
   };
 
-  // Get project context (auto-registers if needed)
-  let project: ProjectManager;
+  // Get project context
+  let project;
   try {
     project = await requireProjectContext();
   } catch (error) {
@@ -474,7 +472,7 @@ export const taskCommand = async (
   let workflow: WorkflowManager;
 
   try {
-    const workflowStore = initWorkflowStore();
+    const workflowStore = initWorkflowStore(project.path);
     const loadedWorkflow = workflowStore.getWorkflow(workflowName);
 
     if (loadedWorkflow) {
@@ -510,7 +508,7 @@ export const taskCommand = async (
   const inputsData: Map<string, string> = new Map();
 
   // Validate branch option and check for uncommitted changes
-  const git = new Git();
+  const git = new Git({ cwd: project.path });
   let baseBranch = sourceBranch;
 
   if (sourceBranch) {
@@ -600,7 +598,7 @@ export const taskCommand = async (
       }
     } else if (fromGithub != null) {
       // Load the inputs from GitHub
-      const github = new GitHub(false);
+      const github = new GitHub({ cwd: project.path });
 
       try {
         const issueData = await github.fetchIssue(fromGithub, git.remoteUrl());
@@ -802,6 +800,7 @@ export const taskCommand = async (
 
       const taskResult = await createTaskForAgent(
         project,
+        project.path,
         selectedAiAgent,
         selectedModel,
         options,

@@ -6,6 +6,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { parse as parseDotenv } from 'dotenv';
 import { ProjectConfigManager } from 'rover-core';
+import { isPathWithin } from './path-utils.js';
 
 /**
  * Parse custom environment variables from project config.
@@ -69,7 +70,7 @@ export function loadEnvsFile(projectConfig: ProjectConfigManager): string[] {
   );
 
   // Security: Validate path to prevent path traversal
-  if (!absolutePath.startsWith(projectConfig.projectRoot)) {
+  if (!isPathWithin(absolutePath, projectConfig.projectRoot)) {
     // Silently skip path traversal attempts
     return envArgs;
   }

@@ -194,14 +194,14 @@ export const initCommand = async (
   }
 
   // Check if already initialized
-  if (ProjectConfigManager.exists() && UserSettingsManager.exists()) {
+  if (ProjectConfigManager.exists(path) && UserSettingsManager.exists(path)) {
     await exitWithSuccess(
       'Rover is already initialized in this directory',
       { success: true },
       { telemetry }
     );
     return;
-  } else if (!UserSettingsManager.exists()) {
+  } else if (!UserSettingsManager.exists(path)) {
     console.log(
       colors.green(
         '\n✓ Rover is initialized in this directory. User settings will be initialized now.'
@@ -326,8 +326,8 @@ export const initCommand = async (
       // Save Project Configuration (rover.json)
       let projectConfig: ProjectConfigManager;
 
-      if (ProjectConfigManager.exists()) {
-        projectConfig = ProjectConfigManager.load();
+      if (ProjectConfigManager.exists(path)) {
+        projectConfig = ProjectConfigManager.load(path);
         // Update with detected values
         environment.languages.forEach(lang => projectConfig.addLanguage(lang));
         environment.packageManagers.forEach(pm =>
@@ -338,7 +338,7 @@ export const initCommand = async (
         );
         projectConfig.setAttribution(attribution);
       } else {
-        projectConfig = ProjectConfigManager.create();
+        projectConfig = ProjectConfigManager.create(path);
         projectConfig.setAttribution(attribution);
         // Set detected values
         environment.languages.forEach(lang => projectConfig.addLanguage(lang));
@@ -352,13 +352,13 @@ export const initCommand = async (
 
       // Save User Settings (.rover/settings.json)
       let userSettings: UserSettingsManager;
-      if (UserSettingsManager.exists()) {
-        userSettings = UserSettingsManager.load();
+      if (UserSettingsManager.exists(path)) {
+        userSettings = UserSettingsManager.load(path);
         // Update AI agents
         availableAgents.forEach(agent => userSettings.addAiAgent(agent));
         userSettings.setDefaultAiAgent(defaultAIAgent);
       } else {
-        userSettings = UserSettingsManager.createDefault();
+        userSettings = UserSettingsManager.createDefault(path);
         // Set available AI agents and default
         availableAgents.forEach(agent => userSettings.addAiAgent(agent));
         userSettings.setDefaultAiAgent(defaultAIAgent);

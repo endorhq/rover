@@ -193,7 +193,9 @@ export const iterateCommand = async (
     // Start the interactive process
     try {
       // Start sandbox container for task execution
-      const sandbox = await createSandbox(task);
+      const sandbox = await createSandbox(task, undefined, {
+        projectPath: project.path,
+      });
       // TODO: ADD INITIAL PROMPT!
       await sandbox.runInteractive();
     } catch (error) {
@@ -382,7 +384,9 @@ export const iterateCommand = async (
       processManager?.completeLastItem();
 
       // Start sandbox container for task execution
-      const sandbox = await createSandbox(task, processManager);
+      const sandbox = await createSandbox(task, processManager, {
+        projectPath: project.path,
+      });
       const containerId = await sandbox.createAndStart();
 
       // Update task metadata with new container ID for this iteration

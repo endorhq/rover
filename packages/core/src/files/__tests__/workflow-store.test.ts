@@ -619,7 +619,7 @@ steps: []
         'utf8'
       );
 
-      const manager = new WorkflowStore();
+      const manager = new WorkflowStore(testProjectDir);
       expect(manager.isInRoverProject()).toBe(true);
       expect(manager.getLocalStorePath()).toBe(
         join(testProjectDir, '.rover', 'workflows')
@@ -1158,7 +1158,7 @@ steps: []
       const sourcePath = join(testProjectDir, 'local.yml');
       writeFileSync(sourcePath, workflowContent, 'utf8');
 
-      const manager = new WorkflowStore();
+      const manager = new WorkflowStore(testProjectDir);
       const result = await manager.saveWorkflow(sourcePath);
 
       expect(result.isLocal).toBe(true);

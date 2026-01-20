@@ -46,7 +46,7 @@ describe('UserSettingsManager', () => {
 
   describe('createDefault', () => {
     it('should create default settings when file does not exist', () => {
-      const settings = UserSettingsManager.createDefault();
+      const settings = UserSettingsManager.createDefault(testDir);
 
       expect(existsSync('.rover/settings.json')).toBe(true);
       const jsonData = JSON.parse(readFileSync('.rover/settings.json', 'utf8'));
@@ -67,7 +67,7 @@ describe('UserSettingsManager', () => {
     it('should create .rover directory if it does not exist', () => {
       expect(existsSync('.rover')).toBe(false);
 
-      UserSettingsManager.createDefault();
+      UserSettingsManager.createDefault(testDir);
 
       expect(existsSync('.rover')).toBe(true);
       expect(existsSync('.rover/settings.json')).toBe(true);
@@ -76,7 +76,7 @@ describe('UserSettingsManager', () => {
 
   describe('load', () => {
     it('should create default settings when file does not exist', () => {
-      const settings = UserSettingsManager.load();
+      const settings = UserSettingsManager.load(testDir);
 
       expect(settings.version).toBe('1.0');
       expect(settings.aiAgents).toEqual([]);
@@ -100,7 +100,7 @@ describe('UserSettingsManager', () => {
         )
       );
 
-      const settings = UserSettingsManager.load();
+      const settings = UserSettingsManager.load(testDir);
 
       expect(settings.version).toBe('1.0');
       expect(settings.aiAgents).toEqual([AI_AGENT.Claude, AI_AGENT.Gemini]);
@@ -121,7 +121,7 @@ describe('UserSettingsManager', () => {
         )
       );
 
-      const settings = UserSettingsManager.load();
+      const settings = UserSettingsManager.load(testDir);
 
       // Should be migrated to current version
       expect(settings.version).toBe('1.0');
@@ -150,7 +150,7 @@ describe('UserSettingsManager', () => {
         JSON.stringify(originalData, null, 2)
       );
 
-      const settings = UserSettingsManager.load();
+      const settings = UserSettingsManager.load(testDir);
 
       // Should remain at version 1.0
       expect(settings.version).toBe('1.0');
@@ -167,7 +167,7 @@ describe('UserSettingsManager', () => {
 
   describe('exists', () => {
     it('should return false when settings file does not exist', () => {
-      expect(UserSettingsManager.exists()).toBe(false);
+      expect(UserSettingsManager.exists(testDir)).toBe(false);
     });
 
     it('should return true when settings file exists', () => {
@@ -181,13 +181,13 @@ describe('UserSettingsManager', () => {
         })
       );
 
-      expect(UserSettingsManager.exists()).toBe(true);
+      expect(UserSettingsManager.exists(testDir)).toBe(true);
     });
   });
 
   describe('save', () => {
     it('should save settings to disk', () => {
-      const settings = UserSettingsManager.createDefault();
+      const settings = UserSettingsManager.createDefault(testDir);
       settings.addAiAgent(AI_AGENT.Claude);
 
       expect(existsSync('.rover/settings.json')).toBe(true);
@@ -196,11 +196,14 @@ describe('UserSettingsManager', () => {
     });
 
     it('should create .rover directory if it does not exist', () => {
-      const settings = new (UserSettingsManager as any)({
-        version: '1.0',
-        aiAgents: [],
-        defaults: {},
-      });
+      const settings = new (UserSettingsManager as any)(
+        {
+          version: '1.0',
+          aiAgents: [],
+          defaults: {},
+        },
+        testDir
+      );
 
       expect(existsSync('.rover')).toBe(false);
 
@@ -213,7 +216,7 @@ describe('UserSettingsManager', () => {
 
   describe('reload', () => {
     it('should reload settings from disk', () => {
-      const settings = UserSettingsManager.createDefault();
+      const settings = UserSettingsManager.createDefault(testDir);
 
       // Modify file on disk
       writeFileSync(
@@ -243,7 +246,7 @@ describe('UserSettingsManager', () => {
 
   describe('setDefaultAiAgent', () => {
     it('should set default AI agent', () => {
-      const settings = UserSettingsManager.createDefault();
+      const settings = UserSettingsManager.createDefault(testDir);
 
       settings.setDefaultAiAgent(AI_AGENT.Claude);
 
@@ -251,7 +254,7 @@ describe('UserSettingsManager', () => {
     });
 
     it('should automatically add agent to available agents list', () => {
-      const settings = UserSettingsManager.createDefault();
+      const settings = UserSettingsManager.createDefault(testDir);
 
       expect(settings.aiAgents).toEqual([]);
 
@@ -261,7 +264,7 @@ describe('UserSettingsManager', () => {
     });
 
     it('should not duplicate agent if already in list', () => {
-      const settings = UserSettingsManager.createDefault();
+      const settings = UserSettingsManager.createDefault(testDir);
       settings.addAiAgent(AI_AGENT.Claude);
 
       expect(settings.aiAgents).toEqual([AI_AGENT.Claude]);
@@ -273,7 +276,7 @@ describe('UserSettingsManager', () => {
     });
 
     it('should save settings after updating default', () => {
-      const settings = UserSettingsManager.createDefault();
+      const settings = UserSettingsManager.createDefault(testDir);
 
       settings.setDefaultAiAgent(AI_AGENT.Gemini);
 
@@ -285,7 +288,7 @@ describe('UserSettingsManager', () => {
 
   describe('addAiAgent', () => {
     it('should add AI agent to list', () => {
-      const settings = UserSettingsManager.createDefault();
+      const settings = UserSettingsManager.createDefault(testDir);
 
       settings.addAiAgent(AI_AGENT.Claude);
 
@@ -293,7 +296,7 @@ describe('UserSettingsManager', () => {
     });
 
     it('should not duplicate agent if already in list', () => {
-      const settings = UserSettingsManager.createDefault();
+      const settings = UserSettingsManager.createDefault(testDir);
 
       settings.addAiAgent(AI_AGENT.Claude);
       settings.addAiAgent(AI_AGENT.Claude);
@@ -302,7 +305,7 @@ describe('UserSettingsManager', () => {
     });
 
     it('should save settings after adding agent', () => {
-      const settings = UserSettingsManager.createDefault();
+      const settings = UserSettingsManager.createDefault(testDir);
 
       settings.addAiAgent(AI_AGENT.Gemini);
 
@@ -311,7 +314,7 @@ describe('UserSettingsManager', () => {
     });
 
     it('should support multiple different agents', () => {
-      const settings = UserSettingsManager.createDefault();
+      const settings = UserSettingsManager.createDefault(testDir);
 
       settings.addAiAgent(AI_AGENT.Claude);
       settings.addAiAgent(AI_AGENT.Gemini);
@@ -322,7 +325,7 @@ describe('UserSettingsManager', () => {
 
   describe('removeAiAgent', () => {
     it('should remove AI agent from list', () => {
-      const settings = UserSettingsManager.createDefault();
+      const settings = UserSettingsManager.createDefault(testDir);
       settings.addAiAgent(AI_AGENT.Claude);
       settings.addAiAgent(AI_AGENT.Gemini);
 
@@ -332,7 +335,7 @@ describe('UserSettingsManager', () => {
     });
 
     it('should do nothing if agent not in list', () => {
-      const settings = UserSettingsManager.createDefault();
+      const settings = UserSettingsManager.createDefault(testDir);
       settings.addAiAgent(AI_AGENT.Claude);
 
       settings.removeAiAgent(AI_AGENT.Gemini);
@@ -341,7 +344,7 @@ describe('UserSettingsManager', () => {
     });
 
     it('should update default if removed agent was the default', () => {
-      const settings = UserSettingsManager.createDefault();
+      const settings = UserSettingsManager.createDefault(testDir);
       settings.addAiAgent(AI_AGENT.Claude);
       settings.addAiAgent(AI_AGENT.Gemini);
       settings.setDefaultAiAgent(AI_AGENT.Claude);
@@ -355,7 +358,7 @@ describe('UserSettingsManager', () => {
     });
 
     it('should not update default if removed agent was not the default', () => {
-      const settings = UserSettingsManager.createDefault();
+      const settings = UserSettingsManager.createDefault(testDir);
       settings.addAiAgent(AI_AGENT.Claude);
       settings.addAiAgent(AI_AGENT.Gemini);
       settings.setDefaultAiAgent(AI_AGENT.Claude);
@@ -367,7 +370,7 @@ describe('UserSettingsManager', () => {
     });
 
     it('should save settings after removing agent', () => {
-      const settings = UserSettingsManager.createDefault();
+      const settings = UserSettingsManager.createDefault(testDir);
       settings.addAiAgent(AI_AGENT.Claude);
       settings.addAiAgent(AI_AGENT.Gemini);
 
@@ -380,7 +383,7 @@ describe('UserSettingsManager', () => {
 
   describe('toJSON', () => {
     it('should return a copy of the data', () => {
-      const settings = UserSettingsManager.createDefault();
+      const settings = UserSettingsManager.createDefault(testDir);
       settings.addAiAgent(AI_AGENT.Claude);
 
       const json = settings.toJSON();
@@ -393,7 +396,7 @@ describe('UserSettingsManager', () => {
     });
 
     it('should return a copy, not a reference', () => {
-      const settings = UserSettingsManager.createDefault();
+      const settings = UserSettingsManager.createDefault(testDir);
 
       const json = settings.toJSON();
       json.aiAgents.push(AI_AGENT.Claude);
@@ -419,14 +422,14 @@ describe('UserSettingsManager', () => {
         )
       );
 
-      const settings = UserSettingsManager.load();
+      const settings = UserSettingsManager.load(testDir);
 
       expect(settings.aiAgents).toEqual([]);
       expect(settings.defaultAiAgent).toBeUndefined();
     });
 
     it('should handle removing last agent when it is the default', () => {
-      const settings = UserSettingsManager.createDefault();
+      const settings = UserSettingsManager.createDefault(testDir);
       settings.setDefaultAiAgent(AI_AGENT.Claude);
 
       expect(settings.defaultAiAgent).toBe(AI_AGENT.Claude);
@@ -453,7 +456,7 @@ describe('UserSettingsManager', () => {
         )
       );
 
-      const settings = UserSettingsManager.load();
+      const settings = UserSettingsManager.load(testDir);
 
       // Migration should add default from Claude fallback
       expect(settings.version).toBe('1.0');

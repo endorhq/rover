@@ -84,7 +84,11 @@ class ClaudeAI implements AIAgentTool {
     }
   }
 
-  async invoke(prompt: string, json: boolean = false): Promise<string> {
+  async invoke(
+    prompt: string,
+    json: boolean = false,
+    cwd?: string
+  ): Promise<string> {
     const claudeArgs = ['-p'];
 
     if (json) {
@@ -99,6 +103,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
     try {
       const { stdout } = await launch(this.AGENT_BIN, claudeArgs, {
         input: prompt,
+        cwd,
         env: {
           ...process.env,
           // Ensure non-interactive mode
@@ -131,7 +136,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
     const prompt = this.promptBuilder.expandTaskPrompt(briefDescription);
 
     try {
-      const response = await this.invoke(prompt, true);
+      const response = await this.invoke(prompt, true, projectPath);
       return parseJsonResponse<IPromptTask>(response);
     } catch (error) {
       console.error('Failed to expand task with Claude:', error);

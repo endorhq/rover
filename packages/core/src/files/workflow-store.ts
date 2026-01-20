@@ -10,7 +10,6 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { WorkflowManager } from './workflow.js';
 import { getConfigDir } from '../paths.js';
-import { findProjectRoot } from '../project-root.js';
 import { PROJECT_CONFIG_FILENAME } from 'rover-schemas';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 
@@ -70,18 +69,23 @@ export class WorkflowStore {
   private localStorePath: string | null;
   private globalStorePath: string;
 
-  constructor() {
+  /**
+   * Create a new WorkflowStore
+   * @param projectPath - Optional project root path. If provided and contains rover.json,
+   *                      enables local workflow storage at <projectPath>/.rover/workflows/
+   */
+  constructor(projectPath?: string) {
     this.workflows = new Map<string, WorkflowEntry>();
 
-    // Check if we're in a Rover project
-    const projectRoot = findProjectRoot();
-    const isRoverProject = existsSync(
-      join(projectRoot, PROJECT_CONFIG_FILENAME)
-    );
+    // Check if we're in a Rover project (only if projectPath is provided)
+    const isRoverProject = projectPath
+      ? existsSync(join(projectPath, PROJECT_CONFIG_FILENAME))
+      : false;
 
-    this.localStorePath = isRoverProject
-      ? join(projectRoot, '.rover', WORKFLOWS_FOLDER)
-      : null;
+    this.localStorePath =
+      isRoverProject && projectPath
+        ? join(projectPath, '.rover', WORKFLOWS_FOLDER)
+        : null;
 
     this.globalStorePath = join(getConfigDir(), WORKFLOWS_FOLDER);
 

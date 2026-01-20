@@ -6,6 +6,7 @@ import QwenAI from './qwen.js';
 import type { IPromptTask } from '../prompts/index.js';
 import { UserSettingsManager, AI_AGENT, launchSync } from 'rover-core';
 import type { WorkflowInput } from 'rover-schemas';
+import { getProjectPath } from '../context.js';
 
 export const findKeychainCredentials = (key: string): string => {
   const result = launchSync(
@@ -18,7 +19,7 @@ export const findKeychainCredentials = (key: string): string => {
 
 export interface AIAgentTool {
   // Invoke the CLI tool using the SDK / direct mode with the given prompt
-  invoke(prompt: string, json: boolean): Promise<string>;
+  invoke(prompt: string, json: boolean, cwd?: string): Promise<string>;
 
   // Check if the current AI agent is available
   // It will throw an exception in other case
@@ -114,8 +115,10 @@ export const getAIAgentTool = (agent: string): AIAgentTool => {
  */
 export const getUserAIAgent = (): AI_AGENT => {
   try {
-    if (UserSettingsManager.exists()) {
-      const userSettings = UserSettingsManager.load();
+    // Get project path from CLI context (may be null in global mode or before context init)
+    const projectPath = getProjectPath();
+    if (projectPath && UserSettingsManager.exists(projectPath)) {
+      const userSettings = UserSettingsManager.load(projectPath);
       return userSettings.defaultAiAgent || AI_AGENT.Claude;
     } else {
       return AI_AGENT.Claude;

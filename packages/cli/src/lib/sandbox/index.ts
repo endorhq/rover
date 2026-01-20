@@ -33,6 +33,8 @@ export async function getAvailableSandboxBackend(): Promise<
 export interface CreateSandboxOptions {
   /** Extra arguments to pass to Docker/Podman from CLI */
   extraArgs?: string;
+  /** Explicit project path for configuration loading */
+  projectPath?: string;
 }
 
 /**

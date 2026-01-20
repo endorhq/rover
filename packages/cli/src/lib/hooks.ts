@@ -19,6 +19,8 @@ export interface HookContext {
   taskTitle: string;
   /** The task status (for onComplete hooks: 'completed' or 'failed') */
   taskStatus?: string;
+  /** The project path where hooks should run */
+  projectPath: string;
 }
 
 /**
@@ -55,6 +57,7 @@ export function executeHook(command: string, context: HookContext): HookResult {
     // Execute the command synchronously using launchSync
     launchSync('sh', ['-c', command], {
       env,
+      cwd: context.projectPath,
       stdio: 'pipe',
     });
 

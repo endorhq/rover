@@ -278,7 +278,7 @@ export const inspectCommand = async (
       // Get file changes for non-active tasks
       let fileChanges: FileChangeStat[] | undefined;
       if (!task.isActive()) {
-        const git = new Git();
+        const git = new Git({ cwd: project.path });
         const stats = await git.diffStats({
           worktreePath: task.worktreePath,
           includeUntracked: true,
@@ -397,7 +397,7 @@ export const inspectCommand = async (
 
       // Show file changes only if task is not in an active state
       if (!task.isActive()) {
-        const git = new Git();
+        const git = new Git({ cwd: project.path });
         const stats = await git.diffStats({
           worktreePath: task.worktreePath,
           includeUntracked: true,
