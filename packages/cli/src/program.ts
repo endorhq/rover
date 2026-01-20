@@ -7,7 +7,6 @@ import {
   showSplashHeader,
   showRegularHeader,
   findOrRegisterProject,
-  ProjectLoaderNotGitRepoError,
 } from 'rover-core';
 import { NETWORK_MODE_VALUES } from 'rover-schemas';
 import { initCommand } from './commands/init.js';
@@ -28,7 +27,7 @@ import { pushCommand } from './commands/push.js';
 import { stopCommand } from './commands/stop.js';
 import { mcpCommand } from './commands/mcp.js';
 import { addWorkflowCommands } from './commands/workflows/index.js';
-import { initCLIContext, isJsonMode, setJsonMode } from './lib/context.js';
+import { getProjectPath, initCLIContext, isJsonMode } from './lib/context.js';
 
 function isWorkflowsToplevelCommand(command: Command): boolean {
   return command.parent?.name() === 'workflows';
@@ -96,7 +95,9 @@ export function createProgram(
         ) {
           showSplashHeader();
         } else if (commandName !== 'mcp') {
-          showRegularHeader(version, process.cwd());
+          // Show actual project path, not just cwd
+          const displayPath = getProjectPath() ?? process.cwd();
+          showRegularHeader(version, displayPath);
         }
       });
   }

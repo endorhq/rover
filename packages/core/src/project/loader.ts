@@ -56,9 +56,10 @@ export type FindOrRegisterProjectOptions = {
  * @throws {ProjectLoaderRegistrationError} When project registration fails
  */
 export async function findOrRegisterProject(
-  _options: FindOrRegisterProjectOptions = {}
+  options: FindOrRegisterProjectOptions = {}
 ): Promise<ProjectManager> {
-  const git = new Git();
+  const cwd = options.cwd;
+  const git = new Git({ cwd });
 
   // Check if inside a git repository
   if (!git.isGitRepo()) {

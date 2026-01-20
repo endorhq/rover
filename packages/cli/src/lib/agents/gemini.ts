@@ -41,7 +41,11 @@ class GeminiAI implements AIAgentTool {
     }
   }
 
-  async invoke(prompt: string, json: boolean = false): Promise<string> {
+  async invoke(
+    prompt: string,
+    json: boolean = false,
+    cwd?: string
+  ): Promise<string> {
     // Do not add -p, it's deprecated
     const geminiArgs: string[] = [];
 
@@ -56,6 +60,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
     try {
       const { stdout } = await launch(this.AGENT_BIN, geminiArgs, {
         input: prompt,
+        cwd,
       });
       return stdout?.toString().trim() || '';
     } catch (error) {
@@ -70,7 +75,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
     const prompt = this.promptBuilder.expandTaskPrompt(briefDescription);
 
     try {
-      const response = await this.invoke(prompt, true);
+      const response = await this.invoke(prompt, true, projectPath);
       return parseJsonResponse<IPromptTask>(response);
     } catch (error) {
       console.error('Failed to expand task with Gemini:', error);

@@ -7,7 +7,7 @@ import {
 } from 'rover-core';
 import { Sandbox, SandboxOptions } from './types.js';
 import { SetupBuilder } from '../setup.js';
-import { findProjectRoot, launch, ProcessManager, VERBOSE } from 'rover-core';
+import { launch, ProcessManager, VERBOSE } from 'rover-core';
 import { existsSync } from 'node:fs';
 import { userInfo } from 'node:os';
 import { generateRandomId } from '../../utils/branch-name.js';
@@ -20,6 +20,7 @@ import {
 } from './container-common.js';
 import { mergeNetworkConfig } from '../network-config.js';
 import { isJsonMode } from '../context.js';
+import { isPathWithin } from '../../utils/path-utils.js';
 import colors from 'ansi-colors';
 
 export class PodmanSandbox extends Sandbox {
@@ -50,12 +51,13 @@ export class PodmanSandbox extends Sandbox {
     }
 
     // Load project configuration
-    const projectConfig = ProjectConfigManager.load();
+    const projectConfig = ProjectConfigManager.load(this.options?.projectPath!);
     const worktreePath = this.task.worktreePath;
 
+    // Validate worktree path is within project root or data directory (security check)
     const worktreeKnownLocation =
-      worktreePath.startsWith(projectConfig.projectRoot) ||
-      worktreePath.startsWith(getDataDir());
+      isPathWithin(worktreePath, projectConfig.projectRoot) ||
+      isPathWithin(worktreePath, getDataDir());
 
     if (worktreePath.length === 0 || !worktreeKnownLocation) {
       throw new Error(
@@ -63,7 +65,7 @@ export class PodmanSandbox extends Sandbox {
       );
     }
 
-    // Generate setup script using SetupBuilde
+    // Generate setup script using SetupBuilder
     const setupBuilder = new SetupBuilder(
       this.task,
       this.task.agent!,
@@ -231,12 +233,13 @@ export class PodmanSandbox extends Sandbox {
     }
 
     // Load project configuration
-    const projectConfig = ProjectConfigManager.load();
+    const projectConfig = ProjectConfigManager.load(this.options?.projectPath!);
     const worktreePath = this.task.worktreePath;
 
+    // Validate worktree path is within project root or data directory (security check)
     const worktreeKnownLocation =
-      worktreePath.startsWith(projectConfig.projectRoot) ||
-      worktreePath.startsWith(getDataDir());
+      isPathWithin(worktreePath, projectConfig.projectRoot) ||
+      isPathWithin(worktreePath, getDataDir());
 
     if (worktreePath.length === 0 || !worktreeKnownLocation) {
       throw new Error(
@@ -244,7 +247,7 @@ export class PodmanSandbox extends Sandbox {
       );
     }
 
-    // Generate setup script using SetupBuilde
+    // Generate setup script using SetupBuilder
     const setupBuilder = new SetupBuilder(
       this.task,
       this.task.agent!,
@@ -409,7 +412,7 @@ export class PodmanSandbox extends Sandbox {
     const containerName = `rover-shell-${this.task.id}-${generateRandomId()}`;
 
     // Get extra args from CLI options and project config, merge them
-    const projectConfig = ProjectConfigManager.load();
+    const projectConfig = ProjectConfigManager.load(this.options?.projectPath!);
     const configExtraArgs = normalizeExtraArgs(projectConfig?.sandboxExtraArgs);
     const cliExtraArgs = normalizeExtraArgs(this.options?.extraArgs);
     const extraArgs = [...configExtraArgs, ...cliExtraArgs];

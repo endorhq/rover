@@ -13,6 +13,8 @@ import {
 export interface SandboxOptions {
   /** Extra arguments to pass to Docker/Podman from CLI */
   extraArgs?: string;
+  /** Project root path for loading configuration */
+  projectPath?: string;
 }
 
 export abstract class SandboxPackage {

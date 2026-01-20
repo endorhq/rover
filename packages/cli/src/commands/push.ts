@@ -67,7 +67,6 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
 
   const telemetry = getTelemetry();
   const json = options.json === true;
-  const git = new Git();
   const result: PushResult = {
     success: false,
     taskId: 0,
@@ -89,17 +88,6 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
   // Store the task ID!
   result.taskId = numericTaskId;
 
-  let projectConfig;
-
-  // Load config
-  try {
-    projectConfig = ProjectConfigManager.load();
-  } catch (err) {
-    if (!isJsonMode()) {
-      console.log(colors.yellow('⚠ Could not load project settings'));
-    }
-  }
-
   // Get project context
   let project;
   try {
@@ -108,6 +96,19 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
     result.error = error instanceof Error ? error.message : String(error);
     await exitWithError(result, { telemetry });
     return;
+  }
+
+  const git = new Git({ cwd: project.path });
+
+  let projectConfig;
+
+  // Load config
+  try {
+    projectConfig = ProjectConfigManager.load(project.path);
+  } catch (err) {
+    if (!isJsonMode()) {
+      console.log(colors.yellow('⚠ Could not load project settings'));
+    }
   }
 
   try {
@@ -363,6 +364,7 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
           taskId: numericTaskId,
           taskBranch: task.branchName,
           taskTitle: task.title,
+          projectPath: project.path,
         },
         'onPush'
       );

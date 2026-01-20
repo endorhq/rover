@@ -36,7 +36,11 @@ class CursorAI implements AIAgentTool {
     }
   }
 
-  async invoke(prompt: string, json: boolean = false): Promise<string> {
+  async invoke(
+    prompt: string,
+    json: boolean = false,
+    cwd?: string
+  ): Promise<string> {
     const cursorArgs = ['agent', '--print'];
     if (json) {
       cursorArgs.push('--output-format');
@@ -50,6 +54,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
     try {
       const { stdout } = await launch(this.AGENT_BIN, cursorArgs, {
         input: prompt,
+        cwd,
       });
 
       const result = stdout?.toString().trim() || '';
@@ -76,7 +81,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
     const prompt = this.promptBuilder.expandTaskPrompt(briefDescription);
 
     try {
-      const response = await this.invoke(prompt, true);
+      const response = await this.invoke(prompt, true, projectPath);
       return parseJsonResponse<IPromptTask>(response);
     } catch (error) {
       console.error('Failed to expand task with Cursor:', error);

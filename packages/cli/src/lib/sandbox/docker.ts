@@ -20,6 +20,7 @@ import {
 } from './container-common.js';
 import { mergeNetworkConfig } from '../network-config.js';
 import { isJsonMode } from '../context.js';
+import { isPathWithin } from '../../utils/path-utils.js';
 import colors from 'ansi-colors';
 
 export class DockerSandbox extends Sandbox {
@@ -54,12 +55,13 @@ export class DockerSandbox extends Sandbox {
     }
 
     // Load project configuration
-    const projectConfig = ProjectConfigManager.load();
+    const projectConfig = ProjectConfigManager.load(this.options?.projectPath!);
     const worktreePath = this.task.worktreePath;
 
+    // Validate worktree path is within project root or data directory (security check)
     const worktreeKnownLocation =
-      worktreePath.startsWith(projectConfig.projectRoot) ||
-      worktreePath.startsWith(getDataDir());
+      isPathWithin(worktreePath, projectConfig.projectRoot) ||
+      isPathWithin(worktreePath, getDataDir());
 
     if (worktreePath.length === 0 || !worktreeKnownLocation) {
       throw new Error(
@@ -249,12 +251,13 @@ export class DockerSandbox extends Sandbox {
     }
 
     // Load project configuration
-    const projectConfig = ProjectConfigManager.load();
+    const projectConfig = ProjectConfigManager.load(this.options?.projectPath!);
     const worktreePath = this.task.worktreePath;
 
+    // Validate worktree path is within project root or data directory (security check)
     const worktreeKnownLocation =
-      worktreePath.startsWith(projectConfig.projectRoot) ||
-      worktreePath.startsWith(getDataDir());
+      isPathWithin(worktreePath, projectConfig.projectRoot) ||
+      isPathWithin(worktreePath, getDataDir());
 
     if (worktreePath.length === 0 || !worktreeKnownLocation) {
       throw new Error(
@@ -437,7 +440,7 @@ export class DockerSandbox extends Sandbox {
     const containerName = `rover-shell-${this.task.id}-${generateRandomId()}`;
 
     // Get extra args from CLI options and project config, merge them
-    const projectConfig = ProjectConfigManager.load();
+    const projectConfig = ProjectConfigManager.load(this.options?.projectPath!);
     const configExtraArgs = normalizeExtraArgs(projectConfig?.sandboxExtraArgs);
     const cliExtraArgs = normalizeExtraArgs(this.options?.extraArgs);
     const extraArgs = [...configExtraArgs, ...cliExtraArgs];

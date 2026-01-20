@@ -214,7 +214,6 @@ export const mergeCommand = async (
   }
 
   const telemetry = getTelemetry();
-  const git = new Git();
   const jsonOutput: TaskMergeOutput = {
     success: false,
   };
@@ -227,18 +226,20 @@ export const mergeCommand = async (
     return;
   }
 
-  if (!git.isGitRepo()) {
-    jsonOutput.error = 'No worktree found for this task';
-    await exitWithError(jsonOutput, { telemetry });
-    return;
-  }
-
   // Require project context
   let project;
   try {
     project = await requireProjectContext();
   } catch (error) {
     jsonOutput.error = error instanceof Error ? error.message : String(error);
+    await exitWithError(jsonOutput, { telemetry });
+    return;
+  }
+
+  const git = new Git({ cwd: project.path });
+
+  if (!git.isGitRepo()) {
+    jsonOutput.error = 'No worktree found for this task';
     await exitWithError(jsonOutput, { telemetry });
     return;
   }
@@ -258,7 +259,7 @@ export const mergeCommand = async (
 
   // Load config
   try {
-    projectConfig = ProjectConfigManager.load();
+    projectConfig = ProjectConfigManager.load(project.path);
   } catch (err) {
     if (!isJsonMode()) {
       console.log(colors.yellow('⚠ Could not load project settings'));
@@ -267,8 +268,8 @@ export const mergeCommand = async (
 
   // Load user preferences
   try {
-    if (UserSettingsManager.exists()) {
-      const userSettings = UserSettingsManager.load();
+    if (UserSettingsManager.exists(project.path)) {
+      const userSettings = UserSettingsManager.load(project.path);
       selectedAiAgent = userSettings.defaultAiAgent || AI_AGENT.Claude;
     } else {
       if (!isJsonMode()) {
@@ -630,6 +631,7 @@ export const mergeCommand = async (
               taskId: numericTaskId,
               taskBranch: taskBranch,
               taskTitle: task.title,
+              projectPath: project.path,
             },
             'onMerge'
           );

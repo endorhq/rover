@@ -16,7 +16,7 @@ export {
 
 export { createGetVersion, getVersion } from './version.js';
 
-export { Git } from './git.js';
+export { Git, type GitOptions } from './git.js';
 
 export {
   requiredClaudeCredentials,

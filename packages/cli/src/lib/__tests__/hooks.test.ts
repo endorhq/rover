@@ -21,6 +21,7 @@ describe('hooks library', () => {
     taskId: 42,
     taskBranch: 'task/42-add-feature',
     taskTitle: 'Add new feature',
+    projectPath: '/test/project',
   };
 
   beforeEach(() => {
@@ -52,7 +53,7 @@ describe('hooks library', () => {
       expect(result.warning).toBeUndefined();
     });
 
-    it('should pass environment variables with ROVER_ prefix', () => {
+    it('should pass environment variables with ROVER_ prefix and cwd', () => {
       mockedLaunchSync.mockReturnValue({
         stdout: '',
         stderr: '',
@@ -75,6 +76,7 @@ describe('hooks library', () => {
             ROVER_TASK_BRANCH: 'task/42-add-feature',
             ROVER_TASK_TITLE: 'Add new feature',
           }),
+          cwd: '/test/project',
           stdio: 'pipe',
         })
       );
@@ -326,6 +328,7 @@ describe('hooks library', () => {
         taskId: 12345,
         taskBranch: 'task/12345-big-task',
         taskTitle: 'A big task',
+        projectPath: '/test/project',
       };
 
       executeHook('test', context);
@@ -357,6 +360,7 @@ describe('hooks library', () => {
         taskId: 1,
         taskBranch: 'task/1-special',
         taskTitle: 'Fix "bug" with $special chars & more',
+        projectPath: '/test/project',
       };
 
       executeHook('test', context);
@@ -389,6 +393,7 @@ describe('hooks library', () => {
         taskBranch: 'task/42-done',
         taskTitle: 'Completed task',
         taskStatus: 'completed',
+        projectPath: '/test/project',
       };
 
       executeHook('echo done', context);
@@ -424,6 +429,7 @@ describe('hooks library', () => {
         taskBranch: 'task/43-failed',
         taskTitle: 'Failed task',
         taskStatus: 'failed',
+        projectPath: '/test/project',
       };
 
       executeHook('echo failed', context);
@@ -455,6 +461,7 @@ describe('hooks library', () => {
         taskId: 44,
         taskBranch: 'task/44-merge',
         taskTitle: 'Merge task',
+        projectPath: '/test/project',
         // taskStatus not provided
       };
 

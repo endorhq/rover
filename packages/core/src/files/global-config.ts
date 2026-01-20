@@ -22,6 +22,10 @@ import {
 import { getConfigDir } from '../paths.js';
 import { ProjectConfigManager } from './project-config.js';
 import { UserSettingsManager } from './user-settings.js';
+// Using deprecated findProjectRoot here because GlobalConfigManager.createDefault()
+// is called during migration/initialization when no explicit project context exists.
+// This is one of the few remaining valid uses of the deprecated function.
+import { findProjectRoot } from '../project-root.js';
 
 /**
  * Manager class for global configuration
@@ -95,15 +99,20 @@ export class GlobalConfigManager {
     // Try to derive agents from user settings
     let agents: AI_AGENT[] = [];
 
+    // Try to derive settings from an existing project in the current directory
+    // Using deprecated findProjectRoot() because this runs during global config
+    // initialization when no explicit project context is available.
     try {
-      const projectConfig = ProjectConfigManager.load();
+      const projectRoot = findProjectRoot();
+      const projectConfig = ProjectConfigManager.load(projectRoot);
       attribution = projectConfig.attribution ? 'enabled' : 'disabled';
     } catch (error) {
       // Ignore errors and keep attribution as 'unknown'
     }
 
     try {
-      const userSettings = UserSettingsManager.load();
+      const projectRoot = findProjectRoot();
+      const userSettings = UserSettingsManager.load(projectRoot);
       agents = userSettings.aiAgents ? userSettings.aiAgents : [];
     } catch (error) {
       // Ignore errors and keep agents as empty

@@ -60,10 +60,21 @@ export type GitRemoteUrlOptions = {
   worktreePath?: string;
 };
 
+export type GitOptions = {
+  /** Working directory for git operations. Defaults to process.cwd(). */
+  cwd?: string;
+};
+
 /**
- * A class to manage and run docker commands
+ * A class to manage and run git commands
  */
 export class Git {
+  private readonly cwd?: string;
+
+  constructor(options?: GitOptions) {
+    this.cwd = options?.cwd;
+  }
+
   version(): string {
     return launchSync('git', ['--version']).stdout?.toString() || 'unknown';
   }
@@ -71,6 +82,7 @@ export class Git {
   isGitRepo(): boolean {
     const result = launchSync('git', ['rev-parse', '--is-inside-work-tree'], {
       reject: false,
+      cwd: this.cwd,
     });
     return result.exitCode === 0;
   }
@@ -81,6 +93,7 @@ export class Git {
   getRepositoryRoot(): string | null {
     const result = launchSync('git', ['rev-parse', '--show-toplevel'], {
       reject: false,
+      cwd: this.cwd,
     });
     if (result.exitCode === 0) {
       return result.stdout?.toString().trim() || null;
@@ -91,6 +104,7 @@ export class Git {
   hasCommits(): boolean {
     const result = launchSync('git', ['rev-list', '--count', 'HEAD'], {
       reject: false,
+      cwd: this.cwd,
     });
     return result.exitCode === 0;
   }
@@ -110,8 +124,10 @@ export class Git {
       args.push('--', options.filePath);
     }
 
+    const effectiveCwd = options.worktreePath ?? this.cwd;
+
     const diffResult = launchSync('git', args, {
-      cwd: options.worktreePath,
+      cwd: effectiveCwd,
     });
 
     // If includeUntracked is true and we're not filtering by a specific file,
@@ -123,7 +139,7 @@ export class Git {
         'git',
         ['ls-files', '--others', '--exclude-standard'],
         {
-          cwd: options.worktreePath,
+          cwd: effectiveCwd,
           reject: false,
         }
       );
@@ -153,7 +169,7 @@ export class Git {
               'git',
               ['diff', '--no-index', '/dev/null', file],
               {
-                cwd: options.worktreePath,
+                cwd: effectiveCwd,
                 reject: false,
               }
             );
@@ -194,8 +210,10 @@ export class Git {
 
     const files = [];
 
+    const effectiveCwd = options.worktreePath ?? this.cwd;
+
     const diffResult = launchSync('git', args, {
-      cwd: options.worktreePath,
+      cwd: effectiveCwd,
     });
 
     const output = diffResult.stdout?.toString() || '';
@@ -223,7 +241,7 @@ export class Git {
         'git',
         ['ls-files', '--others', '--exclude-standard'],
         {
-          cwd: options.worktreePath,
+          cwd: effectiveCwd,
           reject: false,
         }
       );
@@ -238,7 +256,7 @@ export class Git {
 
         for (const file of untrackedFiles) {
           const fileLines = await this.countFileLines(
-            join(options.worktreePath || '', file)
+            join(effectiveCwd || '', file)
           );
           files.push({ path: file, insertions: fileLines, deletions: 0 });
         }
@@ -258,7 +276,7 @@ export class Git {
   add(file: string, options: GitWorktreeOptions = {}): boolean {
     try {
       launchSync('git', ['add', file], {
-        cwd: options.worktreePath,
+        cwd: options.worktreePath ?? this.cwd,
       });
       return true;
     } catch (_err) {
@@ -270,12 +288,14 @@ export class Git {
    * Add all files and commit it
    */
   addAndCommit(message: string, options: GitWorktreeOptions = {}): void {
+    const effectiveCwd = options.worktreePath ?? this.cwd;
+
     launchSync('git', ['add', '-A'], {
-      cwd: options.worktreePath,
+      cwd: effectiveCwd,
     });
 
     launchSync('git', ['commit', '-m', message], {
-      cwd: options.worktreePath,
+      cwd: effectiveCwd,
     });
   }
 
@@ -287,7 +307,7 @@ export class Git {
 
     try {
       const result = launchSync('git', ['remote', 'get-url', remoteName], {
-        cwd: options.worktreePath,
+        cwd: options.worktreePath ?? this.cwd,
       });
 
       return result?.stdout?.toString().trim() || '';
@@ -306,7 +326,7 @@ export class Git {
   ): boolean {
     try {
       launchSync('git', ['merge', '--no-ff', branch, '-m', message], {
-        cwd: options.worktreePath,
+        cwd: options.worktreePath ?? this.cwd,
       });
 
       return true;
@@ -322,7 +342,7 @@ export class Git {
   abortMerge(options: GitWorktreeOptions = {}) {
     try {
       launchSync('git', ['merge', '--abort'], {
-        cwd: options.worktreePath,
+        cwd: options.worktreePath ?? this.cwd,
       });
     } catch (_err) {
       // Ignore abort errors
@@ -335,7 +355,7 @@ export class Git {
   continueMerge(options: GitWorktreeOptions = {}) {
     try {
       launchSync('git', ['merge', '--continue'], {
-        cwd: options.worktreePath,
+        cwd: options.worktreePath ?? this.cwd,
       });
     } catch (_err) {
       // Ignore abort errors
@@ -348,7 +368,7 @@ export class Git {
    */
   pruneWorktree(): boolean {
     try {
-      launchSync('git', ['worktree', 'prune']);
+      launchSync('git', ['worktree', 'prune'], { cwd: this.cwd });
       return true;
     } catch (_err) {
       // Ignore abort errors
@@ -363,7 +383,7 @@ export class Git {
     try {
       // Check if we're in a merge state
       const status = launchSync('git', ['status', '--porcelain'], {
-        cwd: options.worktreePath,
+        cwd: options.worktreePath ?? this.cwd,
       })
         .stdout?.toString()
         .trim();
@@ -407,7 +427,7 @@ export class Git {
 
       const status =
         launchSync('git', args, {
-          cwd: options.worktreePath,
+          cwd: options.worktreePath ?? this.cwd,
         })
           .stdout?.toString()
           .trim() || '';
@@ -464,7 +484,7 @@ export class Git {
     try {
       return (
         launchSync('git', ['branch', '--show-current'], {
-          cwd: options.worktreePath,
+          cwd: options.worktreePath ?? this.cwd,
         })
           .stdout?.toString()
           .trim() || 'unknown'
@@ -483,7 +503,7 @@ export class Git {
         launchSync(
           'git',
           ['show-ref', '--verify', '--quiet', `refs/heads/${branch}`],
-          { reject: false }
+          { reject: false, cwd: this.cwd }
         ).exitCode === 0
       );
     } catch (error) {
@@ -503,6 +523,7 @@ export class Git {
       return (
         launchSync('git', ['worktree', 'add', path, branchName], {
           reject: false,
+          cwd: this.cwd,
         }).exitCode == 0
       );
     }
@@ -510,7 +531,9 @@ export class Git {
     const args = baseBranch
       ? ['worktree', 'add', path, '-b', branchName, baseBranch]
       : ['worktree', 'add', path, '-b', branchName];
-    return launchSync('git', args, { reject: false }).exitCode == 0;
+    return (
+      launchSync('git', args, { reject: false, cwd: this.cwd }).exitCode == 0
+    );
   }
 
   /**
@@ -521,10 +544,11 @@ export class Git {
     let branch = 'main';
 
     try {
-      const remoteHead = launchSync('git', [
-        'symbolic-ref',
-        'refs/remotes/origin/HEAD',
-      ])
+      const remoteHead = launchSync(
+        'git',
+        ['symbolic-ref', 'refs/remotes/origin/HEAD'],
+        { cwd: this.cwd }
+      )
         .stdout?.toString()
         .trim();
 
@@ -533,21 +557,19 @@ export class Git {
       } else {
         // Fallback: check if main or master exists
         try {
-          launchSync('git', [
-            'show-ref',
-            '--verify',
-            '--quiet',
-            'refs/heads/main',
-          ]);
+          launchSync(
+            'git',
+            ['show-ref', '--verify', '--quiet', 'refs/heads/main'],
+            { cwd: this.cwd }
+          );
           branch = 'main';
         } catch (error) {
           try {
-            launchSync('git', [
-              'show-ref',
-              '--verify',
-              '--quiet',
-              'refs/heads/master',
-            ]);
+            launchSync(
+              'git',
+              ['show-ref', '--verify', '--quiet', 'refs/heads/master'],
+              { cwd: this.cwd }
+            );
             branch = 'master';
           } catch (error) {
             branch = 'main'; // Default fallback
@@ -576,7 +598,7 @@ export class Git {
         `${options.count || 15}`,
       ],
       {
-        cwd: options.worktreePath,
+        cwd: options.worktreePath ?? this.cwd,
       }
     )
       .stdout?.toString()
@@ -602,7 +624,7 @@ export class Git {
     args.push('origin', branch);
 
     const result = launchSync('git', args, {
-      cwd: options.worktreePath,
+      cwd: options.worktreePath ?? this.cwd,
       reject: false,
     });
 

@@ -90,10 +90,17 @@ export function getDefaultProject(): ProjectManager | null {
 }
 
 /**
+ * Get the project path from context (null if in global mode).
+ */
+export function getProjectPath(): string | null {
+  return getCLIContext().project?.path ?? null;
+}
+
+/**
  * Resolve the effective project for a command.
  *
  * @param projectOption - Value from --project flag (future)
- * @returns ProjectManager or null (global mode)
+ * @returns ProjectManager and projectPath or null (global mode)
  * @throws If --project specified but not found
  */
 export async function resolveProjectContext(
@@ -111,12 +118,22 @@ export async function resolveProjectContext(
   }
 
   // Otherwise, use the default context from pre-action hook
-  return getDefaultProject();
+  const project = getDefaultProject();
+
+  if (project) {
+    return project;
+  }
+
+  return null;
 }
 
 /**
- * Require a project context for a command.
- * Use this for commands that cannot operate in global mode.
+ * Require a project context for a command. It returns the project and projectPath
+ * as an object. If it cannot initialize the project, it will throw an error.
+ *
+ * Use this for commands that cannot operate in global mode and require
+ * either a project in the current working directory (cwd) or the
+ * `--project` flag.
  *
  * @param projectOption - Value from --project flag (future)
  * @returns ProjectManager

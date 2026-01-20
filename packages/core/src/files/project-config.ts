@@ -20,7 +20,6 @@ import {
   type HooksConfig,
   type NetworkConfig,
 } from 'rover-schemas';
-import { findProjectRoot } from '../project-root.js';
 
 /**
  * Manager class for project configuration (rover.json)
@@ -34,9 +33,10 @@ export class ProjectConfigManager {
 
   /**
    * Load an existing configuration from disk
+   * @param projectPath - The project root path where rover.json is located
    */
-  static load(): ProjectConfigManager {
-    const projectRoot = findProjectRoot();
+  static load(projectPath: string): ProjectConfigManager {
+    const projectRoot = projectPath;
     const filePath = join(projectRoot, PROJECT_CONFIG_FILENAME);
 
     try {
@@ -78,8 +78,9 @@ export class ProjectConfigManager {
 
   /**
    * Create a new project configuration with defaults
+   * @param projectPath - The project root path where rover.json will be created
    */
-  static create(): ProjectConfigManager {
+  static create(projectPath: string): ProjectConfigManager {
     const schema: ProjectConfig = {
       version: CURRENT_PROJECT_SCHEMA_VERSION,
       languages: [],
@@ -88,7 +89,7 @@ export class ProjectConfigManager {
       taskManagers: [],
       attribution: true,
     };
-    const projectRoot = findProjectRoot();
+    const projectRoot = projectPath;
 
     const instance = new ProjectConfigManager(schema, projectRoot);
     instance.save();
@@ -97,10 +98,10 @@ export class ProjectConfigManager {
 
   /**
    * Check if a project configuration exists
+   * @param projectPath - The project root path to check
    */
-  static exists(): boolean {
-    const projectRoot = findProjectRoot();
-    const filePath = join(projectRoot, PROJECT_CONFIG_FILENAME);
+  static exists(projectPath: string): boolean {
+    const filePath = join(projectPath, PROJECT_CONFIG_FILENAME);
     return existsSync(filePath);
   }
 
@@ -168,7 +169,7 @@ export class ProjectConfigManager {
    * Reload configuration from disk
    */
   reload(): void {
-    const reloaded = ProjectConfigManager.load();
+    const reloaded = ProjectConfigManager.load(this.projectRoot);
     this.data = reloaded.data;
   }
 

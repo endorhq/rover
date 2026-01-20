@@ -42,7 +42,7 @@ export const diffCommand = async (
   }
 
   try {
-    const git = new Git();
+    const git = new Git({ cwd: project.path });
 
     // Load task using ProjectManager
     const task = project.getTask(numericTaskId);

@@ -16,23 +16,26 @@ import {
   USER_SETTINGS_DIR,
   type UserSettings,
 } from 'rover-schemas';
-import { findProjectRoot } from '../project-root.js';
 
 /**
  * Manager class for user settings (.rover/settings.json)
  */
 export class UserSettingsManager {
-  constructor(private data: UserSettings) {}
+  constructor(
+    private data: UserSettings,
+    public readonly projectRoot: string
+  ) {}
 
   /**
    * Load user settings from disk
+   * @param projectPath - The project root path where .rover/settings.json is located
    */
-  static load(): UserSettingsManager {
-    const filePath = UserSettingsManager.getSettingsPath();
+  static load(projectPath: string): UserSettingsManager {
+    const filePath = UserSettingsManager.getSettingsPath(projectPath);
 
     if (!existsSync(filePath)) {
       // Return default settings if file doesn't exist
-      return UserSettingsManager.createDefault();
+      return UserSettingsManager.createDefault(projectPath);
     }
 
     try {
@@ -44,7 +47,7 @@ export class UserSettingsManager {
 
       // Validate with Zod
       const validatedData = UserSettingsSchema.parse(migratedData);
-      const instance = new UserSettingsManager(validatedData);
+      const instance = new UserSettingsManager(validatedData, projectPath);
 
       // If migration occurred, save the updated data
       if (migratedData.version !== parsedData.version) {
@@ -71,33 +74,35 @@ export class UserSettingsManager {
 
   /**
    * Create default user settings
+   * @param projectPath - The project root path where .rover/settings.json will be created
    */
-  static createDefault(): UserSettingsManager {
+  static createDefault(projectPath: string): UserSettingsManager {
     const schema: UserSettings = {
       version: CURRENT_USER_SCHEMA_VERSION,
       aiAgents: [],
       defaults: {},
     };
 
-    const instance = new UserSettingsManager(schema);
+    const instance = new UserSettingsManager(schema, projectPath);
     instance.save();
     return instance;
   }
 
   /**
    * Check if user settings exist
+   * @param projectPath - The project root path to check
    */
-  static exists(): boolean {
-    const filePath = UserSettingsManager.getSettingsPath();
+  static exists(projectPath: string): boolean {
+    const filePath = UserSettingsManager.getSettingsPath(projectPath);
     return existsSync(filePath);
   }
 
   /**
    * Get the path to the settings file
+   * @param projectPath - The project root path
    */
-  private static getSettingsPath(): string {
-    const projectRoot = findProjectRoot();
-    return join(projectRoot, USER_SETTINGS_DIR, USER_SETTINGS_FILENAME);
+  private static getSettingsPath(projectPath: string): string {
+    return join(projectPath, USER_SETTINGS_DIR, USER_SETTINGS_FILENAME);
   }
 
   /**
@@ -128,9 +133,8 @@ export class UserSettingsManager {
    * Save current settings to disk
    */
   save(): void {
-    const filePath = UserSettingsManager.getSettingsPath();
-    const projectRoot = findProjectRoot();
-    const dirPath = join(projectRoot, USER_SETTINGS_DIR);
+    const filePath = UserSettingsManager.getSettingsPath(this.projectRoot);
+    const dirPath = join(this.projectRoot, USER_SETTINGS_DIR);
 
     try {
       // Ensure .rover directory exists
@@ -152,7 +156,7 @@ export class UserSettingsManager {
    * Reload settings from disk
    */
   reload(): void {
-    const reloaded = UserSettingsManager.load();
+    const reloaded = UserSettingsManager.load(this.projectRoot);
     this.data = reloaded.data;
   }
 
