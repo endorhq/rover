@@ -181,6 +181,7 @@ configure_all_mcps
 
 echo -e "\n📦 Done installing MCP servers"
 {exportTaskVariables}
+{networkConfigSection}
 # Remove ourselves from sudoers
 echo -e "\n👤 Removing privileges after completing the setup!"
 sudo rm /etc/sudoers.d/1-agent-setup

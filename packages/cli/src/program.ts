@@ -9,6 +9,7 @@ import {
   findOrRegisterProject,
   ProjectLoaderNotGitRepoError,
 } from 'rover-core';
+import { NETWORK_MODE_VALUES } from 'rover-schemas';
 import { initCommand } from './commands/init.js';
 import { listCommand } from './commands/list.js';
 import { exitWithError } from './utils/exit.js';
@@ -162,6 +163,24 @@ export function createProgram(
     .option(
       '-a, --agent <agent>',
       `AI agent with optional model (e.g., claude:opus, gemini:flash). Repeat for multiple agents. Available: ${Object.values(AI_AGENT).join(', ')}`,
+      (value: string, previous: string[] | undefined) =>
+        previous ? [...previous, value] : [value]
+    )
+    .addOption(
+      new Option(
+        '--network-mode <mode>',
+        'Network filtering mode for the container'
+      ).choices(NETWORK_MODE_VALUES)
+    )
+    .option(
+      '--network-allow <host>',
+      'Allow network access to host (domain, IP, or CIDR). Can be repeated.',
+      (value: string, previous: string[] | undefined) =>
+        previous ? [...previous, value] : [value]
+    )
+    .option(
+      '--network-block <host>',
+      'Block network access to host (domain, IP, or CIDR). Can be repeated.',
       (value: string, previous: string[] | undefined) =>
         previous ? [...previous, value] : [value]
     )
