@@ -415,7 +415,7 @@ export const listCommand = async (
         }
       }
     }
-    
+
     // Add a breakline
     console.log();
 
