@@ -93,7 +93,7 @@ export function createProgram(
         let project = null;
 
         // Skip project resolution for init (it creates the project),
-        // mcp (adapts to context), and workflow commands
+        // and workflow commands
         if (
           !isWorkflowsToplevelCommand(actionCommand) &&
           commandName !== 'init'
@@ -120,7 +120,6 @@ export function createProgram(
               });
             }
           }
-          // If --project is set, project stays null - resolved on-demand by commands
         }
 
         // Update the project in the context
