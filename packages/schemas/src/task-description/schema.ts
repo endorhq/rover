@@ -28,7 +28,7 @@ export const TaskSourceSchema = z.object({
   id: z.string().optional(),
   url: z.string().url().optional(),
   title: z.string().optional(),
-  ref: z.record(z.unknown()).optional(),
+  ref: z.record(z.string(), z.unknown()).optional(),
 });
 
 // Task description schema
