@@ -10,7 +10,7 @@ import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
 import {
   isJsonMode,
   setJsonMode,
-  requireProjectContext,
+  requireProjectContextForCommand,
 } from '../lib/context.js';
 import { showRoverChat, TIP_TITLES } from '../utils/display.js';
 import { statusColor } from '../utils/task-status.js';
@@ -91,7 +91,7 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
   // Get project context
   let project;
   try {
-    project = await requireProjectContext();
+    project = await requireProjectContextForCommand();
   } catch (error) {
     result.error = error instanceof Error ? error.message : String(error);
     await exitWithError(result, { telemetry });

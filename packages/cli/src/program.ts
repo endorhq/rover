@@ -104,6 +104,15 @@ export function createProgram(
             try {
               project = await findOrRegisterProject();
             } catch (error) {
+              // Display the header for consistency
+              showRoverHeader({
+                version,
+                // Capitalize the agent for now.
+                agent: `-`,
+                defaultAgent: true,
+                projectPath: getProjectPath() || process.cwd(),
+                projectName: getCLIContext().project?.name,
+              });
               // Config/registration errors - exit
               exitWithError({
                 error: error instanceof Error ? error.message : String(error),
@@ -113,10 +122,23 @@ export function createProgram(
           } else if (ctx.projectOption) {
             // Try to resolve the project if the option / env var is set
             try {
-              project = await requireProjectContext(ctx.projectOption);
-            } catch {
+              project = await requireProjectContext(ctx.projectOption, {
+                missingProjectMessage: colors.yellow(
+                  `Could not find the "${ctx.projectOption}" project.\nPlease, select it from the list. You can type to filter the projects`
+                ),
+              });
+            } catch (error) {
+              // Display the header for consistency
+              showRoverHeader({
+                version,
+                // Capitalize the agent for now.
+                agent: `-`,
+                defaultAgent: true,
+                projectPath: getProjectPath() || process.cwd(),
+                projectName: getCLIContext().project?.name,
+              });
               exitWithError({
-                error: `Project "${ctx.projectOption}" not found.`,
+                error: error instanceof Error ? error.message : String(error),
                 success: false,
               });
             }

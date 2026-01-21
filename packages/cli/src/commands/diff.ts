@@ -5,7 +5,7 @@ import { TaskNotFoundError } from 'rover-schemas';
 import { getTelemetry } from '../lib/telemetry.js';
 import { showTips } from '../utils/display.js';
 import { exitWithError, exitWithSuccess } from '../utils/exit.js';
-import { requireProjectContext } from '../lib/context.js';
+import { requireProjectContextForCommand } from '../lib/context.js';
 
 export const diffCommand = async (
   taskId: string,
@@ -29,7 +29,7 @@ export const diffCommand = async (
   // Require project context
   let project;
   try {
-    project = await requireProjectContext();
+    project = await requireProjectContextForCommand();
   } catch (error) {
     await exitWithError(
       {

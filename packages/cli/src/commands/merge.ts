@@ -19,7 +19,7 @@ import type { CLIJsonOutput } from '../types.js';
 import {
   isJsonMode,
   setJsonMode,
-  requireProjectContext,
+  requireProjectContextForCommand,
 } from '../lib/context.js';
 
 const { prompt } = enquirer;
@@ -229,7 +229,7 @@ export const mergeCommand = async (
   // Require project context
   let project;
   try {
-    project = await requireProjectContext();
+    project = await requireProjectContextForCommand();
   } catch (error) {
     jsonOutput.error = error instanceof Error ? error.message : String(error);
     await exitWithError(jsonOutput, { telemetry });

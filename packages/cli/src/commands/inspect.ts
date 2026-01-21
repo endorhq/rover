@@ -16,7 +16,7 @@ import { getTelemetry } from '../lib/telemetry.js';
 import {
   isJsonMode,
   setJsonMode,
-  requireProjectContext,
+  requireProjectContextForCommand,
 } from '../lib/context.js';
 import { exitWithError, exitWithSuccess } from '../utils/exit.js';
 
@@ -185,7 +185,7 @@ export const inspectCommand = async (
   // Require project context
   let project;
   try {
-    project = await requireProjectContext();
+    project = await requireProjectContextForCommand();
   } catch (error) {
     const errorOutput = jsonErrorOutput(
       error instanceof Error ? error.message : String(error),

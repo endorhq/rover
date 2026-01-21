@@ -7,7 +7,7 @@ import yoctoSpinner from 'yocto-spinner';
 import { TaskNotFoundError } from 'rover-schemas';
 import { getTelemetry } from '../lib/telemetry.js';
 import { exitWithError, exitWithWarn, exitWithSuccess } from '../utils/exit.js';
-import { requireProjectContext } from '../lib/context.js';
+import { requireProjectContextForCommand } from '../lib/context.js';
 
 const { prompt } = enquirer;
 
@@ -32,7 +32,7 @@ export const resetCommand = async (
   // Require project context
   let project: ProjectManager;
   try {
-    project = await requireProjectContext();
+    project = await requireProjectContextForCommand();
   } catch (error) {
     await exitWithError(
       {

@@ -17,7 +17,7 @@ import { getTelemetry } from '../lib/telemetry.js';
 import {
   isJsonMode,
   setJsonMode,
-  requireProjectContext,
+  requireProjectContextForCommand,
 } from '../lib/context.js';
 import yoctoSpinner from 'yocto-spinner';
 import { copyEnvironmentFiles } from '../utils/env-files.js';
@@ -62,7 +62,7 @@ export const restartCommand = async (
   // Require project context
   let project;
   try {
-    project = await requireProjectContext();
+    project = await requireProjectContextForCommand();
   } catch (error) {
     jsonOutput.error = error instanceof Error ? error.message : String(error);
     await exitWithError(jsonOutput, { telemetry });

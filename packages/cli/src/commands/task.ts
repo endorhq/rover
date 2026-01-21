@@ -13,7 +13,6 @@ import {
   showProperties,
   Git,
   type ProjectManager,
-  VERBOSE,
 } from 'rover-core';
 import type { NetworkConfig, NetworkMode } from 'rover-schemas';
 import {
@@ -34,8 +33,7 @@ import { copyEnvironmentFiles } from '../utils/env-files.js';
 import { initWorkflowStore } from '../lib/workflow.js';
 import {
   setJsonMode,
-  isJsonMode,
-  requireProjectContext,
+  requireProjectContextForCommand,
   isVerbose,
 } from '../lib/context.js';
 
@@ -450,7 +448,7 @@ export const taskCommand = async (
   // Get project context
   let project;
   try {
-    project = await requireProjectContext();
+    project = await requireProjectContextForCommand();
   } catch (error) {
     jsonOutput.error =
       error instanceof Error ? error.message : 'Failed to get project context';

@@ -16,7 +16,7 @@ import {
   getUserAIAgent,
   type AIAgentTool,
 } from '../lib/agents/index.js';
-import { isJsonMode, requireProjectContext } from '../lib/context.js';
+import { isJsonMode, requireProjectContextForCommand } from '../lib/context.js';
 import type { IPromptTask } from '../lib/prompts/index.js';
 import { createSandbox } from '../lib/sandbox/index.js';
 import { getTelemetry } from '../lib/telemetry.js';
@@ -112,7 +112,7 @@ export const iterateCommand = async (
   // Require project context
   let project;
   try {
-    project = await requireProjectContext();
+    project = await requireProjectContextForCommand();
   } catch (error) {
     result.error = error instanceof Error ? error.message : String(error);
     exitWithError(result, { telemetry });

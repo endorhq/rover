@@ -17,7 +17,7 @@ import type { CLIJsonOutputWithErrors } from '../types.js';
 import {
   isJsonMode,
   setJsonMode,
-  requireProjectContext,
+  requireProjectContextForCommand,
 } from '../lib/context.js';
 
 const { prompt } = enquirer;
@@ -63,7 +63,7 @@ export const deleteCommand = async (
   // Require project context
   let project: ProjectManager;
   try {
-    project = await requireProjectContext();
+    project = await requireProjectContextForCommand();
   } catch (error) {
     jsonOutput.errors?.push(
       error instanceof Error ? error.message : String(error)
