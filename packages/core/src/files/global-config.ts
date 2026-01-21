@@ -85,9 +85,6 @@ export class GlobalConfigManager {
    */
   static createDefault(): GlobalConfigManager {
     const now = new Date().toISOString();
-    console.log(
-      `Global configuration not found. Creating default at ${GlobalConfigManager.getConfigPath()}`
-    );
 
     // Try to read the existing information if possible
     // In the future, the telemetry will use these values.

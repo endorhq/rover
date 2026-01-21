@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { showSplashHeader, showRegularHeader } from '../header.js';
+import { showRoverHeader } from '../header.js';
 import colors from 'ansi-colors';
 
 // Mock console.log
@@ -18,41 +18,133 @@ describe('header', () => {
     console.log = originalConsoleLog;
   });
 
-  describe('showSplashHeader', () => {
-    it('should display the ROVER banner', () => {
-      showSplashHeader();
+  describe('showRoverHeader', () => {
+    it('should display header with ASCII art and project info', () => {
+      showRoverHeader({
+        version: '1.3.0',
+        agent: 'claude',
+        projectPath: '/home/user/workspace/project',
+      });
 
-      expect(console.log).toHaveBeenCalled();
+      // First line is blank, then 3 lines for the header
+      expect(console.log).toHaveBeenCalledTimes(4);
+    });
+
+    it('should display version with v prefix', () => {
+      showRoverHeader({
+        version: '2.0.0',
+        agent: 'claude',
+        projectPath: '/path',
+      });
+
       const output = consoleOutput.join('\n');
-      // Should contain the ROVER text (without ANSI codes for testing)
-      expect(output).toBeTruthy();
-      expect(output.length).toBeGreaterThan(0);
+      expect(output).toContain('v2.0.0');
     });
 
-    it('should output multiple lines for the banner', () => {
-      showSplashHeader();
+    it('should display Rover name', () => {
+      showRoverHeader({
+        version: '1.0.0',
+        agent: 'claude',
+        projectPath: '/path',
+      });
 
-      // The banner has 4 lines
-      const output = consoleOutput[0];
-      const lines = output.split('\n');
-      expect(lines.length).toBeGreaterThanOrEqual(4);
+      const output = consoleOutput.join('\n');
+      expect(output).toContain('Rover');
     });
 
-    it('should apply colors to the banner', () => {
-      showSplashHeader();
+    it('should display agent name', () => {
+      showRoverHeader({
+        version: '1.0.0',
+        agent: 'gemini',
+        projectPath: '/path',
+      });
 
-      const output = consoleOutput[0];
-      // Should contain ANSI color codes
-      expect(output).toMatch(/\x1b\[/); // ANSI escape sequence
+      const output = consoleOutput.join('\n');
+      expect(output).toContain('gemini');
     });
 
-    it('should use gradient colors when true color is supported', () => {
+    it('should show (default) when defaultAgent is true', () => {
+      showRoverHeader({
+        version: '1.0.0',
+        agent: 'claude',
+        defaultAgent: true,
+        projectPath: '/path',
+      });
+
+      const output = consoleOutput.join('\n');
+      expect(output).toContain('(default)');
+    });
+
+    it('should show (selected) when defaultAgent is false', () => {
+      showRoverHeader({
+        version: '1.0.0',
+        agent: 'claude',
+        defaultAgent: false,
+        projectPath: '/path',
+      });
+
+      const output = consoleOutput.join('\n');
+      expect(output).toContain('(selected)');
+    });
+
+    it('should display project path', () => {
+      showRoverHeader({
+        version: '1.0.0',
+        agent: 'claude',
+        projectPath: '/home/user/workspace/project',
+      });
+
+      const output = consoleOutput.join('\n');
+      expect(output).toContain('/home/user/workspace/project');
+    });
+
+    it('should display project name when provided', () => {
+      showRoverHeader({
+        version: '1.0.0',
+        agent: 'claude',
+        projectPath: '/path',
+        projectName: 'my-awesome-project',
+      });
+
+      const output = consoleOutput.join('\n');
+      expect(output).toContain('my-awesome-project');
+    });
+
+    it('should show "No Project" when projectName is not provided', () => {
+      showRoverHeader({
+        version: '1.0.0',
+        agent: 'claude',
+        projectPath: '/path',
+      });
+
+      const output = consoleOutput.join('\n');
+      expect(output).toContain('No Project');
+    });
+
+    it('should display ASCII art characters', () => {
+      showRoverHeader({
+        version: '1.0.0',
+        agent: 'claude',
+        projectPath: '/path',
+      });
+
+      const output = consoleOutput.join('\n');
+      // Check for ASCII art box characters
+      expect(output).toContain('╭');
+      expect(output).toContain('╯');
+    });
+
+    it('should use true color when supported', () => {
       const originalColorterm = process.env.COLORTERM;
       process.env.COLORTERM = 'truecolor';
 
-      showSplashHeader();
+      showRoverHeader({
+        version: '1.0.0',
+        agent: 'claude',
+        projectPath: '/path',
+      });
 
-      const output = consoleOutput[0];
+      const output = consoleOutput.join('\n');
       // True color uses RGB codes: \x1b[38;2;R;G;Bm
       expect(output).toMatch(/\x1b\[38;2;/);
 
@@ -70,10 +162,14 @@ describe('header', () => {
       delete process.env.TERM_PROGRAM;
       delete process.env.FORCE_COLOR;
 
-      showSplashHeader();
+      showRoverHeader({
+        version: '1.0.0',
+        agent: 'claude',
+        projectPath: '/path',
+      });
 
-      const output = consoleOutput[0];
-      // Should still have some color codes (cyan)
+      const output = consoleOutput.join('\n');
+      // Should still have color codes (cyan fallback)
       expect(output).toMatch(/\x1b\[/);
 
       process.env.COLORTERM = originalColorterm;
@@ -81,72 +177,28 @@ describe('header', () => {
       process.env.TERM_PROGRAM = originalTermProgram;
       process.env.FORCE_COLOR = originalForceColor;
     });
-  });
 
-  describe('showRegularHeader', () => {
-    it('should display header with version and context', () => {
-      showRegularHeader('1.3.0', '/home/user/workspace/project');
+    it('should handle unicode in project path', () => {
+      showRoverHeader({
+        version: '1.0.0',
+        agent: 'claude',
+        projectPath: '/home/用户/项目',
+      });
 
-      expect(console.log).toHaveBeenCalledTimes(2);
-      const [headerLine, separatorLine] = consoleOutput;
-
-      // Header should contain Rover, version, and path
-      expect(headerLine).toContain('Rover');
-      expect(headerLine).toContain('1.3.0');
-      expect(headerLine).toContain('/home/user/workspace/project');
+      const output = consoleOutput.join('\n');
+      expect(output).toContain('/home/用户/项目');
     });
 
-    it('should format version with v prefix', () => {
-      showRegularHeader('2.0.0', '/path');
+    it('should handle unicode in project name', () => {
+      showRoverHeader({
+        version: '1.0.0',
+        agent: 'claude',
+        projectPath: '/path',
+        projectName: '项目名称',
+      });
 
-      const headerLine = consoleOutput[0];
-      expect(headerLine).toContain('v2.0.0');
-    });
-
-    it('should use cyan color for Rover text', () => {
-      showRegularHeader('1.0.0', '/path');
-
-      const headerLine = consoleOutput[0];
-      expect(headerLine).toContain(colors.cyan('Rover'));
-    });
-
-    it('should display separator line', () => {
-      showRegularHeader('1.0.0', '/path');
-
-      expect(consoleOutput.length).toBe(2);
-      const separatorLine = consoleOutput[1];
-      // Separator should contain dashes
-      expect(separatorLine).toMatch(/-+/);
-    });
-
-    it('should handle short paths', () => {
-      showRegularHeader('1.0.0', '/');
-
-      const [headerLine] = consoleOutput;
-      expect(headerLine).toContain('/');
-    });
-
-    it('should handle unicode in paths', () => {
-      showRegularHeader('1.0.0', '/home/用户/项目');
-
-      const [headerLine] = consoleOutput;
-      expect(headerLine).toContain('/home/用户/项目');
-    });
-
-    it('should use gray color for version and context', () => {
-      showRegularHeader('1.0.0', '/path');
-
-      const headerLine = consoleOutput[0];
-      // Both version and context should use gray color
-      expect(headerLine).toContain(colors.gray('(v1.0.0)'));
-      expect(headerLine).toContain(colors.gray('/path'));
-    });
-
-    it('should use · separator between version and context', () => {
-      showRegularHeader('1.0.0', '/path');
-
-      const headerLine = consoleOutput[0];
-      expect(headerLine).toContain('·');
+      const output = consoleOutput.join('\n');
+      expect(output).toContain('项目名称');
     });
   });
 });

@@ -4,8 +4,6 @@ import {
   Git,
   setVerbose,
   getVersion,
-  showSplashHeader,
-  showRegularHeader,
   findOrRegisterProject,
 } from 'rover-core';
 import { NETWORK_MODE_VALUES } from 'rover-schemas';
@@ -35,6 +33,8 @@ import {
   requireProjectContext,
   setProject,
 } from './lib/context.js';
+import { showRoverHeader } from 'rover-core/src/display/header.js';
+import { getUserAIAgent } from './lib/agents/index.js';
 
 function isWorkflowsToplevelCommand(command: Command): boolean {
   return command.parent?.name() === 'workflows';
@@ -127,31 +127,30 @@ export function createProgram(
           setProject(project);
         }
       })
-      .hook('preAction', (thisCommand, actionCommand) => {
+      .hook('preAction', (_thisCommand, actionCommand) => {
         // Show header!
         const commandName = actionCommand.name();
-        const cliOptions = thisCommand.opts();
+        const agent = actionCommand.opts()?.agent ?? getUserAIAgent();
+        let agentName = '-';
 
-        if (isJsonMode()) {
-          // Do not print anything for JSON
+        // Confirm the agent is valid
+        if (Object.values(AI_AGENT).includes(agent.toString().toLowerCase())) {
+          agentName = agent.toString();
+        }
+
+        if (isJsonMode() || commandName === 'mcp') {
+          // Do not print anything for JSON or MCP mode
           return;
         }
 
-        if (
-          !isWorkflowsToplevelCommand(actionCommand) &&
-          ['init', 'task'].includes(commandName)
-        ) {
-          showSplashHeader();
-        } else if (commandName !== 'mcp') {
-          // Show actual project path, or indicate --project flag target
-          let displayPath = getProjectPath();
-          if (!displayPath && cliOptions.project) {
-            displayPath = `(project: ${cliOptions.project})`;
-          } else if (!displayPath) {
-            displayPath = process.cwd();
-          }
-          showRegularHeader(version, displayPath);
-        }
+        showRoverHeader({
+          version,
+          // Capitalize the agent for now.
+          agent: `${agentName[0].toUpperCase()}${agentName.slice(1).toLowerCase()}`,
+          defaultAgent: actionCommand.opts()?.agent == null,
+          projectPath: getProjectPath() || process.cwd(),
+          projectName: getCLIContext().project?.name,
+        });
       });
   }
 

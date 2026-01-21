@@ -1,70 +1,72 @@
 import colors from 'ansi-colors';
 import { rgb, supportsTrueColor } from './utils.js';
 
-/**
- * Show the Rover logo
- */
-export const showSplashHeader = () => {
-  const bannerText = [
-    '▗▄▄▖  ▗▄▖ ▗▖  ▗▖▗▄▄▄▖▗▄▄▖ ',
-    '▐▌ ▐▌▐▌ ▐▌▐▌  ▐▌▐▌   ▐▌ ▐▌',
-    '▐▛▀▚▖▐▌ ▐▌▐▌  ▐▌▐▛▀▀▘▐▛▀▚▖',
-    '▐▌ ▐▌▝▚▄▞▘ ▝▚▞▘ ▐▙▄▄▖▐▌ ▐▌',
-  ];
-
-  let banner;
-
-  if (supportsTrueColor()) {
-    // True color teal gradient from top to bottom (vertical)
-    const colorSteps = [
-      [94, 234, 212], // Teal 300 - top
-      [45, 212, 191], // Teal 400
-      [20, 184, 166], // Teal 500
-      [13, 148, 136], // Teal 600 - bottom
-    ];
-
-    banner = bannerText
-      .map((line, lineIndex) => {
-        // Apply color based on line index (vertical gradient)
-        const colorIndex = Math.min(lineIndex, colorSteps.length - 1);
-        const [r, g, b] = colorSteps[colorIndex];
-
-        // Apply the same color to all characters in the line
-        return line
-          .split('')
-          .map(char => rgb(r, g, b, char))
-          .join('');
-      })
-      .join('\n');
-  } else {
-    // Fallback to simple cyan
-    banner = bannerText.map(line => colors.cyan(line)).join('\n');
-  }
-
-  console.log(banner);
-};
+export interface RoverHeaderOptions {
+  version: string;
+  agent: string;
+  defaultAgent?: boolean;
+  projectPath: string;
+  projectName?: string;
+}
 
 /**
- * Display a regular header showing CLI name, version, and context
+ * Display a consolidated Rover header with ASCII art and project information
  *
  * Example output:
  * ```
- * Rover (v1.3.0) · /home/user/workspace/project
- * ---------------------------------------------
+ *  ╭════╮   Rover · v1.3.0
+ * ▌│ ██ │▐  Claude
+ *  ╰════╯   ◈ my-project /home/user/workspace/project
  * ```
  *
- * @param version - Version string (e.g., "1.3.0")
- * @param context - Context path (e.g., current working directory)
+ * @param options - Header display options
  */
-export function showRegularHeader(
-  version: string,
-  context: string,
-  name: string = 'Rover'
-): void {
-  const cleanText = `${name} (v${version}) · ${context}`;
-  const headerText = `${colors.cyan(name)} ${colors.gray(`(v${version})`)} · ${colors.gray(context)}`;
-  const separator = colors.gray('-'.repeat(cleanText.length));
+export function showRoverHeader(options: RoverHeaderOptions): void {
+  const { version, agent, defaultAgent, projectPath, projectName } = options;
 
-  console.log(headerText);
-  console.log(separator);
+  // ASCII art lines (3 lines)
+  const asciiArt = [' ╭════╮  ', '❙│ ██ │❙ ', ' ╰════╯  '];
+
+  // Text lines (3 lines)
+  const lines = [];
+  lines.push(`Rover · ${colors.gray(`v${version}`)}`);
+  lines.push(
+    defaultAgent
+      ? `${agent} ${colors.gray('(default)')}`
+      : `${agent} ${colors.gray('(selected)')}`
+  );
+
+  if (projectName) {
+    lines.push(
+      `${colors.cyan('◈')} ${colors.cyan(projectName)} ${colors.gray(projectPath)}`
+    );
+  } else {
+    lines.push(
+      `${colors.yellow('◇')} ${colors.yellow('No Project')} ${colors.gray(projectPath)}`
+    );
+  }
+
+  // Breakline
+  console.log();
+
+  // Combine ASCII art with text lines
+  if (supportsTrueColor()) {
+    const t600 = [13, 148, 136];
+    const t400 = [45, 212, 191];
+
+    const coloredAsciiArt = [
+      rgb(t600[0], t600[1], t600[2], asciiArt[0]),
+      `${rgb(t600[0], t600[1], t600[2], '❙│ ')}${rgb(t400[0], t400[1], t400[2], '██')}${rgb(t600[0], t600[1], t600[2], ' │❙ ')}`,
+      rgb(t600[0], t600[1], t600[2], asciiArt[2]),
+    ];
+
+    for (let i = 0; i < asciiArt.length; i++) {
+      console.log(` ${coloredAsciiArt[i]} ${lines[i]}`);
+    }
+  } else {
+    // Fallback to simple cyan
+    for (let i = 0; i < asciiArt.length; i++) {
+      console.log(` ${colors.cyan(asciiArt[i])} ${lines[i]}`);
+    }
+  }
 }

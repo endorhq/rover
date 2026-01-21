@@ -6,7 +6,8 @@
  */
 
 // Export header utilities
-export { showSplashHeader, showRegularHeader } from './header.js';
+export { showRoverHeader } from './header.js';
+export type { RoverHeaderOptions } from './header.js';
 
 // Export title utilities
 export { showTitle } from './title.js';
