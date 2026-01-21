@@ -106,8 +106,6 @@ export const infoCommand = async (options: { json?: boolean } = {}) => {
         showTitle('Projects');
 
         for (const project of projectInfos) {
-          console.log();
-          console.log(colors.cyan(`  ${project.name}`));
           showList(
             [
               `ID: ${project.id}`,
@@ -116,6 +114,7 @@ export const infoCommand = async (options: { json?: boolean } = {}) => {
             ],
             {
               title: colors.cyan(project.name),
+              addLineBreak: true,
             }
           );
         }
