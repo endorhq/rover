@@ -415,6 +415,9 @@ export const listCommand = async (
         }
       }
     }
+    
+    // Add a breakline
+    console.log();
 
     // Render the table
     const table = new Table(columns, { groups });
