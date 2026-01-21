@@ -37,6 +37,17 @@ export interface TableColumn<T> {
 }
 
 /**
+ * Group definition for grouped table rendering
+ */
+export interface GroupDefinition {
+  /** Unique group identifier */
+  id: string;
+
+  /** Display title for the group header */
+  title: string;
+}
+
+/**
  * Table rendering options
  */
 export interface TableOptions {
@@ -66,6 +77,12 @@ export interface TableOptions {
 
   /** Sort order */
   sortOrder?: 'asc' | 'desc';
+
+  /** Group definitions for grouped rendering */
+  groups?: GroupDefinition[];
+
+  /** Style function for group header text */
+  groupHeaderStyle?: (text: string) => string;
 }
 
 /**
@@ -205,11 +222,28 @@ const filterColumns = <T>(
 };
 
 /**
+ * Extended options with required fields for internal use
+ */
+interface RequiredTableOptions {
+  showHeader: boolean;
+  showSeparator: boolean;
+  separatorChar: string;
+  headerStyle: (text: string) => string;
+  borderStyle: 'none' | 'separator' | 'full';
+  maxTableWidth: number;
+  columnSpacing: number;
+  sortBy: string;
+  sortOrder: 'asc' | 'desc';
+  groups?: GroupDefinition[];
+  groupHeaderStyle: (text: string) => string;
+}
+
+/**
  * Table renderer class
  */
-export class Table<T = any> {
+export class Table<T> {
   private columns: TableColumn<T>[];
-  private options: Required<TableOptions>;
+  private options: RequiredTableOptions;
 
   constructor(columns: TableColumn<T>[], options: TableOptions = {}) {
     this.columns = columns;
@@ -223,6 +257,8 @@ export class Table<T = any> {
       columnSpacing: options.columnSpacing ?? 1,
       sortBy: options.sortBy ?? '',
       sortOrder: options.sortOrder ?? 'asc',
+      groups: options.groups,
+      groupHeaderStyle: options.groupHeaderStyle ?? ((text: string) => text),
     };
   }
 
@@ -258,10 +294,70 @@ export class Table<T = any> {
       this.renderSeparator(columnWidths);
     }
 
-    // Render data rows
-    for (const row of data) {
-      this.renderRow(row, visibleColumns, columnWidths);
+    const groups = this.options.groups;
+    if (groups && groups.length > 0) {
+      // Grouped rendering: group rows by groupId, then render with group title rows
+      const groupedData = new Map<string, T[]>();
+      for (const row of data) {
+        const groupId = (row as any)?.groupId || '';
+        if (!groupedData.has(groupId)) {
+          groupedData.set(groupId, []);
+        }
+        groupedData.get(groupId)!.push(row);
+      }
+
+      const totalWidth = columnWidths.reduce(
+        (sum, w) => sum + w,
+        (columnWidths.length - 1) * this.options.columnSpacing
+      );
+
+      let isFirstGroup = true;
+      for (const group of groups) {
+        const groupRows = groupedData.get(group.id) || [];
+        if (groupRows.length === 0) {
+          continue;
+        }
+
+        this.renderGroupTitleRow(group.title, totalWidth, isFirstGroup);
+        isFirstGroup = false;
+
+        for (const row of groupRows) {
+          this.renderRow(row, visibleColumns, columnWidths);
+        }
+      }
+    } else {
+      // Non-grouped rendering: render all rows directly
+      for (const row of data) {
+        this.renderRow(row, visibleColumns, columnWidths);
+      }
     }
+  }
+
+  /**
+   * Render a group title row with borders
+   * @param title - The group title text
+   * @param totalWidth - Total table width for the separator
+   * @param isFirst - Whether this is the first group (no top border)
+   */
+  private renderGroupTitleRow(
+    title: string,
+    totalWidth: number,
+    isFirst: boolean
+  ): void {
+    const separator = colors.gray(
+      this.options.separatorChar.repeat(totalWidth)
+    );
+
+    // Top border (only for non-first groups)
+    if (!isFirst) {
+      console.log(separator);
+    }
+
+    // Group title
+    console.log(this.options.groupHeaderStyle(title));
+
+    // Bottom border
+    console.log(separator);
   }
 
   /**

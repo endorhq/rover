@@ -1,8 +1,11 @@
 import colors from 'ansi-colors';
 import {
+  type GroupDefinition,
   type IterationManager,
   type IterationStatusManager,
   ProjectConfigManager,
+  type ProjectManager,
+  ProjectStore,
   showTips,
   Table,
   type TableColumn,
@@ -10,9 +13,10 @@ import {
   UserSettingsManager,
   VERBOSE,
 } from 'rover-core';
-import type { TaskDescription } from 'rover-schemas';
+import type { GlobalProject, TaskDescription } from 'rover-schemas';
 import {
   isJsonMode,
+  isProjectMode,
   setJsonMode,
   resolveProjectContext,
 } from '../lib/context.js';
@@ -83,7 +87,71 @@ interface TaskRow {
   currentStep: string;
   duration: string;
   error?: string;
+  /** Group ID for grouped rendering (project ID in global mode) */
+  groupId?: string;
 }
+
+/**
+ * Task with associated project metadata for multi-project listing
+ */
+interface TaskWithProject {
+  task: TaskDescriptionManager;
+  project: ProjectManager | null;
+}
+
+/**
+ * Helper to safely get iteration status
+ */
+const maybeIterationStatus = (
+  iteration?: IterationManager
+): IterationStatusManager | undefined => {
+  try {
+    return iteration?.status();
+  } catch {
+    return undefined;
+  }
+};
+
+/**
+ * Build a TaskRow from a task and optional project info
+ */
+const buildTaskRow = (
+  task: TaskDescriptionManager,
+  groupId?: string
+): TaskRow => {
+  const lastIteration = task.getLastIteration();
+  const taskStatus = task.status;
+  const startedAt = task.startedAt;
+
+  // Determine end time based on task status
+  let endTime: string | undefined;
+  if (taskStatus === 'FAILED') {
+    endTime = task.failedAt;
+  } else if (['COMPLETED', 'MERGED', 'PUSHED'].includes(taskStatus)) {
+    endTime = task.completedAt;
+  }
+
+  const iterationStatus = maybeIterationStatus(lastIteration);
+
+  // Format agent with model (e.g., "claude:sonnet")
+  let agentDisplay = task.agent || '-';
+  if (task.agent && task.agentModel) {
+    agentDisplay = `${task.agent}:${task.agentModel}`;
+  }
+
+  return {
+    id: task.id.toString(),
+    title: task.title || 'Unknown Task',
+    agent: agentDisplay,
+    workflow: task.workflowName || '-',
+    status: taskStatus,
+    progress: iterationStatus?.progress || 0,
+    currentStep: iterationStatus?.currentStep || '-',
+    duration: iterationStatus ? formatDuration(startedAt, endTime) : '-',
+    error: task.error,
+    groupId,
+  };
+};
 
 export const listCommand = async (
   options: {
@@ -103,21 +171,54 @@ export const listCommand = async (
     // Get project context (may be null in global mode)
     const project = await resolveProjectContext();
 
-    // Get tasks from project (or empty array if no project context)
-    let tasks: TaskDescriptionManager[] = [];
+    // Collect tasks and project metadata
+    let tasksWithProjects: TaskWithProject[] = [];
+
     if (project) {
-      tasks = project.listTasks();
+      // Scoped mode: single project
+      const tasks = project.listTasks();
+      tasksWithProjects = tasks.map(task => ({
+        task,
+        project,
+      }));
+    } else {
+      // Global mode: fetch tasks from all registered projects
+      const store = new ProjectStore();
+
+      for (const projectData of store.list()) {
+        try {
+          const projectManager = store.get(projectData.id);
+          if (projectManager) {
+            const tasks = projectManager.listTasks();
+            for (const task of tasks) {
+              tasksWithProjects.push({ task, project: projectManager });
+            }
+          }
+        } catch (err) {
+          if (VERBOSE) {
+            console.error(
+              colors.gray(
+                `Failed to load tasks for project ${projectData.id}: ${err}`
+              )
+            );
+          }
+        }
+      }
     }
 
     if (!options.watching) {
       telemetry?.eventListTasks();
     }
 
-    if (tasks.length === 0) {
+    if (tasksWithProjects.length === 0) {
       if (isJsonMode()) {
         console.log(JSON.stringify([]));
       } else {
-        console.log(colors.yellow('📋 No tasks found'));
+        if (project) {
+          console.log(colors.yellow('📋 No tasks found'));
+        } else {
+          console.log(colors.yellow('📋 No tasks found across all projects'));
+        }
 
         if (!options.watch) {
           showTips(
@@ -134,18 +235,9 @@ export const listCommand = async (
       }
     }
 
-    // Load project config for hooks (outside loop for efficiency)
-    let projectConfig: ProjectConfigManager | undefined;
-    if (project?.path) {
-      try {
-        projectConfig = ProjectConfigManager.load(project.path);
-      } catch {
-        // Project config is optional, continue without hooks
-      }
-    }
-
     // Update task status and detect transitions for onComplete hooks
-    tasks.forEach(task => {
+    // (hooks only apply in single-project context)
+    for (const { task, project: projectData } of tasksWithProjects) {
       try {
         // Get previous status before update
         const previousStatus = previousTaskStatuses.get(task.id);
@@ -159,11 +251,22 @@ export const listCommand = async (
           previousStatus !== currentStatus &&
           (currentStatus === 'COMPLETED' || currentStatus === 'FAILED');
 
+        // Load project config for hooks per project
+        let projectConfig: ProjectConfigManager | undefined;
+        if (projectData) {
+          try {
+            projectConfig = ProjectConfigManager.load(projectData.path);
+          } catch {
+            // Project config is optional, continue without hooks
+          }
+        }
+
         // Execute onComplete hooks if configured and this is a new completion
+        // Only execute hooks in single-project mode
         if (
           isNewCompletion &&
           projectConfig?.hooks?.onComplete?.length &&
-          project?.path
+          projectData?.path
         ) {
           executeHooks(
             projectConfig.hooks.onComplete,
@@ -172,7 +275,7 @@ export const listCommand = async (
               taskBranch: task.branchName,
               taskTitle: task.title,
               taskStatus: currentStatus.toLowerCase(),
-              projectPath: project.path,
+              projectPath: projectData.path,
             },
             'onComplete'
           );
@@ -191,15 +294,18 @@ export const listCommand = async (
           console.error(colors.gray(`Error details: ${err}`));
         }
       }
-    });
+    }
 
     // JSON output mode
     if (isJsonMode()) {
       const jsonOutput: Array<
-        TaskDescription & { iterationsData: IterationManager[] }
+        TaskDescription & {
+          iterationsData: IterationManager[];
+          projectId?: string;
+        }
       > = [];
 
-      tasks.forEach(task => {
+      for (const { task, project: projectData } of tasksWithProjects) {
         let iterationsData: IterationManager[] = [];
         try {
           iterationsData = task.getIterations();
@@ -217,58 +323,18 @@ export const listCommand = async (
         jsonOutput.push({
           ...task.rawData,
           iterationsData,
+          projectId: projectData?.id ?? project?.id,
         });
-      });
+      }
 
       console.log(JSON.stringify(jsonOutput, null, 2));
       return;
     }
 
-    // Helper to safely get iteration status
-    const maybeIterationStatus = (
-      iteration?: IterationManager
-    ): IterationStatusManager | undefined => {
-      try {
-        return iteration?.status();
-      } catch (e) {
-        return undefined;
-      }
-    };
-
     // Prepare table data
-    const tableData: TaskRow[] = tasks.map(task => {
-      const lastIteration = task.getLastIteration();
-      const taskStatus = task.status;
-      const startedAt = task.startedAt;
-
-      // Determine end time based on task status
-      let endTime: string | undefined;
-      if (taskStatus === 'FAILED') {
-        endTime = task.failedAt;
-      } else if (['COMPLETED', 'MERGED', 'PUSHED'].includes(taskStatus)) {
-        endTime = task.completedAt;
-      }
-
-      const iterationStatus = maybeIterationStatus(lastIteration);
-
-      // Format agent with model (e.g., "claude:sonnet")
-      let agentDisplay = task.agent || '-';
-      if (task.agent && task.agentModel) {
-        agentDisplay = `${task.agent}:${task.agentModel}`;
-      }
-
-      return {
-        id: task.id.toString(),
-        title: task.title || 'Unknown Task',
-        agent: agentDisplay,
-        workflow: task.workflowName || '-',
-        status: taskStatus,
-        progress: iterationStatus?.progress || 0,
-        currentStep: iterationStatus?.currentStep || '-',
-        duration: iterationStatus ? formatDuration(startedAt, endTime) : '-',
-        error: task.error,
-      };
-    });
+    const tableData: TaskRow[] = tasksWithProjects.map(
+      ({ task, project: projectData }) => buildTaskRow(task, projectData?.id)
+    );
 
     // Define table columns
     const columns: TableColumn<TaskRow>[] = [
@@ -333,11 +399,28 @@ export const listCommand = async (
       },
     ];
 
+    // Build groups for global mode
+    let groups: GroupDefinition[] | undefined;
+    if (!project) {
+      // Build groups from projects that have tasks (dedupe by project id)
+      const seenProjectIds = new Set<string>();
+      groups = [];
+      for (const { project: projectData } of tasksWithProjects) {
+        if (projectData && !seenProjectIds.has(projectData.id)) {
+          seenProjectIds.add(projectData.id);
+          groups.push({
+            id: projectData.id,
+            title: ` ${colors.cyan('◈')} ${colors.cyan(projectData.name)} ${colors.gray(projectData.path)}`,
+          });
+        }
+      }
+    }
+
     // Add a breakline
     console.log();
 
     // Render the table
-    const table = new Table(columns);
+    const table = new Table(columns, { groups });
     table.render(tableData);
 
     // Show errors in verbose mode
@@ -351,6 +434,16 @@ export const listCommand = async (
 
     // Watch mode (configurable refresh interval, default 3 seconds)
     if (options.watch) {
+      // Watch mode is only supported in scoped (single project) mode
+      if (!project) {
+        console.log(
+          colors.yellow(
+            'Watch mode is only supported when inside a project directory'
+          )
+        );
+        return;
+      }
+
       // CLI argument takes precedence, then settings, then default (3s)
       let intervalSeconds: number;
       if (typeof options.watch === 'string') {
