@@ -10,6 +10,7 @@ import {
 } from 'rover-core';
 import { NETWORK_MODE_VALUES } from 'rover-schemas';
 import { initCommand } from './commands/init.js';
+import { infoCommand } from './commands/info.js';
 import { listCommand } from './commands/list.js';
 import { exitWithError } from './utils/exit.js';
 import { taskCommand } from './commands/task.js';
@@ -387,6 +388,13 @@ export function createProgram(
     .command('mcp')
     .description('Start Rover as an MCP server')
     .action(mcpCommand);
+
+  program.commandsGroup(colors.cyan('Rover store:'));
+  program
+    .command('info')
+    .description('Show information about the Rover global store')
+    .option('--json', 'Output in JSON format')
+    .action(infoCommand);
 
   return program;
 }

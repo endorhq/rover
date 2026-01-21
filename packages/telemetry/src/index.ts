@@ -74,6 +74,8 @@ enum EVENT_IDS {
   ADD_WORKFLOW = 'add_workflow',
   // Open a workspace in the extension
   OPEN_WORKSPACE = 'open_workspace',
+  // Show store information
+  INFO = 'info',
 }
 
 class Telemetry {
@@ -226,6 +228,10 @@ class Telemetry {
 
   eventOpenWorkspace() {
     this.capture(EVENT_IDS.OPEN_WORKSPACE);
+  }
+
+  eventInfo() {
+    this.capture(EVENT_IDS.INFO);
   }
 
   // Other methods
