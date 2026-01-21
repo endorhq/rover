@@ -3,7 +3,6 @@ import {
   getVersion,
   launch,
   ProcessManager,
-  showRegularHeader,
   VERBOSE,
   PreContextDataManager,
 } from 'rover-core';
@@ -16,6 +15,7 @@ import {
   rmSync,
 } from 'node:fs';
 import { basename } from 'node:path';
+import { showRoverHeader } from 'rover-core/src/display/header.js';
 
 interface SessionCommandOptions {
   // Paths to pre-context JSON files
@@ -32,7 +32,13 @@ export const sessionCommand = async (
   options: SessionCommandOptions = { preContextFile: [] }
 ) => {
   const version = getVersion();
-  showRegularHeader(version, '/workspace', 'Rover Agent');
+  showRoverHeader({
+    version,
+    agent,
+    defaultAgent: false,
+    projectName: 'Workspace',
+    projectPath: '/workspace',
+  });
 
   const processManager = new ProcessManager({
     title: 'Start interactive session',

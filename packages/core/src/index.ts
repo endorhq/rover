@@ -25,8 +25,6 @@ export {
 } from './credential-utils.js';
 
 export {
-  showSplashHeader,
-  showRegularHeader,
   showTitle,
   showDiagram,
   showFile,
