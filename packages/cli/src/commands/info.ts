@@ -1,0 +1,134 @@
+import colors from 'ansi-colors';
+import { existsSync, readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
+import {
+  getDataDir,
+  ProjectStore,
+  showList,
+  showProperties,
+  showTips,
+  showTitle,
+} from 'rover-core';
+import { isJsonMode, setJsonMode } from '../lib/context.js';
+import { getTelemetry } from '../lib/telemetry.js';
+import { CLIJsonOutput } from '../types.js';
+import { exitWithError, exitWithSuccess } from '../utils/exit.js';
+
+/**
+ * Project information in the info command output
+ */
+interface ProjectInfo {
+  /** Project ID */
+  id: string;
+  /** Project repository name */
+  name: string;
+  /** Filesystem path to the project */
+  path: string;
+  /** Number of tasks for this project */
+  taskCount: number;
+}
+
+/**
+ * JSON output format for the info command
+ */
+interface InfoCommandOutput extends CLIJsonOutput {
+  /** Path to the Rover data store */
+  storePath: string;
+  /** Number of registered projects */
+  projectCount: number;
+  /** Per-project breakdown */
+  projects: ProjectInfo[];
+}
+
+/**
+ * Count tasks for a project by looking at the tasks directory
+ */
+function countProjectTasks(projectsPath: string, projectId: string): number {
+  const tasksPath = join(projectsPath, projectId, 'tasks');
+
+  if (!existsSync(tasksPath)) {
+    return 0;
+  }
+
+  try {
+    const entries = readdirSync(tasksPath, { withFileTypes: true });
+    return entries.filter(e => e.isDirectory()).length;
+  } catch {
+    return 0;
+  }
+}
+
+export const infoCommand = async (options: { json?: boolean } = {}) => {
+  const storePath = getDataDir();
+  const jsonOutput: InfoCommandOutput = {
+    success: true,
+    storePath,
+    projectCount: 0,
+    projects: [],
+  };
+
+  const telemetry = getTelemetry();
+  telemetry?.eventInfo();
+
+  try {
+    const store = new ProjectStore();
+    const projectsPath = store.getProjectsPath();
+
+    // Get projects to display
+    let projectsToShow = store.list();
+
+    // Build project info array
+    const projectInfos: ProjectInfo[] = projectsToShow.map(project => {
+      const taskCount = countProjectTasks(projectsPath, project.id);
+
+      return {
+        id: project.id,
+        name: project.repositoryName,
+        path: project.path,
+        taskCount,
+      };
+    });
+
+    // Build output
+    jsonOutput.projectCount = projectInfos.length;
+    jsonOutput.projects = projectInfos;
+
+    if (!isJsonMode()) {
+      // Human-readable output
+      showTitle('Rover Store Information');
+
+      showProperties({
+        'Store Path': storePath,
+        'Registered Projects': projectInfos.length.toString(),
+      });
+
+      if (projectInfos.length > 0) {
+        showTitle('Projects');
+
+        for (const project of projectInfos) {
+          console.log();
+          console.log(colors.cyan(`  ${project.name}`));
+          showList(
+            [
+              `ID: ${project.id}`,
+              `Path: ${project.path}`,
+              `Tasks: ${project.taskCount}`,
+            ],
+            {
+              title: colors.cyan(project.name),
+            }
+          );
+        }
+      } else {
+        console.log(colors.gray('\n  No projects registered yet.'));
+      }
+    }
+
+    // Exit
+    await exitWithSuccess(null, jsonOutput, { telemetry });
+  } catch (error) {
+    jsonOutput.success = false;
+    jsonOutput.error = error instanceof Error ? error.message : String(error);
+    await exitWithError(jsonOutput, { telemetry });
+  }
+};
