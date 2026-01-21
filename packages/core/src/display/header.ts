@@ -16,7 +16,7 @@ export interface RoverHeaderOptions {
  * ```
  *  ╭════╮   Rover · v1.3.0
  * ▌│ ██ │▐  Claude
- *  ╰════╯   my-project · /home/user/workspace/project
+ *  ╰════╯   ◈ my-project /home/user/workspace/project
  * ```
  *
  * @param options - Header display options
@@ -38,10 +38,12 @@ export function showRoverHeader(options: RoverHeaderOptions): void {
 
   if (projectName) {
     lines.push(
-      `${colors.cyan(projectName)} ${colors.cyan('◈')} ${colors.gray(projectPath)}`
+      `${colors.cyan('◈')} ${colors.cyan(projectName)} ${colors.gray(projectPath)}`
     );
   } else {
-    lines.push(`${colors.yellow('No Project')} · ${colors.gray(projectPath)}`);
+    lines.push(
+      `${colors.yellow('◇')} ${colors.yellow('No Project')} ${colors.gray(projectPath)}`
+    );
   }
 
   // Breakline
