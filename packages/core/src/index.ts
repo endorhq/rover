@@ -46,6 +46,7 @@ export {
   type PropertiesOptions,
   type TableColumn,
   type TableOptions,
+  type GroupDefinition,
   type DiagramStep,
   type DiagramOptions,
 } from './display/index.js';

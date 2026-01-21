@@ -48,4 +48,4 @@ export type {
   DiagramOptions,
 } from './types.js';
 
-export type { TableColumn, TableOptions } from './table.js';
+export type { TableColumn, TableOptions, GroupDefinition } from './table.js';
