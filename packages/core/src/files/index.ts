@@ -14,3 +14,7 @@ export {
   type WorkflowEntry,
 } from './workflow-store.js';
 export { WorkflowManager } from './workflow.js';
+export {
+  removeExcludedFiles,
+  type RemoveExcludedFilesResult,
+} from './exclude-files.js';

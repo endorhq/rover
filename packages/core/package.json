@@ -25,12 +25,14 @@
     "boxen": "^8.0.1",
     "execa": "catalog:runtime",
     "log-update": "^7.0.1",
+    "picomatch": "^4.0.2",
     "rover-schemas": "workspace:*",
     "rover-telemetry": "workspace:*",
     "yaml": "^2.8.1"
   },
   "devDependencies": {
     "@types/node": "catalog:build",
+    "@types/picomatch": "^4.0.2",
     "@types/uuid": "^10.0.0",
     "@vitest/ui": "catalog:build",
     "tsdown": "catalog:build",

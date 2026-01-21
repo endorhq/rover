@@ -14,6 +14,7 @@ import {
   Git,
   type ProjectManager,
   VERBOSE,
+  removeExcludedFiles,
 } from 'rover-core';
 import type { NetworkConfig, NetworkMode } from 'rover-schemas';
 import {
@@ -332,6 +333,15 @@ const createTaskForAgent = async (
 
     // Copy user .env development files
     copyEnvironmentFiles(projectPath, worktreePath);
+
+    // Remove files matching exclude patterns from the worktree
+    const projectConfig = ProjectConfigManager.load(projectPath);
+    if (
+      projectConfig.excludePatterns &&
+      projectConfig.excludePatterns.length > 0
+    ) {
+      removeExcludedFiles(worktreePath, projectConfig.excludePatterns);
+    }
   } catch (error) {
     processManager?.failLastItem();
     console.error(colors.red('Error creating git workspace: ' + error));

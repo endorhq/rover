@@ -85,7 +85,9 @@ export {
   WorkflowStoreError,
   WorkflowSource,
   WorkflowManager,
+  removeExcludedFiles,
   type WorkflowMetadata,
   type AddWorkflowResult,
   type WorkflowEntry,
+  type RemoveExcludedFilesResult,
 } from './files/index.js';
