@@ -27,12 +27,27 @@ import { pushCommand } from './commands/push.js';
 import { stopCommand } from './commands/stop.js';
 import { mcpCommand } from './commands/mcp.js';
 import { addWorkflowCommands } from './commands/workflows/index.js';
-import { getProjectPath, initCLIContext, isJsonMode } from './lib/context.js';
+import {
+  getCLIContext,
+  getProjectPath,
+  initCLIContext,
+  isJsonMode,
+  requireProjectContext,
+  setProject,
+} from './lib/context.js';
 
 function isWorkflowsToplevelCommand(command: Command): boolean {
   return command.parent?.name() === 'workflows';
 }
 
+/**
+ * Initialize the CLI program with all the available commands.
+ * It adds a set of pre-hookds to initialize the context and display headers.
+ * You can exclude runtime hooks for testing purposes.
+ *
+ * @param options.excludeRuntimeHooks Whether to exclude runtime hooks (default: false)
+ * @returns Command The initialized CLI program
+ */
 export function createProgram(
   options: { excludeRuntimeHooks?: boolean } = {}
 ): Command {
@@ -42,47 +57,80 @@ export function createProgram(
   if (!options.excludeRuntimeHooks) {
     program
       .hook('preAction', async (thisCommand, actionCommand) => {
-        const commandName = actionCommand.name();
+        // Ensure the CLI minimal context is initialized
         const cliOptions = thisCommand.opts();
         const options = actionCommand.opts();
 
-        // Set verbose mode from global -v option
-        setVerbose(cliOptions.verbose === true);
+        // Common config
+        const verbose = cliOptions.verbose === true;
+        const jsonMode = options.json === true;
+        const projectOption = cliOptions.project ?? process.env.ROVER_PROJECT;
 
-        // Build context
+        // Configure the rover-core lib in verbose mode
+        setVerbose(verbose);
+
+        // Check if cwd is in a git repo
         const git = new Git();
         const inGitRepo = git.isGitRepo();
 
+        initCLIContext({
+          jsonMode,
+          verbose,
+          inGitRepo,
+          projectOption,
+          // Keep the project null for now - will be resolved in the next hook
+          project: null,
+        });
+      })
+      .hook('preAction', async (_thisCommand, actionCommand) => {
+        // Resolve the project.
+        const commandName = actionCommand.name();
+
+        // Retrive from previous hook
+        const ctx = getCLIContext();
+
+        // Load the project option to determine the current project.
         let project = null;
 
         // Skip project resolution for init (it creates the project),
-        // mcp (adapts to context), and workflow commands
+        // and workflow commands
         if (
           !isWorkflowsToplevelCommand(actionCommand) &&
-          commandName !== 'init' &&
-          inGitRepo
+          commandName !== 'init'
         ) {
-          try {
-            project = await findOrRegisterProject();
-          } catch (error) {
-            // Config/registration errors - exit
-            exitWithError({
-              error: error instanceof Error ? error.message : String(error),
-              success: false,
-            });
+          // Only auto-register cwd project if no --project flag is set
+          if (!ctx.projectOption && ctx.inGitRepo) {
+            try {
+              project = await findOrRegisterProject();
+            } catch (error) {
+              // Config/registration errors - exit
+              exitWithError({
+                error: error instanceof Error ? error.message : String(error),
+                success: false,
+              });
+            }
+          } else if (ctx.projectOption) {
+            // Try to resolve the project if the option / env var is set
+            try {
+              project = await requireProjectContext(ctx.projectOption);
+            } catch {
+              exitWithError({
+                error: `Project "${ctx.projectOption}" not found.`,
+                success: false,
+              });
+            }
           }
         }
 
-        // Initialize context
-        initCLIContext({
-          jsonMode: options.json === true,
-          verbose: cliOptions.verbose === true,
-          project,
-          inGitRepo,
-        });
+        // Update the project in the context
+        if (project) {
+          setProject(project);
+        }
       })
-      .hook('preAction', (_thisCommand, actionCommand) => {
+      .hook('preAction', (thisCommand, actionCommand) => {
+        // Show header!
         const commandName = actionCommand.name();
+        const cliOptions = thisCommand.opts();
 
         if (isJsonMode()) {
           // Do not print anything for JSON
@@ -95,8 +143,13 @@ export function createProgram(
         ) {
           showSplashHeader();
         } else if (commandName !== 'mcp') {
-          // Show actual project path, not just cwd
-          const displayPath = getProjectPath() ?? process.cwd();
+          // Show actual project path, or indicate --project flag target
+          let displayPath = getProjectPath();
+          if (!displayPath && cliOptions.project) {
+            displayPath = `(project: ${cliOptions.project})`;
+          } else if (!displayPath) {
+            displayPath = process.cwd();
+          }
           showRegularHeader(version, displayPath);
         }
       });
@@ -105,6 +158,10 @@ export function createProgram(
   program.option(
     '-v, --verbose',
     'Log verbose information like running commands'
+  );
+  program.option(
+    '-p, --project <name>',
+    'Target a specific project by name, ID, or path (overrides cwd)'
   );
 
   program
