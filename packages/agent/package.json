@@ -24,18 +24,19 @@
   },
   "author": "The Endor team",
   "dependencies": {
-    "yaml": "^2.8.1",
+    "@agentclientprotocol/sdk": "^0.13.0",
     "ansi-colors": "catalog:runtime",
     "commander": "catalog:runtime",
     "execa": "catalog:runtime",
     "ora": "^8.2.0",
+    "yaml": "^2.8.1",
     "zod": "catalog:runtime"
   },
   "devDependencies": {
-    "rover-core": "workspace:*",
-    "rover-schemas": "workspace:*",
     "@types/node": "catalog:build",
     "@vitest/ui": "catalog:build",
+    "rover-core": "workspace:*",
+    "rover-schemas": "workspace:*",
     "tsdown": "catalog:build",
     "typescript": "catalog:build",
     "vitest": "catalog:build"
