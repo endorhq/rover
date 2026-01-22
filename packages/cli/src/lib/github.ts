@@ -150,9 +150,7 @@ export class GitHub {
    * Retrieves the owner and repo from the remote URL. Null in case it couldn't
    * detect it.
    */
-  private getGitHubRepoInfo(
-    remoteUrl: string
-  ): { owner: string; repo: string } | null {
+  getGitHubRepoInfo(remoteUrl: string): { owner: string; repo: string } | null {
     // Handle various GitHub URL formats
     const patterns = [
       /github\.com[:/]([^/]+)\/([^/.]+)(\.git)?$/,

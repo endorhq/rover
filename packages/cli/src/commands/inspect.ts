@@ -87,6 +87,14 @@ interface TaskInspectionOutput {
   workflowName: string;
   /** Path to the git worktree for this task */
   worktreePath: string;
+  /** Task source (origin tracking - github, manual, etc.) */
+  source?: {
+    type: 'github' | 'manual';
+    id?: string;
+    url?: string;
+    title?: string;
+    ref?: Record<string, unknown>;
+  };
 }
 
 /**
@@ -255,14 +263,10 @@ const inspectCommand = async (
             rawFileOutput.error = `Error reading file ${requestedFile}. It was not present in the task output.`;
           }
         }
-        console.log(JSON.stringify(rawFileOutput, null, 2));
         if (rawFileOutput.success) {
-          await exitWithSuccess(null, { success: true }, { telemetry });
+          await exitWithSuccess(null, rawFileOutput, { telemetry });
         } else {
-          await exitWithError(
-            { success: false, error: rawFileOutput.error },
-            { telemetry }
-          );
+          await exitWithError(rawFileOutput, { telemetry });
         }
         return;
       } else {
@@ -331,10 +335,10 @@ const inspectCommand = async (
         uuid: task.uuid,
         workflowName: task.workflowName,
         worktreePath: task.worktreePath,
+        source: task.source,
       };
 
-      console.log(JSON.stringify(jsonOutput, null, 2));
-      await exitWithSuccess(null, { success: true }, { telemetry });
+      await exitWithSuccess(null, jsonOutput, { telemetry });
       return;
     } else {
       // Format status with user-friendly names
@@ -352,6 +356,13 @@ const inspectCommand = async (
         Workflow: task.workflowName,
         'Created At': new Date(task.createdAt).toLocaleString(),
       };
+
+      // Show task source if available (e.g., GitHub issue, etc.)
+      if (task.source?.url) {
+        const sourceLabel =
+          task.source.type === 'github' ? 'GitHub Issue' : 'Source';
+        properties[sourceLabel] = colors.cyan(task.source.url);
+      }
 
       if (task.completedAt) {
         properties['Completed At'] = new Date(
