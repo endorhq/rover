@@ -63,6 +63,9 @@ importers:
       ora:
         specifier: ^8.2.0
         version: 8.2.0
+      rover-core:
+        specifier: workspace:*
+        version: link:../core
       yaml:
         specifier: ^2.8.1
         version: 2.8.1
@@ -76,9 +79,6 @@ importers:
       '@vitest/ui':
         specifier: catalog:build
         version: 2.1.9(vitest@2.1.9)
-      rover-core:
-        specifier: workspace:*
-        version: link:../core
       rover-schemas:
         specifier: workspace:*
         version: link:../schemas
@@ -173,6 +173,9 @@ importers:
       log-update:
         specifier: ^7.0.1
         version: 7.0.1
+      nanoid:
+        specifier: ^5.0.9
+        version: 5.1.5
       rover-schemas:
         specifier: workspace:*
         version: link:../schemas

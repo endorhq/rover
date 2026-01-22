@@ -22,7 +22,7 @@ import {
 import colors from 'ansi-colors';
 import { execa, parseCommandString, type ResultPromise } from 'execa';
 import { readFileSync, writeFileSync } from 'node:fs';
-import { VERBOSE } from 'rover-core';
+import { generateRandomId, VERBOSE } from 'rover-core';
 
 // Custom JSON replacer to handle BigInt values
 function jsonReplacer(_key: string, value: unknown): unknown {
@@ -42,7 +42,6 @@ interface TerminalState {
 }
 
 const terminals = new Map<string, TerminalState>();
-let terminalCounter = 0;
 
 export class ACPClient implements Client {
   private capturedMessages: string = '';
@@ -211,7 +210,7 @@ export class ACPClient implements Client {
       );
     }
 
-    const terminalId = `terminal-${++terminalCounter}`;
+    const terminalId = `terminal-${generateRandomId()}`;
 
     // Convert env array to object, filtering out undefined values
     const envObj: Record<string, string> = {};

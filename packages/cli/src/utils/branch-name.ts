@@ -1,10 +1,7 @@
-import { customAlphabet } from 'nanoid';
+import { generateRandomId } from 'rover-core';
 
-const CUSTOM_ALPHABET =
-  '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-';
-const NANOID_SIZE = 12;
-
-export const generateRandomId = customAlphabet(CUSTOM_ALPHABET, NANOID_SIZE);
+// Re-export generateRandomId for backward compatibility
+export { generateRandomId };
 
 /**
  * Generate a unique branch name for a task
