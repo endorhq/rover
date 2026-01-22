@@ -65,6 +65,7 @@ export class ACPClient implements Client {
     this.capturedMessages = '';
     return messages;
   }
+
   requestPermission(
     params: RequestPermissionRequest
   ): Promise<RequestPermissionResponse> {
@@ -83,6 +84,7 @@ export class ACPClient implements Client {
       },
     });
   }
+
   async sessionUpdate(params: SessionNotification): Promise<void> {
     const update = params.update;
 
@@ -164,6 +166,7 @@ export class ACPClient implements Client {
       }
     }
   }
+
   writeTextFile?(params: WriteTextFileRequest): Promise<WriteTextFileResponse> {
     if (VERBOSE) {
       console.log(
@@ -174,6 +177,7 @@ export class ACPClient implements Client {
     writeFileSync(params.path, params.content);
     return Promise.resolve({});
   }
+
   readTextFile?(params: ReadTextFileRequest): Promise<ReadTextFileResponse> {
     if (VERBOSE) {
       console.log(
@@ -196,6 +200,7 @@ export class ACPClient implements Client {
       content,
     });
   }
+
   createTerminal?(
     params: CreateTerminalRequest
   ): Promise<CreateTerminalResponse> {
@@ -298,6 +303,7 @@ export class ACPClient implements Client {
 
     return Promise.resolve({ terminalId });
   }
+
   terminalOutput?(
     params: TerminalOutputRequest
   ): Promise<TerminalOutputResponse> {
@@ -319,6 +325,7 @@ export class ACPClient implements Client {
       exitStatus: state.exitStatus,
     });
   }
+
   releaseTerminal?(
     params: ReleaseTerminalRequest
   ): Promise<ReleaseTerminalResponse | void> {
@@ -344,6 +351,7 @@ export class ACPClient implements Client {
 
     return Promise.resolve({});
   }
+
   async waitForTerminalExit?(
     params: WaitForTerminalExitRequest
   ): Promise<WaitForTerminalExitResponse> {
@@ -367,6 +375,7 @@ export class ACPClient implements Client {
       signal: state.exitStatus?.signal ?? null,
     };
   }
+
   killTerminal?(
     params: KillTerminalCommandRequest
   ): Promise<KillTerminalCommandResponse | void> {
@@ -387,6 +396,7 @@ export class ACPClient implements Client {
 
     return Promise.resolve({});
   }
+
   extMethod?(
     method: string,
     params: Record<string, unknown>
@@ -398,6 +408,7 @@ export class ACPClient implements Client {
     );
     throw new Error('Method not implemented.');
   }
+
   extNotification?(
     method: string,
     params: Record<string, unknown>
