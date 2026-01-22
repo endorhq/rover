@@ -138,7 +138,7 @@ export class ACPClient implements Client {
             console.log(colors.gray(`[${update.content.type}]`));
           }
         }
-        
+
         if (this.isCapturing) {
           this.capturedMessages += `[THINKING] ${update.content.text}`;
         }

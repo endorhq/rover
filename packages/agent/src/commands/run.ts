@@ -337,7 +337,7 @@ export const runCommand = async (
       // Priority: workflow defaults > CLI flag > fallback to claude
       // (per-step tool configuration takes precedence, handled in Runner/ACPRunner)
       const tool =
-        options.agentTool || workflowManager.defaults?.tool ||  'claude';
+        options.agentTool || workflowManager.defaults?.tool || 'claude';
 
       // Temporarily ACP usage decision during ACP migration process:
       // force Claude to always use ACP mode
