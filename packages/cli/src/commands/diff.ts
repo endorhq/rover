@@ -6,8 +6,22 @@ import { getTelemetry } from '../lib/telemetry.js';
 import { showTips } from '../utils/display.js';
 import { exitWithError, exitWithSuccess } from '../utils/exit.js';
 import { requireProjectContext } from '../lib/context.js';
+import type { CommandDefinition } from '../types.js';
 
-export const diffCommand = async (
+/**
+ * Display git diff for changes made by a Rover task.
+ *
+ * Shows the differences between the task's git worktree and the source branch,
+ * allowing users to review code changes before merging or pushing. Supports
+ * viewing full diffs, file-only lists, and comparing against specific branches.
+ *
+ * @param taskId - The numeric task ID to show diff for
+ * @param filePath - Optional specific file path to diff
+ * @param options - Command options
+ * @param options.onlyFiles - Show only changed filenames with stats
+ * @param options.branch - Compare against a specific branch instead of source
+ */
+const diffCommand = async (
   taskId: string,
   filePath?: string,
   options: { onlyFiles?: boolean; branch?: string } = {}
@@ -247,3 +261,13 @@ export const diffCommand = async (
     }
   }
 };
+
+// Named export for backwards compatibility (used by tests)
+export { diffCommand };
+
+export default {
+  name: 'diff',
+  description: 'Show git diff between task worktree and main branch',
+  requireProject: true,
+  action: diffCommand,
+} satisfies CommandDefinition;

@@ -23,6 +23,7 @@ import { getTelemetry } from '../lib/telemetry.js';
 import type { CLIJsonOutput } from '../types.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
 import { readFromStdin, stdinIsAvailable } from '../utils/stdin.js';
+import type { CommandDefinition } from '../types.js';
 
 const { prompt } = enquirer;
 
@@ -79,9 +80,20 @@ const expandIterationInstructions = async (
 };
 
 /**
- * Command to iterate over a existing task.
+ * Add a new iteration to an existing Rover task with additional instructions.
+ *
+ * Creates a new iteration for a task by providing refinement instructions that
+ * build upon the work from previous iterations. The AI agent uses context from
+ * previous plans and changes to understand the task state. Supports both batch
+ * mode (with instructions) and interactive mode for real-time collaboration.
+ *
+ * @param taskId - The numeric task ID to iterate on
+ * @param instructions - New requirements or refinement instructions to apply
+ * @param options - Command options
+ * @param options.json - Output results in JSON format
+ * @param options.interactive - Open an interactive shell session for iteration
  */
-export const iterateCommand = async (
+const iterateCommand = async (
   taskId: string,
   instructions?: string,
   options: IterateOptions = {}
@@ -432,3 +444,10 @@ export const iterateCommand = async (
     }
   }
 };
+
+export default {
+  name: 'iterate',
+  description: 'Add instructions to a task and start new iteration',
+  requireProject: true,
+  action: iterateCommand,
+} satisfies CommandDefinition;

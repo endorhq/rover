@@ -19,6 +19,7 @@ import {
   setJsonMode,
   requireProjectContext,
 } from '../lib/context.js';
+import type { CommandDefinition } from '../types.js';
 
 const { prompt } = enquirer;
 
@@ -27,7 +28,19 @@ const { prompt } = enquirer;
  */
 interface TaskDeleteOutput extends CLIJsonOutputWithErrors {}
 
-export const deleteCommand = async (
+/**
+ * Delete one or more tasks from a Rover project.
+ *
+ * This command permanently removes task metadata and associated git worktrees.
+ * It validates task IDs, shows a summary of tasks to be deleted, and prompts
+ * for confirmation before proceeding (unless --yes flag is used).
+ *
+ * @param taskIds - Array of task ID strings to delete
+ * @param options - Command options
+ * @param options.json - Output results in JSON format
+ * @param options.yes - Skip confirmation prompt
+ */
+const deleteCommand = async (
   taskIds: string[],
   options: { json?: boolean; yes?: boolean } = {}
 ) => {
@@ -218,3 +231,13 @@ export const deleteCommand = async (
     await telemetry?.shutdown();
   }
 };
+
+// Named export for backwards compatibility (used by tests)
+export { deleteCommand };
+
+export default {
+  name: 'delete',
+  description: 'Delete a task',
+  requireProject: true,
+  action: deleteCommand,
+} satisfies CommandDefinition;

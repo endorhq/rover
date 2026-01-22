@@ -11,6 +11,7 @@ import {
   setJsonMode,
   requireProjectContext,
 } from '../lib/context.js';
+import type { CommandDefinition } from '../types.js';
 
 /**
  * Interface for JSON output
@@ -23,9 +24,20 @@ interface TaskStopOutput extends CLIJsonOutput {
 }
 
 /**
- * Stop a running task and clean up its resources
+ * Stop a running task and optionally clean up its resources.
+ *
+ * Terminates an in-progress task by stopping its Docker container. Can also
+ * remove associated resources like the container, git worktree, and branch.
+ * Useful for cancelling stuck tasks or freeing up system resources.
+ *
+ * @param taskId - The numeric task ID to stop
+ * @param options - Command options
+ * @param options.json - Output results in JSON format
+ * @param options.removeAll - Remove container, git worktree, and branch
+ * @param options.removeContainer - Remove only the Docker container
+ * @param options.removeGitWorktreeAndBranch - Remove git worktree and branch
  */
-export const stopCommand = async (
+const stopCommand = async (
   taskId: string,
   options: {
     json?: boolean;
@@ -196,3 +208,13 @@ export const stopCommand = async (
     await telemetry?.shutdown();
   }
 };
+
+// Named export for backwards compatibility (used by tests)
+export { stopCommand };
+
+export default {
+  name: 'stop',
+  description: 'Stop a running task and clean up its resources',
+  requireProject: true,
+  action: stopCommand,
+} satisfies CommandDefinition;

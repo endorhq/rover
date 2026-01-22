@@ -71,3 +71,18 @@ export interface AIProvider {
     conflictedContent: string
   ): Promise<string | null>;
 }
+
+/**
+ * Defines the metadata for a CLI command.
+ * Each command file exports a default object that satisfies this interface.
+ */
+export interface CommandDefinition {
+  /** Command name used in CLI (e.g., 'list', 'task') */
+  name: string;
+  /** Description shown in help text */
+  description: string;
+  /** Whether this command requires an active project context */
+  requireProject: boolean;
+  /** The command action handler */
+  action: (...args: any[]) => Promise<void>;
+}

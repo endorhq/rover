@@ -6,13 +6,13 @@ import {
   ProjectStore,
   showList,
   showProperties,
-  showTips,
   showTitle,
 } from 'rover-core';
-import { isJsonMode, setJsonMode } from '../lib/context.js';
+import { isJsonMode } from '../lib/context.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { CLIJsonOutput } from '../types.js';
 import { exitWithError, exitWithSuccess } from '../utils/exit.js';
+import type { CommandDefinition } from '../types.js';
 
 /**
  * Project information in the info command output
@@ -58,7 +58,17 @@ function countProjectTasks(projectsPath: string, projectId: string): number {
   }
 }
 
-export const infoCommand = async (options: { json?: boolean } = {}) => {
+/**
+ * Display information about the Rover global store.
+ *
+ * Shows the location of the Rover data directory and lists all registered
+ * projects with their IDs, paths, and task counts. This is useful for
+ * understanding the global Rover state and debugging project registration.
+ *
+ * @param _options - Command options
+ * @param _options.json - Output results in JSON format
+ */
+const infoCommand = async (_options: { json?: boolean } = {}) => {
   const storePath = getDataDir();
   const jsonOutput: InfoCommandOutput = {
     success: true,
@@ -131,3 +141,13 @@ export const infoCommand = async (options: { json?: boolean } = {}) => {
     await exitWithError(jsonOutput, { telemetry });
   }
 };
+
+// Named export for backwards compatibility (used by tests)
+export { infoCommand };
+
+export default {
+  name: 'info',
+  description: 'Show information about the Rover global store',
+  requireProject: false,
+  action: infoCommand,
+} satisfies CommandDefinition;
