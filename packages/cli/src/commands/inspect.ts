@@ -240,14 +240,10 @@ export const inspectCommand = async (
             rawFileOutput.error = `Error reading file ${requestedFile}. It was not present in the task output.`;
           }
         }
-        console.log(JSON.stringify(rawFileOutput, null, 2));
         if (rawFileOutput.success) {
-          await exitWithSuccess(null, { success: true }, { telemetry });
+          await exitWithSuccess(null, rawFileOutput, { telemetry });
         } else {
-          await exitWithError(
-            { success: false, error: rawFileOutput.error },
-            { telemetry }
-          );
+          await exitWithError(rawFileOutput, { telemetry });
         }
         return;
       } else {
@@ -318,8 +314,7 @@ export const inspectCommand = async (
         worktreePath: task.worktreePath,
       };
 
-      console.log(JSON.stringify(jsonOutput, null, 2));
-      await exitWithSuccess(null, { success: true }, { telemetry });
+      await exitWithSuccess(null, jsonOutput, { telemetry });
       return;
     } else {
       // Format status with user-friendly names
