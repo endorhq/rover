@@ -225,6 +225,9 @@ export class TaskDescriptionManager {
     // Preserve networkConfig field
     migrated.networkConfig = data.networkConfig;
 
+    // Preserve baseCommit field
+    migrated.baseCommit = data.baseCommit;
+
     return migrated as TaskDescription;
   }
 
@@ -687,6 +690,9 @@ export class TaskDescriptionManager {
   get networkConfig(): NetworkConfig | undefined {
     return this.data.networkConfig;
   }
+  get baseCommit(): string | undefined {
+    return this.data.baseCommit;
+  }
 
   // ============================================================
   // Data Modification (Setters)
@@ -713,6 +719,14 @@ export class TaskDescriptionManager {
    */
   setAgentImage(agentImage: string): void {
     this.data.agentImage = agentImage;
+    this.save();
+  }
+
+  /**
+   * Set the base commit hash (the commit when the worktree was created)
+   */
+  setBaseCommit(commit: string): void {
+    this.data.baseCommit = commit;
     this.save();
   }
 

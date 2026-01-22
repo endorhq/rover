@@ -40,6 +40,8 @@ interface FileChangeStat {
 interface TaskInspectionOutput {
   /** Whether the operation was successful */
   success: boolean;
+  /** The base commit hash when the worktree was created */
+  baseCommit?: string;
   /** Git branch name for the task worktree */
   branchName: string;
   /** ISO timestamp when task was completed */
@@ -110,6 +112,7 @@ const jsonErrorOutput = (
 ): TaskInspectionOutput => {
   return {
     success: false,
+    baseCommit: task?.baseCommit,
     branchName: task?.branchName || '',
     completedAt: task?.completedAt,
     createdAt: task?.createdAt || new Date().toISOString(),
@@ -293,6 +296,7 @@ export const inspectCommand = async (
       // Output JSON format
       const jsonOutput: TaskInspectionOutput = {
         success: true,
+        baseCommit: task.baseCommit,
         branchName: task.branchName,
         completedAt: task.completedAt,
         createdAt: task.createdAt,
