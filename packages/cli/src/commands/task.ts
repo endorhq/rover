@@ -33,9 +33,10 @@ import { copyEnvironmentFiles } from '../utils/env-files.js';
 import { initWorkflowStore } from '../lib/workflow.js';
 import {
   setJsonMode,
-  requireProjectContextForCommand,
+  requireProjectContext,
   isVerbose,
 } from '../lib/context.js';
+import type { CommandDefinition } from '../types.js';
 
 const { prompt } = enquirer;
 
@@ -424,12 +425,29 @@ const createTaskForAgent = async (
 };
 
 /**
- * Task commands
+ * Create and assign a new task to an AI agent for execution.
+ *
+ * This is the primary command for creating work items in Rover. It expands
+ * the task description using AI, sets up an isolated git worktree, creates
+ * iteration tracking, and launches a sandboxed container running the specified
+ * AI agent. Supports multiple agents working on the same task in parallel,
+ * GitHub issue integration, custom workflows, and network filtering.
+ *
+ * @param initPrompt - Initial task description (prompts if not provided)
+ * @param options - Command options
+ * @param options.workflow - Workflow name to use (defaults to 'swe')
+ * @param options.fromGithub - GitHub issue number to fetch description from
+ * @param options.yes - Skip interactive prompts
+ * @param options.sourceBranch - Base branch for git worktree creation
+ * @param options.targetBranch - Custom name for the task branch
+ * @param options.agent - AI agent(s) to use with optional model (e.g., 'claude:opus')
+ * @param options.json - Output results in JSON format
+ * @param options.sandboxExtraArgs - Extra arguments to pass to the container
+ * @param options.networkMode - Network filtering mode for the container
+ * @param options.networkAllow - Hosts to allow network access to
+ * @param options.networkBlock - Hosts to block network access to
  */
-export const taskCommand = async (
-  initPrompt?: string,
-  options: TaskOptions = {}
-) => {
+const taskCommand = async (initPrompt?: string, options: TaskOptions = {}) => {
   const telemetry = getTelemetry();
   // Extract options
   const { yes, json, fromGithub, sourceBranch, targetBranch, agent } = options;
@@ -448,7 +466,7 @@ export const taskCommand = async (
   // Get project context
   let project;
   try {
-    project = await requireProjectContextForCommand();
+    project = await requireProjectContext();
   } catch (error) {
     jsonOutput.error =
       error instanceof Error ? error.message : 'Failed to get project context';
@@ -971,3 +989,10 @@ export const taskCommand = async (
 
   await telemetry?.shutdown();
 };
+
+export default {
+  name: 'task',
+  description: 'Create and assign task to an AI Agent to complete it',
+  requireProject: true,
+  action: taskCommand,
+} satisfies CommandDefinition;

@@ -11,6 +11,7 @@ import { readFromStdin } from '../../utils/stdin.js';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { writeFileSync, mkdtempSync, rmSync } from 'node:fs';
+import type { CommandDefinition } from '../../types.js';
 
 interface AddWorkflowCommandOptions {
   // Custom name for the workflow
@@ -38,7 +39,7 @@ interface AddWorkflowOutput extends CLIJsonOutput {
  * @param source The URL, local path, or '-' for stdin
  * @param options Options to modify the behavior
  */
-export const addWorkflowCommand = async (
+const addWorkflowCommand = async (
   source: string,
   options: AddWorkflowCommandOptions
 ) => {
@@ -127,3 +128,14 @@ export const addWorkflowCommand = async (
     await telemetry?.shutdown();
   }
 };
+
+// Named export for backwards compatibility (used by tests)
+export { addWorkflowCommand };
+
+export default {
+  name: 'add',
+  description:
+    'Add a workflow from a URL, local path, or stdin to the workflow store',
+  requireProject: false,
+  action: addWorkflowCommand,
+} satisfies CommandDefinition;

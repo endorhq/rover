@@ -31,20 +31,6 @@ vi.mock('../../lib/context.js', () => ({
         join(testDir, '.rover', 'tasks', taskId.toString(), 'workspace'),
     });
   }),
-  requireProjectContextForCommand: vi.fn().mockImplementation(() => {
-    return Promise.resolve({
-      path: testDir,
-      getTask: (taskId: number) => {
-        const taskPath = join(testDir, '.rover', 'tasks', taskId.toString());
-        if (TaskDescriptionManager.exists(taskPath)) {
-          return TaskDescriptionManager.load(taskPath, taskId);
-        }
-        return undefined;
-      },
-      getWorkspacePath: (taskId: number) =>
-        join(testDir, '.rover', 'tasks', taskId.toString(), 'workspace'),
-    });
-  }),
   isJsonMode: vi.fn().mockReturnValue(false),
   setJsonMode: vi.fn(),
 }));

@@ -19,8 +19,9 @@ import type { CLIJsonOutput } from '../types.js';
 import {
   isJsonMode,
   setJsonMode,
-  requireProjectContextForCommand,
+  requireProjectContext,
 } from '../lib/context.js';
+import type { CommandDefinition } from '../types.js';
 
 const { prompt } = enquirer;
 
@@ -205,10 +206,20 @@ interface TaskMergeOutput extends CLIJsonOutput {
   cleanedUp?: boolean;
 }
 
-export const mergeCommand = async (
-  taskId: string,
-  options: MergeOptions = {}
-) => {
+/**
+ * Merge a completed task's changes into the current branch.
+ *
+ * Handles the full merge workflow: commits any uncommitted worktree changes
+ * with an AI-generated commit message, merges the task branch into the current
+ * branch, and handles merge conflicts using AI-powered resolution. Triggers
+ * onMerge hooks after successful merges.
+ *
+ * @param taskId - The numeric task ID to merge
+ * @param options - Command options
+ * @param options.force - Skip confirmation prompt
+ * @param options.json - Output results in JSON format
+ */
+const mergeCommand = async (taskId: string, options: MergeOptions = {}) => {
   if (options.json !== undefined) {
     setJsonMode(options.json);
   }
@@ -229,7 +240,7 @@ export const mergeCommand = async (
   // Require project context
   let project;
   try {
-    project = await requireProjectContextForCommand();
+    project = await requireProjectContext();
   } catch (error) {
     jsonOutput.error = error instanceof Error ? error.message : String(error);
     await exitWithError(jsonOutput, { telemetry });
@@ -670,3 +681,10 @@ export const mergeCommand = async (
     await telemetry?.shutdown();
   }
 };
+
+export default {
+  name: 'merge',
+  description: 'Merge the task changes into your current branch',
+  requireProject: true,
+  action: mergeCommand,
+} satisfies CommandDefinition;

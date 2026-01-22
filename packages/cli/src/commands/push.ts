@@ -10,11 +10,12 @@ import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
 import {
   isJsonMode,
   setJsonMode,
-  requireProjectContextForCommand,
+  requireProjectContext,
 } from '../lib/context.js';
 import { showRoverChat, TIP_TITLES } from '../utils/display.js';
 import { statusColor } from '../utils/task-status.js';
 import { executeHooks } from '../lib/hooks.js';
+import type { CommandDefinition } from '../types.js';
 
 const { prompt } = enquirer;
 
@@ -58,9 +59,20 @@ interface PushResult extends CLIJsonOutput {
 }
 
 /**
- * Push command implementation
+ * Commit and push a task's changes to the remote repository.
+ *
+ * Stages all changes in the task worktree, commits them with a provided or
+ * prompted message (including Rover co-author attribution if enabled), and
+ * pushes the task branch to the remote. Sets up upstream tracking if needed.
+ * Triggers onPush hooks after successful pushes.
+ *
+ * @param taskId - The numeric task ID to push
+ * @param options - Command options
+ * @param options.message - Commit message (prompts if not provided)
+ * @param options.pr - Reserved for future GitHub PR creation support
+ * @param options.json - Output results in JSON format
  */
-export const pushCommand = async (taskId: string, options: PushOptions) => {
+const pushCommand = async (taskId: string, options: PushOptions) => {
   if (options.json !== undefined) {
     setJsonMode(options.json);
   }
@@ -91,7 +103,7 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
   // Get project context
   let project;
   try {
-    project = await requireProjectContextForCommand();
+    project = await requireProjectContext();
   } catch (error) {
     result.error = error instanceof Error ? error.message : String(error);
     await exitWithError(result, { telemetry });
@@ -401,3 +413,10 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
     await telemetry?.shutdown();
   }
 };
+
+export default {
+  name: 'push',
+  description: 'Commit and push task changes to remote, with GitHub PR support',
+  requireProject: true,
+  action: pushCommand,
+} satisfies CommandDefinition;

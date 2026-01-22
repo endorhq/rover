@@ -258,26 +258,7 @@ export async function requireProjectContext(
     );
   } else {
     throw new Error(
-      'This Rover command requires a project to run. You can:\n- Run it on a git repository folder (Rover will autoregister the project)\n- Use the --project option.\n- Set the ROVER_PROJECT environment variable.'
+      'This Rover command requires a project to run. You can:\n\n- Run it on a git repository folder (Rover will autoregister the project)\n- Use the --project option.\n- Set the ROVER_PROJECT environment variable.'
     );
   }
-}
-
-/**
- * Helper just for commands. It sets a default message
- */
-export async function requireProjectContextForCommand(
-  projectOverride?: string,
-  options: RequireProjectOptions = {}
-): Promise<ProjectManager> {
-  const mergedOptions: RequireProjectOptions = {
-    missingProjectMessage:
-      options.missingProjectMessage ??
-      colors.yellow(
-        `Please select a project to proceed.\nYou can type to filter the projects.`
-      ),
-    ...options,
-  };
-
-  return requireProjectContext(projectOverride, mergedOptions);
 }

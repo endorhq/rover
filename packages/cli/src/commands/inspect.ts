@@ -16,9 +16,10 @@ import { getTelemetry } from '../lib/telemetry.js';
 import {
   isJsonMode,
   setJsonMode,
-  requireProjectContextForCommand,
+  requireProjectContext,
 } from '../lib/context.js';
 import { exitWithError, exitWithSuccess } from '../utils/exit.js';
+import type { CommandDefinition } from '../types.js';
 
 const DEFAULT_FILE_CONTENTS = 'summary.md';
 
@@ -134,7 +135,21 @@ const jsonErrorOutput = (
   };
 };
 
-export const inspectCommand = async (
+/**
+ * Display detailed information about a Rover task.
+ *
+ * Shows comprehensive task metadata including status, timestamps, workspace paths,
+ * and workflow output files. By default displays the summary.md from the latest
+ * iteration. Can output specific files or raw file contents for scripting.
+ *
+ * @param taskId - The numeric task ID to inspect
+ * @param iterationNumber - Optional specific iteration number (defaults to latest)
+ * @param options - Command options
+ * @param options.json - Output results in JSON format
+ * @param options.file - Array of workflow output files to display (formatted)
+ * @param options.rawFile - Array of files to output as raw content (no formatting)
+ */
+const inspectCommand = async (
   taskId: string,
   iterationNumber?: number,
   options: { json?: boolean; file?: string[]; rawFile?: string[] } = {}
@@ -185,7 +200,7 @@ export const inspectCommand = async (
   // Require project context
   let project;
   try {
-    project = await requireProjectContextForCommand();
+    project = await requireProjectContext();
   } catch (error) {
     const errorOutput = jsonErrorOutput(
       error instanceof Error ? error.message : String(error),
@@ -456,3 +471,10 @@ export const inspectCommand = async (
     }
   }
 };
+
+export default {
+  name: 'inspect',
+  description: 'Inspect a task',
+  requireProject: true,
+  action: inspectCommand,
+} satisfies CommandDefinition;

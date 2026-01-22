@@ -23,6 +23,7 @@ import { join, dirname } from 'node:path';
 import { getTelemetry } from '../../lib/telemetry.js';
 import { isJsonMode, setJsonMode } from '../../lib/context.js';
 import { readFromStdin } from '../../utils/stdin.js';
+import type { CommandDefinition } from '../../types.js';
 
 interface InspectWorkflowCommandOptions {
   // Output formats
@@ -140,7 +141,7 @@ function cleanupTempFile(filePath: string): void {
  * @param workflowSource Name, URL, or file path of the workflow to inspect
  * @param options Options to modify the output
  */
-export const inspectWorkflowCommand = async (
+const inspectWorkflowCommand = async (
   workflowSource: string,
   options: InspectWorkflowCommandOptions
 ) => {
@@ -431,3 +432,13 @@ export const inspectWorkflowCommand = async (
     await telemetry?.shutdown();
   }
 };
+
+// Named export for backwards compatibility (used by tests)
+export { inspectWorkflowCommand };
+
+export default {
+  name: 'inspect',
+  description: 'Display detailed information about a specific workflow',
+  requireProject: false,
+  action: inspectWorkflowCommand,
+} satisfies CommandDefinition;

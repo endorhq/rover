@@ -10,8 +10,9 @@ import { exitWithError, exitWithWarn } from '../utils/exit.js';
 import {
   isJsonMode,
   setJsonMode,
-  requireProjectContextForCommand,
+  requireProjectContext,
 } from '../lib/context.js';
+import type { CommandDefinition } from '../types.js';
 
 /**
  * Interface for JSON output
@@ -42,7 +43,20 @@ const getAvailableIterations = (task: TaskDescriptionManager): number[] => {
   }
 };
 
-export const logsCommand = async (
+/**
+ * Display execution logs for a Rover task iteration.
+ *
+ * Retrieves and displays the Docker container logs for a task's execution.
+ * Shows the AI agent's real-time activity including commands run, files modified,
+ * and progress updates. Supports following logs in real-time for running tasks.
+ *
+ * @param taskId - The numeric task ID to show logs for
+ * @param iterationNumber - Optional specific iteration number (defaults to latest)
+ * @param options - Command options
+ * @param options.follow - Follow log output in real-time (like tail -f)
+ * @param options.json - Output logs in JSON format
+ */
+const logsCommand = async (
   taskId: string,
   iterationNumber?: string,
   options: { follow?: boolean; json?: boolean } = {}
@@ -72,7 +86,7 @@ export const logsCommand = async (
   // Require project context
   let project;
   try {
-    project = await requireProjectContextForCommand();
+    project = await requireProjectContext();
   } catch (error) {
     jsonOutput.error = error instanceof Error ? error.message : String(error);
     await exitWithError(jsonOutput, { telemetry });
@@ -285,3 +299,13 @@ export const logsCommand = async (
     await telemetry?.shutdown();
   }
 };
+
+// Named export for backwards compatibility (used by tests)
+export { logsCommand };
+
+export default {
+  name: 'logs',
+  description: 'Show execution logs for a task iteration',
+  requireProject: true,
+  action: logsCommand,
+} satisfies CommandDefinition;

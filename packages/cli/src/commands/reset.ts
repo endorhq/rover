@@ -7,11 +7,24 @@ import yoctoSpinner from 'yocto-spinner';
 import { TaskNotFoundError } from 'rover-schemas';
 import { getTelemetry } from '../lib/telemetry.js';
 import { exitWithError, exitWithWarn, exitWithSuccess } from '../utils/exit.js';
-import { requireProjectContextForCommand } from '../lib/context.js';
+import { requireProjectContext } from '../lib/context.js';
+import type { CommandDefinition } from '../types.js';
 
 const { prompt } = enquirer;
 
-export const resetCommand = async (
+/**
+ * Reset a task to its initial state, removing all progress.
+ *
+ * Completely resets a task by removing its git worktree, branch, and any
+ * iteration data. This is a destructive operation that cannot be undone.
+ * Useful for starting fresh when a task has gone off track or when the
+ * workspace needs to be recreated.
+ *
+ * @param taskId - The numeric task ID to reset
+ * @param options - Command options
+ * @param options.force - Skip confirmation prompt
+ */
+const resetCommand = async (
   taskId: string,
   options: { force?: boolean } = {}
 ) => {
@@ -32,7 +45,7 @@ export const resetCommand = async (
   // Require project context
   let project: ProjectManager;
   try {
-    project = await requireProjectContextForCommand();
+    project = await requireProjectContext();
   } catch (error) {
     await exitWithError(
       {
@@ -179,3 +192,10 @@ export const resetCommand = async (
     }
   }
 };
+
+export default {
+  name: 'reset',
+  description: 'Reset a task to original state and remove any worktree/branch',
+  requireProject: true,
+  action: resetCommand,
+} satisfies CommandDefinition;
