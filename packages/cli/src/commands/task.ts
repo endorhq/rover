@@ -613,43 +613,9 @@ export const taskCommand = async (
   // We need to process the workflow inputs. We will ask users to provide this
   // information or load it as a JSON from the stdin.
   if (inputs && inputs.length > 0) {
-    if (stdinIsAvailable()) {
-      const stdinInput = await readFromStdin();
-      if (stdinInput) {
-        try {
-          const parsed = JSON.parse(stdinInput);
-
-          for (const key in parsed) {
-            inputsData.set(key, parsed[key]);
-
-            if (key == 'description') {
-              description = parsed[key];
-            }
-          }
-
-          if (!json) {
-            console.log(colors.gray('✓ Read task description from stdin'));
-          }
-        } catch (err) {
-          // Assume the text is just the description
-          description = stdinInput;
-          inputsData.set('description', description);
-          if (!json) {
-            showProperties(
-              {
-                Description: description,
-              },
-              { addLineBreak: false }
-            );
-          }
-        }
-      } else if (description != null && description.length > 0) {
-        // There are cases like running the CLI from the extension that might
-        // configure an empty stdin, while passing the `description` as argument.
-        // In that case, we also load the description
-        inputsData.set('description', description);
-      }
-    } else if (fromGithub != null) {
+    // Check --from-github flag first since it's an explicit user intent
+    // that should take priority over stdin detection
+    if (fromGithub != null) {
       // Load the inputs from GitHub
       const github = new GitHub({ cwd: project.path });
 
@@ -734,6 +700,42 @@ export const taskCommand = async (
 
         await exitWithError(jsonOutput, { telemetry });
         return;
+      }
+    } else if (stdinIsAvailable()) {
+      const stdinInput = await readFromStdin();
+      if (stdinInput) {
+        try {
+          const parsed = JSON.parse(stdinInput);
+
+          for (const key in parsed) {
+            inputsData.set(key, parsed[key]);
+
+            if (key == 'description') {
+              description = parsed[key];
+            }
+          }
+
+          if (!json) {
+            console.log(colors.gray('✓ Read task description from stdin'));
+          }
+        } catch (err) {
+          // Assume the text is just the description
+          description = stdinInput;
+          inputsData.set('description', description);
+          if (!json) {
+            showProperties(
+              {
+                Description: description,
+              },
+              { addLineBreak: false }
+            );
+          }
+        }
+      } else if (description != null && description.length > 0) {
+        // There are cases like running the CLI from the extension that might
+        // configure an empty stdin, while passing the `description` as argument.
+        // In that case, we also load the description
+        inputsData.set('description', description);
       }
     } else {
       const questions = [];
