@@ -51,7 +51,8 @@ vi.mock('../../utils/display.js', () => ({
 
 describe('inspect command', () => {
   let originalCwd: string;
-  let processExitSpy: ReturnType<typeof vi.spyOn>;
+  // biome-ignore lint/suspicious/noExplicitAny: process.exit mock type requires flexible typing
+  let processExitSpy: any;
   let consoleLogSpy: ReturnType<typeof vi.spyOn>;
   let capturedOutput: string[];
 
