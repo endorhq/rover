@@ -139,7 +139,7 @@ export class ACPClient implements Client {
           }
         }
 
-        if (this.isCapturing) {
+        if (this.isCapturing && update.content.type === 'text') {
           this.capturedMessages += `[THINKING] ${update.content.text}`;
         }
         break;
