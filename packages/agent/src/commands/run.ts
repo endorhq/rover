@@ -339,9 +339,8 @@ export const runCommand = async (
       const tool =
         options.agentTool || workflowManager.defaults?.tool || 'claude';
 
-      // Temporarily ACP usage decision during ACP migration process:
-      // force Claude to always use ACP mode
-      const useACPMode = tool.toLowerCase() === 'claude';
+      // ACP usage decision: use ACP mode for agents that support it
+      const useACPMode = ['claude', 'gemini'].includes(tool.toLowerCase());
 
       if (useACPMode) {
         console.log(colors.cyan('\n🔗 ACP Mode enabled'));

@@ -51,6 +51,12 @@ function getACPSpawnCommand(tool: string): { command: string; args: string[] } {
         command: 'npx',
         args: ['-y', '@zed-industries/claude-code-acp'],
       };
+    case 'gemini':
+      // Gemini implements ACP natively via --experimental-acp flag
+      return {
+        command: 'gemini',
+        args: ['--experimental-acp'],
+      };
     default:
       throw new Error(`No ACP available for tool ${tool}`);
   }
