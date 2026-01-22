@@ -86,6 +86,14 @@ interface TaskInspectionOutput {
   workflowName: string;
   /** Path to the git worktree for this task */
   worktreePath: string;
+  /** Task source (origin tracking - github, manual, etc.) */
+  source?: {
+    type: 'github' | 'manual';
+    id?: string;
+    url?: string;
+    title?: string;
+    ref?: Record<string, unknown>;
+  };
 }
 
 /**
@@ -312,6 +320,7 @@ export const inspectCommand = async (
         uuid: task.uuid,
         workflowName: task.workflowName,
         worktreePath: task.worktreePath,
+        source: task.source,
       };
 
       await exitWithSuccess(null, jsonOutput, { telemetry });
@@ -332,6 +341,13 @@ export const inspectCommand = async (
         Workflow: task.workflowName,
         'Created At': new Date(task.createdAt).toLocaleString(),
       };
+
+      // Show task source if available (e.g., GitHub issue, etc.)
+      if (task.source?.url) {
+        const sourceLabel =
+          task.source.type === 'github' ? 'GitHub Issue' : 'Source';
+        properties[sourceLabel] = colors.cyan(task.source.url);
+      }
 
       if (task.completedAt) {
         properties['Completed At'] = new Date(

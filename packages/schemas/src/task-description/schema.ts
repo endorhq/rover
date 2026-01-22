@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { NetworkConfigSchema } from '../project-config/schema.js';
 
 // Schema version for migrations
-export const CURRENT_TASK_DESCRIPTION_SCHEMA_VERSION = '1.2';
+export const CURRENT_TASK_DESCRIPTION_SCHEMA_VERSION = '1.3';
 
 // Task status schema
 export const TaskStatusSchema = z.enum([
@@ -18,6 +18,18 @@ export const TaskStatusSchema = z.enum([
   'MERGED',
   'PUSHED',
 ]);
+
+// Source type schema for task origin tracking
+export const SourceTypeSchema = z.enum(['github', 'manual']);
+
+// Task source schema - tracks where a task originated from
+export const TaskSourceSchema = z.object({
+  type: SourceTypeSchema,
+  id: z.string().optional(),
+  url: z.string().url().optional(),
+  title: z.string().optional(),
+  ref: z.record(z.string(), z.unknown()).optional(),
+});
 
 // Task description schema
 export const TaskDescriptionSchema = z.object({
@@ -67,6 +79,9 @@ export const TaskDescriptionSchema = z.object({
 
   // Network configuration override for this task
   networkConfig: NetworkConfigSchema.optional(),
+
+  // Task source (origin tracking - github, manual, etc.)
+  source: TaskSourceSchema.optional(),
 
   // Metadata
   version: z.string(),
