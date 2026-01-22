@@ -483,6 +483,9 @@ const inspectCommand = async (
   }
 };
 
+// Named export for backwards compatibility (used by tests)
+export { inspectCommand };
+
 export default {
   name: 'inspect',
   description: 'Inspect a task',
