@@ -339,6 +339,15 @@ const createTaskForAgent = async (
 
     // Copy user .env development files
     copyEnvironmentFiles(projectPath, worktreePath);
+
+    // Configure sparse checkout to exclude files matching exclude patterns
+    const projectConfig = ProjectConfigManager.load(projectPath);
+    if (
+      projectConfig.excludePatterns &&
+      projectConfig.excludePatterns.length > 0
+    ) {
+      git.setupSparseCheckout(worktreePath, projectConfig.excludePatterns);
+    }
   } catch (error) {
     processManager?.failLastItem();
     console.error(colors.red('Error creating git workspace: ' + error));

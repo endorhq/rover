@@ -643,6 +643,56 @@ export class Git {
   }
 
   /**
+   * Setup sparse checkout to exclude files matching the given patterns.
+   * Uses --no-cone mode to support full glob pattern syntax.
+   *
+   * @param worktreePath - Path to the worktree to configure
+   * @param excludePatterns - Array of glob patterns to exclude
+   */
+  setupSparseCheckout(worktreePath: string, excludePatterns: string[]): void {
+    if (!excludePatterns || excludePatterns.length === 0) {
+      return;
+    }
+
+    // Initialize sparse checkout in no-cone mode (supports full glob patterns)
+    const initResult = launchSync(
+      'git',
+      ['sparse-checkout', 'init', '--no-cone'],
+      {
+        cwd: worktreePath,
+        reject: false,
+      }
+    );
+
+    if (initResult.exitCode !== 0) {
+      const errorMsg =
+        initResult.stderr?.toString() || 'Failed to initialize sparse checkout';
+      throw new GitError(errorMsg);
+    }
+
+    // Build sparse checkout patterns:
+    // First include everything with /*, then exclude specific patterns with !
+    const sparsePatterns = ['/*', ...excludePatterns.map(p => `!${p}`)];
+
+    // Set the patterns
+    const setResult = launchSync(
+      'git',
+      ['sparse-checkout', 'set', ...sparsePatterns],
+      {
+        cwd: worktreePath,
+        reject: false,
+      }
+    );
+
+    if (setResult.exitCode !== 0) {
+      const errorMsg =
+        setResult.stderr?.toString() ||
+        'Failed to set sparse checkout patterns';
+      throw new GitError(errorMsg);
+    }
+  }
+
+  /**
    * Count file lines efficiently.
    * @see https://stackoverflow.com/a/41439945
    */

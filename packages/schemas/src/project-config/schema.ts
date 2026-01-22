@@ -5,7 +5,7 @@
 import { z } from 'zod';
 
 // Current schema version
-export const CURRENT_PROJECT_SCHEMA_VERSION = '1.2';
+export const CURRENT_PROJECT_SCHEMA_VERSION = '1.3';
 
 // Filename constant
 export const PROJECT_CONFIG_FILENAME = 'rover.json';
@@ -145,4 +145,6 @@ export const ProjectConfigSchema = z.object({
   sandbox: SandboxConfigSchema.optional(),
   /** Optional hooks configuration for task lifecycle events */
   hooks: HooksConfigSchema.optional(),
+  /** Optional glob patterns for files to exclude from agent context */
+  excludePatterns: z.array(z.string()).optional(),
 });
