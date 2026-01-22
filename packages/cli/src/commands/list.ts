@@ -158,8 +158,8 @@ const buildTaskRow = (
  * List all tasks in the current project or across all registered projects.
  *
  * Displays a table of tasks with their IDs, titles, agents, workflows, status,
- * progress, and duration. In project context, shows tasks for that project;
- * in global context (outside any project), shows tasks grouped by project.
+ * progress, and duration. In project context, shows tasks for that project.
+ * In global context (outside any project), shows tasks grouped by project.
  * Supports watch mode for real-time status updates and triggers onComplete hooks.
  *
  * @param options - Command options
