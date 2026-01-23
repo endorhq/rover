@@ -111,17 +111,12 @@ export function createProgram(
         // Resolve the project.
         const commandName = actionCommand.name();
 
-        // Retrive from previous hook
+        // Retrieve from previous hook
         const ctx = getCLIContext();
 
         // Get command definition and check if it requires project
         // It must be defined.
         const commandDef = getCommandDefinition(commandName)!;
-
-        // Skip project resolution for commands that don't require it
-        if (!commandDef.requireProject) {
-          return;
-        }
 
         try {
           // Load the project option to determine the current project.
@@ -131,8 +126,8 @@ export function createProgram(
             // The user didn't specify the --project flag and it's in a repo.
             // Find or auto-register the project based on the current git repo.
             project = await findOrRegisterProject();
-          } else {
-            // Since the command require the project, resolve it or exit with error.
+          } else if (commandDef.requireProject) {
+            // The command requires a project - resolve it or show the selector.
             let message = `The "${commandName}" command requires a project context.\nPlease, select it from the list. You can type to filter the projects`;
 
             if (ctx.projectOption) {
@@ -149,11 +144,14 @@ export function createProgram(
             setProject(project);
           }
         } catch (error) {
-          // Config/registration errors - exit
-          exitWithError({
-            error: error instanceof Error ? error.message : String(error),
-            success: false,
-          });
+          // Config/registration errors - exit only if project is required
+          if (commandDef.requireProject) {
+            exitWithError({
+              error: error instanceof Error ? error.message : String(error),
+              success: false,
+            });
+          }
+          // For optional project commands, silently continue in global mode
         }
       })
       .hook('preAction', (_thisCommand, actionCommand) => {
