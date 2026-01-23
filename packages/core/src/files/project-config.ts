@@ -144,6 +144,9 @@ export class ProjectConfigManager {
       ...(data.envsFile !== undefined ? { envsFile: data.envsFile } : {}),
       ...(sandbox !== undefined ? { sandbox } : {}),
       ...(data.hooks !== undefined ? { hooks: data.hooks } : {}),
+      ...(data.excludePatterns !== undefined
+        ? { excludePatterns: data.excludePatterns }
+        : {}),
     };
 
     return migrated;
@@ -212,6 +215,9 @@ export class ProjectConfigManager {
   }
   get network(): NetworkConfig | undefined {
     return this.data.sandbox?.network;
+  }
+  get excludePatterns(): string[] | undefined {
+    return this.data.excludePatterns;
   }
 
   // Data Modification (Setters)

@@ -7,6 +7,7 @@ import {
   IterationManager,
   AI_AGENT,
   Git,
+  ProjectConfigManager,
   type ProjectManager,
 } from 'rover-core';
 import { TaskNotFoundError } from 'rover-schemas';
@@ -140,6 +141,15 @@ const restartCommand = async (
 
         // Copy user .env development files
         copyEnvironmentFiles(project.path, worktreePath);
+
+        // Configure sparse checkout to exclude files matching exclude patterns
+        const projectConfig = ProjectConfigManager.load(project.path);
+        if (
+          projectConfig.excludePatterns &&
+          projectConfig.excludePatterns.length > 0
+        ) {
+          git.setupSparseCheckout(worktreePath, projectConfig.excludePatterns);
+        }
 
         // Update task with workspace information
         task.setWorkspace(worktreePath, branchName);
