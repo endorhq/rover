@@ -51,6 +51,11 @@ function getACPSpawnCommand(tool: string): { command: string; args: string[] } {
         command: 'npx',
         args: ['-y', '@zed-industries/claude-code-acp'],
       };
+    case 'copilot':
+      return {
+        command: 'copilot',
+        args: ['--acp'],
+      };
     default:
       throw new Error(`No ACP available for tool ${tool}`);
   }

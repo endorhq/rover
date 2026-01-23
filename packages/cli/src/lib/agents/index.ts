@@ -1,5 +1,6 @@
 import ClaudeAI from './claude.js';
 import CodexAI from './codex.js';
+import CopilotAI from './copilot.js';
 import CursorAI from './cursor.js';
 import GeminiAI from './gemini.js';
 import QwenAI from './qwen.js';
@@ -98,6 +99,8 @@ export const getAIAgentTool = (agent: string): AIAgentTool => {
       return new ClaudeAI();
     case 'codex':
       return new CodexAI();
+    case 'copilot':
+      return new CopilotAI();
     case 'cursor':
       return new CursorAI();
     case 'gemini':

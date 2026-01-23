@@ -27,6 +27,15 @@ export const AGENT_MODELS: Record<AI_AGENT, AgentModelConfig[]> = {
     { name: 'opus', description: 'Highest capability' },
     { name: 'haiku', description: 'Fastest and cheapest' },
   ],
+  [AI_AGENT.Copilot]: [
+    {
+      name: 'gpt-4o',
+      description: 'High capability multimodal model',
+      isDefault: true,
+    },
+    { name: 'claude-3.5-sonnet', description: 'Claude 3.5 Sonnet' },
+    { name: 'o1', description: 'Advanced reasoning model' },
+  ],
   [AI_AGENT.Gemini]: [
     {
       name: 'flash',

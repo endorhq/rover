@@ -38,6 +38,9 @@ export function parseAgentString(agentString: string): ParsedAgent {
     case 'codex':
       normalizedAgent = AI_AGENT.Codex;
       break;
+    case 'copilot':
+      normalizedAgent = AI_AGENT.Copilot;
+      break;
     case 'cursor':
       normalizedAgent = AI_AGENT.Cursor;
       break;
