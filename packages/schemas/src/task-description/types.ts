@@ -12,6 +12,18 @@ export type TaskStatus = z.infer<typeof TaskStatusSchema>;
 // Infer TaskDescriptionSchema type from Zod schema
 export type TaskDescription = z.infer<typeof TaskDescriptionSchema>;
 
+// Source types for task origin tracking
+export type SourceType = 'github' | 'manual';
+
+// Task source - tracks where a task originated from
+export interface TaskSource {
+  type: SourceType; // Source type: 'github', 'manual', etc.
+  id?: string; // Source-specific identifier (e.g., "123", "ENG-123")
+  url?: string; // Human-readable URL for the source
+  title?: string; // Human-readable title/context
+  ref?: Record<string, unknown>; // Source-specific data for API calls
+}
+
 // Data required to create a new task
 export interface CreateTaskData {
   id: number;
@@ -24,6 +36,7 @@ export interface CreateTaskData {
   agentModel?: string; // AI model to use (e.g., opus, sonnet, flash)
   sourceBranch?: string; // Source branch task was created from
   networkConfig?: NetworkConfig; // Network filtering config (overrides project config)
+  source?: TaskSource; // Source of the task (github, manual, etc.)
 }
 
 // Metadata for status updates

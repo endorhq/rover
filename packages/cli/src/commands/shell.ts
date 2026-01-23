@@ -12,11 +12,21 @@ import {
   createSandbox,
   getAvailableSandboxBackend,
 } from '../lib/sandbox/index.js';
+import type { CommandDefinition } from '../types.js';
 
 /**
- * Start an interactive shell for testing task changes
+ * Open an interactive shell in a task's workspace for manual testing.
+ *
+ * Provides direct shell access to a task's git worktree, allowing users to
+ * manually test changes, run commands, or debug issues. Can run either as
+ * a local shell in the worktree directory or inside a sandboxed container
+ * matching the task's execution environment.
+ *
+ * @param taskId - The numeric task ID to open shell for
+ * @param options - Command options
+ * @param options.container - Run shell inside a sandboxed container instead of locally
  */
-export const shellCommand = async (
+const shellCommand = async (
   taskId: string,
   options: { container?: boolean }
 ) => {
@@ -213,3 +223,10 @@ export const shellCommand = async (
     await telemetry?.shutdown();
   }
 };
+
+export default {
+  name: 'shell',
+  description: 'Open interactive shell for testing task changes',
+  requireProject: true,
+  action: shellCommand,
+} satisfies CommandDefinition;

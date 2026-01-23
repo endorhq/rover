@@ -22,6 +22,7 @@
   "author": "The Endor team",
   "dependencies": {
     "ansi-colors": "catalog:runtime",
+    "nanoid": "^5.0.9",
     "boxen": "^8.0.1",
     "execa": "catalog:runtime",
     "log-update": "^7.0.1",

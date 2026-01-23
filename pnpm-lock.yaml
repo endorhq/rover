@@ -48,6 +48,9 @@ importers:
 
   packages/agent:
     dependencies:
+      '@agentclientprotocol/sdk':
+        specifier: ^0.13.0
+        version: 0.13.0(zod@4.1.12)
       ansi-colors:
         specifier: catalog:runtime
         version: 4.1.3
@@ -170,6 +173,9 @@ importers:
       log-update:
         specifier: ^7.0.1
         version: 7.0.1
+      nanoid:
+        specifier: ^5.0.9
+        version: 5.1.5
       rover-schemas:
         specifier: workspace:*
         version: link:../schemas
@@ -287,6 +293,11 @@ importers:
         version: 5.9.3
 
 packages:
+
+  '@agentclientprotocol/sdk@0.13.0':
+    resolution: {integrity: sha512-Z6/Fp4cXLbYdMXr5AK752JM5qG2VKb6ShM0Ql6FimBSckMmLyK54OA20UhPYoH4C37FSFwUTARuwQOwQUToYrw==}
+    peerDependencies:
+      zod: ^3.25.0 || ^4.0.0
 
   '@babel/generator@7.28.5':
     resolution: {integrity: sha512-3EwLFhZ38J4VyIP6WNtt2kUdW9dokXA9Cr4IVIFHuCpZ3H8/YFOl5JjZHisrn1fATPBmKKqXzDFvh9fUwHz6CQ==}
@@ -2429,6 +2440,10 @@ packages:
     resolution: {integrity: sha512-JInaHOamG8pt5+Ey8kGmdcAcg3OL9reK8ltczgHTAwNhMys/6ThXHityHxVV2p3fkw/c+MAvBHFVYHFZDmjMCQ==}
 
 snapshots:
+
+  '@agentclientprotocol/sdk@0.13.0(zod@4.1.12)':
+    dependencies:
+      zod: 4.1.12
 
   '@babel/generator@7.28.5':
     dependencies:

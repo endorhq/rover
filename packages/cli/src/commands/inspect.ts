@@ -19,6 +19,7 @@ import {
   requireProjectContext,
 } from '../lib/context.js';
 import { exitWithError, exitWithSuccess } from '../utils/exit.js';
+import type { CommandDefinition } from '../types.js';
 
 const DEFAULT_FILE_CONTENTS = 'summary.md';
 
@@ -88,6 +89,14 @@ interface TaskInspectionOutput {
   workflowName: string;
   /** Path to the git worktree for this task */
   worktreePath: string;
+  /** Task source (origin tracking - github, manual, etc.) */
+  source?: {
+    type: 'github' | 'manual';
+    id?: string;
+    url?: string;
+    title?: string;
+    ref?: Record<string, unknown>;
+  };
 }
 
 /**
@@ -137,7 +146,21 @@ const jsonErrorOutput = (
   };
 };
 
-export const inspectCommand = async (
+/**
+ * Display detailed information about a Rover task.
+ *
+ * Shows comprehensive task metadata including status, timestamps, workspace paths,
+ * and workflow output files. By default displays the summary.md from the latest
+ * iteration. Can output specific files or raw file contents for scripting.
+ *
+ * @param taskId - The numeric task ID to inspect
+ * @param iterationNumber - Optional specific iteration number (defaults to latest)
+ * @param options - Command options
+ * @param options.json - Output results in JSON format
+ * @param options.file - Array of workflow output files to display (formatted)
+ * @param options.rawFile - Array of files to output as raw content (no formatting)
+ */
+const inspectCommand = async (
   taskId: string,
   iterationNumber?: number,
   options: { json?: boolean; file?: string[]; rawFile?: string[] } = {}
@@ -243,14 +266,10 @@ export const inspectCommand = async (
             rawFileOutput.error = `Error reading file ${requestedFile}. It was not present in the task output.`;
           }
         }
-        console.log(JSON.stringify(rawFileOutput, null, 2));
         if (rawFileOutput.success) {
-          await exitWithSuccess(null, { success: true }, { telemetry });
+          await exitWithSuccess(null, rawFileOutput, { telemetry });
         } else {
-          await exitWithError(
-            { success: false, error: rawFileOutput.error },
-            { telemetry }
-          );
+          await exitWithError(rawFileOutput, { telemetry });
         }
         return;
       } else {
@@ -320,10 +339,10 @@ export const inspectCommand = async (
         uuid: task.uuid,
         workflowName: task.workflowName,
         worktreePath: task.worktreePath,
+        source: task.source,
       };
 
-      console.log(JSON.stringify(jsonOutput, null, 2));
-      await exitWithSuccess(null, { success: true }, { telemetry });
+      await exitWithSuccess(null, jsonOutput, { telemetry });
       return;
     } else {
       // Format status with user-friendly names
@@ -341,6 +360,13 @@ export const inspectCommand = async (
         Workflow: task.workflowName,
         'Created At': new Date(task.createdAt).toLocaleString(),
       };
+
+      // Show task source if available (e.g., GitHub issue, etc.)
+      if (task.source?.url) {
+        const sourceLabel =
+          task.source.type === 'github' ? 'GitHub Issue' : 'Source';
+        properties[sourceLabel] = colors.cyan(task.source.url);
+      }
 
       if (task.completedAt) {
         properties['Completed At'] = new Date(
@@ -460,3 +486,13 @@ export const inspectCommand = async (
     }
   }
 };
+
+// Named export for backwards compatibility (used by tests)
+export { inspectCommand };
+
+export default {
+  name: 'inspect',
+  description: 'Inspect a task',
+  requireProject: true,
+  action: inspectCommand,
+} satisfies CommandDefinition;

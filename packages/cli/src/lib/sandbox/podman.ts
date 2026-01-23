@@ -7,10 +7,9 @@ import {
 } from 'rover-core';
 import { Sandbox, SandboxOptions } from './types.js';
 import { SetupBuilder } from '../setup.js';
-import { launch, ProcessManager, VERBOSE } from 'rover-core';
+import { generateRandomId, launch, ProcessManager, VERBOSE } from 'rover-core';
 import { existsSync } from 'node:fs';
 import { userInfo } from 'node:os';
-import { generateRandomId } from '../../utils/branch-name.js';
 import {
   ContainerBackend,
   resolveAgentImage,

@@ -85,6 +85,7 @@ export class TaskDescriptionManager {
       agentModel: taskData.agentModel,
       sourceBranch: taskData.sourceBranch,
       networkConfig: taskData.networkConfig,
+      source: taskData.source,
       version: CURRENT_TASK_DESCRIPTION_SCHEMA_VERSION,
     };
 
@@ -227,6 +228,23 @@ export class TaskDescriptionManager {
 
     // Preserve baseCommit field
     migrated.baseCommit = data.baseCommit;
+
+    // Preserve task source (and migrate from old githubIssue if present)
+    if (data.source) {
+      migrated.source = data.source;
+    } else if (data.githubIssue) {
+      // Migrate old githubIssue format to new source format
+      migrated.source = {
+        type: 'github',
+        id: String(data.githubIssue.number),
+        url: `https://github.com/${data.githubIssue.repository}/issues/${data.githubIssue.number}`,
+        ref: {
+          owner: data.githubIssue.repository.split('/')[0],
+          repo: data.githubIssue.repository.split('/')[1],
+          number: data.githubIssue.number,
+        },
+      };
+    }
 
     return migrated as TaskDescription;
   }
@@ -692,6 +710,9 @@ export class TaskDescriptionManager {
   }
   get baseCommit(): string | undefined {
     return this.data.baseCommit;
+  }
+  get source(): TaskDescription['source'] {
+    return this.data.source;
   }
 
   // ============================================================

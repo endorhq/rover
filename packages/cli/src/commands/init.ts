@@ -21,6 +21,7 @@ import {
 import { showRoverChat, showTips, TIP_TITLES } from '../utils/display.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { exitWithError, exitWithWarn, exitWithSuccess } from '../utils/exit.js';
+import type { CommandDefinition } from '../types.js';
 
 // Get the default prompt
 const { prompt } = enquirer;
@@ -84,12 +85,18 @@ const ensureGitignore = async (projectPath: string): Promise<void> => {
 };
 
 /**
- * Init the project
+ * Initialize Rover in a git repository.
+ *
+ * Sets up the project configuration (rover.json) and user settings (.rover/settings.json)
+ * required to use Rover. The command performs system checks to verify Git, Docker, and
+ * AI agent availability (Claude, Codex, Cursor, Gemini, Qwen), detects the project's
+ * programming languages and package managers, and configures the default AI agent.
+ *
+ * @param path - Path to the project root (defaults to current directory)
+ * @param options - Command options
+ * @param options.yes - Skip interactive prompts and use defaults
  */
-export const initCommand = async (
-  path: string = '.',
-  options: { yes?: boolean }
-) => {
+const initCommand = async (path: string = '.', options: { yes?: boolean }) => {
   const telemetry = getTelemetry();
   const resolvedPath = resolve(path);
   const git = new Git({ cwd: resolvedPath });
@@ -415,3 +422,13 @@ export const initCommand = async (
     return;
   }
 };
+
+// Named export for backwards compatibility (used by tests)
+export { initCommand };
+
+export default {
+  name: 'init',
+  description: 'Create a shared configuration for this project',
+  requireProject: false,
+  action: initCommand,
+} satisfies CommandDefinition;

@@ -3,6 +3,8 @@ export const PROJECT_CONFIG_FILE = 'rover.json';
 // Re-export from verbose.ts
 export { VERBOSE, setVerbose } from './verbose.js';
 
+export { generateRandomId } from './random-id.js';
+
 export { findProjectRoot, clearProjectRootCache } from './project-root.js';
 
 export {

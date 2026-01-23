@@ -11,7 +11,6 @@ let testDir: string;
 // Mock context to return a mock ProjectManager
 vi.mock('../../lib/context.js', () => ({
   requireProjectContext: vi.fn().mockImplementation(() => {
-    // Return a ProjectManager-like object directly (not wrapped in { project, projectPath })
     return Promise.resolve({
       path: testDir,
       getTask: (taskId: number) => {

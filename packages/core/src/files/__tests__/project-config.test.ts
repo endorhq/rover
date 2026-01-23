@@ -49,7 +49,7 @@ describe('ProjectConfigManager - Environment Variable Configuration', () => {
     const jsonData = JSON.parse(readFileSync('rover.json', 'utf8'));
 
     // Version should be 1.2
-    expect(jsonData.version).toBe('1.2');
+    expect(jsonData.version).toBe('1.3');
 
     // Optional fields should not be present if undefined
     expect('envs' in jsonData).toBe(false);
@@ -149,7 +149,7 @@ describe('ProjectConfigManager - Environment Variable Configuration', () => {
     const config = ProjectConfigManager.load(testDir);
 
     // Should be migrated to 1.2
-    expect(config.version).toBe('1.2');
+    expect(config.version).toBe('1.3');
 
     // Optional fields should not be present
     expect(config.envs).toBeUndefined();
@@ -157,7 +157,7 @@ describe('ProjectConfigManager - Environment Variable Configuration', () => {
 
     // Check saved file
     const jsonData = JSON.parse(readFileSync('rover.json', 'utf8'));
-    expect(jsonData.version).toBe('1.2');
+    expect(jsonData.version).toBe('1.3');
     expect('envs' in jsonData).toBe(false);
     expect('envsFile' in jsonData).toBe(false);
   });
@@ -183,7 +183,7 @@ describe('ProjectConfigManager - Environment Variable Configuration', () => {
     const config = ProjectConfigManager.load(testDir);
 
     // Should be migrated to 1.2
-    expect(config.version).toBe('1.2');
+    expect(config.version).toBe('1.3');
 
     // Should preserve custom fields
     expect(config.envs).toEqual(['NODE_ENV']);
@@ -191,7 +191,7 @@ describe('ProjectConfigManager - Environment Variable Configuration', () => {
 
     // Check saved file
     const jsonData = JSON.parse(readFileSync('rover.json', 'utf8'));
-    expect(jsonData.version).toBe('1.2');
+    expect(jsonData.version).toBe('1.3');
     expect(jsonData.envs).toEqual(['NODE_ENV']);
     expect(jsonData.envsFile).toBe('.env');
   });
@@ -215,11 +215,11 @@ describe('ProjectConfigManager - Environment Variable Configuration', () => {
 
     const config = ProjectConfigManager.load(testDir);
 
-    expect(config.version).toBe('1.2');
+    expect(config.version).toBe('1.3');
 
     // Check saved file has been migrated to 1.2
     const jsonData = JSON.parse(readFileSync('rover.json', 'utf8'));
-    expect(jsonData.version).toBe('1.2');
+    expect(jsonData.version).toBe('1.3');
     expect(jsonData.envs).toEqual(['NODE_ENV']);
   });
 
@@ -241,7 +241,7 @@ describe('ProjectConfigManager - Environment Variable Configuration', () => {
 
     const config = ProjectConfigManager.load(testDir);
 
-    expect(config.version).toBe('1.2');
+    expect(config.version).toBe('1.3');
     expect(config.languages).toEqual(['typescript', 'python']);
     expect(config.packageManagers).toEqual(['npm', 'pip']);
     expect(config.taskManagers).toEqual(['make']);
@@ -324,7 +324,7 @@ describe('ProjectConfigManager - Environment Variable Configuration', () => {
     const config = ProjectConfigManager.load(testDir);
 
     // Should remain at version 1.2
-    expect(config.version).toBe('1.2');
+    expect(config.version).toBe('1.3');
 
     // All fields should be preserved exactly
     expect(config.languages).toEqual(['typescript']);
@@ -337,7 +337,7 @@ describe('ProjectConfigManager - Environment Variable Configuration', () => {
 
     // Check saved file remains unchanged
     const jsonData = JSON.parse(readFileSync('rover.json', 'utf8'));
-    expect(jsonData.version).toBe('1.2');
+    expect(jsonData.version).toBe('1.3');
     expect(jsonData.mcps).toEqual([]);
     expect(jsonData.envs).toEqual(['NODE_ENV']);
     expect(jsonData.envsFile).toBe('.env');
@@ -458,7 +458,7 @@ describe('ProjectConfigManager - Environment Variable Configuration', () => {
     const config = ProjectConfigManager.load(testDir);
 
     // Should be migrated to 1.2
-    expect(config.version).toBe('1.2');
+    expect(config.version).toBe('1.3');
 
     // Should preserve custom fields
     expect(config.agentImage).toBe('custom/agent:legacy');
@@ -466,7 +466,7 @@ describe('ProjectConfigManager - Environment Variable Configuration', () => {
 
     // Check saved file
     const jsonData = JSON.parse(readFileSync('rover.json', 'utf8'));
-    expect(jsonData.version).toBe('1.2');
+    expect(jsonData.version).toBe('1.3');
     expect(jsonData.sandbox.agentImage).toBe('custom/agent:legacy');
     expect(jsonData.sandbox.initScript).toBe('init.sh');
   });
@@ -490,12 +490,12 @@ describe('ProjectConfigManager - Environment Variable Configuration', () => {
 
     const config = ProjectConfigManager.load(testDir);
 
-    expect(config.version).toBe('1.2');
+    expect(config.version).toBe('1.3');
     expect(config.agentImage).toBe('ghcr.io/custom/rover:v1.0');
 
     // Check saved file has been migrated to 1.2
     const jsonData = JSON.parse(readFileSync('rover.json', 'utf8'));
-    expect(jsonData.version).toBe('1.2');
+    expect(jsonData.version).toBe('1.3');
     expect(jsonData.sandbox.agentImage).toBe('ghcr.io/custom/rover:v1.0');
   });
 
@@ -521,7 +521,7 @@ describe('ProjectConfigManager - Environment Variable Configuration', () => {
 
     const config = ProjectConfigManager.load(testDir);
 
-    expect(config.version).toBe('1.2');
+    expect(config.version).toBe('1.3');
     expect(config.languages).toEqual(['typescript', 'python']);
     expect(config.packageManagers).toEqual(['npm', 'pip']);
     expect(config.taskManagers).toEqual(['make']);
@@ -654,7 +654,7 @@ describe('ProjectConfigManager - Environment Variable Configuration', () => {
     const config = ProjectConfigManager.load(testDir);
 
     // Should be migrated to 1.2
-    expect(config.version).toBe('1.2');
+    expect(config.version).toBe('1.3');
 
     // Should preserve hooks field
     expect(config.hooks).toEqual({
@@ -663,7 +663,7 @@ describe('ProjectConfigManager - Environment Variable Configuration', () => {
 
     // Check saved file
     const jsonData = JSON.parse(readFileSync('rover.json', 'utf8'));
-    expect(jsonData.version).toBe('1.2');
+    expect(jsonData.version).toBe('1.3');
     expect(jsonData.hooks).toEqual({
       onMerge: ['echo "migrated hook"'],
     });
@@ -722,7 +722,7 @@ describe('ProjectConfigManager - Environment Variable Configuration', () => {
 
     const config = ProjectConfigManager.load(testDir);
 
-    expect(config.version).toBe('1.2');
+    expect(config.version).toBe('1.3');
     expect(config.languages).toEqual(['typescript', 'python']);
     expect(config.packageManagers).toEqual(['npm', 'pip']);
     expect(config.taskManagers).toEqual(['make']);
@@ -735,5 +735,164 @@ describe('ProjectConfigManager - Environment Variable Configuration', () => {
       onMerge: ['npm run build'],
       onPush: ['npm run deploy'],
     });
+  });
+
+  it('should create new config without excludePatterns field', () => {
+    const config = ProjectConfigManager.create(testDir);
+
+    expect(existsSync('rover.json')).toBe(true);
+    const jsonData = JSON.parse(readFileSync('rover.json', 'utf8'));
+
+    // Optional excludePatterns field should not be present if undefined
+    expect('excludePatterns' in jsonData).toBe(false);
+
+    // Getter should return undefined
+    expect(config.excludePatterns).toBeUndefined();
+
+    // Check saved file
+    expect(jsonData.version).toBe('1.3');
+    expect('excludePatterns' in jsonData).toBe(false);
+  });
+
+  it('should migrate from version 1.2 to 1.3 preserving excludePatterns', () => {
+    writeFileSync(
+      'rover.json',
+      JSON.stringify(
+        {
+          version: '1.2',
+          languages: ['typescript'],
+          packageManagers: ['npm'],
+          taskManagers: [],
+          attribution: true,
+          mcps: [],
+          excludePatterns: ['secret/**', '*.key'],
+        },
+        null,
+        2
+      )
+    );
+
+    const config = ProjectConfigManager.load(testDir);
+
+    // Should be migrated to 1.3
+    expect(config.version).toBe('1.3');
+
+    // Should preserve excludePatterns
+    expect(config.excludePatterns).toEqual(['secret/**', '*.key']);
+
+    // Check saved file
+    const jsonData = JSON.parse(readFileSync('rover.json', 'utf8'));
+    expect(jsonData.version).toBe('1.3');
+    expect(jsonData.excludePatterns).toEqual(['secret/**', '*.key']);
+  });
+
+  it('should handle empty excludePatterns array', () => {
+    writeFileSync(
+      'rover.json',
+      JSON.stringify(
+        {
+          version: '1.3',
+          languages: [],
+          packageManagers: [],
+          taskManagers: [],
+          attribution: true,
+          mcps: [],
+          excludePatterns: [],
+        },
+        null,
+        2
+      )
+    );
+
+    const config = ProjectConfigManager.load(testDir);
+
+    expect(config.excludePatterns).toEqual([]);
+  });
+
+  it('should preserve all fields including excludePatterns during migration', () => {
+    writeFileSync(
+      'rover.json',
+      JSON.stringify(
+        {
+          version: '1.0',
+          languages: ['typescript', 'python'],
+          packageManagers: ['npm', 'pip'],
+          taskManagers: ['make'],
+          attribution: false,
+          envs: ['NODE_ENV'],
+          envsFile: '.env',
+          agentImage: 'myregistry/agent:custom',
+          initScript: 'scripts/setup.sh',
+          hooks: {
+            onMerge: ['npm run build'],
+            onPush: ['npm run deploy'],
+          },
+          excludePatterns: ['private/**', '*.secret'],
+        },
+        null,
+        2
+      )
+    );
+
+    const config = ProjectConfigManager.load(testDir);
+
+    expect(config.version).toBe('1.3');
+    expect(config.languages).toEqual(['typescript', 'python']);
+    expect(config.packageManagers).toEqual(['npm', 'pip']);
+    expect(config.taskManagers).toEqual(['make']);
+    expect(config.attribution).toBe(false);
+    expect(config.envs).toEqual(['NODE_ENV']);
+    expect(config.envsFile).toBe('.env');
+    expect(config.agentImage).toBe('myregistry/agent:custom');
+    expect(config.initScript).toBe('scripts/setup.sh');
+    expect(config.hooks).toEqual({
+      onMerge: ['npm run build'],
+      onPush: ['npm run deploy'],
+    });
+    expect(config.excludePatterns).toEqual(['private/**', '*.secret']);
+  });
+
+  it('should not re-migrate version 1.3 config', () => {
+    writeFileSync(
+      'rover.json',
+      JSON.stringify(
+        {
+          version: '1.3',
+          languages: ['typescript'],
+          packageManagers: ['npm'],
+          taskManagers: [],
+          attribution: true,
+          mcps: [],
+          envs: ['NODE_ENV'],
+          envsFile: '.env',
+          excludePatterns: ['secret/**'],
+        },
+        null,
+        2
+      )
+    );
+
+    const config = ProjectConfigManager.load(testDir);
+
+    // Should remain at version 1.3
+    expect(config.version).toBe('1.3');
+
+    // All fields should be preserved exactly
+    expect(config.languages).toEqual(['typescript']);
+    expect(config.packageManagers).toEqual(['npm']);
+    expect(config.taskManagers).toEqual([]);
+    expect(config.attribution).toBe(true);
+    expect(config.mcps).toEqual([]);
+    expect(config.envs).toEqual(['NODE_ENV']);
+    expect(config.envsFile).toBe('.env');
+    expect(config.excludePatterns).toEqual(['secret/**']);
+
+    // Check saved file remains unchanged
+    const jsonData = JSON.parse(readFileSync('rover.json', 'utf8'));
+    expect(jsonData.version).toBe('1.3');
+    expect(jsonData.mcps).toEqual([]);
+    expect(jsonData.envs).toEqual(['NODE_ENV']);
+    expect(jsonData.envsFile).toBe('.env');
+    expect(jsonData.excludePatterns).toEqual(['secret/**']);
   });
 });

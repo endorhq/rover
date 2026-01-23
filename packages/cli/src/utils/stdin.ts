@@ -79,3 +79,11 @@ export const readFromStdin = async (): Promise<string | null> => {
 export const stdinIsAvailable = (): boolean => {
   return !process.stdin.isTTY;
 };
+
+/**
+ * Check if the current terminal is interactive.
+ * @returns true if stdin is a TTY.
+ */
+export function isInteractiveTerminal(): boolean {
+  return process.stdin.isTTY === true;
+}

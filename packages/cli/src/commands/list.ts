@@ -23,6 +23,7 @@ import {
 import { executeHooks } from '../lib/hooks.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { formatTaskStatus, statusColor } from '../utils/task-status.js';
+import type { CommandDefinition } from '../types.js';
 
 /**
  * Track previous task statuses to detect transitions for onComplete hooks.
@@ -153,7 +154,21 @@ const buildTaskRow = (
   };
 };
 
-export const listCommand = async (
+/**
+ * List all tasks in the current project or across all registered projects.
+ *
+ * Displays a table of tasks with their IDs, titles, agents, workflows, status,
+ * progress, and duration. In project context, shows tasks for that project.
+ * In global context (outside any project), shows tasks grouped by project.
+ * Supports watch mode for real-time status updates and triggers onComplete hooks.
+ *
+ * @param options - Command options
+ * @param options.watch - Enable watch mode with optional refresh interval in seconds
+ * @param options.verbose - Show additional details including error messages
+ * @param options.json - Output results in JSON format
+ * @param options.watching - Internal flag indicating active watch mode cycle
+ */
+const listCommand = async (
   options: {
     watch?: boolean | string;
     verbose?: boolean;
@@ -512,3 +527,13 @@ export const listCommand = async (
     await telemetry?.shutdown();
   }
 };
+
+// Named export for backwards compatibility (used by tests)
+export { listCommand };
+
+export default {
+  name: 'list',
+  description: 'Show the tasks from current project or all projects',
+  requireProject: false,
+  action: listCommand,
+} satisfies CommandDefinition;

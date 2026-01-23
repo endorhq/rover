@@ -7,6 +7,7 @@ import {
   IterationManager,
   AI_AGENT,
   Git,
+  ProjectConfigManager,
   type ProjectManager,
 } from 'rover-core';
 import { TaskNotFoundError } from 'rover-schemas';
@@ -21,6 +22,7 @@ import {
 } from '../lib/context.js';
 import yoctoSpinner from 'yocto-spinner';
 import { copyEnvironmentFiles } from '../utils/env-files.js';
+import type { CommandDefinition } from '../types.js';
 
 /**
  * Interface for JSON output
@@ -34,9 +36,18 @@ interface TaskRestartOutput extends CLIJsonOutput {
 }
 
 /**
- * Restart a task that is in NEW or FAILED status
+ * Restart a task that is in NEW or FAILED status.
+ *
+ * Re-executes a task that either never started (NEW) or previously failed.
+ * Resets the task state, ensures the git worktree exists, and spawns a new
+ * sandboxed container to run the AI agent. Useful for retrying tasks after
+ * fixing configuration issues or transient failures.
+ *
+ * @param taskId - The numeric task ID to restart
+ * @param options - Command options
+ * @param options.json - Output results in JSON format
  */
-export const restartCommand = async (
+const restartCommand = async (
   taskId: string,
   options: { json?: boolean } = {}
 ) => {
@@ -130,6 +141,15 @@ export const restartCommand = async (
 
         // Copy user .env development files
         copyEnvironmentFiles(project.path, worktreePath);
+
+        // Configure sparse checkout to exclude files matching exclude patterns
+        const projectConfig = ProjectConfigManager.load(project.path);
+        if (
+          projectConfig.excludePatterns &&
+          projectConfig.excludePatterns.length > 0
+        ) {
+          git.setupSparseCheckout(worktreePath, projectConfig.excludePatterns);
+        }
 
         // Update task with workspace information
         task.setWorkspace(worktreePath, branchName);
@@ -241,3 +261,13 @@ export const restartCommand = async (
     await telemetry?.shutdown();
   }
 };
+
+// Named export for backwards compatibility (used by tests)
+export { restartCommand };
+
+export default {
+  name: 'restart',
+  description: 'Restart a new or failed task',
+  requireProject: true,
+  action: restartCommand,
+} satisfies CommandDefinition;

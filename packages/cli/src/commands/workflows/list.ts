@@ -9,6 +9,7 @@ import { exitWithError, exitWithSuccess } from '../../utils/exit.js';
 import { Workflow } from 'rover-schemas';
 import { getTelemetry } from '../../lib/telemetry.js';
 import { isJsonMode, setJsonMode } from '../../lib/context.js';
+import type { CommandDefinition } from '../../types.js';
 
 interface ListWorkflowsCommandOptions {
   // Output format
@@ -45,9 +46,7 @@ interface WorkflowRow {
  *
  * @param options Options to modify the output
  */
-export const listWorkflowsCommand = async (
-  options: ListWorkflowsCommandOptions
-) => {
+const listWorkflowsCommand = async (options: ListWorkflowsCommandOptions) => {
   const telemetry = getTelemetry();
   if (options.json !== undefined) {
     setJsonMode(options.json);
@@ -135,3 +134,10 @@ export const listWorkflowsCommand = async (
     await telemetry?.shutdown();
   }
 };
+
+export default {
+  name: 'list',
+  description: 'List all available workflows',
+  requireProject: false,
+  action: listWorkflowsCommand,
+} satisfies CommandDefinition;
