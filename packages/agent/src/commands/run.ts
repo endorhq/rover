@@ -174,7 +174,10 @@ const handlePreContextInjection = (
           colors.gray(`✓ Pre-context file location added to step ${step.id}\n`)
         );
 
-        step.prompt = preContextMessage + '\n\n**USE** pre-context information to identify the current iteration and **PRIORITIZE** its instructions (at `currentIteration` in the JSON), taking into account previous iterations instructions (at `previousIterations` in the JSON).\n\n---\n\n' + step.prompt;
+        step.prompt =
+          preContextMessage +
+          '\n\n**USE** pre-context information to identify the current iteration and **PRIORITIZE** its instructions (at `currentIteration` in the JSON), taking into account previous iterations instructions (at `previousIterations` in the JSON).\n\n---\n\n' +
+          step.prompt;
       }
     }
   }
