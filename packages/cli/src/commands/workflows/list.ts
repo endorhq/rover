@@ -137,6 +137,7 @@ const listWorkflowsCommand = async (options: ListWorkflowsCommandOptions) => {
 
 export default {
   name: 'list',
+  parent: 'workflows',
   description: 'List all available workflows',
   requireProject: false,
   action: listWorkflowsCommand,

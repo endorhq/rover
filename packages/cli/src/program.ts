@@ -59,28 +59,24 @@ const commands: CommandDefinition[] = [
   pushCmd,
   stopCmd,
   mcpCmd,
-  // Workflow subcommands use full path names to avoid collision with top-level commands
-  { ...workflowAddCmd, name: 'workflows add' },
-  { ...workflowListCmd, name: 'workflows list' },
-  { ...workflowInspectCmd, name: 'workflows inspect' },
+  workflowAddCmd,
+  workflowListCmd,
+  workflowInspectCmd,
 ];
 
 /**
- * Get command definition by resolving the full command path.
- * Traverses the parent chain to build the full name (e.g., "workflows add")
- * so that subcommands are correctly looked up in the registry.
+ * Get command definition by matching the command name and optional parent.
+ * For subcommands (e.g., "workflows add"), the parent field distinguishes
+ * them from top-level commands with the same name.
  */
 function getCommandDefinition(
   actionCommand: Command
 ): CommandDefinition | undefined {
-  const parts: string[] = [];
-  let cmd: Command | null = actionCommand;
-  while (cmd && cmd.parent) {
-    parts.unshift(cmd.name());
-    cmd = cmd.parent;
-  }
-  const fullName = parts.join(' ');
-  return commands.find(c => c.name === fullName);
+  const name = actionCommand.name();
+  const parent = actionCommand.parent?.parent
+    ? actionCommand.parent.name()
+    : undefined;
+  return commands.find(c => c.name === name && c.parent === parent);
 }
 
 /**

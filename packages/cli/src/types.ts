@@ -79,6 +79,8 @@ export interface AIProvider {
 export interface CommandDefinition {
   /** Command name used in CLI (e.g., 'list', 'task') */
   name: string;
+  /** Parent command name for subcommands (e.g., 'workflows' for 'workflows add') */
+  parent?: string;
   /** Description shown in help text */
   description: string;
   /** Whether this command requires an active project context */

@@ -135,6 +135,7 @@ export { addWorkflowCommand };
 
 export default {
   name: 'add',
+  parent: 'workflows',
   description:
     'Add a workflow from a URL, local path, or stdin to the workflow store',
   requireProject: false,

@@ -441,6 +441,7 @@ export { inspectWorkflowCommand };
 
 export default {
   name: 'inspect',
+  parent: 'workflows',
   description: 'Display detailed information about a specific workflow',
   requireProject: false,
   action: inspectWorkflowCommand,
