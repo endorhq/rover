@@ -17,7 +17,7 @@
     "start": "node --enable-source-maps dist/cli.mjs",
     "clean": "rm -rf dist",
     "check": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "vitest run --passWithNoTests",
     "test:watch": "vitest watch",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage"
