@@ -3,7 +3,11 @@ import colors from 'ansi-colors';
 import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
-import { getAIAgentTool, getUserAIAgent } from '../lib/agents/index.js';
+import {
+  getAIAgentTool,
+  getUserAIAgent,
+  getUserDefaultModel,
+} from '../lib/agents/index.js';
 import {
   ProjectConfigManager,
   IterationManager,
@@ -535,6 +539,12 @@ const taskCommand = async (initPrompt?: string, options: TaskOptions = {}) => {
       selectedAgents = [{ agent: AI_AGENT.Claude, model: undefined }];
     }
   }
+
+  // Fill in default models for agents without a specified model
+  selectedAgents = selectedAgents.map(({ agent: agentName, model }) => ({
+    agent: agentName,
+    model: model ?? getUserDefaultModel(agentName),
+  }));
 
   // Validate all agents before proceeding
   for (const { agent: selectedAiAgent } of selectedAgents) {

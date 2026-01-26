@@ -134,8 +134,9 @@ export const getUserAIAgent = (): AI_AGENT => {
  */
 export const getUserDefaultModel = (agent: AI_AGENT): string | undefined => {
   try {
-    if (UserSettingsManager.exists()) {
-      const userSettings = UserSettingsManager.load();
+    const projectPath = getProjectPath();
+    if (projectPath && UserSettingsManager.exists(projectPath)) {
+      const userSettings = UserSettingsManager.load(projectPath);
       return userSettings.getDefaultModel(agent);
     }
     return undefined;
