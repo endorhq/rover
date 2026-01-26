@@ -449,16 +449,6 @@ const listCommand = async (
 
     // Watch mode (configurable refresh interval, default 3 seconds)
     if (options.watch) {
-      // Watch mode is only supported in scoped (single project) mode
-      if (!project) {
-        console.log(
-          colors.yellow(
-            'Watch mode is only supported when inside a project directory'
-          )
-        );
-        return;
-      }
-
       // CLI argument takes precedence, then settings, then default (3s)
       let intervalSeconds: number;
       if (typeof options.watch === 'string') {
