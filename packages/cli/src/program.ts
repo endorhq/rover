@@ -142,7 +142,7 @@ export function createProgram(
             });
           }
 
-          // Skip forcing to resol
+          // Skip forcing to resolve
           if (project) {
             setProject(project);
           }
