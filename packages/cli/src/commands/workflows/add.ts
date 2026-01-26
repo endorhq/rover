@@ -104,14 +104,11 @@ const addWorkflowCommand = async (
       const workflowName = colors.bold(result.name);
       const storePath = colors.gray(result.path);
 
-      console.log(
-        [
-          `${colors.green('✓')} Workflow ${workflowName} added to ${storeType} store`,
-          `  ${storePath}`,
-        ].join('\n')
-      );
+      const message = [
+        `Workflow ${workflowName} added to ${storeType} store ${storePath}`,
+      ].join('\n');
 
-      await exitWithSuccess(null, output, { telemetry });
+      await exitWithSuccess(message, output, { telemetry });
     }
   } catch (error) {
     if (error instanceof WorkflowStoreError) {
