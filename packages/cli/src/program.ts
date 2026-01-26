@@ -118,33 +118,31 @@ export function createProgram(
         // It must be defined.
         const commandDef = getCommandDefinition(commandName)!;
 
-        // Skip project resolution for commands that don't require it
-        if (!commandDef.requireProject) {
-          return;
-        }
-
         try {
-          // Load the project option to determine the current project.
-          let project = null;
+          let project;
 
-          if (!ctx.projectOption && ctx.inGitRepo) {
-            // The user didn't specify the --project flag and it's in a repo.
-            // Find or auto-register the project based on the current git repo.
+          if (ctx.projectOption) {
+            // When users pass the project option, always try to resolve it.
+            const message = `Could not find the "${ctx.projectOption}" project. Please, select a \nvalid project from the list. You can type to filter the projects`;
+
+            project = await requireProjectContext(ctx.projectOption, {
+              missingProjectMessage: colors.yellow(message),
+            });
+          } else if (ctx.inGitRepo) {
+            // No project option but in git repo, resolve it.
             project = await findOrRegisterProject();
-          } else {
-            // Since the command require the project, resolve it or exit with error.
-            let message = `The "${commandName}" command requires a project context.\nPlease, select it from the list. You can type to filter the projects`;
+          }
 
-            if (ctx.projectOption) {
-              message = `Could not find the "${ctx.projectOption}" project. Please, select a \nvalid project from the list. You can type to filter the projects`;
-            }
+          if (!project && commandDef.requireProject) {
+            // If project is required, force to resolve it.
+            let message = `The "${commandName}" command requires a project context.\nPlease, select it from the list. You can type to filter the projects`;
 
             project = await requireProjectContext(ctx.projectOption, {
               missingProjectMessage: colors.yellow(message),
             });
           }
 
-          // Update the project in the context
+          // Skip forcing to resolve
           if (project) {
             setProject(project);
           }
