@@ -21,7 +21,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { getTelemetry } from '../../lib/telemetry.js';
-import { isJsonMode, setJsonMode } from '../../lib/context.js';
+import { getProjectPath, isJsonMode, setJsonMode } from '../../lib/context.js';
 import { readFromStdin } from '../../utils/stdin.js';
 import type { CommandDefinition } from '../../types.js';
 
@@ -255,10 +255,12 @@ const inspectWorkflowCommand = async (
       }
     } else {
       // Load by workflow name
-      const workflowStore = initWorkflowStore();
-      workflow = workflowStore.getWorkflow(workflowSource);
+      const workflowStore = initWorkflowStore(
+        getProjectPath() ?? process.cwd()
+      );
+      const entry = workflowStore.getWorkflowEntry(workflowSource);
 
-      if (!workflow) {
+      if (!entry) {
         if (isJsonMode()) {
           console.log(
             JSON.stringify(
@@ -282,7 +284,8 @@ const inspectWorkflowCommand = async (
         }
         return;
       }
-      sourceOrigin = 'built-in';
+      workflow = entry.workflow;
+      sourceOrigin = entry.source;
     }
 
     // Handle --raw flag: output workflow as YAML

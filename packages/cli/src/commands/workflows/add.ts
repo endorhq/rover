@@ -6,7 +6,7 @@ import { WorkflowStore, WorkflowStoreError } from 'rover-core';
 import { CLIJsonOutput } from '../../types.js';
 import { exitWithError, exitWithSuccess } from '../../utils/exit.js';
 import { getTelemetry } from '../../lib/telemetry.js';
-import { isJsonMode, setJsonMode } from '../../lib/context.js';
+import { getProjectPath, isJsonMode, setJsonMode } from '../../lib/context.js';
 import { readFromStdin } from '../../utils/stdin.js';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -72,7 +72,9 @@ const addWorkflowCommand = async (
       actualSource = tempFile;
     }
 
-    const store = new WorkflowStore();
+    const store = new WorkflowStore(
+      options.global ? undefined : (getProjectPath() ?? process.cwd())
+    );
 
     // Track add workflow event
     telemetry?.eventAddWorkflow();
@@ -102,12 +104,14 @@ const addWorkflowCommand = async (
       const workflowName = colors.bold(result.name);
       const storePath = colors.gray(result.path);
 
-      const message = [
-        `${colors.green('✓')} Workflow ${workflowName} added to ${storeType} store`,
-        `  ${storePath}`,
-      ].join('\n');
+      console.log(
+        [
+          `${colors.green('✓')} Workflow ${workflowName} added to ${storeType} store`,
+          `  ${storePath}`,
+        ].join('\n')
+      );
 
-      await exitWithSuccess(message, output, { telemetry });
+      await exitWithSuccess(null, output, { telemetry });
     }
   } catch (error) {
     if (error instanceof WorkflowStoreError) {

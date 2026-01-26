@@ -26,6 +26,9 @@ import pushCmd from './commands/push.js';
 import stopCmd from './commands/stop.js';
 import mcpCmd from './commands/mcp.js';
 import { addWorkflowCommands } from './commands/workflows/index.js';
+import workflowAddCmd from './commands/workflows/add.js';
+import workflowListCmd from './commands/workflows/list.js';
+import workflowInspectCmd from './commands/workflows/inspect.js';
 import {
   getCLIContext,
   getProjectPath,
@@ -56,13 +59,28 @@ const commands: CommandDefinition[] = [
   pushCmd,
   stopCmd,
   mcpCmd,
+  // Workflow subcommands use full path names to avoid collision with top-level commands
+  { ...workflowAddCmd, name: 'workflows add' },
+  { ...workflowListCmd, name: 'workflows list' },
+  { ...workflowInspectCmd, name: 'workflows inspect' },
 ];
 
 /**
- * Get command definition by name
+ * Get command definition by resolving the full command path.
+ * Traverses the parent chain to build the full name (e.g., "workflows add")
+ * so that subcommands are correctly looked up in the registry.
  */
-function getCommandDefinition(name: string): CommandDefinition | undefined {
-  return commands.find(cmd => cmd.name === name);
+function getCommandDefinition(
+  actionCommand: Command
+): CommandDefinition | undefined {
+  const parts: string[] = [];
+  let cmd: Command | null = actionCommand;
+  while (cmd && cmd.parent) {
+    parts.unshift(cmd.name());
+    cmd = cmd.parent;
+  }
+  const fullName = parts.join(' ');
+  return commands.find(c => c.name === fullName);
 }
 
 /**
@@ -116,7 +134,7 @@ export function createProgram(
 
         // Get command definition and check if it requires project
         // It must be defined.
-        const commandDef = getCommandDefinition(commandName)!;
+        const commandDef = getCommandDefinition(actionCommand)!;
 
         // Skip project resolution for commands that don't require it
         if (!commandDef.requireProject) {
