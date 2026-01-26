@@ -59,6 +59,7 @@ export const TaskDescriptionSchema = z.object({
   agent: z.string().optional(),
   agentModel: z.string().optional(),
   sourceBranch: z.string().optional(),
+  baseCommit: z.string().optional(),
 
   // Docker Execution
   containerId: z.string().optional(),

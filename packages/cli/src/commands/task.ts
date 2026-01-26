@@ -337,6 +337,12 @@ const createTaskForAgent = async (
   try {
     git.createWorktree(worktreePath, branchName, baseBranch);
 
+    // Capture the base commit hash (the commit when the worktree was created)
+    const baseCommit = git.getCommitHash('HEAD', { worktreePath });
+    if (baseCommit) {
+      task.setBaseCommit(baseCommit);
+    }
+
     // Copy user .env development files
     copyEnvironmentFiles(projectPath, worktreePath);
 

@@ -24,7 +24,7 @@ import type { CommandDefinition } from '../types.js';
 const diffCommand = async (
   taskId: string,
   filePath?: string,
-  options: { onlyFiles?: boolean; branch?: string } = {}
+  options: { onlyFiles?: boolean; branch?: string; base?: boolean } = {}
 ) => {
   const telemetry = getTelemetry();
   // Convert string taskId to number
@@ -83,6 +83,52 @@ const diffCommand = async (
       return;
     }
 
+    // Check for mutual exclusivity of --base and --branch
+    if (options.base && options.branch) {
+      await exitWithError(
+        {
+          success: false,
+          error: 'Cannot use --base and --branch together',
+        },
+        {
+          tips: [
+            'Use ' +
+              colors.cyan('--base') +
+              ' to compare against the starting commit',
+            'Use ' +
+              colors.cyan('--branch <name>') +
+              ' to compare against a specific branch',
+          ],
+          telemetry,
+        }
+      );
+      return;
+    }
+
+    // Handle --base flag: use the base commit as the comparison point
+    let compareRef = options.branch;
+    if (options.base) {
+      if (!task.baseCommit) {
+        await exitWithError(
+          {
+            success: false,
+            error:
+              'This task was created before base commit tracking. Use `--branch <name>` instead.',
+          },
+          {
+            tips: [
+              'Use ' +
+                colors.cyan(`rover diff ${numericTaskId} --branch main`) +
+                ' to compare with the main branch',
+            ],
+            telemetry,
+          }
+        );
+        return;
+      }
+      compareRef = task.baseCommit;
+    }
+
     // Check if we're in a git repository
     if (!git.isGitRepo()) {
       await exitWithError(
@@ -99,10 +145,13 @@ const diffCommand = async (
     console.log(colors.gray('├── Title: ') + task.title);
     console.log(colors.gray('├── Workspace: ') + task.worktreePath);
 
-    if (options.branch) {
+    if (compareRef) {
       console.log(colors.gray('├── Task Branch: ') + task.branchName);
+      const compareLabel = options.base
+        ? `base commit (${compareRef.substring(0, 7)})`
+        : compareRef;
       console.log(
-        colors.gray('└── Comparing with: ') + colors.cyan(options.branch)
+        colors.gray('└── Comparing with: ') + colors.cyan(compareLabel)
       );
     } else {
       console.log(colors.gray('└── Task Branch: ') + task.branchName);
@@ -118,8 +167,8 @@ const diffCommand = async (
           const diffResult = await git.diffStats({
             worktreePath: task.worktreePath,
             filePath: filePath,
-            branch: options.branch,
-            includeUntracked: !options.branch,
+            branch: compareRef,
+            includeUntracked: !compareRef,
           });
 
           if (diffResult.files.length === 0) {
@@ -153,8 +202,8 @@ const diffCommand = async (
             worktreePath: task.worktreePath,
             filePath: filePath,
             onlyFiles: options.onlyFiles,
-            branch: options.branch,
-            includeUntracked: !options.branch, // Only include untracked when not comparing branches
+            branch: compareRef,
+            includeUntracked: !compareRef, // Only include untracked when not comparing to a ref
           });
 
           const diffOutput = diffResult.stdout?.toString();
@@ -233,7 +282,14 @@ const diffCommand = async (
       );
     }
 
-    if (!options.branch) {
+    if (!compareRef) {
+      if (task.baseCommit) {
+        tips.push(
+          'Use ' +
+            colors.cyan(`rover diff ${numericTaskId} --base`) +
+            ' to compare against the starting commit'
+        );
+      }
       tips.push(
         'Use ' +
           colors.cyan(`rover diff ${numericTaskId} --branch <branchName>`) +

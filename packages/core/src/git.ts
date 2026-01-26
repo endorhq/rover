@@ -495,6 +495,29 @@ export class Git {
   }
 
   /**
+   * Get the commit hash for a given ref (branch, tag, HEAD, etc.)
+   * @param ref The ref to get the commit hash for (defaults to HEAD)
+   * @param options Optional worktree path
+   * @returns The full commit hash
+   */
+  getCommitHash(
+    ref: string = 'HEAD',
+    options: GitWorktreeOptions = {}
+  ): string {
+    try {
+      return (
+        launchSync('git', ['rev-parse', ref], {
+          cwd: options.worktreePath ?? this.cwd,
+        })
+          .stdout?.toString()
+          .trim() || ''
+      );
+    } catch (error) {
+      return '';
+    }
+  }
+
+  /**
    * Check if a given branch exists
    */
   branchExists(branch: string): boolean {
