@@ -714,6 +714,9 @@ export class TaskDescriptionManager {
   get source(): TaskDescription['source'] {
     return this.data.source;
   }
+  get onCompleteHookFiredForStatus(): TaskDescription['onCompleteHookFiredForStatus'] {
+    return this.data.onCompleteHookFiredForStatus;
+  }
 
   // ============================================================
   // Data Modification (Setters)
@@ -748,6 +751,15 @@ export class TaskDescriptionManager {
    */
   setBaseCommit(commit: string): void {
     this.data.baseCommit = commit;
+    this.save();
+  }
+
+  /**
+   * Record that the onComplete hook was fired for a specific status.
+   * Used to prevent duplicate hook executions across process restarts.
+   */
+  setOnCompleteHookFiredForStatus(status: TaskStatus): void {
+    this.data.onCompleteHookFiredForStatus = status;
     this.save();
   }
 
