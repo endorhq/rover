@@ -26,6 +26,9 @@ import pushCmd from './commands/push.js';
 import stopCmd from './commands/stop.js';
 import mcpCmd from './commands/mcp.js';
 import { addWorkflowCommands } from './commands/workflows/index.js';
+import workflowAddCmd from './commands/workflows/add.js';
+import workflowListCmd from './commands/workflows/list.js';
+import workflowInspectCmd from './commands/workflows/inspect.js';
 import {
   getCLIContext,
   getProjectPath,
@@ -56,13 +59,24 @@ const commands: CommandDefinition[] = [
   pushCmd,
   stopCmd,
   mcpCmd,
+  workflowAddCmd,
+  workflowListCmd,
+  workflowInspectCmd,
 ];
 
 /**
- * Get command definition by name
+ * Get command definition by matching the command name and optional parent.
+ * For subcommands (e.g., "workflows add"), the parent field distinguishes
+ * them from top-level commands with the same name.
  */
-function getCommandDefinition(name: string): CommandDefinition | undefined {
-  return commands.find(cmd => cmd.name === name);
+function getCommandDefinition(
+  actionCommand: Command
+): CommandDefinition | undefined {
+  const name = actionCommand.name();
+  const parent = actionCommand.parent?.parent
+    ? actionCommand.parent.name()
+    : undefined;
+  return commands.find(c => c.name === name && c.parent === parent);
 }
 
 /**
@@ -116,7 +130,7 @@ export function createProgram(
 
         // Get command definition and check if it requires project
         // It must be defined.
-        const commandDef = getCommandDefinition(commandName)!;
+        const commandDef = getCommandDefinition(actionCommand)!;
 
         try {
           let project;

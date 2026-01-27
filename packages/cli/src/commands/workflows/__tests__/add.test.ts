@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { addWorkflowCommand } from '../add.js';
+import { WorkflowStore } from 'rover-core';
 
 // Mock telemetry to avoid external calls
 vi.mock('../../../lib/telemetry.js', () => ({
@@ -10,6 +11,17 @@ vi.mock('../../../lib/telemetry.js', () => ({
     eventAddWorkflow: vi.fn(),
     shutdown: vi.fn().mockResolvedValue(undefined),
   }),
+}));
+
+// Mock context
+let mockGetProjectPath = vi.fn<() => string | null>().mockReturnValue(null);
+let mockJsonMode = false;
+vi.mock('../../../lib/context.js', () => ({
+  getProjectPath: () => mockGetProjectPath(),
+  isJsonMode: () => mockJsonMode,
+  setJsonMode: (value: boolean) => {
+    mockJsonMode = value;
+  },
 }));
 
 // Mock stdin utilities
@@ -59,6 +71,8 @@ describe('add workflow command', () => {
       saveWorkflow: vi.fn(),
     };
     mockReadFromStdin = vi.fn().mockResolvedValue(null);
+    mockGetProjectPath = vi.fn<() => string | null>().mockReturnValue(null);
+    mockJsonMode = false;
   });
 
   afterEach(() => {
@@ -439,6 +453,57 @@ steps: []
         'source.yml',
         '',
         undefined
+      );
+    });
+  });
+
+  describe('store selection', () => {
+    it('should pass project path to WorkflowStore constructor', async () => {
+      const projectPath = '/home/user/my-project';
+      mockGetProjectPath.mockReturnValue(projectPath);
+
+      mockWorkflowStore.saveWorkflow.mockResolvedValue({
+        name: 'test',
+        path: join(projectPath, '.rover', 'workflows', 'test.yml'),
+        isLocal: true,
+      });
+
+      await addWorkflowCommand('source.yml', { json: false });
+
+      expect(WorkflowStore).toHaveBeenCalledWith(projectPath);
+    });
+
+    it('should pass cwd to WorkflowStore when not in a project', async () => {
+      mockGetProjectPath.mockReturnValue(null);
+
+      mockWorkflowStore.saveWorkflow.mockResolvedValue({
+        name: 'test',
+        path: '/home/user/.rover/config/workflows/test.yml',
+        isLocal: false,
+      });
+
+      await addWorkflowCommand('source.yml', { json: false });
+
+      expect(WorkflowStore).toHaveBeenCalledWith(process.cwd());
+    });
+
+    it('should pass --global flag to saveWorkflow', async () => {
+      const projectPath = '/home/user/my-project';
+      mockGetProjectPath.mockReturnValue(projectPath);
+
+      mockWorkflowStore.saveWorkflow.mockResolvedValue({
+        name: 'test',
+        path: '/home/user/.rover/config/workflows/test.yml',
+        isLocal: false,
+      });
+
+      await addWorkflowCommand('source.yml', { global: true, json: false });
+
+      expect(WorkflowStore).toHaveBeenCalledWith(undefined);
+      expect(mockWorkflowStore.saveWorkflow).toHaveBeenCalledWith(
+        'source.yml',
+        undefined,
+        true
       );
     });
   });
