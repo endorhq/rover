@@ -167,10 +167,17 @@ const logsCommand = async (
       console.log(colors.gray('Following logs... (Press Ctrl+C to exit)'));
       console.log('');
 
-      try {
-        const controller = new AbortController();
-        const cancelSignal = controller.signal;
+      const controller = new AbortController();
+      const cancelSignal = controller.signal;
 
+      // Register SIGINT handler before launching so Ctrl+C
+      // aborts the detached docker process
+      const sigintHandler = () => {
+        controller.abort();
+      };
+      process.on('SIGINT', sigintHandler);
+
+      try {
         const logsProcess = await launch(
           'docker',
           ['logs', '-f', containerId],
@@ -191,15 +198,11 @@ const logsCommand = async (
             )
           );
         }
-
-        // Handle process interruption (Ctrl+C)
-        process.on('SIGINT', () => {
-          console.log(colors.yellow('\n\n⚠ Stopping log following...'));
-          controller.abort();
-          process.exit(0);
-        });
       } catch (error: any) {
-        if (error.message.includes('No such container')) {
+        if (error.isCanceled) {
+          // Clean exit on Ctrl+C
+          console.log(colors.yellow('\n\n⚠ Stopping log following...'));
+        } else if (error.message?.includes('No such container')) {
           console.log(colors.yellow('⚠ Container no longer exists'));
           console.log(
             colors.gray('Cannot follow logs for a non-existent container')
@@ -208,6 +211,8 @@ const logsCommand = async (
           console.log(colors.red('Error following Docker logs:'));
           console.log(colors.red(error.message));
         }
+      } finally {
+        process.removeListener('SIGINT', sigintHandler);
       }
     } else {
       // Get logs using docker logs command (one-time)
