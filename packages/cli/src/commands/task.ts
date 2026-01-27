@@ -758,7 +758,7 @@ const taskCommand = async (initPrompt?: string, options: TaskOptions = {}) => {
         }
       } catch (err) {
         if (err instanceof GitHubError) {
-          jsonOutput.error = `Failed to fetch issue from GitHub: ${err.cause}`;
+          jsonOutput.error = `Failed to fetch issue from GitHub: ${err.message}`;
         } else {
           jsonOutput.error = `Failed to fetch issue from GitHub: ${err}`;
         }
