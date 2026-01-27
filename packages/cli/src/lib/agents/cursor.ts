@@ -28,6 +28,11 @@ class CursorAI implements AIAgentTool {
   // constants
   public AGENT_BIN = 'cursor-agent';
   private promptBuilder = new PromptBuilder('cursor');
+  private model?: string;
+
+  constructor(model?: string) {
+    this.model = model;
+  }
 
   async checkAgent(): Promise<void> {
     try {

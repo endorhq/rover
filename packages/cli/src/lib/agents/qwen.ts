@@ -35,6 +35,11 @@ class QwenAI implements AIAgentTool {
   // constants
   public AGENT_BIN = 'qwen';
   private promptBuilder = new PromptBuilder('qwen');
+  private model?: string;
+
+  constructor(model?: string) {
+    this.model = model;
+  }
 
   async checkAgent(): Promise<void> {
     try {

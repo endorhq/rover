@@ -33,6 +33,11 @@ class GeminiAI implements AIAgentTool {
   // constants
   public AGENT_BIN = 'gemini';
   private promptBuilder = new PromptBuilder('gemini');
+  private model?: string;
+
+  constructor(model?: string) {
+    this.model = model;
+  }
 
   async checkAgent(): Promise<void> {
     try {

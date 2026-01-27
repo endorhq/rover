@@ -3,7 +3,11 @@ import enquirer from 'enquirer';
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import yoctoSpinner from 'yocto-spinner';
-import { getAIAgentTool, type AIAgentTool } from '../lib/agents/index.js';
+import {
+  getAIAgentTool,
+  getUserDefaultModel,
+  type AIAgentTool,
+} from '../lib/agents/index.js';
 import {
   AI_AGENT,
   Git,
@@ -13,6 +17,7 @@ import {
   showProperties,
   showList,
 } from 'rover-core';
+import { parseAgentString } from '../utils/agent-parser.js';
 import { TaskNotFoundError } from 'rover-schemas';
 import { executeHooks } from '../lib/hooks.js';
 import { getTelemetry } from '../lib/telemetry.js';
@@ -188,6 +193,7 @@ const resolveMergeConflicts = async (
 };
 
 interface MergeOptions {
+  agent?: string;
   force?: boolean;
   json?: boolean;
 }
@@ -250,39 +256,54 @@ const mergeCommand = async (taskId: string, options: MergeOptions = {}) => {
 
   jsonOutput.taskId = numericTaskId;
 
-  // Load AI agent selection from user settings
+  // Load AI agent selection
   let selectedAiAgent = 'claude'; // default
+  let selectedModel: string | undefined;
   let projectConfig;
 
   // Load config
   projectConfig = ProjectConfigManager.load(project.path);
 
-  // Load user preferences
-  try {
-    if (UserSettingsManager.exists(project.path)) {
-      const userSettings = UserSettingsManager.load(project.path);
-      selectedAiAgent = userSettings.defaultAiAgent || AI_AGENT.Claude;
-    } else {
+  if (options.agent) {
+    // Use agent from -a flag
+    const parsed = parseAgentString(options.agent);
+    selectedAiAgent = parsed.agent;
+    selectedModel = parsed.model;
+  } else {
+    // Load user preferences
+    try {
+      if (UserSettingsManager.exists(project.path)) {
+        const userSettings = UserSettingsManager.load(project.path);
+        selectedAiAgent = userSettings.defaultAiAgent || AI_AGENT.Claude;
+      } else {
+        if (!isJsonMode()) {
+          console.log(
+            colors.yellow('⚠ User settings not found, defaulting to Claude')
+          );
+          console.log(
+            colors.gray(
+              '  Run `rover init` to configure AI agent preferences'
+            )
+          );
+        }
+      }
+    } catch (error) {
       if (!isJsonMode()) {
         console.log(
-          colors.yellow('⚠ User settings not found, defaulting to Claude')
-        );
-        console.log(
-          colors.gray('  Run `rover init` to configure AI agent preferences')
+          colors.yellow(
+            '⚠ Could not load user settings, defaulting to Claude'
+          )
         );
       }
+      selectedAiAgent = AI_AGENT.Claude;
     }
-  } catch (error) {
-    if (!isJsonMode()) {
-      console.log(
-        colors.yellow('⚠ Could not load user settings, defaulting to Claude')
-      );
-    }
-    selectedAiAgent = AI_AGENT.Claude;
+
+    // Load default model from user settings if no -a flag
+    selectedModel = getUserDefaultModel(selectedAiAgent as AI_AGENT);
   }
 
   // Create AI agent instance
-  const aiAgent = getAIAgentTool(selectedAiAgent);
+  const aiAgent = getAIAgentTool(selectedAiAgent, selectedModel);
 
   try {
     // Load task using ProjectManager
