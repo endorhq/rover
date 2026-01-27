@@ -465,16 +465,15 @@ export class Git {
   ): boolean {
     const targetBranch = options.targetBranch || this.getCurrentBranch();
 
-    try {
-      const unmergedCommits =
-        launchSync('git', ['log', `${targetBranch}..${srcBranch}`, '--oneline'])
-          .stdout?.toString()
-          .trim() || '';
+    // Let errors propagate so callers can handle "remote doesn't exist" case
+    const unmergedCommits =
+      launchSync('git', ['log', `${targetBranch}..${srcBranch}`, '--oneline'], {
+        cwd: options.worktreePath ?? this.cwd,
+      })
+        .stdout?.toString()
+        .trim() || '';
 
-      return unmergedCommits.length > 0;
-    } catch (_err) {
-      return false;
-    }
+    return unmergedCommits.length > 0;
   }
 
   /**
