@@ -26,12 +26,6 @@ import { formatTaskStatus, statusColor } from '../utils/task-status.js';
 import type { CommandDefinition } from '../types.js';
 
 /**
- * Track previous task statuses to detect transitions for onComplete hooks.
- * Module-level to persist across watch mode polling cycles.
- */
-const previousTaskStatuses = new Map<number, string>();
-
-/**
  * Format duration from start to now or completion
  */
 const formatDuration = (startTime?: string, endTime?: string): string => {
@@ -250,21 +244,20 @@ const listCommand = async (
       }
     }
 
-    // Update task status and detect transitions for onComplete hooks
-    // (hooks only apply in single-project context)
+    // Update task status and detect completions for onComplete hooks
     for (const { task, project: projectData } of tasksWithProjects) {
       try {
-        // Get previous status before update
-        const previousStatus = previousTaskStatuses.get(task.id);
-
         // Update status from iteration
         task.updateStatusFromIteration();
         const currentStatus = task.status;
 
-        // Detect NEW transition to COMPLETED or FAILED
-        const isNewCompletion =
-          previousStatus !== currentStatus &&
-          (currentStatus === 'COMPLETED' || currentStatus === 'FAILED');
+        // Check if this is a terminal status that should trigger onComplete hooks
+        const isTerminalStatus =
+          currentStatus === 'COMPLETED' || currentStatus === 'FAILED';
+
+        // Check if hook has already been fired for this status (persisted in task file)
+        const hookAlreadyFired =
+          task.onCompleteHookFiredForStatus === currentStatus;
 
         // Load project config for hooks per project
         let projectConfig: ProjectConfigManager | undefined;
@@ -276,10 +269,10 @@ const listCommand = async (
           }
         }
 
-        // Execute onComplete hooks if configured and this is a new completion
-        // Only execute hooks in single-project mode
+        // Execute onComplete hooks if configured and not already fired for this status
         if (
-          isNewCompletion &&
+          isTerminalStatus &&
+          !hookAlreadyFired &&
           projectConfig?.hooks?.onComplete?.length &&
           projectData?.path
         ) {
@@ -294,10 +287,10 @@ const listCommand = async (
             },
             'onComplete'
           );
-        }
 
-        // Update tracking for next iteration
-        previousTaskStatuses.set(task.id, currentStatus);
+          // Record that hook was fired for this status (persists to task file)
+          task.setOnCompleteHookFiredForStatus(currentStatus);
+        }
       } catch (err) {
         if (!isJsonMode()) {
           console.log(
