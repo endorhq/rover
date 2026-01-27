@@ -403,6 +403,10 @@ export function createProgram(
     .command('merge')
     .description('Merge the task changes into your current branch')
     .argument('<taskId>', 'Task ID to merge')
+    .option(
+      '-a, --agent <agent>',
+      'AI agent with optional model (e.g., claude:sonnet)'
+    )
     .option('-f, --force', 'Force merge without confirmation')
     .option('--json', 'Output in JSON format')
     .action(mergeCmd.action);
