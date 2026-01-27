@@ -433,6 +433,46 @@ export class Git {
   }
 
   /**
+   * Rebase the current branch onto the given branch
+   */
+  rebaseBranch(onto: string, options: GitWorktreeOptions = {}): boolean {
+    try {
+      launchSync('git', ['rebase', onto], {
+        cwd: options.worktreePath ?? this.cwd,
+      });
+      return true;
+    } catch (_err) {
+      return false;
+    }
+  }
+
+  /**
+   * Abort current rebase
+   */
+  abortRebase(options: GitWorktreeOptions = {}) {
+    try {
+      launchSync('git', ['rebase', '--abort'], {
+        cwd: options.worktreePath ?? this.cwd,
+      });
+    } catch (_err) {
+      // Ignore abort errors
+    }
+  }
+
+  /**
+   * Continue current rebase
+   */
+  continueRebase(options: GitWorktreeOptions = {}) {
+    try {
+      launchSync('git', ['rebase', '--continue'], {
+        cwd: options.worktreePath ?? this.cwd,
+      });
+    } catch (_err) {
+      // Ignore continue errors
+    }
+  }
+
+  /**
    * Continue current merge
    */
   continueMerge(options: GitWorktreeOptions = {}) {
