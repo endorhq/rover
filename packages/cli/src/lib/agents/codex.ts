@@ -30,6 +30,11 @@ class CodexAI implements AIAgentTool {
   // constants
   public AGENT_BIN = 'codex';
   private promptBuilder = new PromptBuilder('codex');
+  private model?: string;
+
+  constructor(model?: string) {
+    this.model = model;
+  }
 
   async checkAgent(): Promise<void> {
     try {

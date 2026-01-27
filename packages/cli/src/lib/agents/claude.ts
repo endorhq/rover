@@ -76,6 +76,11 @@ class ClaudeAI implements AIAgentTool {
   // constants
   public AGENT_BIN = 'claude';
   private promptBuilder = new PromptBuilder('claude');
+  private model?: string;
+
+  constructor(model?: string) {
+    this.model = model;
+  }
 
   async checkAgent(): Promise<void> {
     try {
