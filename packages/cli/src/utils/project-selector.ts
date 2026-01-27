@@ -5,6 +5,7 @@
 import colors from 'ansi-colors';
 import enquirer from 'enquirer';
 import { ProjectStore, type ProjectManager } from 'rover-core';
+import { selectPromptActions } from './prompt-actions.js';
 
 const { AutoComplete } = enquirer as unknown as {
   AutoComplete: new (options: {
@@ -12,6 +13,7 @@ const { AutoComplete } = enquirer as unknown as {
     message: string;
     limit: number;
     choices: Array<{ name: string; value: string }>;
+    actions: Record<string, Record<string, string>>;
   }) => {
     run(): Promise<string>;
   };
@@ -50,6 +52,7 @@ export async function promptProjectSelection(): Promise<ProjectManager | null> {
       message: 'Select a project',
       limit: 10,
       choices,
+      actions: selectPromptActions,
     });
 
     const selectedId = await prompt.run();
