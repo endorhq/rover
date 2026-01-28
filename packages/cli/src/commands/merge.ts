@@ -20,6 +20,10 @@ import {
 import { parseAgentString } from '../utils/agent-parser.js';
 import { TaskNotFoundError } from 'rover-schemas';
 import { executeHooks } from '../lib/hooks.js';
+import {
+  truncateConflictContext,
+  getBlameContext,
+} from '../lib/context-optimizer.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { showRoverChat, showTips } from '../utils/display.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
@@ -129,7 +133,9 @@ const resolveMergeConflicts = async (
   conflictedFiles: string[],
   aiAgent: AIAgentTool,
   json: boolean,
-  concurrency: number = 4
+  concurrency: number = 4,
+  contextLines: number = 50,
+  sendFullFile: boolean = false
 ): Promise<{ success: boolean; failureReason?: string }> => {
   let spinner;
 
@@ -140,12 +146,14 @@ const resolveMergeConflicts = async (
   }
 
   try {
-    // Compute diff context once before the loop
-    const diffContext = git
-      .getRecentCommits({
-        branch: git.getCurrentBranch(),
-      })
-      .join('\n');
+    // Fallback diff context for --send-full-file mode
+    const fallbackDiffContext = sendFullFile
+      ? git
+          .getRecentCommits({
+            branch: git.getCurrentBranch(),
+          })
+          .join('\n')
+      : '';
 
     const failures: string[] = [];
     let resolvedCount = 0;
@@ -158,7 +166,31 @@ const resolveMergeConflicts = async (
           return;
         }
 
-        const conflictedContent = readFileSync(filePath, 'utf8');
+        const rawContent = readFileSync(filePath, 'utf8');
+
+        let conflictedContent: string;
+        let diffContext: string;
+
+        if (sendFullFile) {
+          conflictedContent = rawContent;
+          diffContext = fallbackDiffContext;
+        } else {
+          const truncated = truncateConflictContext(rawContent, contextLines);
+          conflictedContent = truncated.content;
+          diffContext = getBlameContext(
+            git,
+            filePath,
+            truncated.conflictRegions,
+            { ours: 'HEAD', theirs: 'MERGE_HEAD' }
+          );
+          if (!diffContext) {
+            diffContext =
+              fallbackDiffContext ||
+              git
+                .getRecentCommits({ branch: git.getCurrentBranch() })
+                .join('\n');
+          }
+        }
 
         try {
           const resolvedContent = await aiAgent.resolveMergeConflicts(
@@ -218,6 +250,8 @@ const resolveMergeConflicts = async (
 interface MergeOptions {
   agent?: string;
   concurrency?: string;
+  contextLines?: string;
+  sendFullFile?: boolean;
   force?: boolean;
   json?: boolean;
 }
@@ -560,12 +594,15 @@ const mergeCommand = async (taskId: string, options: MergeOptions = {}) => {
           }
 
           const concurrency = parseInt(options.concurrency || '4', 10);
+          const contextLinesNum = parseInt(options.contextLines || '50', 10);
           const resolution = await resolveMergeConflicts(
             git,
             mergeConflicts,
             aiAgent,
             options.json === true,
-            concurrency
+            concurrency,
+            contextLinesNum,
+            options.sendFullFile === true
           );
 
           if (resolution.success) {
