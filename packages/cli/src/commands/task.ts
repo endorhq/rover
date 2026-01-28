@@ -32,7 +32,11 @@ import { NewTaskProvider } from 'rover-telemetry';
 import { readFromStdin, stdinIsAvailable } from '../utils/stdin.js';
 import type { CLIJsonOutput } from '../types.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
-import { GitHub, GitHubError } from '../lib/github.js';
+import {
+  GitHub,
+  GitHubError,
+  formatCommentsAsMarkdown,
+} from '../lib/github.js';
 import { copyEnvironmentFiles } from '../utils/env-files.js';
 import { initWorkflowStore } from '../lib/workflow.js';
 import {
@@ -219,38 +223,6 @@ interface TaskOptions {
   networkAllow?: string[];
   networkBlock?: string[];
 }
-
-/**
- * Format a date string to a more readable format (YYYY-MM-DD)
- */
-const formatCommentDate = (dateString: string): string => {
-  if (!dateString) return '';
-  try {
-    const date = new Date(dateString);
-    return date.toISOString().split('T')[0];
-  } catch {
-    return dateString;
-  }
-};
-
-/**
- * Format GitHub comments as markdown to append to the issue body
- */
-const formatCommentsAsMarkdown = (
-  comments: Array<{ author: string; body: string; createdAt: string }>
-): string => {
-  if (!comments || comments.length === 0) return '';
-
-  const formattedComments = comments
-    .map(comment => {
-      const date = formatCommentDate(comment.createdAt);
-      const dateStr = date ? ` (${date})` : '';
-      return `**@${comment.author}**${dateStr}:\n${comment.body}`;
-    })
-    .join('\n\n');
-
-  return `\n\n---\n## Comments\n\n${formattedComments}`;
-};
 
 /**
  * Build NetworkConfig from CLI options

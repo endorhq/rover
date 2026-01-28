@@ -21,6 +21,7 @@ type GitHubIssueResult = {
 
 type FetchIssueOptions = {
   includeComments?: boolean;
+  since?: string;
 };
 
 export type GitHubOptions = {
@@ -71,7 +72,7 @@ export class GitHub {
     remoteUrl: string,
     options: FetchIssueOptions = {}
   ): Promise<GitHubIssueResult> {
-    const { includeComments = false } = options;
+    const { includeComments = false, since } = options;
     const repoInfo = this.getGitHubRepoInfo(remoteUrl);
     const jsonFields = includeComments ? 'title,body,comments' : 'title,body';
 
@@ -115,7 +116,8 @@ export class GitHub {
             issueResult.comments = await this.fetchIssueComments(
               repoInfo.owner,
               repoInfo.repo,
-              number
+              number,
+              since
             );
           }
 
@@ -139,7 +141,14 @@ export class GitHub {
 
           // Parse comments from gh CLI response
           if (includeComments && issue.comments) {
-            issueResult.comments = this.parseGhCliComments(issue.comments);
+            let comments = this.parseGhCliComments(issue.comments);
+            if (since) {
+              const sinceDate = new Date(since);
+              comments = comments.filter(
+                c => new Date(c.createdAt) > sinceDate
+              );
+            }
+            issueResult.comments = comments;
           }
 
           return issueResult;
@@ -176,7 +185,14 @@ export class GitHub {
 
           // Parse comments from gh CLI response
           if (includeComments && issue.comments) {
-            issueResult.comments = this.parseGhCliComments(issue.comments);
+            let comments = this.parseGhCliComments(issue.comments);
+            if (since) {
+              const sinceDate = new Date(since);
+              comments = comments.filter(
+                c => new Date(c.createdAt) > sinceDate
+              );
+            }
+            issueResult.comments = comments;
           }
 
           return issueResult;
@@ -212,10 +228,14 @@ export class GitHub {
   private async fetchIssueComments(
     owner: string,
     repo: string,
-    issueNumber: string | number
+    issueNumber: string | number,
+    since?: string
   ): Promise<GitHubComment[]> {
     try {
-      const apiUrl = `https://api.github.com/repos/${owner}/${repo}/issues/${issueNumber}/comments`;
+      let apiUrl = `https://api.github.com/repos/${owner}/${repo}/issues/${issueNumber}/comments`;
+      if (since) {
+        apiUrl += `?since=${encodeURIComponent(since)}`;
+      }
       const response = await fetch(apiUrl, {
         headers: {
           'User-Agent': 'Rover-CLI',
@@ -268,3 +288,35 @@ export class GitHub {
     return null;
   }
 }
+
+/**
+ * Format a date string to a more readable format (YYYY-MM-DD)
+ */
+export const formatCommentDate = (dateString: string): string => {
+  if (!dateString) return '';
+  try {
+    const date = new Date(dateString);
+    return date.toISOString().split('T')[0];
+  } catch {
+    return dateString;
+  }
+};
+
+/**
+ * Format GitHub comments as markdown to append to the issue body
+ */
+export const formatCommentsAsMarkdown = (
+  comments: Array<{ author: string; body: string; createdAt: string }>
+): string => {
+  if (!comments || comments.length === 0) return '';
+
+  const formattedComments = comments
+    .map(comment => {
+      const date = formatCommentDate(comment.createdAt);
+      const dateStr = date ? ` (${date})` : '';
+      return `**@${comment.author}**${dateStr}:\n${comment.body}`;
+    })
+    .join('\n\n');
+
+  return `\n\n---\n## Comments\n\n${formattedComments}`;
+};

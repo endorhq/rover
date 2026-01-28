@@ -279,6 +279,8 @@ const mcpCommand = async () => {
   const iterateSchema = z.object({
     taskId: z.string(),
     instructions: z.string().optional(),
+    fromGithub: z.string().optional(),
+    includeComments: z.boolean().optional(),
   });
 
   server.registerTool(
@@ -291,10 +293,14 @@ const mcpCommand = async () => {
     },
     async args => {
       const parsed = iterateSchema.parse(args);
-      return runCommand(iterateCmd.action, [
-        parsed.taskId,
-        parsed.instructions,
-      ]);
+      return runCommand(
+        iterateCmd.action,
+        [parsed.taskId, parsed.instructions],
+        {
+          fromGithub: parsed.fromGithub,
+          includeComments: parsed.includeComments,
+        }
+      );
     }
   );
 

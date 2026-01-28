@@ -382,6 +382,14 @@ export function createProgram(
       'Open an interactive command session to iterate on the task'
     )
     .option('--json', 'Output JSON and skip confirmation prompts')
+    .option(
+      '--from-github <issue>',
+      'GitHub issue number to fetch comments from'
+    )
+    .option(
+      '--include-comments',
+      'Include new GitHub issue comments in iteration instructions'
+    )
     .action(iterateCmd.action);
 
   program

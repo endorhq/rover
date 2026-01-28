@@ -22,6 +22,7 @@ export interface TaskSource {
   url?: string; // Human-readable URL for the source
   title?: string; // Human-readable title/context
   ref?: Record<string, unknown>; // Source-specific data for API calls
+  lastCommentFetchedAt?: string; // Timestamp of last comment fetch for incremental filtering
 }
 
 // Data required to create a new task
