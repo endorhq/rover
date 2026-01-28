@@ -378,6 +378,10 @@ export function createProgram(
       'Open an interactive command session to iterate on the task'
     )
     .option('--json', 'Output JSON and skip confirmation prompts')
+    .option(
+      '-a, --agent <agent>',
+      'AI agent to use for this iteration (e.g., claude, claude:sonnet)'
+    )
     .action(iterateCmd.action);
 
   program
