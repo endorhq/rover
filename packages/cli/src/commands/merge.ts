@@ -128,63 +128,82 @@ const resolveMergeConflicts = async (
   git: Git,
   conflictedFiles: string[],
   aiAgent: AIAgentTool,
-  json: boolean
+  json: boolean,
+  concurrency: number = 4
 ): Promise<{ success: boolean; failureReason?: string }> => {
   let spinner;
 
   if (!isJsonMode()) {
-    spinner = yoctoSpinner({ text: 'Analyzing merge conflicts...' }).start();
+    spinner = yoctoSpinner({
+      text: `Resolving conflicts in ${conflictedFiles.length} file(s)...`,
+    }).start();
   }
 
   try {
-    // Process each conflicted file
+    // Compute diff context once before the loop
+    const diffContext = git
+      .getRecentCommits({
+        branch: git.getCurrentBranch(),
+      })
+      .join('\n');
+
+    const failures: string[] = [];
+    let resolvedCount = 0;
+    const executing: Promise<void>[] = [];
+
     for (const filePath of conflictedFiles) {
-      if (spinner) {
-        spinner.text = `Resolving conflicts in ${filePath}...`;
-      }
-
-      if (!existsSync(filePath)) {
-        spinner?.error(`File ${filePath} not found, skipping...`);
-        continue;
-      }
-
-      // Read the conflicted file
-      const conflictedContent = readFileSync(filePath, 'utf8');
-
-      // Get git diff context for better understanding
-      const diffContext = git
-        .getRecentCommits({
-          branch: git.getCurrentBranch(),
-        })
-        .join('\n');
-
-      try {
-        const resolvedContent = await aiAgent.resolveMergeConflicts(
-          filePath,
-          diffContext,
-          conflictedContent
-        );
-
-        if (!resolvedContent) {
-          const reason = `AI returned empty resolution for ${filePath}`;
-          spinner?.error(reason);
-          return { success: false, failureReason: reason };
+      const task = (async () => {
+        if (!existsSync(filePath)) {
+          failures.push(`File ${filePath} not found`);
+          return;
         }
 
-        // Write the resolved content back to the file
-        writeFileSync(filePath, resolvedContent);
+        const conflictedContent = readFileSync(filePath, 'utf8');
 
-        // Stage the resolved file
-        if (!git.add(filePath)) {
-          const reason = `Error adding ${filePath} to the git commit`;
-          spinner?.error(reason);
-          return { success: false, failureReason: reason };
+        try {
+          const resolvedContent = await aiAgent.resolveMergeConflicts(
+            filePath,
+            diffContext,
+            conflictedContent
+          );
+
+          if (!resolvedContent) {
+            failures.push(`AI returned empty resolution for ${filePath}`);
+            return;
+          }
+
+          writeFileSync(filePath, resolvedContent);
+
+          if (!git.add(filePath)) {
+            failures.push(`Error adding ${filePath} to the git commit`);
+            return;
+          }
+
+          resolvedCount++;
+          if (spinner) {
+            spinner.text = `Resolved ${resolvedCount}/${conflictedFiles.length} file(s)...`;
+          }
+        } catch (error) {
+          failures.push(`Error resolving ${filePath}: ${error}`);
         }
-      } catch (error) {
-        const reason = `Error resolving ${filePath}: ${error}`;
-        spinner?.error(reason);
-        return { success: false, failureReason: reason };
+      })();
+
+      const wrapped = task.then(() => {
+        executing.splice(executing.indexOf(wrapped), 1);
+      });
+      executing.push(wrapped);
+
+      if (executing.length >= concurrency) {
+        await Promise.race(executing);
       }
+    }
+
+    await Promise.all(executing);
+
+    if (failures.length > 0) {
+      const reason = failures.join('; ');
+      spinner?.error(`Failed to resolve ${failures.length} file(s)`);
+      return { success: false, failureReason: reason };
     }
 
     spinner?.success('All conflicts resolved by AI');
@@ -198,6 +217,7 @@ const resolveMergeConflicts = async (
 
 interface MergeOptions {
   agent?: string;
+  concurrency?: string;
   force?: boolean;
   json?: boolean;
 }
@@ -539,11 +559,13 @@ const mergeCommand = async (taskId: string, options: MergeOptions = {}) => {
             ]);
           }
 
+          const concurrency = parseInt(options.concurrency || '4', 10);
           const resolution = await resolveMergeConflicts(
             git,
             mergeConflicts,
             aiAgent,
-            options.json === true
+            options.json === true,
+            concurrency
           );
 
           if (resolution.success) {
