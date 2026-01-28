@@ -119,18 +119,18 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Check
-        run: pnpm run check:${{ inputs.project }}
+        run: pnpm --filter ./packages/${{ inputs.project }} check
 
       - name: Test
         # For now, skip tests on the VSCode Extension
         if: inputs.project == 'cli'
-        run: pnpm run test:${{ inputs.project }}
+        run: pnpm --filter ./packages/${{ inputs.project }} test
 
       - name: Build
-        run: pnpm run build:${{ inputs.project }}
+        run: pnpm build
 
       - name: Package
-        run: pnpm run package:${{ inputs.project }}
+        run: pnpm --filter ./packages/${{ inputs.project }} package
 
       - name: (Dry Run) Commit and tag
         if: inputs.dryRun == true
