@@ -124,7 +124,7 @@ const resolveRebaseConflicts = async (
   conflictedFiles: string[],
   aiAgent: AIAgentTool,
   worktreePath: string
-): Promise<boolean> => {
+): Promise<{ success: boolean; failureReason?: string }> => {
   let spinner;
 
   if (!isJsonMode()) {
@@ -145,9 +145,12 @@ const resolveRebaseConflicts = async (
 
       const conflictedContent = readFileSync(fullPath, 'utf8');
 
+      // During a rebase, HEAD is detached so getCurrentBranch returns 'unknown'.
+      // Use 'HEAD' directly to get recent commits from the current position.
+      const currentBranchName = git.getCurrentBranch({ worktreePath });
       const diffContext = git
         .getRecentCommits({
-          branch: git.getCurrentBranch({ worktreePath }),
+          branch: currentBranchName === 'unknown' ? 'HEAD' : currentBranchName,
           worktreePath,
         })
         .join('\n');
@@ -160,27 +163,31 @@ const resolveRebaseConflicts = async (
         );
 
         if (!resolvedContent) {
-          spinner?.error(`Failed to resolve conflicts in ${filePath}`);
-          return false;
+          const reason = `AI returned empty resolution for ${filePath}`;
+          spinner?.error(reason);
+          return { success: false, failureReason: reason };
         }
 
         writeFileSync(fullPath, resolvedContent);
 
         if (!git.add(filePath, { worktreePath })) {
-          spinner?.error(`Error adding ${filePath} to the git commit`);
-          return false;
+          const reason = `Error adding ${filePath} to the git commit`;
+          spinner?.error(reason);
+          return { success: false, failureReason: reason };
         }
       } catch (error) {
-        spinner?.error(`Error resolving ${filePath}: ${error}`);
-        return false;
+        const reason = `Error resolving ${filePath}: ${error}`;
+        spinner?.error(reason);
+        return { success: false, failureReason: reason };
       }
     }
 
     spinner?.success('All conflicts resolved by AI');
-    return true;
+    return { success: true };
   } catch (error) {
-    spinner?.error('Failed to resolve rebase conflicts');
-    return false;
+    const reason = `Failed to resolve rebase conflicts: ${error}`;
+    spinner?.error(reason);
+    return { success: false, failureReason: reason };
   }
 };
 
@@ -477,14 +484,14 @@ const rebaseCommand = async (taskId: string, options: RebaseOptions = {}) => {
             ]);
           }
 
-          const resolutionSuccessful = await resolveRebaseConflicts(
+          const resolution = await resolveRebaseConflicts(
             git,
             rebaseConflicts,
             aiAgent,
             task.worktreePath
           );
 
-          if (resolutionSuccessful) {
+          if (resolution.success) {
             jsonOutput.conflictsResolved = true;
 
             if (!isJsonMode()) {
@@ -540,7 +547,9 @@ const rebaseCommand = async (taskId: string, options: RebaseOptions = {}) => {
               return;
             }
           } else {
-            jsonOutput.error = 'AI failed to resolve rebase conflicts';
+            jsonOutput.error =
+              resolution.failureReason ||
+              'AI failed to resolve rebase conflicts';
             git.abortRebase({ worktreePath: task.worktreePath });
 
             if (!isJsonMode()) {

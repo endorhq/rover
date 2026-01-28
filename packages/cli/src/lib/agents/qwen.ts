@@ -148,6 +148,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
         .filter((line: string) => line.trim() !== '');
       return lines[0] || null;
     } catch (error) {
+      console.error('Failed to generate commit message with Qwen:', error);
       return null;
     }
   }
@@ -167,7 +168,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
 
       return response;
     } catch (err) {
-      return null;
+      throw err;
     }
   }
 
