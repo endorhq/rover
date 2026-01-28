@@ -185,6 +185,14 @@ npm install -g @endorhq/rover@latest
 
 > 💡 TIP: You can run multiple tasks in parallel. Just take into account your AI agents' limits.
 
+#### Configuration
+
+Although it's not required, we recommend running `rover init` in your project to generate an initial configuration:
+
+```sh
+rover init
+```
+
 #### VSCode
 
 Rover is available on the [VSCode Marketplace](https://marketplace.visualstudio.com/vscode). You can look for `Rover` in your VSCode Extensions Panel or access the [Marketplace page](https://marketplace.visualstudio.com/items?itemName=endorhq.rover) and click `Install` there.
@@ -192,14 +200,6 @@ Rover is available on the [VSCode Marketplace](https://marketplace.visualstudio.
 If the Rover CLI is not in the `PATH`, the extension will guide you through the setup process. Once everything is ready, you will be able to create your first task!
 
 See the [VSCode documentation site](https://docs.endor.dev/rover/vscode-extension/).
-
-### Configuration
-
-Although it's not required, we recommend running `rover init` in your project to generate an initial configuration:
-
-```sh
-rover init
-```
 
 ## How it works
 
