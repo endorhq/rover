@@ -61,6 +61,8 @@ describe('rover init (e2e)', () => {
     createMockTool('docker', 127, 'command not found: docker');
     createMockTool('claude', 127, 'command not found: claude');
     createMockTool('codex', 127, 'command not found: codex');
+    createMockTool('cursor', 127, 'command not found: cursor');
+    createMockTool('cursor-agent', 127, 'command not found: cursor-agent');
     createMockTool('gemini', 127, 'command not found: gemini');
     createMockTool('qwen', 127, 'command not found: qwen');
 
@@ -88,7 +90,7 @@ describe('rover init (e2e)', () => {
    */
   const runRoverInit = async (args: string[] = ['--yes']) => {
     // Find the rover CLI binary (assuming it's built)
-    const roverBin = join(__dirname, '../../../dist/index.js');
+    const roverBin = join(__dirname, '../../../dist/index.mjs');
 
     // Prepend mock bin to PATH so our mocks are found FIRST
     // This allows us to override real system tools with our mocks
@@ -455,7 +457,7 @@ tasks:
       createMockToolInClone('claude', 0, 'Claude CLI v1.0.0');
 
       // Step 6: Run rover init in the cloned directory
-      const roverBin = join(__dirname, '../../../dist/index.js');
+      const roverBin = join(__dirname, '../../../dist/index.mjs');
       const clonePath = `${cloneMockBinDir}:${originalPath}`;
 
       const cloneInitResult = await execa('node', [roverBin, 'init', '--yes'], {
@@ -580,10 +582,10 @@ tasks:
       // Verify: Command succeeded
       expect(result.exitCode).toBe(0);
 
-      // Verify: .gitignore was created with .rover/ entry
+      // Verify: .gitignore was created with .rover/ entries
       expect(existsSync('.gitignore')).toBe(true);
       const gitignore = readFileSync('.gitignore', 'utf8');
-      expect(gitignore.trim()).toBe('.rover/');
+      expect(gitignore).toContain('.rover/');
     });
 
     it('should append to existing .gitignore', async () => {
