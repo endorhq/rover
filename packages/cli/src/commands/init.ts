@@ -19,6 +19,7 @@ import {
   AI_AGENT,
 } from 'rover-core';
 import { showRoverChat, showTips, TIP_TITLES } from '../utils/display.js';
+import { selectPromptActions } from '../utils/prompt-actions.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { exitWithError, exitWithWarn, exitWithSuccess } from '../utils/exit.js';
 import type { CommandDefinition } from '../types.js';
@@ -272,7 +273,8 @@ const initCommand = async (path: string = '.', options: { yes?: boolean }) => {
             name: agent.charAt(0).toUpperCase() + agent.slice(1),
             value: agent,
           })),
-        })) as { aiAgent: string };
+          actions: selectPromptActions,
+        } as Parameters<typeof prompt>[0])) as { aiAgent: string };
 
         defaultAIAgent = result?.aiAgent.toLocaleLowerCase() as AI_AGENT;
       } catch (error) {
