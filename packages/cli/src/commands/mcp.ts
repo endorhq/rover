@@ -100,6 +100,7 @@ const mcpCommand = async () => {
   const taskSchema = z.object({
     initPrompt: z.string(),
     fromGithub: z.string().optional(),
+    includeComments: z.boolean().optional(),
     sourceBranch: z.string().optional(),
     targetBranch: z.string().optional(),
     agent: z.nativeEnum(AI_AGENT).optional(),
@@ -116,6 +117,7 @@ const mcpCommand = async () => {
       const parsed = taskSchema.parse(args);
       return runCommand(taskCmd.action, [parsed.initPrompt], {
         fromGithub: parsed.fromGithub,
+        includeComments: parsed.includeComments,
         yes: true,
         sourceBranch: parsed.sourceBranch,
         targetBranch: parsed.targetBranch,
