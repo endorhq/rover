@@ -308,9 +308,11 @@ const createTaskForAgent = async (
 
   if (!expandedTask) {
     processManager?.failLastItem();
-    console.error(
-      colors.red(`Failed to expand task description using ${selectedAiAgent}`)
-    );
+    if (!jsonMode) {
+      console.error(
+        colors.red(`Failed to expand task description using ${selectedAiAgent}`)
+      );
+    }
     return null;
   } else {
     processManager?.completeLastItem();
@@ -360,7 +362,9 @@ const createTaskForAgent = async (
     }
   } catch (error) {
     processManager?.failLastItem();
-    console.error(colors.red('Error creating git workspace: ' + error));
+    if (!jsonMode) {
+      console.error(colors.red('Error creating git workspace: ' + error));
+    }
     return null;
   }
 
@@ -426,16 +430,18 @@ const createTaskForAgent = async (
     processManager?.failLastItem();
     processManager?.finish();
 
-    console.warn(
-      colors.yellow(
-        `Task ${taskId} was created, but reset to 'New' due to an error running the container`
-      )
-    );
-    console.log(
-      colors.gray(
-        'Use ' + colors.cyan(`rover restart ${taskId}`) + ' to retry it'
-      )
-    );
+    if (!jsonMode) {
+      console.warn(
+        colors.yellow(
+          `Task ${taskId} was created, but reset to 'New' due to an error running the container`
+        )
+      );
+      console.log(
+        colors.gray(
+          'Use ' + colors.cyan(`rover restart ${taskId}`) + ' to retry it'
+        )
+      );
+    }
   }
 
   return {
