@@ -118,6 +118,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build
+        run: pnpm build
+
       - name: Check
         run: pnpm --filter ./packages/${{ inputs.project }} check
 
@@ -125,9 +128,6 @@ jobs:
         # For now, skip tests on the VSCode Extension
         if: inputs.project == 'cli'
         run: pnpm --filter ./packages/${{ inputs.project }} test
-
-      - name: Build
-        run: pnpm build
 
       - name: Package
         run: pnpm --filter ./packages/${{ inputs.project }} package
