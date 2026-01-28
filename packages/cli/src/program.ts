@@ -417,6 +417,11 @@ export function createProgram(
       '-a, --agent <agent>',
       'AI agent with optional model (e.g., claude:sonnet)'
     )
+    .option(
+      '-c, --concurrency <n>',
+      'Max parallel AI conflict resolutions',
+      '4'
+    )
     .option('-f, --force', 'Force merge without confirmation')
     .option('--json', 'Output in JSON format')
     .action(mergeCmd.action);
@@ -428,6 +433,11 @@ export function createProgram(
     .option(
       '-a, --agent <agent>',
       'AI agent with optional model (e.g., claude:sonnet)'
+    )
+    .option(
+      '-c, --concurrency <n>',
+      'Max parallel AI conflict resolutions',
+      '4'
     )
     .option('-f, --force', 'Force rebase without confirmation')
     .option('--json', 'Output in JSON format')
