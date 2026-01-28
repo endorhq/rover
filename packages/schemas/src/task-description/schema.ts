@@ -84,9 +84,9 @@ export const TaskDescriptionSchema = z.object({
   // Task source (origin tracking - github, manual, etc.)
   source: TaskSourceSchema.optional(),
 
-  // Hook tracking - stores the status when onComplete hook was last fired
-  // Prevents duplicate hook executions across process restarts
-  onCompleteHookFiredForStatus: TaskStatusSchema.optional(),
+  // Hook tracking - stores the lastStatusCheck timestamp when onComplete hook was last fired
+  // Compared against lastStatusCheck to detect new terminal status transitions
+  onCompleteHookFiredAt: z.string().datetime().optional(),
 
   // Metadata
   version: z.string(),

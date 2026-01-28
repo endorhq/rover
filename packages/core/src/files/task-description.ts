@@ -714,8 +714,8 @@ export class TaskDescriptionManager {
   get source(): TaskDescription['source'] {
     return this.data.source;
   }
-  get onCompleteHookFiredForStatus(): TaskDescription['onCompleteHookFiredForStatus'] {
-    return this.data.onCompleteHookFiredForStatus;
+  get onCompleteHookFiredAt(): TaskDescription['onCompleteHookFiredAt'] {
+    return this.data.onCompleteHookFiredAt;
   }
 
   // ============================================================
@@ -755,11 +755,11 @@ export class TaskDescriptionManager {
   }
 
   /**
-   * Record that the onComplete hook was fired for a specific status.
-   * Used to prevent duplicate hook executions across process restarts.
+   * Record that the onComplete hook was fired at a specific lastStatusCheck timestamp.
+   * Used to prevent duplicate hook executions while allowing re-fires after iterate/restart.
    */
-  setOnCompleteHookFiredForStatus(status: TaskStatus): void {
-    this.data.onCompleteHookFiredForStatus = status;
+  setOnCompleteHookFiredAt(timestamp: string): void {
+    this.data.onCompleteHookFiredAt = timestamp;
     this.save();
   }
 

@@ -255,9 +255,9 @@ const listCommand = async (
         const isTerminalStatus =
           currentStatus === 'COMPLETED' || currentStatus === 'FAILED';
 
-        // Check if hook has already been fired for this status (persisted in task file)
+        // Check if hook has already been fired for this status transition
         const hookAlreadyFired =
-          task.onCompleteHookFiredForStatus === currentStatus;
+          task.onCompleteHookFiredAt === task.lastStatusCheck;
 
         // Load project config for hooks per project
         let projectConfig: ProjectConfigManager | undefined;
@@ -288,8 +288,8 @@ const listCommand = async (
             'onComplete'
           );
 
-          // Record that hook was fired for this status (persists to task file)
-          task.setOnCompleteHookFiredForStatus(currentStatus);
+          // Record that hook was fired for this status transition (persists to task file)
+          task.setOnCompleteHookFiredAt(task.lastStatusCheck!);
         }
       } catch (err) {
         if (!isJsonMode()) {
