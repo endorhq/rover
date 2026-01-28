@@ -1,7 +1,6 @@
 # End to end testing (e2e testing)
 
-Maintain a set of End-To-End (e2e) tests for this project. All end to
-end tests
+Maintain a set of End-To-End (e2e) tests for this project.
 
 These tests must ensure that the funcional requirements are met. Tests
 are organized in test suites. A Test suite is responsible for testing
