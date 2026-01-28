@@ -112,7 +112,11 @@ exit 0
 
     writeFileSync(
       'package.json',
-      JSON.stringify({ name: 'test-project', version: '1.0.0', type: 'module' }, null, 2)
+      JSON.stringify(
+        { name: 'test-project', version: '1.0.0', type: 'module' },
+        null,
+        2
+      )
     );
     writeFileSync('README.md', '# Test Project\n');
 

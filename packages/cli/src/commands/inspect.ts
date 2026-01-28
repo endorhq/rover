@@ -41,6 +41,8 @@ interface FileChangeStat {
 interface TaskInspectionOutput {
   /** Whether the operation was successful */
   success: boolean;
+  /** AI agent used for the task */
+  agent?: string;
   /** The base commit hash when the worktree was created */
   baseCommit?: string;
   /** Git branch name for the task worktree */
@@ -121,6 +123,7 @@ const jsonErrorOutput = (
 ): TaskInspectionOutput => {
   return {
     success: false,
+    agent: task?.agent,
     baseCommit: task?.baseCommit,
     branchName: task?.branchName || '',
     completedAt: task?.completedAt,
@@ -315,6 +318,7 @@ const inspectCommand = async (
       // Output JSON format
       const jsonOutput: TaskInspectionOutput = {
         success: true,
+        agent: task.agent,
         baseCommit: task.baseCommit,
         branchName: task.branchName,
         completedAt: task.completedAt,

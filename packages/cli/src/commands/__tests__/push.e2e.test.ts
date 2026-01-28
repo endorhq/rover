@@ -169,6 +169,11 @@ exit 0
   // TODO: All push tests require a real agent to make progress in the container.
   // The mock Docker doesn't run real containers, so tasks never reach COMPLETED status.
 
+  it.skip('should push task branch to remote (requires real agent)', () => {
+    // Placeholder test - push requires completed task with real agent execution
+    // See commented test cases below for planned test scenarios
+  });
+
   // describe('push with pending changes', () => {
   //   it('should commit and push task branch with provided message', ...);
   // });

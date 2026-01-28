@@ -171,6 +171,11 @@ exit 0
   // TODO: All hooks tests require a real agent to make progress in the container.
   // The mock Docker doesn't run real containers, so tasks never reach COMPLETED status.
 
+  it.skip('should execute hooks when tasks complete (requires real agent)', () => {
+    // Placeholder test - hooks require real agent execution
+    // See commented test cases below for planned test scenarios
+  });
+
   // describe('onComplete hook', () => {
   //   it('should execute onComplete hook when task reaches terminal status via rover list', ...);
   //   it('should receive ROVER_TASK_ID, ROVER_TASK_BRANCH, ROVER_TASK_TITLE, and ROVER_TASK_STATUS', ...);

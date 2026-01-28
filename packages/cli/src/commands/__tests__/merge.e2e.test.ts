@@ -153,6 +153,11 @@ exit 0
   // TODO: All merge tests require a real agent to make progress in the container.
   // The mock Docker doesn't run real containers, so tasks never reach COMPLETED status.
 
+  it.skip('should merge task branch into current branch (requires real agent)', () => {
+    // Placeholder test - merge requires completed task with real agent execution
+    // See commented test cases below for planned test scenarios
+  });
+
   // describe('successful merge', () => {
   //   it('should merge task branch into the current branch', ...);
   //   it('should include changes from the task branch after merge', ...);

@@ -133,7 +133,11 @@ steps:
 
     writeFileSync(
       'package.json',
-      JSON.stringify({ name: 'test-project', version: '1.0.0', type: 'module' }, null, 2)
+      JSON.stringify(
+        { name: 'test-project', version: '1.0.0', type: 'module' },
+        null,
+        2
+      )
     );
     writeFileSync('README.md', '# Test Project\n');
 
@@ -223,7 +227,15 @@ steps:
     it('should add a workflow from stdin when source is -', async () => {
       const result = await execa(
         'node',
-        [roverBin, 'workflows', 'add', '-', '--name', 'stdin-workflow', '--json'],
+        [
+          roverBin,
+          'workflows',
+          'add',
+          '-',
+          '--name',
+          'stdin-workflow',
+          '--json',
+        ],
         {
           cwd: testDir,
           env: {
@@ -296,12 +308,7 @@ steps:
   describe('inspect workflow', () => {
     it('should display detailed information about a specific workflow', async () => {
       // Inspect the built-in swe workflow
-      const result = await runRover([
-        'workflows',
-        'inspect',
-        'swe',
-        '--json',
-      ]);
+      const result = await runRover(['workflows', 'inspect', 'swe', '--json']);
 
       expect(result.exitCode).toBe(0);
 
@@ -313,12 +320,7 @@ steps:
     });
 
     it('should show raw YAML content with --raw flag', async () => {
-      const result = await runRover([
-        'workflows',
-        'inspect',
-        'swe',
-        '--raw',
-      ]);
+      const result = await runRover(['workflows', 'inspect', 'swe', '--raw']);
 
       expect(result.exitCode).toBe(0);
       // Raw output should contain YAML content
