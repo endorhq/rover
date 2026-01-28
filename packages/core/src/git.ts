@@ -352,14 +352,20 @@ export class Git {
   /**
    * Rebase the current branch onto the given branch
    */
-  rebaseBranch(onto: string, options: GitWorktreeOptions = {}): boolean {
+  rebaseBranch(
+    onto: string,
+    options: GitWorktreeOptions = {}
+  ): { success: boolean; error?: string } {
     try {
       launchSync('git', ['rebase', onto], {
         cwd: options.worktreePath ?? this.cwd,
       });
-      return true;
-    } catch (_err) {
-      return false;
+      return { success: true };
+    } catch (err) {
+      const stderr = (err as any)?.stderr?.toString().trim() || '';
+      const message =
+        stderr || (err instanceof Error ? err.message : String(err));
+      return { success: false, error: message };
     }
   }
 
@@ -380,26 +386,20 @@ export class Git {
    * Continue current rebase
    */
   continueRebase(options: GitWorktreeOptions = {}) {
-    try {
-      launchSync('git', ['rebase', '--continue'], {
-        cwd: options.worktreePath ?? this.cwd,
-      });
-    } catch (_err) {
-      // Ignore continue errors
-    }
+    launchSync('git', ['rebase', '--continue'], {
+      cwd: options.worktreePath ?? this.cwd,
+      env: { ...process.env, GIT_EDITOR: 'true' },
+    });
   }
 
   /**
    * Continue current merge
    */
   continueMerge(options: GitWorktreeOptions = {}) {
-    try {
-      launchSync('git', ['merge', '--continue'], {
-        cwd: options.worktreePath ?? this.cwd,
-      });
-    } catch (_err) {
-      // Ignore abort errors
-    }
+    launchSync('git', ['merge', '--continue'], {
+      cwd: options.worktreePath ?? this.cwd,
+      env: { ...process.env, GIT_EDITOR: 'true' },
+    });
   }
 
   /**
