@@ -123,63 +123,85 @@ const resolveRebaseConflicts = async (
   git: Git,
   conflictedFiles: string[],
   aiAgent: AIAgentTool,
-  worktreePath: string
+  worktreePath: string,
+  concurrency: number = 4
 ): Promise<{ success: boolean; failureReason?: string }> => {
   let spinner;
 
   if (!isJsonMode()) {
-    spinner = yoctoSpinner({ text: 'Analyzing rebase conflicts...' }).start();
+    spinner = yoctoSpinner({
+      text: `Resolving conflicts in ${conflictedFiles.length} file(s)...`,
+    }).start();
   }
 
   try {
+    // Compute diff context once before the loop
+    const currentBranchName = git.getCurrentBranch({ worktreePath });
+    const diffContext = git
+      .getRecentCommits({
+        branch: currentBranchName === 'unknown' ? 'HEAD' : currentBranchName,
+        worktreePath,
+      })
+      .join('\n');
+
+    const failures: string[] = [];
+    let resolvedCount = 0;
+    const executing: Promise<void>[] = [];
+
     for (const filePath of conflictedFiles) {
-      if (spinner) {
-        spinner.text = `Resolving conflicts in ${filePath}...`;
-      }
-
-      const fullPath = join(worktreePath, filePath);
-      if (!existsSync(fullPath)) {
-        spinner?.error(`File ${filePath} not found, skipping...`);
-        continue;
-      }
-
-      const conflictedContent = readFileSync(fullPath, 'utf8');
-
-      // During a rebase, HEAD is detached so getCurrentBranch returns 'unknown'.
-      // Use 'HEAD' directly to get recent commits from the current position.
-      const currentBranchName = git.getCurrentBranch({ worktreePath });
-      const diffContext = git
-        .getRecentCommits({
-          branch: currentBranchName === 'unknown' ? 'HEAD' : currentBranchName,
-          worktreePath,
-        })
-        .join('\n');
-
-      try {
-        const resolvedContent = await aiAgent.resolveMergeConflicts(
-          filePath,
-          diffContext,
-          conflictedContent
-        );
-
-        if (!resolvedContent) {
-          const reason = `AI returned empty resolution for ${filePath}`;
-          spinner?.error(reason);
-          return { success: false, failureReason: reason };
+      const task = (async () => {
+        const fullPath = join(worktreePath, filePath);
+        if (!existsSync(fullPath)) {
+          failures.push(`File ${filePath} not found`);
+          return;
         }
 
-        writeFileSync(fullPath, resolvedContent);
+        const conflictedContent = readFileSync(fullPath, 'utf8');
 
-        if (!git.add(filePath, { worktreePath })) {
-          const reason = `Error adding ${filePath} to the git commit`;
-          spinner?.error(reason);
-          return { success: false, failureReason: reason };
+        try {
+          const resolvedContent = await aiAgent.resolveMergeConflicts(
+            filePath,
+            diffContext,
+            conflictedContent
+          );
+
+          if (!resolvedContent) {
+            failures.push(`AI returned empty resolution for ${filePath}`);
+            return;
+          }
+
+          writeFileSync(fullPath, resolvedContent);
+
+          if (!git.add(filePath, { worktreePath })) {
+            failures.push(`Error adding ${filePath} to the git commit`);
+            return;
+          }
+
+          resolvedCount++;
+          if (spinner) {
+            spinner.text = `Resolved ${resolvedCount}/${conflictedFiles.length} file(s)...`;
+          }
+        } catch (error) {
+          failures.push(`Error resolving ${filePath}: ${error}`);
         }
-      } catch (error) {
-        const reason = `Error resolving ${filePath}: ${error}`;
-        spinner?.error(reason);
-        return { success: false, failureReason: reason };
+      })();
+
+      const wrapped = task.then(() => {
+        executing.splice(executing.indexOf(wrapped), 1);
+      });
+      executing.push(wrapped);
+
+      if (executing.length >= concurrency) {
+        await Promise.race(executing);
       }
+    }
+
+    await Promise.all(executing);
+
+    if (failures.length > 0) {
+      const reason = failures.join('; ');
+      spinner?.error(`Failed to resolve ${failures.length} file(s)`);
+      return { success: false, failureReason: reason };
     }
 
     spinner?.success('All conflicts resolved by AI');
@@ -193,6 +215,7 @@ const resolveRebaseConflicts = async (
 
 interface RebaseOptions {
   agent?: string;
+  concurrency?: string;
   force?: boolean;
   json?: boolean;
 }
@@ -449,11 +472,11 @@ const rebaseCommand = async (taskId: string, options: RebaseOptions = {}) => {
       if (spinner) spinner.text = 'Rebasing task branch...';
 
       // Rebase the task branch onto the current branch
-      const rebaseSuccessful = git.rebaseBranch(currentBranch, {
+      const rebaseResult = git.rebaseBranch(currentBranch, {
         worktreePath: task.worktreePath,
       });
 
-      if (rebaseSuccessful) {
+      if (rebaseResult.success) {
         jsonOutput.rebased = true;
         spinner?.success('Task branch rebased successfully');
       } else {
@@ -484,11 +507,13 @@ const rebaseCommand = async (taskId: string, options: RebaseOptions = {}) => {
             ]);
           }
 
+          const concurrency = parseInt(options.concurrency || '4', 10);
           const resolution = await resolveRebaseConflicts(
             git,
             rebaseConflicts,
             aiAgent,
-            task.worktreePath
+            task.worktreePath,
+            concurrency
           );
 
           if (resolution.success) {
@@ -582,7 +607,8 @@ const rebaseCommand = async (taskId: string, options: RebaseOptions = {}) => {
         } else {
           // Other rebase error, not conflicts
           if (spinner) spinner.error('Rebase failed');
-          jsonOutput.error = 'Rebase failed with an unknown error';
+          jsonOutput.error =
+            rebaseResult.error || 'Rebase failed with an unknown error';
           await exitWithError(jsonOutput, { telemetry });
           return;
         }
