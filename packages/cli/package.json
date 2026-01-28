@@ -1,6 +1,6 @@
 {
   "name": "@endorhq/rover",
-  "version": "0.0.0-dev",
+  "version": "2.0.0",
   "description": "A manager for AI coding agents that works with Claude Code, Gemini, and Qwen.",
   "main": "dist/index.mjs",
   "type": "module",
@@ -28,7 +28,11 @@
     "url": "https://github.com/endorhq/rover.git",
     "directory": "packages/cli"
   },
-  "files": ["README.md", "LICENSE.md", "dist/*"],
+  "files": [
+    "README.md",
+    "LICENSE.md",
+    "dist/*"
+  ],
   "scripts": {
     "build": "tsdown --config-loader unrun",
     "build-dev": "TSUP_DEV=true tsdown --config-loader unrun",
