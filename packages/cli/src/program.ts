@@ -416,6 +416,15 @@ export function createProgram(
     )
     .option('-f, --force', 'Force merge without confirmation')
     .option('--json', 'Output in JSON format')
+    .option(
+      '--context-lines <n>',
+      'Lines of context around each conflict region',
+      '50'
+    )
+    .option(
+      '--send-full-file',
+      'Send full file content to AI instead of truncated context'
+    )
     .action(mergeCmd.action);
 
   program
@@ -433,6 +442,15 @@ export function createProgram(
     )
     .option('-f, --force', 'Force rebase without confirmation')
     .option('--json', 'Output in JSON format')
+    .option(
+      '--context-lines <n>',
+      'Lines of context around each conflict region',
+      '50'
+    )
+    .option(
+      '--send-full-file',
+      'Send full file content to AI instead of truncated context'
+    )
     .action(rebaseCmd.action);
 
   program

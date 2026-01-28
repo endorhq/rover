@@ -26,6 +26,10 @@ import {
 } from '../lib/context.js';
 import type { CommandDefinition } from '../types.js';
 import { parseAgentString } from '../utils/agent-parser.js';
+import {
+  truncateConflictContext,
+  getBlameContext,
+} from '../lib/context-optimizer.js';
 
 const { prompt } = enquirer;
 
@@ -124,7 +128,9 @@ const resolveRebaseConflicts = async (
   conflictedFiles: string[],
   aiAgent: AIAgentTool,
   worktreePath: string,
-  concurrency: number = 4
+  concurrency: number = 4,
+  contextLines: number = 50,
+  sendFullFile: boolean = false
 ): Promise<{ success: boolean; failureReason?: string }> => {
   let spinner;
 
@@ -135,14 +141,17 @@ const resolveRebaseConflicts = async (
   }
 
   try {
-    // Compute diff context once before the loop
     const currentBranchName = git.getCurrentBranch({ worktreePath });
-    const diffContext = git
-      .getRecentCommits({
-        branch: currentBranchName === 'unknown' ? 'HEAD' : currentBranchName,
-        worktreePath,
-      })
-      .join('\n');
+    // Fallback diff context for --send-full-file mode
+    const fallbackDiffContext = sendFullFile
+      ? git
+          .getRecentCommits({
+            branch:
+              currentBranchName === 'unknown' ? 'HEAD' : currentBranchName,
+            worktreePath,
+          })
+          .join('\n')
+      : '';
 
     const failures: string[] = [];
     let resolvedCount = 0;
@@ -156,7 +165,38 @@ const resolveRebaseConflicts = async (
           return;
         }
 
-        const conflictedContent = readFileSync(fullPath, 'utf8');
+        const rawContent = readFileSync(fullPath, 'utf8');
+
+        let conflictedContent: string;
+        let diffContext: string;
+
+        if (sendFullFile) {
+          conflictedContent = rawContent;
+          diffContext = fallbackDiffContext;
+        } else {
+          const truncated = truncateConflictContext(rawContent, contextLines);
+          conflictedContent = truncated.content;
+          diffContext = getBlameContext(
+            git,
+            filePath,
+            truncated.conflictRegions,
+            { ours: 'HEAD', theirs: 'REBASE_HEAD' },
+            worktreePath
+          );
+          if (!diffContext) {
+            diffContext =
+              fallbackDiffContext ||
+              git
+                .getRecentCommits({
+                  branch:
+                    currentBranchName === 'unknown'
+                      ? 'HEAD'
+                      : currentBranchName,
+                  worktreePath,
+                })
+                .join('\n');
+          }
+        }
 
         try {
           const resolvedContent = await aiAgent.resolveMergeConflicts(
@@ -216,6 +256,8 @@ const resolveRebaseConflicts = async (
 interface RebaseOptions {
   agent?: string;
   concurrency?: string;
+  contextLines?: string;
+  sendFullFile?: boolean;
   force?: boolean;
   json?: boolean;
 }
@@ -508,12 +550,15 @@ const rebaseCommand = async (taskId: string, options: RebaseOptions = {}) => {
           }
 
           const concurrency = parseInt(options.concurrency || '4', 10);
+          const contextLinesNum = parseInt(options.contextLines || '50', 10);
           const resolution = await resolveRebaseConflicts(
             git,
             rebaseConflicts,
             aiAgent,
             task.worktreePath,
-            concurrency
+            concurrency,
+            contextLinesNum,
+            options.sendFullFile === true
           );
 
           if (resolution.success) {
