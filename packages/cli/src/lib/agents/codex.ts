@@ -29,6 +29,11 @@ class CodexAI implements AIAgentTool {
   // constants
   public AGENT_BIN = 'codex';
   private promptBuilder = new PromptBuilder('codex');
+  private model?: string;
+
+  constructor(model?: string) {
+    this.model = model;
+  }
 
   async checkAgent(): Promise<void> {
     try {
@@ -45,6 +50,11 @@ class CodexAI implements AIAgentTool {
   ): Promise<string> {
     const answerTmpFile = fileSync();
     const codexArgs = ['exec', '--output-last-message', answerTmpFile.name];
+
+    if (this.model) {
+      codexArgs.push('--model', this.model);
+    }
+
     if (json) {
       // Codex does not have any way to force the JSON output at CLI level.
       // Trying to force it via prompting
@@ -129,6 +139,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
         .filter((line: string) => line.trim() !== '');
       return lines[0] || null;
     } catch (error) {
+      console.error('Failed to generate commit message with Codex:', error);
       return null;
     }
   }
@@ -148,7 +159,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
 
       return response;
     } catch (err) {
-      return null;
+      throw err;
     }
   }
 

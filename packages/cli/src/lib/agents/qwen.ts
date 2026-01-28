@@ -34,6 +34,11 @@ class QwenAI implements AIAgentTool {
   // constants
   public AGENT_BIN = 'qwen';
   private promptBuilder = new PromptBuilder('qwen');
+  private model?: string;
+
+  constructor(model?: string) {
+    this.model = model;
+  }
 
   async checkAgent(): Promise<void> {
     try {
@@ -49,6 +54,10 @@ class QwenAI implements AIAgentTool {
     cwd?: string
   ): Promise<string> {
     const qwenArgs = ['-p'];
+
+    if (this.model) {
+      qwenArgs.push('--model', this.model);
+    }
 
     if (json) {
       // Qwen does not have any way to force the JSON output at CLI level.
@@ -132,6 +141,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
         .filter((line: string) => line.trim() !== '');
       return lines[0] || null;
     } catch (error) {
+      console.error('Failed to generate commit message with Qwen:', error);
       return null;
     }
   }
@@ -151,7 +161,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
 
       return response;
     } catch (err) {
-      return null;
+      throw err;
     }
   }
 
