@@ -7,9 +7,21 @@ export class GitHubError extends Error {
   }
 }
 
+type GitHubComment = {
+  author: string;
+  body: string;
+  createdAt: string;
+};
+
 type GitHubIssueResult = {
   title: string;
   body: string;
+  comments?: GitHubComment[];
+};
+
+type FetchIssueOptions = {
+  includeComments?: boolean;
+  since?: string;
 };
 
 export type GitHubOptions = {
@@ -49,13 +61,20 @@ export class GitHub {
    * Fetch the GitHub issue title and body from the given issue number and
    * remote URL. It will try to use the gh CLI and the API as a fallback.
    *
+   * @param number - The issue number
+   * @param remoteUrl - The remote URL of the repository
+   * @param options - Optional configuration for fetching
+   * @param options.includeComments - Whether to include issue comments
    * @throws GitHubError
    */
   async fetchIssue(
     number: string | number,
-    remoteUrl: string
+    remoteUrl: string,
+    options: FetchIssueOptions = {}
   ): Promise<GitHubIssueResult> {
+    const { includeComments = false, since } = options;
     const repoInfo = this.getGitHubRepoInfo(remoteUrl);
+    const jsonFields = includeComments ? 'title,body,comments' : 'title,body';
 
     if (repoInfo) {
       // First, CLI. If it's not available, it will fail.
@@ -66,7 +85,7 @@ export class GitHub {
         '--repo',
         `${repoInfo.owner}/${repoInfo.repo}`,
         '--json',
-        'title,body',
+        jsonFields,
       ]);
 
       if (result.failed || result.stdout == null) {
@@ -87,10 +106,22 @@ export class GitHub {
           }
 
           const issue = await response.json();
-          return {
+          const issueResult: GitHubIssueResult = {
             title: issue.title || '',
             body: issue.body || '',
           };
+
+          // Fetch comments if requested
+          if (includeComments) {
+            issueResult.comments = await this.fetchIssueComments(
+              repoInfo.owner,
+              repoInfo.repo,
+              number,
+              since
+            );
+          }
+
+          return issueResult;
         } catch (err) {
           if (err instanceof GitHubError) {
             throw err;
@@ -103,10 +134,24 @@ export class GitHub {
         // Return the data
         try {
           const issue = JSON.parse(result.stdout.toString());
-          return {
+          const issueResult: GitHubIssueResult = {
             title: issue.title,
             body: issue.body || '',
           };
+
+          // Parse comments from gh CLI response
+          if (includeComments && issue.comments) {
+            let comments = this.parseGhCliComments(issue.comments);
+            if (since) {
+              const sinceDate = new Date(since);
+              comments = comments.filter(
+                c => new Date(c.createdAt) > sinceDate
+              );
+            }
+            issueResult.comments = comments;
+          }
+
+          return issueResult;
         } catch (_err) {
           throw new GitHubError(
             'The GitHub CLI returned an invalid JSON response: ' + result.stdout
@@ -123,7 +168,7 @@ export class GitHub {
 
       const result = await launch(
         'gh',
-        ['issue', 'view', number.toString(), '--json', 'title,body'],
+        ['issue', 'view', number.toString(), '--json', jsonFields],
         { cwd: this.cwd }
       );
 
@@ -133,16 +178,91 @@ export class GitHub {
         // Return the data
         try {
           const issue = JSON.parse(result.stdout.toString());
-          return {
+          const issueResult: GitHubIssueResult = {
             title: issue.title,
             body: issue.body || '',
           };
+
+          // Parse comments from gh CLI response
+          if (includeComments && issue.comments) {
+            let comments = this.parseGhCliComments(issue.comments);
+            if (since) {
+              const sinceDate = new Date(since);
+              comments = comments.filter(
+                c => new Date(c.createdAt) > sinceDate
+              );
+            }
+            issueResult.comments = comments;
+          }
+
+          return issueResult;
         } catch (_err) {
           throw new GitHubError(
             'The GitHub CLI returned an invalid JSON response: ' + result.stdout
           );
         }
       }
+    }
+  }
+
+  /**
+   * Parse comments from gh CLI JSON response format
+   */
+  private parseGhCliComments(
+    comments: Array<{
+      author?: { login?: string };
+      body?: string;
+      createdAt?: string;
+    }>
+  ): GitHubComment[] {
+    return comments.map(comment => ({
+      author: comment.author?.login || 'unknown',
+      body: comment.body || '',
+      createdAt: comment.createdAt || '',
+    }));
+  }
+
+  /**
+   * Fetch comments for an issue using the GitHub API
+   */
+  private async fetchIssueComments(
+    owner: string,
+    repo: string,
+    issueNumber: string | number,
+    since?: string
+  ): Promise<GitHubComment[]> {
+    try {
+      let apiUrl = `https://api.github.com/repos/${owner}/${repo}/issues/${issueNumber}/comments`;
+      if (since) {
+        apiUrl += `?since=${encodeURIComponent(since)}`;
+      }
+      const response = await fetch(apiUrl, {
+        headers: {
+          'User-Agent': 'Rover-CLI',
+          Accept: 'application/vnd.github.v3+json',
+        },
+      });
+
+      if (!response.ok) {
+        // Non-fatal: return empty comments array if we can't fetch them
+        return [];
+      }
+
+      const comments = await response.json();
+      return comments.map(
+        (comment: {
+          user?: { login?: string };
+          body?: string;
+          created_at?: string;
+        }) => ({
+          author: comment.user?.login || 'unknown',
+          body: comment.body || '',
+          createdAt: comment.created_at || '',
+        })
+      );
+    } catch (_err) {
+      // Non-fatal: return empty comments array if we can't fetch them
+      return [];
     }
   }
 
@@ -168,3 +288,35 @@ export class GitHub {
     return null;
   }
 }
+
+/**
+ * Format a date string to a more readable format (YYYY-MM-DD)
+ */
+export const formatCommentDate = (dateString: string): string => {
+  if (!dateString) return '';
+  try {
+    const date = new Date(dateString);
+    return date.toISOString().split('T')[0];
+  } catch {
+    return dateString;
+  }
+};
+
+/**
+ * Format GitHub comments as markdown to append to the issue body
+ */
+export const formatCommentsAsMarkdown = (
+  comments: Array<{ author: string; body: string; createdAt: string }>
+): string => {
+  if (!comments || comments.length === 0) return '';
+
+  const formattedComments = comments
+    .map(comment => {
+      const date = formatCommentDate(comment.createdAt);
+      const dateStr = date ? ` (${date})` : '';
+      return `**@${comment.author}**${dateStr}:\n${comment.body}`;
+    })
+    .join('\n\n');
+
+  return `\n\n---\n## Comments\n\n${formattedComments}`;
+};

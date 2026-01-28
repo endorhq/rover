@@ -718,6 +718,14 @@ export class TaskDescriptionManager {
     return this.data.onCompleteHookFiredForStatus;
   }
 
+  /**
+   * Update task source metadata
+   */
+  updateSource(source: TaskDescription['source']): void {
+    this.data.source = source;
+    this.save();
+  }
+
   // ============================================================
   // Data Modification (Setters)
   // ============================================================

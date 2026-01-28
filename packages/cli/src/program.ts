@@ -243,6 +243,10 @@ export function createProgram(
       '--from-github <issue>',
       'Fetch task description from a GitHub issue number'
     )
+    .option(
+      '--include-comments',
+      'Include issue comments in the task description (requires --from-github)'
+    )
     .addOption(
       new Option(
         '--workflow, -w <name>',
@@ -378,6 +382,14 @@ export function createProgram(
       'Open an interactive command session to iterate on the task'
     )
     .option('--json', 'Output JSON and skip confirmation prompts')
+    .option(
+      '--from-github <issue>',
+      'GitHub issue number to fetch comments from'
+    )
+    .option(
+      '--include-comments',
+      'Include new GitHub issue comments in iteration instructions'
+    )
     .action(iterateCmd.action);
 
   program

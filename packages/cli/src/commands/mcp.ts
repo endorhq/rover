@@ -100,6 +100,7 @@ const mcpCommand = async () => {
   const taskSchema = z.object({
     initPrompt: z.string(),
     fromGithub: z.string().optional(),
+    includeComments: z.boolean().optional(),
     sourceBranch: z.string().optional(),
     targetBranch: z.string().optional(),
     agent: z.nativeEnum(AI_AGENT).optional(),
@@ -116,6 +117,7 @@ const mcpCommand = async () => {
       const parsed = taskSchema.parse(args);
       return runCommand(taskCmd.action, [parsed.initPrompt], {
         fromGithub: parsed.fromGithub,
+        includeComments: parsed.includeComments,
         yes: true,
         sourceBranch: parsed.sourceBranch,
         targetBranch: parsed.targetBranch,
@@ -277,6 +279,8 @@ const mcpCommand = async () => {
   const iterateSchema = z.object({
     taskId: z.string(),
     instructions: z.string().optional(),
+    fromGithub: z.string().optional(),
+    includeComments: z.boolean().optional(),
   });
 
   server.registerTool(
@@ -289,10 +293,14 @@ const mcpCommand = async () => {
     },
     async args => {
       const parsed = iterateSchema.parse(args);
-      return runCommand(iterateCmd.action, [
-        parsed.taskId,
-        parsed.instructions,
-      ]);
+      return runCommand(
+        iterateCmd.action,
+        [parsed.taskId, parsed.instructions],
+        {
+          fromGithub: parsed.fromGithub,
+          includeComments: parsed.includeComments,
+        }
+      );
     }
   );
 

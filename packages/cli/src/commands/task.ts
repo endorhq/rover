@@ -32,7 +32,11 @@ import { NewTaskProvider } from 'rover-telemetry';
 import { readFromStdin, stdinIsAvailable } from '../utils/stdin.js';
 import type { CLIJsonOutput } from '../types.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
-import { GitHub, GitHubError } from '../lib/github.js';
+import {
+  GitHub,
+  GitHubError,
+  formatCommentsAsMarkdown,
+} from '../lib/github.js';
 import { copyEnvironmentFiles } from '../utils/env-files.js';
 import { initWorkflowStore } from '../lib/workflow.js';
 import {
@@ -208,6 +212,7 @@ interface TaskTaskOutput extends CLIJsonOutput {
 interface TaskOptions {
   workflow?: string;
   fromGithub?: string;
+  includeComments?: boolean;
   yes?: boolean;
   sourceBranch?: string;
   targetBranch?: string;
@@ -477,7 +482,15 @@ const createTaskForAgent = async (
 const taskCommand = async (initPrompt?: string, options: TaskOptions = {}) => {
   const telemetry = getTelemetry();
   // Extract options
-  const { yes, json, fromGithub, sourceBranch, targetBranch, agent } = options;
+  const {
+    yes,
+    json,
+    fromGithub,
+    includeComments,
+    sourceBranch,
+    targetBranch,
+    agent,
+  } = options;
 
   // Set global JSON mode for tests and backwards compatibility
   if (json !== undefined) {
@@ -489,6 +502,21 @@ const taskCommand = async (initPrompt?: string, options: TaskOptions = {}) => {
   const jsonOutput: TaskTaskOutput = {
     success: false,
   };
+
+  // Validate --include-comments requires --from-github
+  if (includeComments && !fromGithub) {
+    jsonOutput.error =
+      '--include-comments requires --from-github to be specified';
+    await exitWithError(jsonOutput, {
+      tips: [
+        'Use ' +
+          colors.cyan('rover task --from-github <issue> --include-comments') +
+          ' to include issue comments',
+      ],
+      telemetry: getTelemetry(),
+    });
+    return;
+  }
 
   // Get project context
   let project;
@@ -685,9 +713,22 @@ const taskCommand = async (initPrompt?: string, options: TaskOptions = {}) => {
       }
 
       try {
-        const issueData = await github.fetchIssue(fromGithub, remoteUrl);
+        const issueData = await github.fetchIssue(fromGithub, remoteUrl, {
+          includeComments,
+        });
         if (issueData) {
+          // Start with the issue body
           description = issueData.body;
+
+          // Append comments if they were included
+          if (
+            includeComments &&
+            issueData.comments &&
+            issueData.comments.length > 0
+          ) {
+            description += formatCommentsAsMarkdown(issueData.comments);
+          }
+
           inputsData.set('description', description);
 
           if (!issueData.body || issueData.body.length == 0) {

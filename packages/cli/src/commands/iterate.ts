@@ -24,6 +24,8 @@ import type { CLIJsonOutput } from '../types.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
 import { readFromStdin, stdinIsAvailable } from '../utils/stdin.js';
 import type { CommandDefinition } from '../types.js';
+import { GitHub, formatCommentsAsMarkdown } from '../lib/github.js';
+import { Git } from 'rover-core';
 
 const { prompt } = enquirer;
 
@@ -50,6 +52,8 @@ type IterationContext = {
 interface IterateOptions {
   json?: boolean;
   interactive?: boolean;
+  fromGithub?: string;
+  includeComments?: boolean;
 }
 
 /**
@@ -276,6 +280,76 @@ const iterateCommand = async (
     }
 
     result.instructions = finalInstructions;
+
+    // Fetch GitHub issue comments if requested
+    if (options.includeComments) {
+      const issueNumber = options.fromGithub || task.source?.id;
+      if (!issueNumber) {
+        exitWithError(
+          {
+            ...result,
+            error:
+              '--include-comments requires a GitHub issue source. Use --from-github <issue> or create the task with --from-github.',
+          },
+          { telemetry }
+        );
+        return;
+      }
+
+      try {
+        const git = new Git({ cwd: project.path });
+        const remoteUrl = git.remoteUrl() || '';
+        const github = new GitHub({ cwd: project.path });
+
+        // Determine since: use stored timestamp if same issue
+        const since =
+          task.source?.lastCommentFetchedAt && task.source?.id === issueNumber
+            ? task.source.lastCommentFetchedAt
+            : undefined;
+
+        const issueData = await github.fetchIssue(issueNumber, remoteUrl, {
+          includeComments: true,
+          since,
+        });
+
+        if (issueData.comments && issueData.comments.length > 0) {
+          const commentsMarkdown = formatCommentsAsMarkdown(issueData.comments);
+          finalInstructions = finalInstructions
+            ? `${finalInstructions}\n${commentsMarkdown}`
+            : commentsMarkdown.trim();
+          result.instructions = finalInstructions;
+
+          if (!isJsonMode()) {
+            console.log(
+              colors.green(
+                `  Fetched ${issueData.comments.length} new comment(s) from issue #${issueNumber}`
+              )
+            );
+          }
+        } else if (!isJsonMode()) {
+          console.log(
+            colors.gray(`  No new comments found on issue #${issueNumber}`)
+          );
+        }
+
+        // Update the lastCommentFetchedAt timestamp and store issue id
+        task.updateSource({
+          ...task.source,
+          type: task.source?.type || 'github',
+          id: task.source?.id || String(issueNumber),
+          lastCommentFetchedAt: new Date().toISOString(),
+        });
+      } catch (error) {
+        // Non-fatal: warn and continue without comments
+        if (!isJsonMode()) {
+          console.log(
+            colors.yellow(
+              `  Warning: Could not fetch GitHub comments: ${error instanceof Error ? error.message : String(error)}`
+            )
+          );
+        }
+      }
+    }
 
     try {
       // Load AI agent selection - prefer task's agent or fall back to user settings
