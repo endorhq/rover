@@ -43,12 +43,6 @@ Rover will:
 
 Depending on the task complexity, it might take a few minutes. Meanwhile, you **can create new tasks and run them in parallel** or simply relax, step back and do some other work, whether on your computer or away from it!
 
-Although it's not required, we recommend running `rover init` in your project to generate an initial configuration:
-
-```sh
-rover init
-```
-
 ## Why Rover?
 
 Running and managing multiple AI coding agents simultaneously can be overwhelming. You need to run them isolated from each other and they constantly ask for attention. **Context switching quickly becomes a productivity drain**.
@@ -198,6 +192,14 @@ Rover is available on the [VSCode Marketplace](https://marketplace.visualstudio.
 If the Rover CLI is not in the `PATH`, the extension will guide you through the setup process. Once everything is ready, you will be able to create your first task!
 
 See the [VSCode documentation site](https://docs.endor.dev/rover/vscode-extension/).
+
+### Configuration
+
+Although it's not required, we recommend running `rover init` in your project to generate an initial configuration:
+
+```sh
+rover init
+```
 
 ## How it works
 
