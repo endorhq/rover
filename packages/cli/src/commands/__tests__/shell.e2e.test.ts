@@ -87,25 +87,6 @@ exit 0
     });
   };
 
-  const waitForTaskStatus = async (
-    taskId: number,
-    expectedStatuses: string[],
-    timeoutMs: number = 600000
-  ): Promise<string> => {
-    const startTime = Date.now();
-    while (Date.now() - startTime < timeoutMs) {
-      const result = await runRover(['inspect', String(taskId), '--json']);
-      if (result.exitCode === 0) {
-        const output = JSON.parse(result.stdout);
-        if (expectedStatuses.includes(output.status)) return output.status;
-      }
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    }
-    throw new Error(
-      `Timeout waiting for task ${taskId} to reach one of statuses: ${expectedStatuses.join(', ')}`
-    );
-  };
-
   beforeEach(async () => {
     originalCwd = process.cwd();
     originalPath = process.env.PATH || '';
@@ -156,15 +137,18 @@ exit 0
     rmSync(testDir, { recursive: true, force: true });
   });
 
-  // TODO: These tests require waitForTaskStatus which hangs with mock Docker
-  // because tasks never reach the expected status without a real agent
-  describe.skip('local shell', () => {
+  describe('local shell', () => {
     it('should verify the task has a valid worktree path for local shell access', async () => {
       // Create a task
-      await runRover(['task', '-y', 'Create a hello world script', '--json']);
-      await waitForTaskStatus(1, ['IN_PROGRESS', 'COMPLETED', 'FAILED']);
+      const taskResult = await runRover([
+        'task',
+        '-y',
+        'Create a hello world script',
+        '--json',
+      ]);
+      expect(taskResult.exitCode).toBe(0);
 
-      // Inspect the task to verify worktree exists
+      // Inspect the task to verify worktree exists (no need to wait for status)
       const inspectResult = await runRover(['inspect', '1', '--json']);
       expect(inspectResult.exitCode).toBe(0);
 
@@ -176,15 +160,19 @@ exit 0
         expect(existsSync(task.worktreePath)).toBe(true);
       }
     });
+
+    it('should fail gracefully when task does not exist', async () => {
+      // Try to shell into a non-existent task
+      const result = await runRover(['shell', '999']);
+
+      // Should fail because task doesn't exist
+      expect(result.exitCode).not.toBe(0);
+    });
   });
 
-  describe.skip('container shell', () => {
+  describe('container shell', () => {
     it('should have --container flag available for container-based shell access', async () => {
-      // Create a task
-      await runRover(['task', '-y', 'Create a hello world script', '--json']);
-      await waitForTaskStatus(1, ['IN_PROGRESS', 'COMPLETED', 'FAILED']);
-
-      // Verify the shell command is recognized (help output)
+      // Verify the shell command is recognized and has --container flag (help output)
       const helpResult = await runRover(['shell', '--help']);
       expect(helpResult.exitCode).toBe(0);
       expect(helpResult.stdout).toContain('container');

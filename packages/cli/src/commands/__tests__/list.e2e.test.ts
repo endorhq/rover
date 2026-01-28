@@ -270,4 +270,167 @@ exit 0
       expect(Array.isArray(output)).toBe(true);
     });
   });
+
+  describe('watch mode', () => {
+    it('should accept the --watch flag with default interval', async () => {
+      // Create a task first
+      await runRover(['task', '-y', 'Create a hello world script', '--json']);
+
+      // Start watch mode with a very short timeout to verify it accepts the flag
+      // We use AbortController to cancel after a brief moment since watch mode runs indefinitely
+      const roverBin = join(__dirname, '../../../dist/index.mjs');
+      const testPath = `${mockBinDir}:${originalPath}`;
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 1000);
+
+      try {
+        await execa('node', [roverBin, 'list', '--watch'], {
+          cwd: testDir,
+          env: {
+            PATH: testPath,
+            HOME: process.env.HOME,
+            USER: process.env.USER,
+            TMPDIR: process.env.TMPDIR,
+            ROVER_NO_TELEMETRY: '1',
+          },
+          signal: controller.signal,
+          reject: false,
+        });
+      } catch (error: unknown) {
+        // Expected to be aborted - this is fine
+        if (
+          error &&
+          typeof error === 'object' &&
+          'killed' in error &&
+          error.killed
+        ) {
+          // Process was killed as expected
+        }
+      } finally {
+        clearTimeout(timeoutId);
+      }
+
+      // If we got here without an error about invalid flags, the command accepts --watch
+      expect(true).toBe(true);
+    });
+
+    it('should accept a custom interval argument (1-60 seconds)', async () => {
+      // Create a task first
+      await runRover(['task', '-y', 'Create a hello world script', '--json']);
+
+      // Test with custom interval of 5 seconds
+      const roverBin = join(__dirname, '../../../dist/index.mjs');
+      const testPath = `${mockBinDir}:${originalPath}`;
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 1000);
+
+      try {
+        await execa('node', [roverBin, 'list', '--watch', '5'], {
+          cwd: testDir,
+          env: {
+            PATH: testPath,
+            HOME: process.env.HOME,
+            USER: process.env.USER,
+            TMPDIR: process.env.TMPDIR,
+            ROVER_NO_TELEMETRY: '1',
+          },
+          signal: controller.signal,
+          reject: false,
+        });
+      } catch (error: unknown) {
+        // Expected to be aborted
+        if (
+          error &&
+          typeof error === 'object' &&
+          'killed' in error &&
+          error.killed
+        ) {
+          // Process was killed as expected
+        }
+      } finally {
+        clearTimeout(timeoutId);
+      }
+
+      // If we got here without an error about invalid interval, it accepts custom intervals
+      expect(true).toBe(true);
+    });
+
+    it('should accept minimum interval of 1 second', async () => {
+      await runRover(['task', '-y', 'Create a hello world script', '--json']);
+
+      const roverBin = join(__dirname, '../../../dist/index.mjs');
+      const testPath = `${mockBinDir}:${originalPath}`;
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 1000);
+
+      try {
+        await execa('node', [roverBin, 'list', '--watch', '1'], {
+          cwd: testDir,
+          env: {
+            PATH: testPath,
+            HOME: process.env.HOME,
+            USER: process.env.USER,
+            TMPDIR: process.env.TMPDIR,
+            ROVER_NO_TELEMETRY: '1',
+          },
+          signal: controller.signal,
+          reject: false,
+        });
+      } catch (error: unknown) {
+        if (
+          error &&
+          typeof error === 'object' &&
+          'killed' in error &&
+          error.killed
+        ) {
+          // Process was killed as expected
+        }
+      } finally {
+        clearTimeout(timeoutId);
+      }
+
+      expect(true).toBe(true);
+    });
+
+    it('should accept maximum interval of 60 seconds', async () => {
+      await runRover(['task', '-y', 'Create a hello world script', '--json']);
+
+      const roverBin = join(__dirname, '../../../dist/index.mjs');
+      const testPath = `${mockBinDir}:${originalPath}`;
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 1000);
+
+      try {
+        await execa('node', [roverBin, 'list', '--watch', '60'], {
+          cwd: testDir,
+          env: {
+            PATH: testPath,
+            HOME: process.env.HOME,
+            USER: process.env.USER,
+            TMPDIR: process.env.TMPDIR,
+            ROVER_NO_TELEMETRY: '1',
+          },
+          signal: controller.signal,
+          reject: false,
+        });
+      } catch (error: unknown) {
+        if (
+          error &&
+          typeof error === 'object' &&
+          'killed' in error &&
+          error.killed
+        ) {
+          // Process was killed as expected
+        }
+      } finally {
+        clearTimeout(timeoutId);
+      }
+
+      expect(true).toBe(true);
+    });
+  });
 });

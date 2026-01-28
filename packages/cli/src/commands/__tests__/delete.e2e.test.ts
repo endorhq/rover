@@ -251,15 +251,21 @@ exit 0
     });
   });
 
-  describe.skip('alias support', () => {
-    it('should work with the del alias', async () => {
-      await runRover(['task', '-y', 'Create a hello world script', '--json']);
-      await waitForTaskStatus(1, ['IN_PROGRESS', 'COMPLETED', 'FAILED']);
-      await runRover(['stop', '1']);
+  describe('alias support', () => {
+    it('should recognize the del alias', async () => {
+      // Verify the del alias is recognized by checking help output
+      const helpResult = await runRover(['del', '--help']);
 
-      const deleteResult = await runRover(['del', '1', '--yes', '--json']);
+      expect(helpResult.exitCode).toBe(0);
+      expect(helpResult.stdout).toContain('delete');
+    });
 
-      expect(deleteResult.exitCode).toBe(0);
+    it('should fail gracefully for non-existent task with del alias', async () => {
+      // Try to delete a non-existent task using the alias
+      const deleteResult = await runRover(['del', '999', '--yes', '--json']);
+
+      // Should fail because task doesn't exist
+      expect(deleteResult.exitCode).not.toBe(0);
     });
   });
 });

@@ -207,12 +207,37 @@ exit 0
   //   });
   // });
 
-  // describe('alias support', () => {
-  //   it('should work with the iter alias', async () => {
-  //     await runRover(['task', '-y', 'Create a hello world script']);
-  //     await waitForTaskStatus(1, ['COMPLETED', 'FAILED']);
-  //     const result = await runRover(['iter', '1', 'Add error handling', '--json']);
-  //     expect(result.exitCode).toBeDefined();
-  //   });
-  // });
+  describe('alias support', () => {
+    it('should recognize the iter alias', async () => {
+      // Verify the iter alias is recognized by checking help output
+      const helpResult = await runRover(['iter', '--help']);
+
+      expect(helpResult.exitCode).toBe(0);
+      expect(helpResult.stdout).toContain('iterate');
+    });
+
+    it('should require a task ID when using the iter alias', async () => {
+      // Using iter without a task ID should fail gracefully
+      const result = await runRover(['iter']);
+
+      // Should fail because no task ID was provided
+      expect(result.exitCode).not.toBe(0);
+    });
+
+    it('should report error for non-existent task with iter alias', async () => {
+      // Create a task first so the project is properly initialized
+      await runRover(['task', '-y', 'Create a hello world script', '--json']);
+
+      // Try to iterate on a non-existent task using the alias
+      const result = await runRover([
+        'iter',
+        '999',
+        'Add error handling',
+        '--json',
+      ]);
+
+      // Should fail because task 999 doesn't exist
+      expect(result.exitCode).not.toBe(0);
+    });
+  });
 });
