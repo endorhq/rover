@@ -1,13 +1,15 @@
 {
   "name": "rover-workspace",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "author": "The Endor Team <hello@endor.dev>",
   "engines": {
     "pnpm": ">=10",
     "node": ">=20"
   },
   "packageManager": "pnpm@10.25.0",
-  "workspaces": ["packages/*"],
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "dev": "pnpm --filter './packages/*' -r --parallel dev",
     "build": "pnpm -r --filter './packages/*' build",
