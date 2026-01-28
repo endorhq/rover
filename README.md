@@ -49,11 +49,6 @@ Although it's not required, we recommend running `rover init` in your project to
 rover init
 ```
 
-This step is optional — Rover works out of the box without any configuration. `rover init` generates two configuration files:
-
-- **`rover.json`** — Project-wide settings (languages, environment variables, hooks, MCP servers) shared with your team via version control. See the [project configuration docs](https://docs.endor.dev/rover/config/project-config/).
-- **`.rover/settings.json`** — Personal preferences (default agent, model selection, watch interval) that stay local and are not committed to version control. See the [user settings docs](https://docs.endor.dev/rover/config/user-settings/).
-
 ## Why Rover?
 
 Running and managing multiple AI coding agents simultaneously can be overwhelming. You need to run them isolated from each other and they constantly ask for attention. **Context switching quickly becomes a productivity drain**.
