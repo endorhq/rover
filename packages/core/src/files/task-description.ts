@@ -741,6 +741,12 @@ export class TaskDescriptionManager {
   /**
    * Set agent image
    */
+  setAgent(agent: string, model?: string): void {
+    this.data.agent = agent;
+    this.data.agentModel = model;
+    this.save();
+  }
+
   setAgentImage(agentImage: string): void {
     this.data.agentImage = agentImage;
     this.save();

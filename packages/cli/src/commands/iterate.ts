@@ -14,8 +14,10 @@ import { TaskNotFoundError } from 'rover-schemas';
 import {
   getAIAgentTool,
   getUserAIAgent,
+  getUserDefaultModel,
   type AIAgentTool,
 } from '../lib/agents/index.js';
+import { parseAgentString } from '../utils/agent-parser.js';
 import { isJsonMode, requireProjectContext } from '../lib/context.js';
 import type { IPromptTask } from '../lib/prompts/index.js';
 import { createSandbox } from '../lib/sandbox/index.js';
@@ -50,6 +52,7 @@ type IterationContext = {
 interface IterateOptions {
   json?: boolean;
   interactive?: boolean;
+  agent?: string;
 }
 
 /**
@@ -278,11 +281,20 @@ const iterateCommand = async (
     result.instructions = finalInstructions;
 
     try {
-      // Load AI agent selection - prefer task's agent or fall back to user settings
-      let selectedAiAgent = task.agent || AI_AGENT.Claude; // Use task agent if available
+      // Load AI agent selection - prefer CLI flag, then task's agent, then user settings
+      let selectedAiAgent: string;
+      let selectedModel: string | undefined;
 
-      if (!task.agent) {
-        // No agent stored in task, try user settings
+      if (options.agent) {
+        const parsed = parseAgentString(options.agent);
+        selectedAiAgent = parsed.agent;
+        selectedModel = parsed.model ?? getUserDefaultModel(parsed.agent);
+        task.setAgent(selectedAiAgent, selectedModel);
+      } else if (task.agent) {
+        selectedAiAgent = task.agent;
+        selectedModel = task.agentModel;
+      } else {
+        selectedAiAgent = AI_AGENT.Claude;
         try {
           selectedAiAgent = getUserAIAgent();
         } catch (_err) {
