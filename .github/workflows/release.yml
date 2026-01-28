@@ -98,7 +98,7 @@ jobs:
           if [ "$CURRENT_VERSION" == "$TARGET_VERSION" ]; then
             echo "Version already set to $TARGET_VERSION, skipping bump"
           else
-            pnpm version "$TARGET_VERSION"
+            pnpm version "$TARGET_VERSION" --no-workspaces-update
           fi
         working-directory: ./packages/${{ inputs.project }}
 
@@ -111,7 +111,7 @@ jobs:
           if [ "$CURRENT_VERSION" == "$TARGET_VERSION" ]; then
             echo "Version already set to $TARGET_VERSION, skipping bump"
           else
-            pnpm version "$TARGET_VERSION"
+            pnpm version "$TARGET_VERSION" --no-workspaces-update
           fi
         working-directory: ./packages/agent
 
