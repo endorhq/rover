@@ -88,7 +88,7 @@ describe('rover init (e2e)', () => {
    */
   const runRoverInit = async (args: string[] = ['--yes']) => {
     // Find the rover CLI binary (assuming it's built)
-    const roverBin = join(__dirname, '../../../dist/index.js');
+    const roverBin = join(__dirname, '../../../dist/index.mjs');
 
     // Prepend mock bin to PATH so our mocks are found FIRST
     // This allows us to override real system tools with our mocks
@@ -455,7 +455,7 @@ tasks:
       createMockToolInClone('claude', 0, 'Claude CLI v1.0.0');
 
       // Step 6: Run rover init in the cloned directory
-      const roverBin = join(__dirname, '../../../dist/index.js');
+      const roverBin = join(__dirname, '../../../dist/index.mjs');
       const clonePath = `${cloneMockBinDir}:${originalPath}`;
 
       const cloneInitResult = await execa('node', [roverBin, 'init', '--yes'], {

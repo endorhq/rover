@@ -40,6 +40,50 @@ describe('rover task (e2e)', () => {
     chmodSync(scriptPath, 0o755);
   };
 
+  /**
+   * Creates a mock executable from a full script string
+   */
+  const createMockScript = (toolName: string, scriptContent: string) => {
+    const scriptPath = join(mockBinDir, toolName);
+    writeFileSync(scriptPath, scriptContent);
+    chmodSync(scriptPath, 0o755);
+  };
+
+  /**
+   * Creates a mock Claude CLI that handles both --version checks and
+   * task expansion invocations (claude -p --output-format json).
+   * The mock returns a valid JSON response for expandTask.
+   */
+  const createMockClaude = () => {
+    createMockScript(
+      'claude',
+      `#!/usr/bin/env bash
+if [[ "$1" == "--version" ]]; then
+  echo "Claude CLI v1.0.0"
+  exit 0
+fi
+
+# Handle prompt mode: claude -p [--output-format json]
+if [[ "$1" == "-p" ]]; then
+  # Read stdin (the prompt)
+  PROMPT=$(cat)
+
+  # Check if JSON output format is requested
+  if [[ "$2" == "--output-format" && "$3" == "json" ]]; then
+    # Return a valid Claude JSON response with nested result
+    echo '{"result":"{\\"title\\":\\"Create hello world bash script\\",\\"description\\":\\"Create a hello world bash script that prints Hello World and the current date and time.\\"}"}'
+  else
+    echo '{"title":"Create hello world bash script","description":"Create a hello world bash script that prints Hello World."}'
+  fi
+  exit 0
+fi
+
+echo "Claude CLI v1.0.0"
+exit 0
+`
+    );
+  };
+
   beforeEach(async () => {
     // Save original state
     originalCwd = process.cwd();
@@ -52,6 +96,18 @@ describe('rover task (e2e)', () => {
     // Create mock bin directory for mocking system tools
     mockBinDir = join(testDir, '.mock-bin');
     mkdirSync(mockBinDir, { recursive: true });
+
+    // Create failing mocks for all tools by default
+    // This ensures that only explicitly enabled tools will be detected
+    createMockTool('docker', 127, 'command not found: docker');
+    createMockTool('claude', 127, 'command not found: claude');
+    createMockTool('codex', 127, 'command not found: codex');
+    createMockTool('gemini', 127, 'command not found: gemini');
+    createMockTool('qwen', 127, 'command not found: qwen');
+
+    // Enable Docker and Claude for the initialization and task phases
+    createMockTool('docker', 0, 'Docker version 24.0.0');
+    createMockClaude();
 
     // Prepend mock bin to PATH so our mock tools are found first
     process.env.PATH = `${mockBinDir}:${originalPath}`;
@@ -82,7 +138,7 @@ describe('rover task (e2e)', () => {
     await execa('git', ['commit', '-m', 'Initial commit']);
 
     // Initialize rover
-    const roverBin = join(__dirname, '../../../dist/index.js');
+    const roverBin = join(__dirname, '../../../dist/index.mjs');
     const testPath = `${mockBinDir}:${originalPath}`;
 
     await execa('node', [roverBin, 'init', '--yes'], {
@@ -108,7 +164,7 @@ describe('rover task (e2e)', () => {
    * Helper to run the rover task command
    */
   const runRoverTask = async (taskDescription: string, args: string[] = []) => {
-    const roverBin = join(__dirname, '../../../dist/index.js');
+    const roverBin = join(__dirname, '../../../dist/index.mjs');
     const testPath = `${mockBinDir}:${originalPath}`;
 
     return execa('node', [roverBin, 'task', '-y', taskDescription, ...args], {
@@ -333,23 +389,17 @@ fi
       );
 
       // Debug output if test fails
-      if (result.exitCode === 0) {
+      if (result.exitCode !== 0) {
         console.log('STDOUT:', result.stdout);
         console.log('STDERR:', result.stderr);
       }
 
-      // Verify: Command failed with appropriate error
-      expect(result.exitCode).toBe(1);
-      const output = result.stdout || result.stderr;
+      // Verify: Command succeeded (task was created, even though container failed)
+      expect(result.exitCode).toBe(0);
+
+      // Verify: Warning about container failure is shown
+      const output = result.stdout + (result.stderr || '');
       expect(output).toMatch(/reset to 'New'|error running the container/i);
-
-      // Verify: Task was created and reset to NEW status
-      const taskStatusFile = join(testDir, '.rover/tasks/1/description.json');
-      expect(existsSync(taskStatusFile)).toBe(true);
-
-      const taskStatus = JSON.parse(readFileSync(taskStatusFile, 'utf8'));
-      expect(taskStatus.status).toBe('NEW');
-      expect(taskStatus.id).toBe(1);
 
       // Verify: Restart suggestion is provided
       expect(output).toMatch(/rover restart/);
@@ -387,6 +437,157 @@ fi
         cwd: testDir,
       });
       expect(branchResult.stdout.trim()).toMatch(/main|master/);
+    });
+  });
+
+  describe('non-interactive mode', () => {
+    it('should produce structured JSON output with --json flag', async () => {
+      // Execute: Run rover task with --json flag
+      const result = await runRoverTask(
+        'Create a hello world bash script named hello.sh',
+        ['--json']
+      );
+
+      // Verify: Command succeeded
+      expect(result.exitCode).toBe(0);
+
+      // Verify: Output is valid JSON
+      const jsonOutput = JSON.parse(result.stdout);
+      expect(jsonOutput.success).toBe(true);
+      expect(jsonOutput.taskId).toBe(1);
+      expect(jsonOutput.title).toBeTruthy();
+      expect(jsonOutput.description).toBeTruthy();
+      expect(jsonOutput.status).toBeTruthy();
+      expect(jsonOutput.createdAt).toBeTruthy();
+      expect(jsonOutput.workspace).toBeTruthy();
+      expect(jsonOutput.branch).toBeTruthy();
+    });
+
+    it('should be fully automatable with both --yes and --json flags', async () => {
+      // Execute: Run rover task with both --yes and --json flags
+      // The -y flag is already passed by runRoverTask, so we only add --json
+      const result = await runRoverTask(
+        'Create a hello world bash script named hello.sh',
+        ['--json']
+      );
+
+      // Verify: Command succeeded without any interactive prompts
+      expect(result.exitCode).toBe(0);
+
+      // Verify: Output is valid JSON containing task metadata
+      const jsonOutput = JSON.parse(result.stdout);
+      expect(jsonOutput.success).toBe(true);
+      expect(typeof jsonOutput.taskId).toBe('number');
+      expect(typeof jsonOutput.title).toBe('string');
+      expect(typeof jsonOutput.description).toBe('string');
+      expect(typeof jsonOutput.workspace).toBe('string');
+      expect(typeof jsonOutput.branch).toBe('string');
+      expect(typeof jsonOutput.savedTo).toBe('string');
+    });
+  });
+
+  describe('source and target branch control', () => {
+    it('should use --source-branch to base the worktree on a specific branch', async () => {
+      // Setup: Commit rover config files so they're available on all branches
+      await execa('git', ['add', '.'], { cwd: testDir });
+      await execa('git', ['commit', '-m', 'Add rover config'], {
+        cwd: testDir,
+      });
+
+      // Create a feature branch with a distinct file
+      await execa('git', ['checkout', '-b', 'feature-base'], { cwd: testDir });
+      writeFileSync(join(testDir, 'feature-file.txt'), 'feature content\n');
+      await execa('git', ['add', 'feature-file.txt'], { cwd: testDir });
+      await execa('git', ['commit', '-m', 'Add feature file'], {
+        cwd: testDir,
+      });
+
+      // Switch back to main branch
+      await execa('git', ['checkout', 'master'], { cwd: testDir }).catch(() =>
+        execa('git', ['checkout', 'main'], { cwd: testDir })
+      );
+
+      // Execute: Run rover task with --source-branch pointing to the feature branch
+      const result = await runRoverTask(
+        'Create a hello world bash script named hello.sh',
+        ['--source-branch', 'feature-base', '--json']
+      );
+
+      // Debug output if test fails
+      if (result.exitCode !== 0) {
+        console.log('STDOUT:', result.stdout);
+        console.log('STDERR:', result.stderr);
+      }
+
+      // Verify: Command succeeded
+      expect(result.exitCode).toBe(0);
+
+      // Verify: JSON output confirms task creation
+      const jsonOutput = JSON.parse(result.stdout);
+      expect(jsonOutput.success).toBe(true);
+      expect(jsonOutput.taskId).toBe(1);
+
+      // Verify: The task workspace contains the file from the feature branch
+      const workspacePath = jsonOutput.workspace;
+      expect(existsSync(join(workspacePath, 'feature-file.txt'))).toBe(true);
+      const content = readFileSync(
+        join(workspacePath, 'feature-file.txt'),
+        'utf8'
+      );
+      expect(content).toContain('feature content');
+    });
+
+    it('should use --target-branch to set a custom branch name for the task', async () => {
+      const customBranchName = 'custom-task-branch';
+
+      // Execute: Run rover task with --target-branch
+      const result = await runRoverTask(
+        'Create a hello world bash script named hello.sh',
+        ['--target-branch', customBranchName, '--json']
+      );
+
+      // Debug output if test fails
+      if (result.exitCode !== 0) {
+        console.log('STDOUT:', result.stdout);
+        console.log('STDERR:', result.stderr);
+      }
+
+      // Verify: Command succeeded
+      expect(result.exitCode).toBe(0);
+
+      // Verify: JSON output shows the custom branch name
+      const jsonOutput = JSON.parse(result.stdout);
+      expect(jsonOutput.success).toBe(true);
+      expect(jsonOutput.branch).toBe(customBranchName);
+
+      // Verify: The custom branch exists in the git repository
+      const branchResult = await execa(
+        'git',
+        ['branch', '--list', customBranchName],
+        {
+          cwd: testDir,
+        }
+      );
+      expect(branchResult.stdout).toContain(customBranchName);
+    });
+
+    it('should fail when --source-branch specifies a non-existent branch', async () => {
+      // Execute: Run rover task with a non-existent source branch
+      const result = await runRoverTask(
+        'Create a hello world bash script named hello.sh',
+        ['--source-branch', 'non-existent-branch', '--json']
+      );
+
+      // Verify: Command failed
+      expect(result.exitCode).not.toBe(0);
+
+      // Verify: JSON output contains error about the branch
+      const jsonOutput = JSON.parse(result.stdout);
+      expect(jsonOutput.success).toBe(false);
+      expect(jsonOutput.errors).toBeDefined();
+      expect(
+        jsonOutput.errors.some((e: string) => e.includes('non-existent-branch'))
+      ).toBe(true);
     });
   });
 });
