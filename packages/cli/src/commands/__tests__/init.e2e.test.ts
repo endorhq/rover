@@ -61,6 +61,8 @@ describe('rover init (e2e)', () => {
     createMockTool('docker', 127, 'command not found: docker');
     createMockTool('claude', 127, 'command not found: claude');
     createMockTool('codex', 127, 'command not found: codex');
+    createMockTool('cursor', 127, 'command not found: cursor');
+    createMockTool('cursor-agent', 127, 'command not found: cursor-agent');
     createMockTool('gemini', 127, 'command not found: gemini');
     createMockTool('qwen', 127, 'command not found: qwen');
 
@@ -580,10 +582,10 @@ tasks:
       // Verify: Command succeeded
       expect(result.exitCode).toBe(0);
 
-      // Verify: .gitignore was created with .rover/ entry
+      // Verify: .gitignore was created with .rover/ entries
       expect(existsSync('.gitignore')).toBe(true);
       const gitignore = readFileSync('.gitignore', 'utf8');
-      expect(gitignore.trim()).toBe('.rover/');
+      expect(gitignore).toContain('.rover/');
     });
 
     it('should append to existing .gitignore', async () => {
