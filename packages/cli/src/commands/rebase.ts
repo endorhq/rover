@@ -660,6 +660,14 @@ const rebaseCommand = async (taskId: string, options: RebaseOptions = {}) => {
       }
 
       if (jsonOutput.rebased) {
+        // Update baseCommit so `rover diff --base` excludes upstream changes
+        const newBaseCommit = git.getCommitHash(currentBranch, {
+          worktreePath: task.worktreePath,
+        });
+        if (newBaseCommit) {
+          task.setBaseCommit(newBaseCommit);
+        }
+
         jsonOutput.success = true;
         await exitWithSuccess(
           'Task branch has been successfully rebased onto your current branch',
