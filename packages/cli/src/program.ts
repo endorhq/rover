@@ -407,6 +407,7 @@ export function createProgram(
     .option('--base', 'Compare against the base commit when task was created')
     .option('-b, --branch <name>', 'Compare changes with a specific branch')
     .option('--only-files', 'Show only changed filenames')
+    .option('--json', 'Output in JSON format')
     .action(diffCmd.action);
 
   program
