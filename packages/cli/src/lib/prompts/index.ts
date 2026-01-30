@@ -3,6 +3,7 @@ import expandIterationPrompt from './expand-iteration-instructions.md';
 import expandTaskPrompt from './expand-task.md';
 import generateCommitPrompt from './generate-commit-message.md';
 import resolveMergePrompt from './resolve-merge-conflicts.md';
+import resolveMergeRegionsPrompt from './resolve-merge-conflicts-regions.md';
 import extractGithubInputsPrompt from './extract-github-inputs.md';
 import type { WorkflowInput } from 'rover-schemas';
 
@@ -12,6 +13,7 @@ enum PROMPT_ID {
   ExpandTask = 'ExpandTask',
   GenerateCommit = 'GenerateCommit',
   ResolveMerge = 'ResolveMerge',
+  ResolveMergeRegions = 'ResolveMergeRegions',
   ExtractGithubInputs = 'ExtractGithubInputs',
 }
 
@@ -20,6 +22,7 @@ const PROMPT_CONTENT: Record<PROMPT_ID, string> = {
   [PROMPT_ID.ExpandTask]: expandTaskPrompt,
   [PROMPT_ID.GenerateCommit]: generateCommitPrompt,
   [PROMPT_ID.ResolveMerge]: resolveMergePrompt,
+  [PROMPT_ID.ResolveMergeRegions]: resolveMergeRegionsPrompt,
   [PROMPT_ID.ExtractGithubInputs]: extractGithubInputsPrompt,
 };
 
@@ -217,6 +220,20 @@ ${summaries.join('\n')}
       filePath,
       diffContext,
       conflictedContent,
+    });
+  }
+
+  resolveMergeConflictsRegionsPrompt(
+    filePath: string,
+    diffContext: string,
+    conflictedContent: string,
+    regionCount: number
+  ): string {
+    return this.loadTemplate(PROMPT_ID.ResolveMergeRegions, {
+      filePath,
+      diffContext,
+      conflictedContent,
+      regionCount: regionCount.toString(),
     });
   }
 

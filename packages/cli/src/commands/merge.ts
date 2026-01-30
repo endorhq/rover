@@ -20,6 +20,8 @@ import { executeHooks } from '../lib/hooks.js';
 import {
   truncateConflictContext,
   getBlameContext,
+  parseResolvedRegions,
+  reconstructFile,
 } from '../lib/context-optimizer.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { showRoverChat, showTips } from '../utils/display.js';
@@ -167,17 +169,19 @@ const resolveMergeConflicts = async (
 
         let conflictedContent: string;
         let diffContext: string;
+        const truncated = sendFullFile
+          ? null
+          : truncateConflictContext(rawContent, contextLines);
 
         if (sendFullFile) {
           conflictedContent = rawContent;
           diffContext = fallbackDiffContext;
         } else {
-          const truncated = truncateConflictContext(rawContent, contextLines);
-          conflictedContent = truncated.content;
+          conflictedContent = truncated!.content;
           diffContext = getBlameContext(
             git,
             filePath,
-            truncated.conflictRegions,
+            truncated!.conflictRegions,
             { ours: 'HEAD', theirs: 'MERGE_HEAD' }
           );
           if (!diffContext) {
@@ -190,18 +194,54 @@ const resolveMergeConflicts = async (
         }
 
         try {
-          const resolvedContent = await aiAgent.resolveMergeConflicts(
-            filePath,
-            diffContext,
-            conflictedContent
-          );
+          let finalContent: string | null = null;
 
-          if (!resolvedContent) {
+          if (sendFullFile) {
+            // Full-file mode: AI returns entire resolved file
+            finalContent = await aiAgent.resolveMergeConflicts(
+              filePath,
+              diffContext,
+              conflictedContent
+            );
+          } else {
+            // Region-based mode: AI returns only resolved conflict regions
+            const regionCount = truncated!.conflictRegions.length;
+
+            try {
+              const regionOutput = await aiAgent.resolveMergeConflictsRegions(
+                filePath,
+                diffContext,
+                conflictedContent,
+                regionCount
+              );
+
+              if (regionOutput) {
+                const resolvedRegions = parseResolvedRegions(
+                  regionOutput,
+                  regionCount
+                );
+                finalContent = reconstructFile(
+                  rawContent,
+                  truncated!.conflictRegions,
+                  resolvedRegions
+                );
+              }
+            } catch {
+              // Region parsing failed — fallback to full-file resolution
+              finalContent = await aiAgent.resolveMergeConflicts(
+                filePath,
+                diffContext,
+                rawContent
+              );
+            }
+          }
+
+          if (!finalContent) {
             failures.push(`AI returned empty resolution for ${filePath}`);
             return;
           }
 
-          writeFileSync(filePath, resolvedContent);
+          writeFileSync(filePath, finalContent);
 
           if (!git.add(filePath)) {
             failures.push(`Error adding ${filePath} to the git commit`);

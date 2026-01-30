@@ -165,6 +165,27 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
     }
   }
 
+  async resolveMergeConflictsRegions(
+    filePath: string,
+    diffContext: string,
+    conflictedContent: string,
+    regionCount: number
+  ): Promise<string | null> {
+    try {
+      const prompt = this.promptBuilder.resolveMergeConflictsRegionsPrompt(
+        filePath,
+        diffContext,
+        conflictedContent,
+        regionCount
+      );
+      const response = await this.invoke(prompt, false);
+
+      return response;
+    } catch (err) {
+      throw err;
+    }
+  }
+
   async extractGithubInputs(
     issueDescription: string,
     inputs: WorkflowInput[]
