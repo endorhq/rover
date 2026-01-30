@@ -179,10 +179,14 @@ const shellCommand = async (
       }
 
       try {
+        // Use detached: false for interactive shells to ensure proper TTY
+        // signal handling and job control. Without this, the terminal can
+        // get into a corrupted state when using job control (Ctrl+Z, fg, etc.)
         const shellInit = launch(shell, shellArgs, {
           stdio: 'inherit',
           cwd: task.worktreePath,
           reject: false,
+          detached: false,
         });
 
         spinner.success(`Shell started using ${shell}`);
