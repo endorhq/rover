@@ -308,6 +308,112 @@ describe('TaskDescriptionManager', () => {
     });
   });
 
+  describe('sandboxMetadata field', () => {
+    it('should store and retrieve sandboxMetadata via setContainerInfo', () => {
+      const taskPath = getTaskPath(10);
+      const task = TaskDescriptionManager.create(taskPath, {
+        id: 10,
+        title: 'Sandbox Metadata Test',
+        description: 'Test description',
+        inputs: new Map(),
+        workflowName: 'swe',
+      });
+
+      // Initially should be undefined
+      expect(task.sandboxMetadata).toBeUndefined();
+
+      // Set container info with sandboxMetadata
+      task.setContainerInfo('container-123', 'running', {
+        dockerHost: 'unix:///var/run/docker.sock',
+      });
+      expect(task.sandboxMetadata).toEqual({
+        dockerHost: 'unix:///var/run/docker.sock',
+      });
+      expect(task.containerId).toBe('container-123');
+
+      // Verify persistence
+      const reloaded = TaskDescriptionManager.load(taskPath, 10);
+      expect(reloaded.sandboxMetadata).toEqual({
+        dockerHost: 'unix:///var/run/docker.sock',
+      });
+      expect(reloaded.containerId).toBe('container-123');
+    });
+
+    it('should handle undefined sandboxMetadata in setContainerInfo', () => {
+      const taskPath = getTaskPath(11);
+      const task = TaskDescriptionManager.create(taskPath, {
+        id: 11,
+        title: 'Sandbox Metadata Undefined Test',
+        description: 'Test description',
+        inputs: new Map(),
+        workflowName: 'swe',
+      });
+
+      // Set container info without sandboxMetadata
+      task.setContainerInfo('container-456', 'running');
+      expect(task.sandboxMetadata).toBeUndefined();
+      expect(task.containerId).toBe('container-456');
+
+      // Verify persistence
+      const reloaded = TaskDescriptionManager.load(taskPath, 11);
+      expect(reloaded.sandboxMetadata).toBeUndefined();
+    });
+
+    it('should migrate legacy dockerHost to sandboxMetadata', () => {
+      const { readFileSync, writeFileSync } = require('node:fs');
+
+      const taskPath = getTaskPath(12);
+      const task = TaskDescriptionManager.create(taskPath, {
+        id: 12,
+        title: 'Docker Host Migration Test',
+        description: 'Test migration',
+        inputs: new Map(),
+        workflowName: 'swe',
+      });
+
+      // Manually set old dockerHost field and version to simulate legacy data
+      const descriptionPath = join(taskPath, 'description.json');
+      const taskData = JSON.parse(readFileSync(descriptionPath, 'utf8'));
+      taskData.version = '1.4'; // Old version
+      taskData.dockerHost = 'tcp://192.168.1.100:2375'; // Legacy field
+      delete taskData.sandboxMetadata; // Ensure no sandboxMetadata
+      writeFileSync(descriptionPath, JSON.stringify(taskData, null, 2), 'utf8');
+
+      // Reload - should trigger migration and convert dockerHost to sandboxMetadata
+      const migratedTask = TaskDescriptionManager.load(taskPath, 12);
+      expect(migratedTask.sandboxMetadata).toEqual({
+        dockerHost: 'tcp://192.168.1.100:2375',
+      });
+      expect(migratedTask.version).toBe(
+        CURRENT_TASK_DESCRIPTION_SCHEMA_VERSION
+      );
+    });
+
+    it('should support arbitrary metadata keys in sandboxMetadata', () => {
+      const taskPath = getTaskPath(13);
+      const task = TaskDescriptionManager.create(taskPath, {
+        id: 13,
+        title: 'Arbitrary Metadata Test',
+        description: 'Test description',
+        inputs: new Map(),
+        workflowName: 'swe',
+      });
+
+      // Set container info with arbitrary metadata
+      const metadata = {
+        dockerHost: 'tcp://localhost:2375',
+        customKey: 'customValue',
+        nested: { foo: 'bar' },
+      };
+      task.setContainerInfo('container-999', 'running', metadata);
+      expect(task.sandboxMetadata).toEqual(metadata);
+
+      // Verify persistence
+      const reloaded = TaskDescriptionManager.load(taskPath, 13);
+      expect(reloaded.sandboxMetadata).toEqual(metadata);
+    });
+  });
+
   describe('utility methods', () => {
     it('should provide correct utility methods for new statuses', () => {
       const taskPath = getTaskPath(9);

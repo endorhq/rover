@@ -159,7 +159,11 @@ const updateTaskMetadata = (
 
       // Handle Docker execution metadata
       if (updates.containerId && updates.executionStatus) {
-        task.setContainerInfo(updates.containerId, updates.executionStatus);
+        task.setContainerInfo(
+          updates.containerId,
+          updates.executionStatus,
+          updates.sandboxMetadata
+        );
       } else if (updates.executionStatus) {
         task.updateExecutionStatus(updates.executionStatus, {
           exitCode: updates.exitCode,
@@ -441,6 +445,9 @@ const createTaskForAgent = async (
         containerId,
         executionStatus: 'running',
         runningAt: new Date().toISOString(),
+        sandboxMetadata: process.env.DOCKER_HOST
+          ? { dockerHost: process.env.DOCKER_HOST }
+          : undefined,
       },
       jsonMode
     );

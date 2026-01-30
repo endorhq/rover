@@ -15,6 +15,8 @@ export interface SandboxOptions {
   extraArgs?: string;
   /** Project root path for loading configuration */
   projectPath?: string;
+  /** Sandbox-specific metadata (from task metadata) */
+  sandboxMetadata?: Record<string, unknown>;
 }
 
 export abstract class SandboxPackage {

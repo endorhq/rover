@@ -393,9 +393,24 @@ export class DockerSandbox extends Sandbox {
     return launch('docker', dockerArgs, { stdio: 'inherit', reject: false });
   }
 
+  /**
+   * Get the environment object with DOCKER_HOST set if available from options.
+   */
+  private getDockerEnv(): NodeJS.ProcessEnv {
+    const dockerHost = this.options?.sandboxMetadata?.dockerHost;
+    if (typeof dockerHost === 'string') {
+      return { ...process.env, DOCKER_HOST: dockerHost };
+    }
+    return process.env;
+  }
+
   protected async remove(): Promise<string> {
     return (
-      (await launch('docker', ['rm', '-f', this.sandboxName])).stdout
+      (
+        await launch('docker', ['rm', '-f', this.sandboxName], {
+          env: this.getDockerEnv(),
+        })
+      ).stdout
         ?.toString()
         .trim() || this.sandboxName
     );
@@ -403,7 +418,11 @@ export class DockerSandbox extends Sandbox {
 
   protected async stop(): Promise<string> {
     return (
-      (await launch('docker', ['stop', this.sandboxName])).stdout
+      (
+        await launch('docker', ['stop', this.sandboxName], {
+          env: this.getDockerEnv(),
+        })
+      ).stdout
         ?.toString()
         .trim() || this.sandboxName
     );
@@ -411,13 +430,18 @@ export class DockerSandbox extends Sandbox {
 
   protected async logs(): Promise<string> {
     return (
-      (await launch('docker', ['logs', this.sandboxName])).stdout?.toString() ||
-      ''
+      (
+        await launch('docker', ['logs', this.sandboxName], {
+          env: this.getDockerEnv(),
+        })
+      ).stdout?.toString() || ''
     );
   }
 
   protected async *followLogs(): AsyncIterable<string> {
-    const process = launch('docker', ['logs', '--follow', this.sandboxName]);
+    const process = launch('docker', ['logs', '--follow', this.sandboxName], {
+      env: this.getDockerEnv(),
+    });
 
     if (!process.stdout) {
       return;
