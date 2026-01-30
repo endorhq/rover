@@ -92,8 +92,6 @@ interface TaskInspectionOutput {
   workflowName: string;
   /** Path to the git worktree for this task */
   worktreePath: string;
-  /** AI agent used for this task */
-  agent?: string;
   /** Model used by the AI agent */
   agentModel?: string;
   /** Combined agent:model display string */
