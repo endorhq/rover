@@ -63,6 +63,14 @@ export interface AIAgentTool {
     conflictedContent: string
   ): Promise<string | null>;
 
+  // Resolve merge conflicts returning only the resolved regions
+  resolveMergeConflictsRegions(
+    filePath: string,
+    diffContext: string,
+    conflictedContent: string,
+    regionCount: number
+  ): Promise<string | null>;
+
   // Extract workflow input values from a GitHub issue description
   extractGithubInputs(
     issueDescription: string,

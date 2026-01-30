@@ -91,6 +91,56 @@ export function truncateConflictContext(
 }
 
 /**
+ * Parse AI output that uses the `---REGION N---` format.
+ * Returns an array of resolved region strings (one per conflict).
+ */
+export function parseResolvedRegions(
+  aiOutput: string,
+  expectedCount: number
+): string[] {
+  const parts = aiOutput.split(/^---REGION \d+---$/m);
+  // First element is anything before the first marker (should be empty/whitespace)
+  const regions = parts
+    .slice(1)
+    .map(p => p.replace(/^\n/, '').replace(/\n$/, ''));
+
+  if (regions.length !== expectedCount) {
+    throw new Error(
+      `Expected ${expectedCount} resolved region(s) but got ${regions.length}`
+    );
+  }
+
+  return regions;
+}
+
+/**
+ * Reconstruct a full file by replacing conflict regions with resolved content.
+ * Processes regions in reverse order to preserve line numbers.
+ */
+export function reconstructFile(
+  originalContent: string,
+  conflictRegions: ConflictRegion[],
+  resolvedRegions: string[]
+): string {
+  const lines = originalContent.split('\n');
+
+  // Process in reverse so earlier line numbers stay valid
+  for (let i = conflictRegions.length - 1; i >= 0; i--) {
+    const region = conflictRegions[i];
+    const resolved = resolvedRegions[i];
+    const resolvedLines = resolved.split('\n');
+    // Replace from startLine to endLine (inclusive)
+    lines.splice(
+      region.startLine,
+      region.endLine - region.startLine + 1,
+      ...resolvedLines
+    );
+  }
+
+  return lines.join('\n');
+}
+
+/**
  * Get blame-based commit context for conflict regions.
  * Runs git blame on each conflict region against both sides of the merge/rebase.
  */
