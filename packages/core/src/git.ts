@@ -350,16 +350,56 @@ export class Git {
   }
 
   /**
-   * Continue current merge
+   * Rebase the current branch onto the given branch
    */
-  continueMerge(options: GitWorktreeOptions = {}) {
+  rebaseBranch(
+    onto: string,
+    options: GitWorktreeOptions = {}
+  ): { success: boolean; error?: string } {
     try {
-      launchSync('git', ['merge', '--continue'], {
+      launchSync('git', ['rebase', onto], {
+        cwd: options.worktreePath ?? this.cwd,
+      });
+      return { success: true };
+    } catch (err) {
+      const stderr = (err as any)?.stderr?.toString().trim() || '';
+      const message =
+        stderr || (err instanceof Error ? err.message : String(err));
+      return { success: false, error: message };
+    }
+  }
+
+  /**
+   * Abort current rebase
+   */
+  abortRebase(options: GitWorktreeOptions = {}) {
+    try {
+      launchSync('git', ['rebase', '--abort'], {
         cwd: options.worktreePath ?? this.cwd,
       });
     } catch (_err) {
       // Ignore abort errors
     }
+  }
+
+  /**
+   * Continue current rebase
+   */
+  continueRebase(options: GitWorktreeOptions = {}) {
+    launchSync('git', ['rebase', '--continue'], {
+      cwd: options.worktreePath ?? this.cwd,
+      env: { ...process.env, GIT_EDITOR: 'true' },
+    });
+  }
+
+  /**
+   * Continue current merge
+   */
+  continueMerge(options: GitWorktreeOptions = {}) {
+    launchSync('git', ['merge', '--continue'], {
+      cwd: options.worktreePath ?? this.cwd,
+      env: { ...process.env, GIT_EDITOR: 'true' },
+    });
   }
 
   /**
@@ -712,6 +752,70 @@ export class Git {
         'Failed to set sparse checkout patterns';
       throw new GitError(errorMsg);
     }
+  }
+
+  /**
+   * Get blame-based commit information for a specific line range.
+   * Runs `git blame --porcelain` and extracts unique commit hashes and summaries.
+   */
+  getBlameCommits(
+    filePath: string,
+    startLine: number,
+    endLine: number,
+    ref: string,
+    worktreePath?: string
+  ): { hash: string; summary: string }[] {
+    const result = launchSync(
+      'git',
+      [
+        'blame',
+        '--porcelain',
+        `-L`,
+        `${startLine},${endLine}`,
+        ref,
+        '--',
+        filePath,
+      ],
+      {
+        cwd: worktreePath ?? this.cwd,
+        reject: false,
+      }
+    );
+
+    if (result.exitCode !== 0) {
+      return [];
+    }
+
+    const output = result.stdout?.toString() || '';
+    const commits = new Map<string, string>();
+
+    const lines = output.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      // Porcelain format: first line of each blame entry starts with 40-char hash
+      const hashMatch = line.match(/^([0-9a-f]{40})\s/);
+      if (hashMatch) {
+        const hash = hashMatch[1];
+        if (!commits.has(hash)) {
+          // Look for the "summary" line in this blame entry
+          for (let j = i + 1; j < lines.length; j++) {
+            if (lines[j].startsWith('summary ')) {
+              commits.set(hash, lines[j].substring(8));
+              break;
+            }
+            // Stop if we hit the next blame entry
+            if (lines[j].match(/^[0-9a-f]{40}\s/)) {
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    return Array.from(commits.entries()).map(([hash, summary]) => ({
+      hash,
+      summary,
+    }));
   }
 
   /**
