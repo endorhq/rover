@@ -34,6 +34,11 @@ class QwenAI implements AIAgentTool {
   // constants
   public AGENT_BIN = 'qwen';
   private promptBuilder = new PromptBuilder('qwen');
+  private model?: string;
+
+  constructor(model?: string) {
+    this.model = model;
+  }
 
   async checkAgent(): Promise<void> {
     try {
@@ -49,6 +54,10 @@ class QwenAI implements AIAgentTool {
     cwd?: string
   ): Promise<string> {
     const qwenArgs = ['-p'];
+
+    if (this.model) {
+      qwenArgs.push('--model', this.model);
+    }
 
     if (json) {
       // Qwen does not have any way to force the JSON output at CLI level.

@@ -75,6 +75,11 @@ class ClaudeAI implements AIAgentTool {
   // constants
   public AGENT_BIN = 'claude';
   private promptBuilder = new PromptBuilder('claude');
+  private model?: string;
+
+  constructor(model?: string) {
+    this.model = model;
+  }
 
   async checkAgent(): Promise<void> {
     try {
@@ -90,6 +95,10 @@ class ClaudeAI implements AIAgentTool {
     cwd?: string
   ): Promise<string> {
     const claudeArgs = ['-p'];
+
+    if (this.model) {
+      claudeArgs.push('--model', this.model);
+    }
 
     if (json) {
       claudeArgs.push('--output-format');

@@ -32,6 +32,11 @@ class GeminiAI implements AIAgentTool {
   // constants
   public AGENT_BIN = 'gemini';
   private promptBuilder = new PromptBuilder('gemini');
+  private model?: string;
+
+  constructor(model?: string) {
+    this.model = model;
+  }
 
   async checkAgent(): Promise<void> {
     try {
@@ -48,6 +53,10 @@ class GeminiAI implements AIAgentTool {
   ): Promise<string> {
     // Do not add -p, it's deprecated
     const geminiArgs: string[] = [];
+
+    if (this.model) {
+      geminiArgs.push('--model', this.model);
+    }
 
     if (json) {
       // Gemini does not have any way to force the JSON output at CLI level.
