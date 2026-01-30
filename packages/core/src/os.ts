@@ -16,6 +16,15 @@ export type { Options, Result, SyncOptions, SyncResult };
 // Expand some types to add our custom options
 export type LaunchOptions = Options & {
   mightLogSensitiveInformation?: boolean;
+  /**
+   * Whether to run the child process in a new process group (detached mode).
+   * Defaults to true to prevent child processes from being terminated when
+   * signals are sent to the parent's process group.
+   *
+   * Set to false for interactive processes (like shells) that need proper
+   * TTY signal handling and job control.
+   */
+  detached?: boolean;
 };
 
 export type LaunchSyncOptions = SyncOptions & {
@@ -165,8 +174,10 @@ export function launch(
     // Run in a new process group to prevent child processes from being
     // terminated when signals are sent to the parent's process group.
     // See: https://github.com/endorhq/rover/issues/374
+    // Default to detached: true unless explicitly set to false (e.g., for interactive shells)
+    const shouldDetach = options?.detached !== false;
     let newOpts: Options = {
-      detached: true,
+      detached: shouldDetach,
       ...expandedOptions,
     } as Options;
 
@@ -221,10 +232,15 @@ export function launch(
   // Run in a new process group to prevent child processes from being
   // terminated when signals are sent to the parent's process group.
   // See: https://github.com/endorhq/rover/issues/374
+  // Default to detached: true unless explicitly set to false (e.g., for interactive shells)
+  const shouldDetach = options?.detached !== false;
   if (expandedOptions) {
-    return execa({ detached: true, ...expandedOptions })`${parsedCommand}`;
+    return execa({
+      detached: shouldDetach,
+      ...expandedOptions,
+    })`${parsedCommand}`;
   } else {
-    return execa({ detached: true })`${parsedCommand}`;
+    return execa({ detached: shouldDetach })`${parsedCommand}`;
   }
 }
 

@@ -390,7 +390,12 @@ export class DockerSandbox extends Sandbox {
       dockerArgs.push('--pre-context-file', `/__pre_context_${index}__.json`);
     });
 
-    return launch('docker', dockerArgs, { stdio: 'inherit', reject: false });
+    // Use detached: false to ensure proper TTY signal handling and job control
+    return launch('docker', dockerArgs, {
+      stdio: 'inherit',
+      reject: false,
+      detached: false,
+    });
   }
 
   /**
@@ -485,9 +490,11 @@ export class DockerSandbox extends Sandbox {
     ];
 
     // Start Docker container with direct stdio inheritance for true interactivity
+    // Use detached: false to ensure proper TTY signal handling and job control
     await launch('docker', dockerArgs, {
       reject: false,
       stdio: 'inherit', // This gives full control to the user
+      detached: false,
     });
   }
 }
