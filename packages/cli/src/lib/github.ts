@@ -253,8 +253,7 @@ export class GitHub {
   getGitHubRepoInfo(remoteUrl: string): { owner: string; repo: string } | null {
     // Handle various GitHub URL formats
     const patterns = [
-      /github\.com[:/]([^/]+)\/([^/.]+)(\.git)?$/,
-      /^git@github\.com:([^/]+)\/([^/.]+)(\.git)?$/,
+      /github[^:/]*[:/]([^/]+)\/([^/.]+)(\.git)?$/,
       /^https?:\/\/github\.com\/([^/]+)\/([^/.]+)(\.git)?$/,
     ];
 
