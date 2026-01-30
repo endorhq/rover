@@ -178,6 +178,13 @@ const logsCommand = async (
       process.on('SIGINT', sigintHandler);
 
       try {
+        // Build environment with stored DOCKER_HOST if available
+        const dockerHost = task.sandboxMetadata?.dockerHost;
+        const dockerEnv =
+          typeof dockerHost === 'string'
+            ? { ...process.env, DOCKER_HOST: dockerHost }
+            : process.env;
+
         const logsProcess = await launch(
           'docker',
           ['logs', '-f', containerId],
@@ -185,6 +192,7 @@ const logsCommand = async (
             stdout: ['inherit'],
             stderr: ['inherit'],
             cancelSignal,
+            env: dockerEnv,
           }
         );
 
@@ -217,8 +225,17 @@ const logsCommand = async (
     } else {
       // Get logs using docker logs command (one-time)
       try {
+        // Build environment with stored DOCKER_HOST if available
+        const dockerHostSync = task.sandboxMetadata?.dockerHost;
+        const dockerEnvSync =
+          typeof dockerHostSync === 'string'
+            ? { ...process.env, DOCKER_HOST: dockerHostSync }
+            : process.env;
+
         const logs =
-          launchSync('docker', ['logs', containerId])?.stdout?.toString() || '';
+          launchSync('docker', ['logs', containerId], {
+            env: dockerEnvSync,
+          })?.stdout?.toString() || '';
 
         if (logs.trim() === '') {
           await exitWithWarn(
