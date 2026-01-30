@@ -3,6 +3,8 @@ import {
   findConflictRegions,
   truncateConflictContext,
   getBlameContext,
+  parseResolvedRegions,
+  reconstructFile,
 } from '../context-optimizer.js';
 
 describe('context-optimizer', () => {
@@ -211,6 +213,154 @@ describe('context-optimizer', () => {
       // 2 regions × 2 refs = 4 calls
       expect(mockGit.getBlameCommits).toHaveBeenCalledTimes(4);
       expect(result).toContain('- commit A');
+    });
+  });
+
+  describe('parseResolvedRegions', () => {
+    it('should parse correctly formatted regions', () => {
+      const aiOutput = [
+        '---REGION 1---',
+        'resolved line A',
+        'resolved line B',
+        '---REGION 2---',
+        'resolved line C',
+      ].join('\n');
+
+      const regions = parseResolvedRegions(aiOutput, 2);
+      expect(regions).toEqual([
+        'resolved line A\nresolved line B',
+        'resolved line C',
+      ]);
+    });
+
+    it('should throw on count mismatch', () => {
+      const aiOutput = '---REGION 1---\nresolved';
+      expect(() => parseResolvedRegions(aiOutput, 2)).toThrow(
+        'Expected 2 resolved region(s) but got 1'
+      );
+    });
+
+    it('should handle a single region', () => {
+      const aiOutput = '---REGION 1---\nfixed code';
+      const regions = parseResolvedRegions(aiOutput, 1);
+      expect(regions).toEqual(['fixed code']);
+    });
+
+    it('should strip leading/trailing newlines from each region', () => {
+      const aiOutput = '---REGION 1---\n\nline1\nline2\n';
+      // After split on marker, part is "\n\nline1\nline2\n"
+      // We strip one leading \n and one trailing \n
+      const regions = parseResolvedRegions(aiOutput, 1);
+      expect(regions).toEqual(['\nline1\nline2']);
+    });
+  });
+
+  describe('reconstructFile', () => {
+    it('should replace a single conflict region', () => {
+      const original = [
+        'line 0',
+        'line 1',
+        '<<<<<<< HEAD',
+        'our change',
+        '=======',
+        'their change',
+        '>>>>>>> branch',
+        'line 7',
+        'line 8',
+      ].join('\n');
+
+      const regions = [{ startLine: 2, endLine: 6 }];
+      const resolved = ['merged change'];
+
+      const result = reconstructFile(original, regions, resolved);
+      expect(result).toBe(
+        ['line 0', 'line 1', 'merged change', 'line 7', 'line 8'].join('\n')
+      );
+    });
+
+    it('should replace multiple conflict regions preserving surrounding content', () => {
+      const original = [
+        'header',
+        '<<<<<<< HEAD',
+        'ours1',
+        '=======',
+        'theirs1',
+        '>>>>>>> branch',
+        'middle',
+        '<<<<<<< HEAD',
+        'ours2',
+        '=======',
+        'theirs2',
+        '>>>>>>> branch',
+        'footer',
+      ].join('\n');
+
+      const regions = [
+        { startLine: 1, endLine: 5 },
+        { startLine: 7, endLine: 11 },
+      ];
+      const resolved = ['resolved1', 'resolved2'];
+
+      const result = reconstructFile(original, regions, resolved);
+      expect(result).toBe(
+        ['header', 'resolved1', 'middle', 'resolved2', 'footer'].join('\n')
+      );
+    });
+
+    it('should handle multi-line resolved regions', () => {
+      const original = [
+        'before',
+        '<<<<<<< HEAD',
+        'ours',
+        '=======',
+        'theirs',
+        '>>>>>>> branch',
+        'after',
+      ].join('\n');
+
+      const regions = [{ startLine: 1, endLine: 5 }];
+      const resolved = ['line A\nline B\nline C'];
+
+      const result = reconstructFile(original, regions, resolved);
+      expect(result).toBe(
+        ['before', 'line A', 'line B', 'line C', 'after'].join('\n')
+      );
+    });
+  });
+
+  describe('integration: truncate → resolve → reconstruct', () => {
+    it('should preserve full file content through the round-trip', () => {
+      // Build a 200-line file with a conflict in the middle
+      const lines: string[] = [];
+      for (let i = 0; i < 200; i++) {
+        lines.push(`line ${i}`);
+      }
+      lines[100] = '<<<<<<< HEAD';
+      lines[101] = 'our change';
+      lines[102] = '=======';
+      lines[103] = 'their change';
+      lines[104] = '>>>>>>> branch';
+
+      const originalContent = lines.join('\n');
+      const truncated = truncateConflictContext(originalContent, 5);
+
+      // Simulate AI returning region-based output
+      const aiOutput = '---REGION 1---\nmerged result';
+      const resolvedRegions = parseResolvedRegions(aiOutput, 1);
+
+      const reconstructed = reconstructFile(
+        originalContent,
+        truncated.conflictRegions,
+        resolvedRegions
+      );
+
+      // The file should have 200 lines (5 conflict lines replaced by 1)
+      const resultLines = reconstructed.split('\n');
+      expect(resultLines.length).toBe(196); // 200 - 5 + 1
+      expect(resultLines[0]).toBe('line 0');
+      expect(resultLines[100]).toBe('merged result');
+      expect(resultLines[101]).toBe('line 105');
+      expect(resultLines[195]).toBe('line 199');
     });
   });
 });
