@@ -39,6 +39,9 @@ jobs:
       - name: Test
         run: pnpm test
 
+      - name: Test (offline e2e)
+        run: pnpm e2e-test
+
       - name: Test Build Artifact
         run: pnpm start --version
         working-directory: packages/cli
