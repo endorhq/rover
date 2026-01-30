@@ -11,6 +11,7 @@ import {
   type TaskDescriptionManager,
 } from 'rover-core';
 import { TaskNotFoundError, type TaskStatus } from 'rover-schemas';
+import { formatAgentWithModel } from '../utils/agent-parser.js';
 import { join } from 'node:path';
 import { getTelemetry } from '../lib/telemetry.js';
 import {
@@ -91,6 +92,12 @@ interface TaskInspectionOutput {
   workflowName: string;
   /** Path to the git worktree for this task */
   worktreePath: string;
+  /** AI agent used for this task */
+  agent?: string;
+  /** Model used by the AI agent */
+  agentModel?: string;
+  /** Combined agent:model display string */
+  agentDisplay?: string;
   /** Task source (origin tracking - github, manual, etc.) */
   source?: {
     type: 'github' | 'manual';
@@ -319,6 +326,10 @@ const inspectCommand = async (
       const jsonOutput: TaskInspectionOutput = {
         success: true,
         agent: task.agent,
+        agentModel: task.agentModel,
+        agentDisplay: task.agent
+          ? formatAgentWithModel(task.agent as any, task.agentModel)
+          : undefined,
         baseCommit: task.baseCommit,
         branchName: task.branchName,
         completedAt: task.completedAt,
@@ -361,6 +372,9 @@ const inspectCommand = async (
         ID: `${task.id.toString()} (${colors.gray(task.uuid)})`,
         Title: task.title,
         Status: statusColorFunc(formattedStatus),
+        Agent: task.agent
+          ? formatAgentWithModel(task.agent as any, task.agentModel)
+          : '-',
         Workflow: task.workflowName,
         'Created At': new Date(task.createdAt).toLocaleString(),
       };
