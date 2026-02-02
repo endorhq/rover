@@ -249,7 +249,7 @@ jobs:
     with:
       tag: v${{ inputs.targetVersion }}
       ref: ${{ needs.release.outputs.git_tag }}
-      image-name: ghcr.io/${{ github.repository_owner }}/rover-agent
+      image-name: ghcr.io/${{ github.repository_owner }}/rover/agent
     permissions:
       contents: read
       packages: write

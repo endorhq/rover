@@ -215,7 +215,13 @@ const restartCommand = async (
       const containerId = await sandbox.createAndStart();
 
       // Update task metadata with new container ID
-      task.setContainerInfo(containerId, 'running');
+      task.setContainerInfo(
+        containerId,
+        'running',
+        process.env.DOCKER_HOST
+          ? { dockerHost: process.env.DOCKER_HOST }
+          : undefined
+      );
     } catch (error) {
       // If sandbox execution fails, reset task back to NEW status
       task.resetToNew();

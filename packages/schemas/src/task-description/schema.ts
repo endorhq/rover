@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { NetworkConfigSchema } from '../project-config/schema.js';
 
 // Schema version for migrations
-export const CURRENT_TASK_DESCRIPTION_SCHEMA_VERSION = '1.3';
+export const CURRENT_TASK_DESCRIPTION_SCHEMA_VERSION = '1.5';
 
 // Task status schema
 export const TaskStatusSchema = z.enum([
@@ -61,8 +61,9 @@ export const TaskDescriptionSchema = z.object({
   sourceBranch: z.string().optional(),
   baseCommit: z.string().optional(),
 
-  // Docker Execution
+  // Sandbox Execution
   containerId: z.string().optional(),
+  sandboxMetadata: z.record(z.string(), z.unknown()).optional(),
   executionStatus: z.string().optional(),
   runningAt: z.string().datetime().optional(),
   errorAt: z.string().datetime().optional(),

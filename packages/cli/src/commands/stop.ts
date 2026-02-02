@@ -94,7 +94,9 @@ const stopCommand = async (
 
     // Stop sandbox container if it exists and is running
     if (task.containerId) {
-      const sandbox = await createSandbox(task, processManager);
+      const sandbox = await createSandbox(task, processManager, {
+        sandboxMetadata: task.sandboxMetadata,
+      });
       await sandbox.stopAndRemove();
     }
 

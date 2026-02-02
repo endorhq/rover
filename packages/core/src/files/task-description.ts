@@ -196,6 +196,14 @@ export class TaskDescriptionManager {
 
     // Preserve all execution-related fields
     migrated.containerId = data.containerId || '';
+    // Migrate old dockerHost to sandboxMetadata
+    if (data.dockerHost !== undefined) {
+      migrated.sandboxMetadata = { dockerHost: data.dockerHost };
+      // Remove the old dockerHost field after migration
+      delete migrated.dockerHost;
+    } else {
+      migrated.sandboxMetadata = data.sandboxMetadata;
+    }
     migrated.executionStatus = data.executionStatus || '';
     migrated.runningAt = data.runningAt || undefined;
     migrated.errorAt = data.errorAt || undefined;
@@ -669,6 +677,9 @@ export class TaskDescriptionManager {
   get containerId(): string | undefined {
     return this.data.containerId;
   }
+  get sandboxMetadata(): Record<string, unknown> | undefined {
+    return this.data.sandboxMetadata;
+  }
   get executionStatus(): string | undefined {
     return this.data.executionStatus;
   }
@@ -776,9 +787,14 @@ export class TaskDescriptionManager {
   /**
    * Set container execution information
    */
-  setContainerInfo(containerId: string, executionStatus: string): void {
+  setContainerInfo(
+    containerId: string,
+    executionStatus: string,
+    sandboxMetadata?: Record<string, unknown>
+  ): void {
     this.data.containerId = containerId;
     this.data.executionStatus = executionStatus;
+    this.data.sandboxMetadata = sandboxMetadata;
     if (executionStatus === 'running') {
       this.data.runningAt = new Date().toISOString();
     }
