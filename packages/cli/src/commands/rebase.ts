@@ -461,16 +461,6 @@ const rebaseCommand = async (taskId: string, options: RebaseOptions = {}) => {
     const currentBranch = git.getCurrentBranch();
     jsonOutput.currentBranch = currentBranch;
 
-    // Check for uncommitted changes in main repo
-    if (git.hasUncommittedChanges()) {
-      jsonOutput.error = `Current branch (${currentBranch}) has uncommitted changes`;
-      await exitWithError(jsonOutput, {
-        tips: ['Please commit or stash your changes before rebasing'],
-        telemetry,
-      });
-      return;
-    }
-
     // Check if worktree has changes to commit
     const hasWorktreeChanges = git.hasUncommittedChanges({
       worktreePath: task.worktreePath,
