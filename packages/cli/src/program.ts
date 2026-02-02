@@ -26,6 +26,9 @@ import pushCmd from './commands/push.js';
 import stopCmd from './commands/stop.js';
 import mcpCmd from './commands/mcp.js';
 import { addWorkflowCommands } from './commands/workflows/index.js';
+import workflowAddCmd from './commands/workflows/add.js';
+import workflowListCmd from './commands/workflows/list.js';
+import workflowInspectCmd from './commands/workflows/inspect.js';
 import {
   getCLIContext,
   getProjectPath,
@@ -56,13 +59,24 @@ const commands: CommandDefinition[] = [
   pushCmd,
   stopCmd,
   mcpCmd,
+  workflowAddCmd,
+  workflowListCmd,
+  workflowInspectCmd,
 ];
 
 /**
- * Get command definition by name
+ * Get command definition by matching the command name and optional parent.
+ * For subcommands (e.g., "workflows add"), the parent field distinguishes
+ * them from top-level commands with the same name.
  */
-function getCommandDefinition(name: string): CommandDefinition | undefined {
-  return commands.find(cmd => cmd.name === name);
+function getCommandDefinition(
+  actionCommand: Command
+): CommandDefinition | undefined {
+  const name = actionCommand.name();
+  const parent = actionCommand.parent?.parent
+    ? actionCommand.parent.name()
+    : undefined;
+  return commands.find(c => c.name === name && c.parent === parent);
 }
 
 /**
@@ -116,35 +130,33 @@ export function createProgram(
 
         // Get command definition and check if it requires project
         // It must be defined.
-        const commandDef = getCommandDefinition(commandName)!;
-
-        // Skip project resolution for commands that don't require it
-        if (!commandDef.requireProject) {
-          return;
-        }
+        const commandDef = getCommandDefinition(actionCommand)!;
 
         try {
-          // Load the project option to determine the current project.
-          let project = null;
+          let project;
 
-          if (!ctx.projectOption && ctx.inGitRepo) {
-            // The user didn't specify the --project flag and it's in a repo.
-            // Find or auto-register the project based on the current git repo.
+          if (ctx.projectOption) {
+            // When users pass the project option, always try to resolve it.
+            const message = `Could not find the "${ctx.projectOption}" project. Please, select a \nvalid project from the list. You can type to filter the projects`;
+
+            project = await requireProjectContext(ctx.projectOption, {
+              missingProjectMessage: colors.yellow(message),
+            });
+          } else if (ctx.inGitRepo) {
+            // No project option but in git repo, resolve it.
             project = await findOrRegisterProject();
-          } else {
-            // Since the command require the project, resolve it or exit with error.
-            let message = `The "${commandName}" command requires a project context.\nPlease, select it from the list. You can type to filter the projects`;
+          }
 
-            if (ctx.projectOption) {
-              message = `Could not find the "${ctx.projectOption}" project. Please, select a \nvalid project from the list. You can type to filter the projects`;
-            }
+          if (!project && commandDef.requireProject) {
+            // If project is required, force to resolve it.
+            let message = `The "${commandName}" command requires a project context.\nPlease, select it from the list. You can type to filter the projects`;
 
             project = await requireProjectContext(ctx.projectOption, {
               missingProjectMessage: colors.yellow(message),
             });
           }
 
-          // Update the project in the context
+          // Skip forcing to resolve
           if (project) {
             setProject(project);
           }
@@ -230,6 +242,10 @@ export function createProgram(
     .option(
       '--from-github <issue>',
       'Fetch task description from a GitHub issue number'
+    )
+    .option(
+      '--include-comments',
+      'Include issue comments in the task description (requires --from-github)'
     )
     .addOption(
       new Option(
@@ -366,6 +382,10 @@ export function createProgram(
       'Open an interactive command session to iterate on the task'
     )
     .option('--json', 'Output JSON and skip confirmation prompts')
+    .option(
+      '-a, --agent <agent>',
+      'AI agent to use for this iteration (e.g., claude, claude:sonnet)'
+    )
     .action(iterateCmd.action);
 
   program
@@ -382,8 +402,10 @@ export function createProgram(
     .description('Show git diff between task worktree and main branch')
     .argument('<taskId>', 'Task ID to show diff for')
     .argument('[filePath]', 'Optional file path to show diff for specific file')
+    .option('--base', 'Compare against the base commit when task was created')
     .option('-b, --branch <name>', 'Compare changes with a specific branch')
     .option('--only-files', 'Show only changed filenames')
+    .option('--json', 'Output in JSON format')
     .action(diffCmd.action);
 
   program

@@ -5,7 +5,7 @@ import {
   cpSync,
   existsSync,
 } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import {
   TaskDescriptionManager,
   IterationManager,
@@ -15,13 +15,11 @@ import {
   VERBOSE,
 } from 'rover-core';
 import type { PreviousIteration } from 'rover-schemas';
-import sweWorkflow from './workflows/swe.yml';
-import techWriterWorkflow from './workflows/tech-writer.yml';
 import entrypointScript from './entrypoint.sh';
 import pupa from 'pupa';
-import { fileURLToPath } from 'node:url';
 import type { SandboxPackage } from './sandbox/types.js';
 import { mergeNetworkConfig, generateNetworkScript } from './network-config.js';
+import { initWorkflowStore } from './workflow.js';
 
 // Language packages
 import { JavaScriptSandboxPackage } from './sandbox/languages/javascript.js';
@@ -415,19 +413,14 @@ echo "======================================="
   saveWorkflow(workflowName: string): string {
     // Write workflow file to task base path (workflow cannot change between iterations)
     const workflowTaskPath = join(this.taskBasePath, 'workflow.yml');
-    const distDir = dirname(fileURLToPath(import.meta.url));
-    let workflowPath;
+    const workflowStore = initWorkflowStore(this.projectConfig.projectRoot);
+    const workflow = workflowStore.getWorkflow(workflowName);
 
-    switch (workflowName) {
-      case 'tech-writer': {
-        workflowPath = join(distDir, techWriterWorkflow);
-        break;
-      }
-      default: {
-        workflowPath = join(distDir, sweWorkflow);
-      }
+    if (!workflow) {
+      throw new Error(`Workflow '${workflowName}' not found`);
     }
-    cpSync(workflowPath, workflowTaskPath);
+
+    cpSync(workflow.filePath, workflowTaskPath);
 
     return workflowTaskPath;
   }

@@ -465,16 +465,15 @@ export class Git {
   ): boolean {
     const targetBranch = options.targetBranch || this.getCurrentBranch();
 
-    try {
-      const unmergedCommits =
-        launchSync('git', ['log', `${targetBranch}..${srcBranch}`, '--oneline'])
-          .stdout?.toString()
-          .trim() || '';
+    // Let errors propagate so callers can handle "remote doesn't exist" case
+    const unmergedCommits =
+      launchSync('git', ['log', `${targetBranch}..${srcBranch}`, '--oneline'], {
+        cwd: options.worktreePath ?? this.cwd,
+      })
+        .stdout?.toString()
+        .trim() || '';
 
-      return unmergedCommits.length > 0;
-    } catch (_err) {
-      return false;
-    }
+    return unmergedCommits.length > 0;
   }
 
   /**
@@ -491,6 +490,29 @@ export class Git {
       );
     } catch (error) {
       return 'unknown';
+    }
+  }
+
+  /**
+   * Get the commit hash for a given ref (branch, tag, HEAD, etc.)
+   * @param ref The ref to get the commit hash for (defaults to HEAD)
+   * @param options Optional worktree path
+   * @returns The full commit hash
+   */
+  getCommitHash(
+    ref: string = 'HEAD',
+    options: GitWorktreeOptions = {}
+  ): string {
+    try {
+      return (
+        launchSync('git', ['rev-parse', ref], {
+          cwd: options.worktreePath ?? this.cwd,
+        })
+          .stdout?.toString()
+          .trim() || ''
+      );
+    } catch (error) {
+      return '';
     }
   }
 
@@ -639,6 +661,56 @@ export class Git {
       }
 
       throw new GitError(errorMessage);
+    }
+  }
+
+  /**
+   * Setup sparse checkout to exclude files matching the given patterns.
+   * Uses --no-cone mode to support full glob pattern syntax.
+   *
+   * @param worktreePath - Path to the worktree to configure
+   * @param excludePatterns - Array of glob patterns to exclude
+   */
+  setupSparseCheckout(worktreePath: string, excludePatterns: string[]): void {
+    if (!excludePatterns || excludePatterns.length === 0) {
+      return;
+    }
+
+    // Initialize sparse checkout in no-cone mode (supports full glob patterns)
+    const initResult = launchSync(
+      'git',
+      ['sparse-checkout', 'init', '--no-cone'],
+      {
+        cwd: worktreePath,
+        reject: false,
+      }
+    );
+
+    if (initResult.exitCode !== 0) {
+      const errorMsg =
+        initResult.stderr?.toString() || 'Failed to initialize sparse checkout';
+      throw new GitError(errorMsg);
+    }
+
+    // Build sparse checkout patterns:
+    // First include everything with /*, then exclude specific patterns with !
+    const sparsePatterns = ['/*', ...excludePatterns.map(p => `!${p}`)];
+
+    // Set the patterns
+    const setResult = launchSync(
+      'git',
+      ['sparse-checkout', 'set', ...sparsePatterns],
+      {
+        cwd: worktreePath,
+        reject: false,
+      }
+    );
+
+    if (setResult.exitCode !== 0) {
+      const errorMsg =
+        setResult.stderr?.toString() ||
+        'Failed to set sparse checkout patterns';
+      throw new GitError(errorMsg);
     }
   }
 

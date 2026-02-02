@@ -11,6 +11,7 @@ import {
   type TaskDescriptionManager,
 } from 'rover-core';
 import { TaskNotFoundError, type TaskStatus } from 'rover-schemas';
+import { formatAgentWithModel } from '../utils/agent-parser.js';
 import { join } from 'node:path';
 import { getTelemetry } from '../lib/telemetry.js';
 import {
@@ -41,6 +42,8 @@ interface FileChangeStat {
 interface TaskInspectionOutput {
   /** Whether the operation was successful */
   success: boolean;
+  /** The base commit hash when the worktree was created */
+  baseCommit?: string;
   /** Git branch name for the task worktree */
   branchName: string;
   /** ISO timestamp when task was completed */
@@ -87,6 +90,12 @@ interface TaskInspectionOutput {
   workflowName: string;
   /** Path to the git worktree for this task */
   worktreePath: string;
+  /** AI agent used for this task */
+  agent?: string;
+  /** Model used by the AI agent */
+  agentModel?: string;
+  /** Combined agent:model display string */
+  agentDisplay?: string;
   /** Task source (origin tracking - github, manual, etc.) */
   source?: {
     type: 'github' | 'manual';
@@ -119,6 +128,7 @@ const jsonErrorOutput = (
 ): TaskInspectionOutput => {
   return {
     success: false,
+    baseCommit: task?.baseCommit,
     branchName: task?.branchName || '',
     completedAt: task?.completedAt,
     createdAt: task?.createdAt || new Date().toISOString(),
@@ -312,6 +322,12 @@ const inspectCommand = async (
       // Output JSON format
       const jsonOutput: TaskInspectionOutput = {
         success: true,
+        agent: task.agent,
+        agentModel: task.agentModel,
+        agentDisplay: task.agent
+          ? formatAgentWithModel(task.agent as any, task.agentModel)
+          : undefined,
+        baseCommit: task.baseCommit,
         branchName: task.branchName,
         completedAt: task.completedAt,
         createdAt: task.createdAt,
@@ -353,6 +369,9 @@ const inspectCommand = async (
         ID: `${task.id.toString()} (${colors.gray(task.uuid)})`,
         Title: task.title,
         Status: statusColorFunc(formattedStatus),
+        Agent: task.agent
+          ? formatAgentWithModel(task.agent as any, task.agentModel)
+          : '-',
         Workflow: task.workflowName,
         'Created At': new Date(task.createdAt).toLocaleString(),
       };

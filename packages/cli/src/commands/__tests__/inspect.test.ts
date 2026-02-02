@@ -267,6 +267,79 @@ describe('inspect command', () => {
     });
   });
 
+  describe('Agent display', () => {
+    it('should show agent:model in human-readable output', async () => {
+      const { task } = createTestTask(1, 'Agent Task');
+      task.setAgent('claude', 'opus');
+
+      await inspectCommand('1');
+
+      const output = capturedOutput.join('\n');
+      expect(output).toContain('claude:opus');
+    });
+
+    it('should show agent without model in human-readable output', async () => {
+      const { task } = createTestTask(1, 'Agent Task');
+      task.setAgent('gemini');
+
+      await inspectCommand('1');
+
+      const output = capturedOutput.join('\n');
+      expect(output).toContain('gemini');
+    });
+
+    it('should show dash when no agent is set in human-readable output', async () => {
+      createTestTask(1, 'No Agent Task');
+
+      await inspectCommand('1');
+
+      const output = capturedOutput.join('\n');
+      // The Agent row should show '-'
+      expect(output).toMatch(/Agent.*-/);
+    });
+
+    it('should include agent fields in JSON output', async () => {
+      const { task } = createTestTask(1, 'Agent JSON Task');
+      task.setAgent('claude', 'opus');
+
+      await inspectCommand('1', undefined, { json: true });
+
+      const jsonOutput = capturedOutput.find(line => {
+        try {
+          JSON.parse(line);
+          return true;
+        } catch {
+          return false;
+        }
+      });
+
+      const parsed = JSON.parse(jsonOutput!);
+      expect(parsed.agent).toBe('claude');
+      expect(parsed.agentModel).toBe('opus');
+      expect(parsed.agentDisplay).toBe('claude:opus');
+    });
+
+    it('should have undefined agent fields in JSON when no agent set', async () => {
+      createTestTask(1, 'No Agent JSON Task');
+
+      await inspectCommand('1', undefined, { json: true });
+
+      const jsonOutput = capturedOutput.find(line => {
+        try {
+          JSON.parse(line);
+          return true;
+        } catch {
+          return false;
+        }
+      });
+
+      const parsed = JSON.parse(jsonOutput!);
+      expect(parsed.agent).toBeUndefined();
+      expect(parsed.agentModel).toBeUndefined();
+      expect(parsed.agentDisplay).toBeUndefined();
+    });
+  });
+
   describe('Standard output', () => {
     it('should display task details in human-readable format', async () => {
       createTestTask(1, 'Human Readable Task');

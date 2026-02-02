@@ -5,7 +5,11 @@
 
 import colors from 'ansi-colors';
 import path from 'node:path';
-import { type ProjectManager, ProjectStore } from 'rover-core';
+import {
+  findOrRegisterProject,
+  type ProjectManager,
+  ProjectStore,
+} from 'rover-core';
 import { isInteractiveTerminal } from '../utils/stdin.js';
 
 /**

@@ -7,9 +7,20 @@ export class GitHubError extends Error {
   }
 }
 
+type GitHubComment = {
+  author: string;
+  body: string;
+  createdAt: string;
+};
+
 type GitHubIssueResult = {
   title: string;
   body: string;
+  comments?: GitHubComment[];
+};
+
+type FetchIssueOptions = {
+  includeComments?: boolean;
 };
 
 export type GitHubOptions = {
@@ -49,13 +60,20 @@ export class GitHub {
    * Fetch the GitHub issue title and body from the given issue number and
    * remote URL. It will try to use the gh CLI and the API as a fallback.
    *
+   * @param number - The issue number
+   * @param remoteUrl - The remote URL of the repository
+   * @param options - Optional configuration for fetching
+   * @param options.includeComments - Whether to include issue comments
    * @throws GitHubError
    */
   async fetchIssue(
     number: string | number,
-    remoteUrl: string
+    remoteUrl: string,
+    options: FetchIssueOptions = {}
   ): Promise<GitHubIssueResult> {
+    const { includeComments = false } = options;
     const repoInfo = this.getGitHubRepoInfo(remoteUrl);
+    const jsonFields = includeComments ? 'title,body,comments' : 'title,body';
 
     if (repoInfo) {
       // First, CLI. If it's not available, it will fail.
@@ -66,7 +84,7 @@ export class GitHub {
         '--repo',
         `${repoInfo.owner}/${repoInfo.repo}`,
         '--json',
-        'title,body',
+        jsonFields,
       ]);
 
       if (result.failed || result.stdout == null) {
@@ -87,10 +105,21 @@ export class GitHub {
           }
 
           const issue = await response.json();
-          return {
+          const issueResult: GitHubIssueResult = {
             title: issue.title || '',
             body: issue.body || '',
           };
+
+          // Fetch comments if requested
+          if (includeComments) {
+            issueResult.comments = await this.fetchIssueComments(
+              repoInfo.owner,
+              repoInfo.repo,
+              number
+            );
+          }
+
+          return issueResult;
         } catch (err) {
           if (err instanceof GitHubError) {
             throw err;
@@ -103,10 +132,17 @@ export class GitHub {
         // Return the data
         try {
           const issue = JSON.parse(result.stdout.toString());
-          return {
+          const issueResult: GitHubIssueResult = {
             title: issue.title,
             body: issue.body || '',
           };
+
+          // Parse comments from gh CLI response
+          if (includeComments && issue.comments) {
+            issueResult.comments = this.parseGhCliComments(issue.comments);
+          }
+
+          return issueResult;
         } catch (_err) {
           throw new GitHubError(
             'The GitHub CLI returned an invalid JSON response: ' + result.stdout
@@ -123,7 +159,7 @@ export class GitHub {
 
       const result = await launch(
         'gh',
-        ['issue', 'view', number.toString(), '--json', 'title,body'],
+        ['issue', 'view', number.toString(), '--json', jsonFields],
         { cwd: this.cwd }
       );
 
@@ -133,10 +169,17 @@ export class GitHub {
         // Return the data
         try {
           const issue = JSON.parse(result.stdout.toString());
-          return {
+          const issueResult: GitHubIssueResult = {
             title: issue.title,
             body: issue.body || '',
           };
+
+          // Parse comments from gh CLI response
+          if (includeComments && issue.comments) {
+            issueResult.comments = this.parseGhCliComments(issue.comments);
+          }
+
+          return issueResult;
         } catch (_err) {
           throw new GitHubError(
             'The GitHub CLI returned an invalid JSON response: ' + result.stdout
@@ -147,14 +190,70 @@ export class GitHub {
   }
 
   /**
+   * Parse comments from gh CLI JSON response format
+   */
+  private parseGhCliComments(
+    comments: Array<{
+      author?: { login?: string };
+      body?: string;
+      createdAt?: string;
+    }>
+  ): GitHubComment[] {
+    return comments.map(comment => ({
+      author: comment.author?.login || 'unknown',
+      body: comment.body || '',
+      createdAt: comment.createdAt || '',
+    }));
+  }
+
+  /**
+   * Fetch comments for an issue using the GitHub API
+   */
+  private async fetchIssueComments(
+    owner: string,
+    repo: string,
+    issueNumber: string | number
+  ): Promise<GitHubComment[]> {
+    try {
+      const apiUrl = `https://api.github.com/repos/${owner}/${repo}/issues/${issueNumber}/comments`;
+      const response = await fetch(apiUrl, {
+        headers: {
+          'User-Agent': 'Rover-CLI',
+          Accept: 'application/vnd.github.v3+json',
+        },
+      });
+
+      if (!response.ok) {
+        // Non-fatal: return empty comments array if we can't fetch them
+        return [];
+      }
+
+      const comments = await response.json();
+      return comments.map(
+        (comment: {
+          user?: { login?: string };
+          body?: string;
+          created_at?: string;
+        }) => ({
+          author: comment.user?.login || 'unknown',
+          body: comment.body || '',
+          createdAt: comment.created_at || '',
+        })
+      );
+    } catch (_err) {
+      // Non-fatal: return empty comments array if we can't fetch them
+      return [];
+    }
+  }
+
+  /**
    * Retrieves the owner and repo from the remote URL. Null in case it couldn't
    * detect it.
    */
   getGitHubRepoInfo(remoteUrl: string): { owner: string; repo: string } | null {
     // Handle various GitHub URL formats
     const patterns = [
-      /github\.com[:/]([^/]+)\/([^/.]+)(\.git)?$/,
-      /^git@github\.com:([^/]+)\/([^/.]+)(\.git)?$/,
+      /github[^:/]*[:/]([^/]+)\/([^/.]+)(\.git)?$/,
       /^https?:\/\/github\.com\/([^/]+)\/([^/.]+)(\.git)?$/,
     ];
 

@@ -165,8 +165,8 @@ const handlePreContextInjection = (
       // Build the pre-context file paths message
       const preContextMessage =
         preContextFilePaths.length === 1
-          ? `\n\n**Note:** Pre-context information is available at: \`${preContextFilePaths[0]}\``
-          : `\n\n**Note:** Pre-context information is available at the following locations:\n${preContextFilePaths.map(path => `- \`${path}\``).join('\n')}`;
+          ? `\n\n**Important:** Pre-context information (JSON file containing task and iterations instructions) is available at: \`${preContextFilePaths[0]}\``
+          : `\n\n**Important:** Pre-context information (JSON files containing task and iterations instructions) are available at the following locations:\n${preContextFilePaths.map(path => `- \`${path}\``).join('\n')}`;
 
       // Prepend pre-context file location to each step's prompt
       for (const step of workflowManager.steps) {
@@ -174,7 +174,10 @@ const handlePreContextInjection = (
           colors.gray(`✓ Pre-context file location added to step ${step.id}\n`)
         );
 
-        step.prompt = preContextMessage + '\n\n---\n' + step.prompt;
+        step.prompt =
+          preContextMessage +
+          '\n\n**USE** pre-context information to identify the current iteration and **PRIORITIZE** its instructions (at `currentIteration` in the JSON), taking into account previous iterations instructions (at `previousIterations` in the JSON).\n\n---\n\n' +
+          step.prompt;
       }
     }
   }

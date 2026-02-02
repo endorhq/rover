@@ -388,10 +388,11 @@ describe('logs command', () => {
 
       await logsCommand('7');
 
-      expect(launchSync).toHaveBeenCalledWith('docker', [
-        'logs',
-        'container123',
-      ]);
+      expect(launchSync).toHaveBeenCalledWith(
+        'docker',
+        ['logs', 'container123'],
+        expect.objectContaining({ env: process.env })
+      );
     });
 
     it('should print logs to console output', async () => {
@@ -541,10 +542,11 @@ Last line`;
 
       await logsCommand('8', undefined, { json: true });
 
-      expect(launchSync).toHaveBeenCalledWith('docker', [
-        'logs',
-        'container456',
-      ]);
+      expect(launchSync).toHaveBeenCalledWith(
+        'docker',
+        ['logs', 'container456'],
+        expect.objectContaining({ env: process.env })
+      );
     });
 
     it('should handle empty logs', async () => {
@@ -834,10 +836,11 @@ Last line`;
       await logsCommand('15', undefined, { follow: true, json: true });
 
       // Should use launchSync instead of launch for JSON mode
-      expect(launchSync).toHaveBeenCalledWith('docker', [
-        'logs',
-        'jsonfollow123',
-      ]);
+      expect(launchSync).toHaveBeenCalledWith(
+        'docker',
+        ['logs', 'jsonfollow123'],
+        expect.objectContaining({ env: process.env })
+      );
       expect(launch).not.toHaveBeenCalled();
     });
   });
@@ -863,7 +866,11 @@ Last line`;
 
       await logsCommand('16');
 
-      expect(launchSync).toHaveBeenCalledWith('docker', ['logs', 'latest123']);
+      expect(launchSync).toHaveBeenCalledWith(
+        'docker',
+        ['logs', 'latest123'],
+        expect.objectContaining({ env: process.env })
+      );
     });
 
     it('should use specific iteration when provided', async () => {
@@ -886,10 +893,11 @@ Last line`;
 
       await logsCommand('17', '2');
 
-      expect(launchSync).toHaveBeenCalledWith('docker', [
-        'logs',
-        'specific123',
-      ]);
+      expect(launchSync).toHaveBeenCalledWith(
+        'docker',
+        ['logs', 'specific123'],
+        expect.objectContaining({ env: process.env })
+      );
     });
   });
 
@@ -914,7 +922,11 @@ Last line`;
 
       await logsCommand('18');
 
-      expect(launchSync).toHaveBeenCalledWith('docker', ['logs', 'single123']);
+      expect(launchSync).toHaveBeenCalledWith(
+        'docker',
+        ['logs', 'single123'],
+        expect.objectContaining({ env: process.env })
+      );
     });
 
     it('should handle task with many iterations', async () => {
@@ -933,7 +945,11 @@ Last line`;
 
       await logsCommand('19', '5');
 
-      expect(launchSync).toHaveBeenCalledWith('docker', ['logs', 'many123']);
+      expect(launchSync).toHaveBeenCalledWith(
+        'docker',
+        ['logs', 'many123'],
+        expect.objectContaining({ env: process.env })
+      );
     });
   });
 
@@ -968,6 +984,144 @@ Last line`;
       await logsCommand('999'); // Non-existent task
 
       expect(mockTelemetry?.shutdown).toHaveBeenCalled();
+    });
+  });
+
+  describe('sandboxMetadata', () => {
+    // Helper to create a test task with container ID and sandboxMetadata
+    const createTestTaskWithSandboxMetadata = async (
+      id: number,
+      title: string,
+      containerId: string,
+      sandboxMetadata: Record<string, unknown>
+    ) => {
+      const taskPath = join(testDir, '.rover', 'tasks', id.toString());
+      const task = TaskDescriptionManager.create(taskPath, {
+        id,
+        title,
+        description: 'Test task description',
+        inputs: new Map(),
+        workflowName: 'swe',
+      });
+
+      // Create a git worktree for the task
+      const worktreePath = join('.rover', 'tasks', id.toString(), 'workspace');
+      const branchName = `rover-task-${id}`;
+
+      // Get the real launchSync for Git operations
+      const { launchSync: realLaunchSync } = (await vi.importActual(
+        'rover-core'
+      )) as any;
+      realLaunchSync('git', [
+        'worktree',
+        'add',
+        worktreePath,
+        '-b',
+        branchName,
+      ]);
+      task.setWorkspace(join(testDir, worktreePath), branchName);
+
+      // Set container ID with sandboxMetadata
+      task.setContainerInfo(containerId, 'running', sandboxMetadata);
+
+      return task;
+    };
+
+    it('should pass stored DOCKER_HOST from sandboxMetadata to launchSync when retrieving logs', async () => {
+      const customDockerHost = 'tcp://192.168.1.100:2375';
+      await createTestTaskWithSandboxMetadata(
+        30,
+        'Sandbox Metadata Task',
+        'sandboxmeta123',
+        { dockerHost: customDockerHost }
+      );
+      createIterations(30, [1]);
+
+      const { launchSync } = await import('rover-core');
+      vi.mocked(launchSync).mockReturnValue({
+        stdout: 'Sandbox metadata logs',
+        stderr: '',
+        status: 0,
+        signal: null,
+        error: undefined,
+        pid: 1234,
+      } as any);
+
+      await logsCommand('30');
+
+      // Verify launchSync was called
+      expect(launchSync).toHaveBeenCalled();
+      // Check that the env contains DOCKER_HOST
+      const callArgs = vi
+        .mocked(launchSync)
+        .mock.calls.find(
+          call => call[0] === 'docker' && call[1]?.includes('logs')
+        );
+      expect(callArgs).toBeDefined();
+      expect(callArgs![2]?.env?.DOCKER_HOST).toBe(customDockerHost);
+    });
+
+    it('should pass stored DOCKER_HOST from sandboxMetadata to launch when following logs', async () => {
+      const customDockerHost = 'unix:///custom/docker.sock';
+      await createTestTaskWithSandboxMetadata(
+        31,
+        'Sandbox Metadata Follow Task',
+        'sandboxmetafollow123',
+        { dockerHost: customDockerHost }
+      );
+      createIterations(31, [1]);
+
+      const { launch } = await import('rover-core');
+      vi.mocked(launch).mockResolvedValue({
+        exitCode: 0,
+        stdout: '',
+        stderr: '',
+        failed: false,
+        timedOut: false,
+        isCanceled: false,
+        killed: false,
+      } as any);
+
+      await logsCommand('31', undefined, { follow: true });
+
+      // Verify launch was called
+      expect(launch).toHaveBeenCalled();
+      // Check that the env contains DOCKER_HOST
+      const callArgs = vi.mocked(launch).mock.calls[0];
+      expect(callArgs[2]?.env?.DOCKER_HOST).toBe(customDockerHost);
+    });
+
+    it('should use current process.env when no sandboxMetadata is stored', async () => {
+      await createTestTaskWithContainer(
+        32,
+        'No Sandbox Metadata Task',
+        'nosandboxmeta123'
+      );
+      createIterations(32, [1]);
+
+      const { launchSync } = await import('rover-core');
+      vi.mocked(launchSync).mockReturnValue({
+        stdout: 'No sandbox metadata logs',
+        stderr: '',
+        status: 0,
+        signal: null,
+        error: undefined,
+        pid: 1234,
+      } as any);
+
+      await logsCommand('32');
+
+      // Verify launchSync was called
+      expect(launchSync).toHaveBeenCalled();
+      // Check that the env is process.env (no DOCKER_HOST override from sandboxMetadata)
+      const callArgs = vi
+        .mocked(launchSync)
+        .mock.calls.find(
+          call => call[0] === 'docker' && call[1]?.includes('logs')
+        );
+      expect(callArgs).toBeDefined();
+      // When sandboxMetadata is undefined, the env should be process.env
+      expect(callArgs![2]?.env).toBe(process.env);
     });
   });
 });

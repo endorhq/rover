@@ -5,7 +5,11 @@ import { TaskNotFoundError } from 'rover-schemas';
 import { getTelemetry } from '../lib/telemetry.js';
 import { showTips } from '../utils/display.js';
 import { exitWithError, exitWithSuccess } from '../utils/exit.js';
-import { requireProjectContext } from '../lib/context.js';
+import {
+  isJsonMode,
+  setJsonMode,
+  requireProjectContext,
+} from '../lib/context.js';
 import type { CommandDefinition } from '../types.js';
 
 /**
@@ -20,12 +24,22 @@ import type { CommandDefinition } from '../types.js';
  * @param options - Command options
  * @param options.onlyFiles - Show only changed filenames with stats
  * @param options.branch - Compare against a specific branch instead of source
+ * @param options.json - Output in JSON format
  */
 const diffCommand = async (
   taskId: string,
   filePath?: string,
-  options: { onlyFiles?: boolean; branch?: string } = {}
+  options: {
+    onlyFiles?: boolean;
+    branch?: string;
+    base?: boolean;
+    json?: boolean;
+  } = {}
 ) => {
+  if (options.json !== undefined) {
+    setJsonMode(options.json);
+  }
+
   const telemetry = getTelemetry();
   // Convert string taskId to number
   const numericTaskId = parseInt(taskId, 10);
@@ -83,6 +97,52 @@ const diffCommand = async (
       return;
     }
 
+    // Check for mutual exclusivity of --base and --branch
+    if (options.base && options.branch) {
+      await exitWithError(
+        {
+          success: false,
+          error: 'Cannot use --base and --branch together',
+        },
+        {
+          tips: [
+            'Use ' +
+              colors.cyan('--base') +
+              ' to compare against the starting commit',
+            'Use ' +
+              colors.cyan('--branch <name>') +
+              ' to compare against a specific branch',
+          ],
+          telemetry,
+        }
+      );
+      return;
+    }
+
+    // Handle --base flag: use the base commit as the comparison point
+    let compareRef = options.branch;
+    if (options.base) {
+      if (!task.baseCommit) {
+        await exitWithError(
+          {
+            success: false,
+            error:
+              'This task was created before base commit tracking. Use `--branch <name>` instead.',
+          },
+          {
+            tips: [
+              'Use ' +
+                colors.cyan(`rover diff ${numericTaskId} --branch main`) +
+                ' to compare with the main branch',
+            ],
+            telemetry,
+          }
+        );
+        return;
+      }
+      compareRef = task.baseCommit;
+    }
+
     // Check if we're in a git repository
     if (!git.isGitRepo()) {
       await exitWithError(
@@ -95,17 +155,22 @@ const diffCommand = async (
       return;
     }
 
-    console.log(colors.bold(`Task ${numericTaskId} Changes`));
-    console.log(colors.gray('├── Title: ') + task.title);
-    console.log(colors.gray('├── Workspace: ') + task.worktreePath);
+    if (!isJsonMode()) {
+      console.log(colors.bold(`Task ${numericTaskId} Changes`));
+      console.log(colors.gray('├── Title: ') + task.title);
+      console.log(colors.gray('├── Workspace: ') + task.worktreePath);
 
-    if (options.branch) {
-      console.log(colors.gray('├── Task Branch: ') + task.branchName);
-      console.log(
-        colors.gray('└── Comparing with: ') + colors.cyan(options.branch)
-      );
-    } else {
-      console.log(colors.gray('└── Task Branch: ') + task.branchName);
+      if (compareRef) {
+        console.log(colors.gray('├── Task Branch: ') + task.branchName);
+        const compareLabel = options.base
+          ? `base commit (${compareRef.substring(0, 7)})`
+          : compareRef;
+        console.log(
+          colors.gray('└── Comparing with: ') + colors.cyan(compareLabel)
+        );
+      } else {
+        console.log(colors.gray('└── Task Branch: ') + task.branchName);
+      }
     }
 
     telemetry?.eventDiff();
@@ -118,9 +183,27 @@ const diffCommand = async (
           const diffResult = await git.diffStats({
             worktreePath: task.worktreePath,
             filePath: filePath,
-            branch: options.branch,
-            includeUntracked: !options.branch,
+            branch: compareRef,
+            includeUntracked: !compareRef,
           });
+
+          if (isJsonMode()) {
+            const jsonOutput = {
+              success: true,
+              taskId: numericTaskId,
+              title: task.title,
+              branchName: task.branchName,
+              worktreePath: task.worktreePath,
+              compareRef: compareRef || null,
+              files: diffResult.files.map(file => ({
+                path: file.path,
+                insertions: file.insertions,
+                deletions: file.deletions,
+              })),
+            };
+            await exitWithSuccess(null, jsonOutput, { telemetry });
+            return;
+          }
 
           if (diffResult.files.length === 0) {
             if (filePath) {
@@ -153,11 +236,25 @@ const diffCommand = async (
             worktreePath: task.worktreePath,
             filePath: filePath,
             onlyFiles: options.onlyFiles,
-            branch: options.branch,
-            includeUntracked: !options.branch, // Only include untracked when not comparing branches
+            branch: compareRef,
+            includeUntracked: !compareRef, // Only include untracked when not comparing to a ref
           });
 
           const diffOutput = diffResult.stdout?.toString();
+
+          if (isJsonMode()) {
+            const jsonOutput = {
+              success: true,
+              taskId: numericTaskId,
+              title: task.title,
+              branchName: task.branchName,
+              worktreePath: task.worktreePath,
+              compareRef: compareRef || null,
+              diff: diffOutput?.trim() || '',
+            };
+            await exitWithSuccess(null, jsonOutput, { telemetry });
+            return;
+          }
 
           if (diffOutput?.trim() === '') {
             // No differences found
@@ -196,6 +293,19 @@ const diffCommand = async (
       } catch (gitError: any) {
         if (gitError.status === 1 && gitError.stderr.toString().trim() === '') {
           // Exit code 1 with no stderr usually means no differences
+          if (isJsonMode()) {
+            const jsonOutput = {
+              success: true,
+              taskId: numericTaskId,
+              title: task.title,
+              branchName: task.branchName,
+              worktreePath: task.worktreePath,
+              compareRef: compareRef || null,
+              ...(options.onlyFiles ? { files: [] } : { diff: '' }),
+            };
+            await exitWithSuccess(null, jsonOutput, { telemetry });
+            return;
+          }
           if (filePath) {
             console.log(
               colors.yellow(`No changes found for file: ${filePath}`)
@@ -215,34 +325,43 @@ const diffCommand = async (
     }
 
     // Show additional context if not showing only files
-    const tips = [];
+    if (!isJsonMode()) {
+      const tips = [];
 
-    if (!options.onlyFiles) {
-      tips.push(
-        'Use ' +
-          colors.cyan(`rover diff ${numericTaskId} --only-files`) +
-          ' to see only changed filenames'
-      );
-    }
+      if (!options.onlyFiles) {
+        tips.push(
+          'Use ' +
+            colors.cyan(`rover diff ${numericTaskId} --only-files`) +
+            ' to see only changed filenames'
+        );
+      }
 
-    if (!filePath) {
-      tips.push(
-        'Use ' +
-          colors.cyan(`rover diff ${numericTaskId} <file>`) +
-          ' to see diff for a specific file'
-      );
-    }
+      if (!filePath) {
+        tips.push(
+          'Use ' +
+            colors.cyan(`rover diff ${numericTaskId} <file>`) +
+            ' to see diff for a specific file'
+        );
+      }
 
-    if (!options.branch) {
-      tips.push(
-        'Use ' +
-          colors.cyan(`rover diff ${numericTaskId} --branch <branchName>`) +
-          ' to compare changes with a specific branch'
-      );
-    }
+      if (!compareRef) {
+        if (task.baseCommit) {
+          tips.push(
+            'Use ' +
+              colors.cyan(`rover diff ${numericTaskId} --base`) +
+              ' to compare against the starting commit'
+          );
+        }
+        tips.push(
+          'Use ' +
+            colors.cyan(`rover diff ${numericTaskId} --branch <branchName>`) +
+            ' to compare changes with a specific branch'
+        );
+      }
 
-    if (tips.length > 0) {
-      showTips(tips);
+      if (tips.length > 0) {
+        showTips(tips);
+      }
     }
 
     await exitWithSuccess(null, { success: true }, { telemetry });

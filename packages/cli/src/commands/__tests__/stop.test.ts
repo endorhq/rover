@@ -374,4 +374,75 @@ describe('stop command', () => {
       );
     });
   });
+
+  describe('sandboxMetadata', () => {
+    it('should pass stored sandboxMetadata to createSandbox when stopping container', async () => {
+      const { createSandbox } = await import('../../lib/sandbox/index.js');
+      const task = createTestTask(13, 'Sandbox Metadata Stop Task');
+
+      // Set container info with custom sandboxMetadata
+      const customDockerHost = 'tcp://192.168.1.100:2375';
+      task.setContainerInfo('container-sandboxmeta', 'running', {
+        dockerHost: customDockerHost,
+      });
+      task.markInProgress();
+
+      await stopCommand('13', { json: true });
+
+      // Verify createSandbox was called
+      expect(createSandbox).toHaveBeenCalled();
+      // Verify the third argument (options) contains the correct sandboxMetadata
+      const callArgs = vi.mocked(createSandbox).mock.calls[0];
+      expect(callArgs[2]).toEqual(
+        expect.objectContaining({
+          sandboxMetadata: { dockerHost: customDockerHost },
+        })
+      );
+    });
+
+    it('should pass undefined sandboxMetadata to createSandbox when no metadata is stored', async () => {
+      const { createSandbox } = await import('../../lib/sandbox/index.js');
+      const task = createTestTask(14, 'No Sandbox Metadata Stop Task');
+
+      // Set container info without sandboxMetadata
+      task.setContainerInfo('container-no-sandboxmeta', 'running');
+      task.markInProgress();
+
+      await stopCommand('14', { json: true });
+
+      // Verify createSandbox was called
+      expect(createSandbox).toHaveBeenCalled();
+      // Verify the third argument (options) has undefined sandboxMetadata
+      const callArgs = vi.mocked(createSandbox).mock.calls[0];
+      expect(callArgs[2]).toEqual(
+        expect.objectContaining({
+          sandboxMetadata: undefined,
+        })
+      );
+    });
+
+    it('should preserve sandboxMetadata across task reload after stop', async () => {
+      const task = createTestTask(15, 'Reload Sandbox Metadata Task');
+
+      // Set container info with custom sandboxMetadata
+      const customDockerHost = 'unix:///custom/docker.sock';
+      task.setContainerInfo('container-reload', 'running', {
+        dockerHost: customDockerHost,
+      });
+      task.markInProgress();
+
+      // Verify sandboxMetadata was set
+      expect(task.sandboxMetadata).toEqual({ dockerHost: customDockerHost });
+
+      await stopCommand('15', { json: true });
+
+      // After stop, container info is cleared so sandboxMetadata should be undefined
+      const reloadedTask = TaskDescriptionManager.load(
+        join(testDir, '.rover', 'tasks', '15'),
+        15
+      );
+      // Container info (including sandboxMetadata) gets cleared by setContainerInfo('', '')
+      expect(reloadedTask.containerId).toBe('');
+    });
+  });
 });

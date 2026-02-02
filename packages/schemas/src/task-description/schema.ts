@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { NetworkConfigSchema } from '../project-config/schema.js';
 
 // Schema version for migrations
-export const CURRENT_TASK_DESCRIPTION_SCHEMA_VERSION = '1.3';
+export const CURRENT_TASK_DESCRIPTION_SCHEMA_VERSION = '1.5';
 
 // Task status schema
 export const TaskStatusSchema = z.enum([
@@ -59,9 +59,11 @@ export const TaskDescriptionSchema = z.object({
   agent: z.string().optional(),
   agentModel: z.string().optional(),
   sourceBranch: z.string().optional(),
+  baseCommit: z.string().optional(),
 
-  // Docker Execution
+  // Sandbox Execution
   containerId: z.string().optional(),
+  sandboxMetadata: z.record(z.string(), z.unknown()).optional(),
   executionStatus: z.string().optional(),
   runningAt: z.string().datetime().optional(),
   errorAt: z.string().datetime().optional(),
@@ -82,6 +84,10 @@ export const TaskDescriptionSchema = z.object({
 
   // Task source (origin tracking - github, manual, etc.)
   source: TaskSourceSchema.optional(),
+
+  // Hook tracking - stores the lastStatusCheck timestamp when onComplete hook was last fired
+  // Compared against lastStatusCheck to detect new terminal status transitions
+  onCompleteHookFiredAt: z.string().datetime().optional(),
 
   // Metadata
   version: z.string(),

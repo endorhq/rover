@@ -26,12 +26,6 @@ import { formatTaskStatus, statusColor } from '../utils/task-status.js';
 import type { CommandDefinition } from '../types.js';
 
 /**
- * Track previous task statuses to detect transitions for onComplete hooks.
- * Module-level to persist across watch mode polling cycles.
- */
-const previousTaskStatuses = new Map<number, string>();
-
-/**
  * Format duration from start to now or completion
  */
 const formatDuration = (startTime?: string, endTime?: string): string => {
@@ -250,21 +244,20 @@ const listCommand = async (
       }
     }
 
-    // Update task status and detect transitions for onComplete hooks
-    // (hooks only apply in single-project context)
+    // Update task status and detect completions for onComplete hooks
     for (const { task, project: projectData } of tasksWithProjects) {
       try {
-        // Get previous status before update
-        const previousStatus = previousTaskStatuses.get(task.id);
-
         // Update status from iteration
         task.updateStatusFromIteration();
         const currentStatus = task.status;
 
-        // Detect NEW transition to COMPLETED or FAILED
-        const isNewCompletion =
-          previousStatus !== currentStatus &&
-          (currentStatus === 'COMPLETED' || currentStatus === 'FAILED');
+        // Check if this is a terminal status that should trigger onComplete hooks
+        const isTerminalStatus =
+          currentStatus === 'COMPLETED' || currentStatus === 'FAILED';
+
+        // Check if hook has already been fired for this status transition
+        const hookAlreadyFired =
+          task.onCompleteHookFiredAt === task.lastStatusCheck;
 
         // Load project config for hooks per project
         let projectConfig: ProjectConfigManager | undefined;
@@ -276,10 +269,10 @@ const listCommand = async (
           }
         }
 
-        // Execute onComplete hooks if configured and this is a new completion
-        // Only execute hooks in single-project mode
+        // Execute onComplete hooks if configured and not already fired for this status
         if (
-          isNewCompletion &&
+          isTerminalStatus &&
+          !hookAlreadyFired &&
           projectConfig?.hooks?.onComplete?.length &&
           projectData?.path
         ) {
@@ -294,10 +287,10 @@ const listCommand = async (
             },
             'onComplete'
           );
-        }
 
-        // Update tracking for next iteration
-        previousTaskStatuses.set(task.id, currentStatus);
+          // Record that hook was fired for this status transition (persists to task file)
+          task.setOnCompleteHookFiredAt(task.lastStatusCheck!);
+        }
       } catch (err) {
         if (!isJsonMode()) {
           console.log(
@@ -449,16 +442,6 @@ const listCommand = async (
 
     // Watch mode (configurable refresh interval, default 3 seconds)
     if (options.watch) {
-      // Watch mode is only supported in scoped (single project) mode
-      if (!project) {
-        console.log(
-          colors.yellow(
-            'Watch mode is only supported when inside a project directory'
-          )
-        );
-        return;
-      }
-
       // CLI argument takes precedence, then settings, then default (3s)
       let intervalSeconds: number;
       if (typeof options.watch === 'string') {

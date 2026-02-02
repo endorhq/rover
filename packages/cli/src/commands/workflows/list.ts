@@ -8,7 +8,7 @@ import { CLIJsonOutput } from '../../types.js';
 import { exitWithError, exitWithSuccess } from '../../utils/exit.js';
 import { Workflow } from 'rover-schemas';
 import { getTelemetry } from '../../lib/telemetry.js';
-import { isJsonMode, setJsonMode } from '../../lib/context.js';
+import { getProjectPath, isJsonMode, setJsonMode } from '../../lib/context.js';
 import type { CommandDefinition } from '../../types.js';
 
 interface ListWorkflowsCommandOptions {
@@ -52,7 +52,7 @@ const listWorkflowsCommand = async (options: ListWorkflowsCommandOptions) => {
     setJsonMode(options.json);
   }
 
-  const workflowStore = initWorkflowStore();
+  const workflowStore = initWorkflowStore(getProjectPath() ?? process.cwd());
   const output: ListWorkflowsOutput = {
     success: false,
     workflows: [],
@@ -137,6 +137,7 @@ const listWorkflowsCommand = async (options: ListWorkflowsCommandOptions) => {
 
 export default {
   name: 'list',
+  parent: 'workflows',
   description: 'List all available workflows',
   requireProject: false,
   action: listWorkflowsCommand,

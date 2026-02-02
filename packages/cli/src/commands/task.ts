@@ -3,7 +3,11 @@ import colors from 'ansi-colors';
 import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
-import { getAIAgentTool, getUserAIAgent } from '../lib/agents/index.js';
+import {
+  getAIAgentTool,
+  getUserAIAgent,
+  getUserDefaultModel,
+} from '../lib/agents/index.js';
 import {
   ProjectConfigManager,
   IterationManager,
@@ -155,7 +159,11 @@ const updateTaskMetadata = (
 
       // Handle Docker execution metadata
       if (updates.containerId && updates.executionStatus) {
-        task.setContainerInfo(updates.containerId, updates.executionStatus);
+        task.setContainerInfo(
+          updates.containerId,
+          updates.executionStatus,
+          updates.sandboxMetadata
+        );
       } else if (updates.executionStatus) {
         task.updateExecutionStatus(updates.executionStatus, {
           exitCode: updates.exitCode,
@@ -204,6 +212,7 @@ interface TaskTaskOutput extends CLIJsonOutput {
 interface TaskOptions {
   workflow?: string;
   fromGithub?: string;
+  includeComments?: boolean;
   yes?: boolean;
   sourceBranch?: string;
   targetBranch?: string;
@@ -214,6 +223,38 @@ interface TaskOptions {
   networkAllow?: string[];
   networkBlock?: string[];
 }
+
+/**
+ * Format a date string to a more readable format (YYYY-MM-DD)
+ */
+const formatCommentDate = (dateString: string): string => {
+  if (!dateString) return '';
+  try {
+    const date = new Date(dateString);
+    return date.toISOString().split('T')[0];
+  } catch {
+    return dateString;
+  }
+};
+
+/**
+ * Format GitHub comments as markdown to append to the issue body
+ */
+const formatCommentsAsMarkdown = (
+  comments: Array<{ author: string; body: string; createdAt: string }>
+): string => {
+  if (!comments || comments.length === 0) return '';
+
+  const formattedComments = comments
+    .map(comment => {
+      const date = formatCommentDate(comment.createdAt);
+      const dateStr = date ? ` (${date})` : '';
+      return `**@${comment.author}**${dateStr}:\n${comment.body}`;
+    })
+    .join('\n\n');
+
+  return `\n\n---\n## Comments\n\n${formattedComments}`;
+};
 
 /**
  * Build NetworkConfig from CLI options
@@ -337,8 +378,23 @@ const createTaskForAgent = async (
   try {
     git.createWorktree(worktreePath, branchName, baseBranch);
 
+    // Capture the base commit hash (the commit when the worktree was created)
+    const baseCommit = git.getCommitHash('HEAD', { worktreePath });
+    if (baseCommit) {
+      task.setBaseCommit(baseCommit);
+    }
+
     // Copy user .env development files
     copyEnvironmentFiles(projectPath, worktreePath);
+
+    // Configure sparse checkout to exclude files matching exclude patterns
+    const projectConfig = ProjectConfigManager.load(projectPath);
+    if (
+      projectConfig.excludePatterns &&
+      projectConfig.excludePatterns.length > 0
+    ) {
+      git.setupSparseCheckout(worktreePath, projectConfig.excludePatterns);
+    }
   } catch (error) {
     processManager?.failLastItem();
     console.error(colors.red('Error creating git workspace: ' + error));
@@ -389,6 +445,9 @@ const createTaskForAgent = async (
         containerId,
         executionStatus: 'running',
         runningAt: new Date().toISOString(),
+        sandboxMetadata: process.env.DOCKER_HOST
+          ? { dockerHost: process.env.DOCKER_HOST }
+          : undefined,
       },
       jsonMode
     );
@@ -458,7 +517,15 @@ const createTaskForAgent = async (
 const taskCommand = async (initPrompt?: string, options: TaskOptions = {}) => {
   const telemetry = getTelemetry();
   // Extract options
-  const { yes, json, fromGithub, sourceBranch, targetBranch, agent } = options;
+  const {
+    yes,
+    json,
+    fromGithub,
+    includeComments,
+    sourceBranch,
+    targetBranch,
+    agent,
+  } = options;
 
   // Set global JSON mode for tests and backwards compatibility
   if (json !== undefined) {
@@ -470,6 +537,21 @@ const taskCommand = async (initPrompt?: string, options: TaskOptions = {}) => {
   const jsonOutput: TaskTaskOutput = {
     success: false,
   };
+
+  // Validate --include-comments requires --from-github
+  if (includeComments && !fromGithub) {
+    jsonOutput.error =
+      '--include-comments requires --from-github to be specified';
+    await exitWithError(jsonOutput, {
+      tips: [
+        'Use ' +
+          colors.cyan('rover task --from-github <issue> --include-comments') +
+          ' to include issue comments',
+      ],
+      telemetry: getTelemetry(),
+    });
+    return;
+  }
 
   // Get project context
   let project;
@@ -520,6 +602,12 @@ const taskCommand = async (initPrompt?: string, options: TaskOptions = {}) => {
       selectedAgents = [{ agent: AI_AGENT.Claude, model: undefined }];
     }
   }
+
+  // Fill in default models for agents without a specified model
+  selectedAgents = selectedAgents.map(({ agent: agentName, model }) => ({
+    agent: agentName,
+    model: model ?? getUserDefaultModel(agentName),
+  }));
 
   // Validate all agents before proceeding
   for (const { agent: selectedAiAgent } of selectedAgents) {
@@ -660,9 +748,22 @@ const taskCommand = async (initPrompt?: string, options: TaskOptions = {}) => {
       }
 
       try {
-        const issueData = await github.fetchIssue(fromGithub, remoteUrl);
+        const issueData = await github.fetchIssue(fromGithub, remoteUrl, {
+          includeComments,
+        });
         if (issueData) {
+          // Start with the issue body
           description = issueData.body;
+
+          // Append comments if they were included
+          if (
+            includeComments &&
+            issueData.comments &&
+            issueData.comments.length > 0
+          ) {
+            description += formatCommentsAsMarkdown(issueData.comments);
+          }
+
           inputsData.set('description', description);
 
           if (!issueData.body || issueData.body.length == 0) {
@@ -733,7 +834,7 @@ const taskCommand = async (initPrompt?: string, options: TaskOptions = {}) => {
         }
       } catch (err) {
         if (err instanceof GitHubError) {
-          jsonOutput.error = `Failed to fetch issue from GitHub: ${err.cause}`;
+          jsonOutput.error = `Failed to fetch issue from GitHub: ${err.message}`;
         } else {
           jsonOutput.error = `Failed to fetch issue from GitHub: ${err}`;
         }
