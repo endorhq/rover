@@ -42,6 +42,8 @@ interface FileChangeStat {
 interface TaskInspectionOutput {
   /** Whether the operation was successful */
   success: boolean;
+  /** AI agent used for the task */
+  agent?: string;
   /** The base commit hash when the worktree was created */
   baseCommit?: string;
   /** Git branch name for the task worktree */
@@ -90,8 +92,6 @@ interface TaskInspectionOutput {
   workflowName: string;
   /** Path to the git worktree for this task */
   worktreePath: string;
-  /** AI agent used for this task */
-  agent?: string;
   /** Model used by the AI agent */
   agentModel?: string;
   /** Combined agent:model display string */
@@ -128,6 +128,7 @@ const jsonErrorOutput = (
 ): TaskInspectionOutput => {
   return {
     success: false,
+    agent: task?.agent,
     baseCommit: task?.baseCommit,
     branchName: task?.branchName || '',
     completedAt: task?.completedAt,
