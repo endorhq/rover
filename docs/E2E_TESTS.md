@@ -30,7 +30,6 @@ maintained by this automation, mentioning that these files **SHOULD
 NOT** be manually modified. Mention what `E2E_TESTS.md` file or files
 should be modified in order to have an impact on the generated code.
 
-
 ## Tests location
 
 Every package conforming Rover **MIGHT** have its own e2e tests. You
@@ -40,7 +39,6 @@ tested on each e2e test directory of every package.
 You can find a `E2E_TESTS.md` file on all packages that contain an e2e
 suite that you have to maintain. This file describes the e2e tests
 that must be maintained for that specific feature.
-
 
 ## Tests execution
 
@@ -75,6 +73,7 @@ pnpm e2e-test:mock
 #### Running real agent tests
 
 Real agent tests require:
+
 - Docker running and able to pull the rover agent image
 - A valid AI agent (Claude CLI, Gemini CLI, etc.) installed and authenticated
 
@@ -102,12 +101,16 @@ ROVER_E2E_REAL_AGENT=true pnpm e2e-test --grep "task restart"
 ### Skip documentation requirements
 
 All skipped tests must have a comment block explaining:
+
 - **Why** the test is skipped (e.g., requires real agent execution)
 - **TODO** with actionable instructions on how to unskip the test
 
-Tests use `describe.skipIf(SKIP_REAL_AGENT_TESTS)` or
-`it.skipIf(SKIP_REAL_AGENT_TESTS)` from the `e2e-utils.ts` module,
-which automatically skips tests unless `ROVER_E2E_REAL_AGENT=true`.
+**IMPORTANT**: Tests **MUST** use `describe.skipIf(SKIP_REAL_AGENT_TESTS)` or
+`it.skipIf(SKIP_REAL_AGENT_TESTS)` from the `e2e-utils.ts` module to conditionally
+skip tests. **NEVER** comment out `describe` or `it` blocks. Commented-out tests
+will not run even when `ROVER_E2E_REAL_AGENT=true` is set, defeating the purpose
+of conditional test execution. Always use the `skipIf` helper to ensure tests can
+be enabled via environment variable.
 
 If you are focusing on a specific package, you can run `pnpm e2e-test`
 on that package if that script is present in the `package.json` file,

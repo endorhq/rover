@@ -7,7 +7,7 @@
  * Any manual changes will be overwritten by the automation.
  *
  * To modify these tests, update the specification files:
- * - /E2E_TESTS.md (root-level testing philosophy and constraints)
+ * - /docs/E2E_TESTS.md (root-level testing philosophy and constraints)
  * - /packages/cli/E2E_TESTS.md (CLI-specific test specifications)
  *
  * Then run the /update-e2e-tests command to regenerate this file.
@@ -216,19 +216,19 @@ exit 0
 
     // This test requires a real agent to make progress in the container.
     // The mock Docker doesn't run real containers, so tasks never reach COMPLETED/FAILED status.
-    // it('should restart a task in FAILED status', async () => {
-    //   await runRover(['task', '-y', 'Create a hello world script']);
-    //   const status = await waitForTaskStatus(1, ['COMPLETED', 'FAILED']);
-    //   if (status === 'FAILED') {
-    //     const restartResult = await runRover(['restart', '1', '--json']);
-    //     expect(restartResult.exitCode).toBe(0);
-    //     await waitForTaskStatus(1, ['IN_PROGRESS', 'COMPLETED', 'FAILED']);
-    //   } else {
-    //     await runRover(['stop', '1']);
-    //     const restartResult = await runRover(['restart', '1', '--json']);
-    //     expect(restartResult.exitCode).toBe(0);
-    //   }
-    // });
+    it('should restart a task in FAILED status', async () => {
+      await runRover(['task', '-y', 'Create a hello world script']);
+      const status = await waitForTaskStatus(1, ['COMPLETED', 'FAILED']);
+      if (status === 'FAILED') {
+        const restartResult = await runRover(['restart', '1', '--json']);
+        expect(restartResult.exitCode).toBe(0);
+        await waitForTaskStatus(1, ['IN_PROGRESS', 'COMPLETED', 'FAILED']);
+      } else {
+        await runRover(['stop', '1']);
+        const restartResult = await runRover(['restart', '1', '--json']);
+        expect(restartResult.exitCode).toBe(0);
+      }
+    });
   });
 
   /**
@@ -248,16 +248,16 @@ exit 0
   describe.skipIf(SKIP_REAL_AGENT_TESTS)('status validation', () => {
     // This test requires a real agent to make progress in the container.
     // The mock Docker doesn't run real containers, so tasks never reach COMPLETED/FAILED status.
-    // it('should fail when trying to restart a task in COMPLETED status', async () => {
-    //   await runRover(['task', '-y', 'Create a hello world script']);
-    //   await waitForTaskStatus(1, ['COMPLETED', 'FAILED']);
-    //   const inspectResult = await runRover(['inspect', '1', '--json']);
-    //   const task = JSON.parse(inspectResult.stdout);
-    //   if (task.status === 'COMPLETED') {
-    //     const restartResult = await runRover(['restart', '1', '--json']);
-    //     expect(restartResult.exitCode).not.toBe(0);
-    //   }
-    // });
+    it('should fail when trying to restart a task in COMPLETED status', async () => {
+      await runRover(['task', '-y', 'Create a hello world script']);
+      await waitForTaskStatus(1, ['COMPLETED', 'FAILED']);
+      const inspectResult = await runRover(['inspect', '1', '--json']);
+      const task = JSON.parse(inspectResult.stdout);
+      if (task.status === 'COMPLETED') {
+        const restartResult = await runRover(['restart', '1', '--json']);
+        expect(restartResult.exitCode).not.toBe(0);
+      }
+    });
 
     it('should fail when trying to restart a running task', async () => {
       await runRover(['task', '-y', 'Create a hello world script']);

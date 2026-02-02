@@ -7,7 +7,7 @@
  * Any manual changes will be overwritten by the automation.
  *
  * To modify these tests, update the specification files:
- * - /E2E_TESTS.md (root-level testing philosophy and constraints)
+ * - /docs/E2E_TESTS.md (root-level testing philosophy and constraints)
  * - /packages/cli/E2E_TESTS.md (CLI-specific test specifications)
  *
  * Then run the /update-e2e-tests command to regenerate this file.

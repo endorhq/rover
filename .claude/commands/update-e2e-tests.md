@@ -13,7 +13,7 @@ You must complete all four phases in order.
 
 ## Phase: Discover E2E specifications and existing tests
 
-1. Find all `E2E_TESTS.md` files in the project by searching recursively from the project root. Read the root-level `E2E_TESTS.md` first to understand the overall testing philosophy, constraints, and execution methodology.
+1. Find all `E2E_TESTS.md` files in the project by searching recursively from the project root. Read the root-level `docs/E2E_TESTS.md` first to understand the overall testing philosophy, constraints, and execution methodology.
 
 2. For each `E2E_TESTS.md` file found in a package directory, read it fully and extract:
    - All test suites listed
@@ -41,7 +41,7 @@ For each package that has an `E2E_TESTS.md` file:
    - **Missing features**: Features within a suite that have no corresponding test case
    - **Missing preconditions/postconditions**: Setup or teardown that is described but not implemented
    - **Inconsistencies**: Tests that exist but do not match the current spec (e.g., testing outdated behavior, wrong assertions, missing flags or options)
-   - **Structural issues**: Tests that violate the constraints from the root `E2E_TESTS.md` (e.g., tests that depend on execution order, share persistent state between suites)
+   - **Structural issues**: Tests that violate the constraints from the root `docs/E2E_TESTS.md` (e.g., tests that depend on execution order, share persistent state between suites)
 
 3. Present a summary to the user showing:
    - The total number of suites and features in the spec

@@ -7,7 +7,7 @@
  * Any manual changes will be overwritten by the automation.
  *
  * To modify these tests, update the specification files:
- * - /E2E_TESTS.md (root-level testing philosophy and constraints)
+ * - /docs/E2E_TESTS.md (root-level testing philosophy and constraints)
  * - /packages/cli/E2E_TESTS.md (CLI-specific test specifications)
  *
  * Then run the /update-e2e-tests command to regenerate this file.
@@ -196,12 +196,17 @@ exit 0
   describe.skipIf(SKIP_REAL_AGENT_TESTS)('instruction-based iteration', () => {
     // This test requires a real agent to make progress in the container.
     // The mock Docker doesn't run real containers, so tasks never reach COMPLETED status.
-    // it('should create a new iteration with refinement instructions', async () => {
-    //   await runRover(['task', '-y', 'Create a hello world script']);
-    //   await waitForTaskStatus(1, ['COMPLETED', 'FAILED']);
-    //   const result = await runRover(['iterate', '1', 'Please also add error handling to the script', '--json']);
-    //   expect(result.exitCode).toBeDefined();
-    // });
+    it('should create a new iteration with refinement instructions', async () => {
+      await runRover(['task', '-y', 'Create a hello world script']);
+      await waitForTaskStatus(1, ['COMPLETED', 'FAILED']);
+      const result = await runRover([
+        'iterate',
+        '1',
+        'Please also add error handling to the script',
+        '--json',
+      ]);
+      expect(result.exitCode).toBeDefined();
+    });
 
     it('should not allow iteration on a currently running task', async () => {
       // Create a task

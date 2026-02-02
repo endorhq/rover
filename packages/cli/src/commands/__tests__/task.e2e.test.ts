@@ -7,7 +7,7 @@
  * Any manual changes will be overwritten by the automation.
  *
  * To modify these tests, update the specification files:
- * - /E2E_TESTS.md (root-level testing philosophy and constraints)
+ * - /docs/E2E_TESTS.md (root-level testing philosophy and constraints)
  * - /packages/cli/E2E_TESTS.md (CLI-specific test specifications)
  *
  * Then run the /update-e2e-tests command to regenerate this file.
@@ -279,26 +279,26 @@ exit 0
   describe.skipIf(SKIP_REAL_AGENT_TESTS)('successful task execution', () => {
     // This test requires a real agent to make progress in the container.
     // The mock Docker doesn't run real containers, so tasks never reach COMPLETED status.
-    // it('should execute a simple task to create a hello world bash script', async () => {
-    //   const result = await runRoverTask(
-    //     'Create a hello world bash script named hello.sh that prints the current date and time. It should explicitly print "Hello World" (without quotes and with the exact provided case)'
-    //   );
-    //   if (result.exitCode !== 0) {
-    //     console.log('STDOUT:', result.stdout);
-    //     console.log('STDERR:', result.stderr);
-    //   }
-    //   expect(result.exitCode).toBe(0);
-    //   await waitForTaskCompletion(1);
-    //   expect(
-    //     existsSync(join(testDir, '.rover/tasks/1/workspace/hello.sh'))
-    //   ).toBe(true);
-    //   const scriptContent = readFileSync(
-    //     join(testDir, '.rover/tasks/1/workspace/hello.sh'),
-    //     'utf8'
-    //   );
-    //   expect(scriptContent).toContain('Hello World');
-    //   expect(scriptContent).toContain('date');
-    // });
+    it('should execute a simple task to create a hello world bash script', async () => {
+      const result = await runRoverTask(
+        'Create a hello world bash script named hello.sh that prints the current date and time. It should explicitly print "Hello World" (without quotes and with the exact provided case)'
+      );
+      if (result.exitCode !== 0) {
+        console.log('STDOUT:', result.stdout);
+        console.log('STDERR:', result.stderr);
+      }
+      expect(result.exitCode).toBe(0);
+      await waitForTaskCompletion(1);
+      expect(
+        existsSync(join(testDir, '.rover/tasks/1/workspace/hello.sh'))
+      ).toBe(true);
+      const scriptContent = readFileSync(
+        join(testDir, '.rover/tasks/1/workspace/hello.sh'),
+        'utf8'
+      );
+      expect(scriptContent).toContain('Hello World');
+      expect(scriptContent).toContain('date');
+    });
 
     it('should create a git worktree for task isolation', async () => {
       // Execute: Run rover task
@@ -466,30 +466,30 @@ fi
    *   1. Set ROVER_E2E_REAL_AGENT=true environment variable
    *   2. Ensure Docker is running and can pull the rover agent image
    *   3. Ensure a valid AI agent (Claude CLI, Gemini CLI, etc.) is installed and authenticated
-   *   4. Uncomment the describe block and run with: ROVER_E2E_REAL_AGENT=true pnpm e2e-test --grep "task isolation"
+   *   4. Run with: ROVER_E2E_REAL_AGENT=true pnpm e2e-test --grep "task isolation"
    */
-  // describe('task isolation', () => {
-  //   it('should not affect the main branch during task execution', async () => {
-  //     const initialLog = await execa('git', ['log', '--oneline'], {
-  //       cwd: testDir,
-  //     });
-  //     const initialCommitCount = initialLog.stdout.split('\n').length;
-  //     const result = await runRoverTask(
-  //       'Create a hello world bash script named hello.sh that prints the current date and time. It should explicitly print "Hello World" (without quotes and with the exact provided case)'
-  //     );
-  //     expect(result.exitCode).toBe(0);
-  //     await waitForTaskCompletion(1);
-  //     const finalLog = await execa('git', ['log', '--oneline'], {
-  //       cwd: testDir,
-  //     });
-  //     const finalCommitCount = finalLog.stdout.split('\n').length;
-  //     expect(finalCommitCount).toBe(initialCommitCount);
-  //     const branchResult = await execa('git', ['branch', '--show-current'], {
-  //       cwd: testDir,
-  //     });
-  //     expect(branchResult.stdout.trim()).toMatch(/main|master/);
-  //   });
-  // });
+  describe.skipIf(SKIP_REAL_AGENT_TESTS)('task isolation', () => {
+    it('should not affect the main branch during task execution', async () => {
+      const initialLog = await execa('git', ['log', '--oneline'], {
+        cwd: testDir,
+      });
+      const initialCommitCount = initialLog.stdout.split('\n').length;
+      const result = await runRoverTask(
+        'Create a hello world bash script named hello.sh that prints the current date and time. It should explicitly print "Hello World" (without quotes and with the exact provided case)'
+      );
+      expect(result.exitCode).toBe(0);
+      await waitForTaskCompletion(1);
+      const finalLog = await execa('git', ['log', '--oneline'], {
+        cwd: testDir,
+      });
+      const finalCommitCount = finalLog.stdout.split('\n').length;
+      expect(finalCommitCount).toBe(initialCommitCount);
+      const branchResult = await execa('git', ['branch', '--show-current'], {
+        cwd: testDir,
+      });
+      expect(branchResult.stdout.trim()).toMatch(/main|master/);
+    });
+  });
 
   describe('non-interactive mode', () => {
     it('should produce structured JSON output with --json flag', async () => {
