@@ -37,25 +37,17 @@ class CopilotAI implements AIAgentTool {
 You MUST output a valid JSON string as an output. Just output the JSON string and nothing else. If you had any error, still return a JSON string with an "error" property.`;
     }
 
-    const copilotArgs = ['-p', prompt];
+    // Use -s (silent) to get clean output without stats
+    const copilotArgs = ['-s', '-p', prompt];
 
     try {
       const { stdout } = await launch(this.AGENT_BIN, copilotArgs, {
         cwd,
       });
 
-      const result = stdout?.toString().trim() || '';
-
-      if (json) {
-        try {
-          const parsed = JSON.parse(result);
-          return `${parsed.result}`;
-        } catch (_err) {
-          throw new InvokeAIAgentError(this.AGENT_BIN, 'Invalid JSON output');
-        }
-      } else {
-        return result;
-      }
+      // Copilot does not have a --output-format json flag like Claude/Cursor,
+      // so we just return the raw result and let parseJsonResponse handle it
+      return stdout?.toString().trim() || '';
     } catch (error) {
       throw new InvokeAIAgentError(this.AGENT_BIN, error);
     }
