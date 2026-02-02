@@ -5,6 +5,8 @@ import {
   getBlameContext,
   parseResolvedRegions,
   reconstructFile,
+  sanitizeAIOutput,
+  hasConflictMarkers,
 } from '../context-optimizer.js';
 
 describe('context-optimizer', () => {
@@ -325,6 +327,63 @@ describe('context-optimizer', () => {
       expect(result).toBe(
         ['before', 'line A', 'line B', 'line C', 'after'].join('\n')
       );
+    });
+  });
+
+  describe('sanitizeAIOutput', () => {
+    it('should strip markdown fences when original has none', () => {
+      const output = '```json\n{"key": "value"}\n```';
+      const result = sanitizeAIOutput(output, 'some original content');
+      expect(result).toBe('{"key": "value"}');
+    });
+
+    it('should preserve markdown fences when original has them', () => {
+      const output = '```json\n{"key": "value"}\n```';
+      const original = 'content with ``` fences';
+      const result = sanitizeAIOutput(output, original);
+      expect(result).toBe('```json\n{"key": "value"}\n```');
+    });
+
+    it('should strip ---END--- when original has none', () => {
+      const output = 'resolved content\n---END---';
+      const result = sanitizeAIOutput(output, 'original content');
+      expect(result).toBe('resolved content');
+    });
+
+    it('should preserve ---END--- when original has it', () => {
+      const output = 'resolved content\n---END---';
+      const result = sanitizeAIOutput(output, 'has ---END--- marker');
+      expect(result).toBe('resolved content\n---END---');
+    });
+
+    it('should strip ---FINAL_END--- variant', () => {
+      const output = 'content\n---FINAL_END---';
+      const result = sanitizeAIOutput(output, 'original');
+      expect(result).toBe('content');
+    });
+
+    it('should pass through clean content unchanged', () => {
+      const output = 'just normal resolved code';
+      const result = sanitizeAIOutput(output, 'original');
+      expect(result).toBe('just normal resolved code');
+    });
+  });
+
+  describe('hasConflictMarkers', () => {
+    it('should detect <<<<<<< markers', () => {
+      expect(hasConflictMarkers('before\n<<<<<<< HEAD\nafter')).toBe(true);
+    });
+
+    it('should detect ======= markers', () => {
+      expect(hasConflictMarkers('before\n=======\nafter')).toBe(true);
+    });
+
+    it('should detect >>>>>>> markers', () => {
+      expect(hasConflictMarkers('before\n>>>>>>> branch\nafter')).toBe(true);
+    });
+
+    it('should return false for clean content', () => {
+      expect(hasConflictMarkers('normal code\nno conflicts')).toBe(false);
     });
   });
 

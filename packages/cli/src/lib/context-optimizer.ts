@@ -141,6 +141,36 @@ export function reconstructFile(
 }
 
 /**
+ * Strip AI artifacts (markdown fences, trailing markers) only if
+ * they weren't present in the original content.
+ */
+export function sanitizeAIOutput(
+  output: string,
+  originalContent: string
+): string {
+  let s = output;
+
+  // Strip wrapping markdown fences only if original didn't have them
+  const fenceMatch = s.match(/^```[\w-]*\n?([\s\S]*?)\n?```\s*$/);
+  if (fenceMatch && !originalContent.includes('```')) {
+    s = fenceMatch[1];
+  }
+
+  // Strip trailing ---END--- style markers only if original didn't have them
+  const endMarkerMatch = s.match(/\n?---[A-Z_]*END[A-Z_]*---\s*$/i);
+  if (endMarkerMatch && !originalContent.includes(endMarkerMatch[0].trim())) {
+    s = s.replace(/\n?---[A-Z_]*END[A-Z_]*---\s*$/i, '');
+  }
+
+  return s.trim();
+}
+
+/** Returns true if content still has conflict markers */
+export function hasConflictMarkers(content: string): boolean {
+  return /^<{7} |^={7}$|^>{7} /m.test(content);
+}
+
+/**
  * Get blame-based commit context for conflict regions.
  * Runs git blame on each conflict region against both sides of the merge/rebase.
  */
