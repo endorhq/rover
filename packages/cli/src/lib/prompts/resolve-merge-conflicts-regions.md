@@ -27,4 +27,6 @@ Conflicted file content (truncated):
 %conflictedContent%
 ```
 
+Respond with ONLY the resolved regions, no explanations, no markdown formatting, no code fences.
+
 Remember: Return EXACTLY %regionCount% region(s) using the `---REGION N---` format. Do NOT return the full file.

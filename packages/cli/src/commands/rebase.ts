@@ -31,6 +31,8 @@ import {
   getBlameContext,
   parseResolvedRegions,
   reconstructFile,
+  sanitizeAIOutput,
+  hasConflictMarkers,
 } from '../lib/context-optimizer.js';
 
 const { prompt } = enquirer;
@@ -212,12 +214,15 @@ const resolveRebaseConflicts = async (
               diffContext,
               conflictedContent
             );
+            if (finalContent) {
+              finalContent = sanitizeAIOutput(finalContent, rawContent);
+            }
           } else {
             // Region-based mode: AI returns only resolved conflict regions
             const regionCount = truncated!.conflictRegions.length;
 
             try {
-              const regionOutput = await aiAgent.resolveMergeConflictsRegions(
+              let regionOutput = await aiAgent.resolveMergeConflictsRegions(
                 filePath,
                 diffContext,
                 conflictedContent,
@@ -225,6 +230,10 @@ const resolveRebaseConflicts = async (
               );
 
               if (regionOutput) {
+                regionOutput = sanitizeAIOutput(
+                  regionOutput,
+                  conflictedContent
+                );
                 const resolvedRegions = parseResolvedRegions(
                   regionOutput,
                   regionCount
@@ -242,11 +251,21 @@ const resolveRebaseConflicts = async (
                 diffContext,
                 rawContent
               );
+              if (finalContent) {
+                finalContent = sanitizeAIOutput(finalContent, rawContent);
+              }
             }
           }
 
           if (!finalContent) {
             failures.push(`AI returned empty resolution for ${filePath}`);
+            return;
+          }
+
+          if (hasConflictMarkers(finalContent)) {
+            failures.push(
+              `AI output for ${filePath} still contains conflict markers`
+            );
             return;
           }
 
