@@ -13,7 +13,7 @@ RUN cd ./packages/agent && pnpm pack && mv *.tgz /rover-agent.tgz
 FROM node:current
 ARG NIX_AI_TOOLS_REV
 ARG TARGETARCH
-ARG PACKAGE_MANAGER_MCP_SERVER_VERSION="v0.2.0"
+ARG PACKAGE_MANAGER_MCP_SERVER_VERSION="v0.3.0"
 ENV NIX_AI_TOOLS_REV=${NIX_AI_TOOLS_REV}
 # This ensures that the user profile is always sourced when we `docker
 # exec` manually into the container for manual inspection.
