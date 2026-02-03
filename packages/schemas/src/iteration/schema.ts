@@ -96,5 +96,5 @@ export const IterationSchema = z.object({
   /** Previous iteration context */
   previousContext: IterationPreviousContextSchema,
   /** Context entries for this iteration */
-  context: z.array(IterationContextEntrySchema).optional(),
+  context: z.array(IterationContextEntrySchema),
 });

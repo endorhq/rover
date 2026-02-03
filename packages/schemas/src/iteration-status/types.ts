@@ -4,7 +4,10 @@
  */
 
 import type { z } from 'zod';
-import type { IterationStatusSchema, IterationStatusNameSchema } from './schema.js';
+import type {
+  IterationStatusSchema,
+  IterationStatusNameSchema,
+} from './schema.js';
 
 /**
  * Type representing a specific status name for the current iteration

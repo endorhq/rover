@@ -702,7 +702,7 @@ describe('IterationManager', () => {
       expect(reloadedData.version).toBe(originalData.version);
     });
 
-    it('should handle data without version field by adding it', () => {
+    it('should handle data without version field by adding it and context', () => {
       const dataWithoutVersion = {
         id: 1,
         iteration: 1,
@@ -718,13 +718,44 @@ describe('IterationManager', () => {
         'utf8'
       );
 
-      // Migration should add version field
+      // Migration should add version and context fields
       const loaded = IterationManager.load(iterationPath);
       expect(loaded.version).toBe(CURRENT_ITERATION_SCHEMA_VERSION);
+      expect(loaded.context).toEqual([]);
 
-      // Verify it was saved with the version
+      // Verify it was saved with the version and context
       const savedData = JSON.parse(readFileSync(iterationFilePath, 'utf8'));
       expect(savedData.version).toBe(CURRENT_ITERATION_SCHEMA_VERSION);
+      expect(savedData.context).toEqual([]);
+    });
+
+    it('should migrate from version 1.0 to current version with empty context', () => {
+      const dataV1 = {
+        version: '1.0',
+        id: 1,
+        iteration: 1,
+        title: 'Task',
+        description: 'Description',
+        createdAt: new Date().toISOString(),
+        previousContext: {},
+      };
+
+      writeFileSync(iterationFilePath, JSON.stringify(dataV1), 'utf8');
+
+      // Migration should bump version from 1.0 to current and add context
+      const loaded = IterationManager.load(iterationPath);
+      expect(loaded.version).toBe(CURRENT_ITERATION_SCHEMA_VERSION);
+      expect(loaded.context).toEqual([]);
+
+      // Verify it was saved with the updated version and context
+      const savedData = JSON.parse(readFileSync(iterationFilePath, 'utf8'));
+      expect(savedData.version).toBe(CURRENT_ITERATION_SCHEMA_VERSION);
+      expect(savedData.context).toEqual([]);
+
+      // Verify existing data is preserved
+      expect(savedData.id).toBe(1);
+      expect(savedData.title).toBe('Task');
+      expect(savedData.description).toBe('Description');
     });
   });
 
