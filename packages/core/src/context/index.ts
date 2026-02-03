@@ -9,6 +9,7 @@ export type {
   PRMetadata,
   PRDiffMetadata,
   FileMetadata,
+  HTTPSResourceMetadata,
   ContextMetadata,
 } from './types.js';
 
@@ -35,4 +36,5 @@ export {
   registerBuiltInProviders,
   LocalFileProvider,
   GitHubProvider,
+  HTTPSProvider,
 } from './providers/index.js';
