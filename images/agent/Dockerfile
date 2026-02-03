@@ -3,8 +3,8 @@ FROM node:current AS agent-builder
 COPY . /app
 WORKDIR /app
 
-# Load corepack
-RUN corepack enable pnpm
+# Install pnpm
+RUN npm install -g pnpm
 
 # Build the agent
 RUN pnpm install && pnpm build-libs && pnpm --filter @endorhq/agent build
@@ -23,8 +23,8 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/* && \
     curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="/usr/local/bin" sh && \
     case ${TARGETARCH} in \
-      amd64) ARCH_SUFFIX="x86_64-unknown-linux-gnu" ;; \
-      arm64) ARCH_SUFFIX="aarch64-unknown-linux-gnu" ;; \
+      amd64) ARCH_SUFFIX="x86_64-unknown-linux-musl" ;; \
+      arm64) ARCH_SUFFIX="aarch64-unknown-linux-musl" ;; \
       *) echo "Unsupported architecture: ${TARGETARCH}" && exit 1 ;; \
     esac && \
     curl -fsSL -o /usr/local/bin/package-manager-mcp-server \
