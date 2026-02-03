@@ -5,8 +5,7 @@ export class JustSandboxPackage extends SandboxPackage {
   name = 'just';
 
   installScript(): string {
-    // Install just command runner
-    return `curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin`;
+    return `sudo apt-get update && sudo apt-get install -y --no-install-recommends just`;
   }
 
   initScript(): string {

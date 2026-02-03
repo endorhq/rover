@@ -5,8 +5,7 @@ export class PoetrySandboxPackage extends SandboxPackage {
   name = 'poetry';
 
   installScript(): string {
-    // Install Poetry using the official installer (requires Python)
-    return `curl -sSL https://install.python-poetry.org | python3 -`;
+    return `sudo apt-get update && sudo apt-get install -y --no-install-recommends python3-poetry`;
   }
 
   initScript(): string {
