@@ -51,7 +51,7 @@ export const ContextMetadataSchema = z
     /** Context type identifier (e.g., 'github:issue', 'file', 'https:resource') */
     type: z.string(),
   })
-  .passthrough(); // Allow additional provider-specific fields
+  .loose(); // Allow additional provider-specific fields
 
 /**
  * Context entry in iteration schema.
@@ -61,7 +61,7 @@ export const IterationContextEntrySchema = z.object({
   /** URI identifying the context source */
   uri: z.string().min(1),
   /** ISO datetime when the context was fetched */
-  fetchedAt: z.string().datetime(),
+  fetchedAt: z.iso.datetime(),
   /** Relative path to the content file in the context folder */
   file: z.string().min(1),
   /** Trust settings for this context source */
@@ -92,7 +92,7 @@ export const IterationSchema = z.object({
   /** Iteration description */
   description: z.string().min(1, 'Description is required'),
   /** ISO datetime string */
-  createdAt: z.string().datetime(),
+  createdAt: z.iso.datetime(),
   /** Previous iteration context */
   previousContext: IterationPreviousContextSchema,
   /** Context entries for this iteration */

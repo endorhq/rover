@@ -140,13 +140,14 @@ export const WorkflowCommandStepSchema = WorkflowBaseStepSchema.extend({
  * Conditional step schema (recursive)
  * Allows branching logic based on conditions
  */
-export const WorkflowConditionalStepSchema: z.ZodType<any> =
+export const WorkflowConditionalStepSchema: z.ZodType<unknown> =
   WorkflowBaseStepSchema.extend({
     /** Step type - 'conditional' */
     type: z.literal('conditional'),
     /** Condition expression to evaluate */
     condition: z.string(),
     /** Steps to execute if condition is true */
+    // biome-ignore lint/suspicious/noThenProperty: 'then' is a valid workflow concept for if-then-else branching
     then: z.lazy(() => z.array(WorkflowStepSchema)).optional(),
     /** Steps to execute if condition is false */
     else: z.lazy(() => z.array(WorkflowStepSchema)).optional(),
@@ -156,7 +157,7 @@ export const WorkflowConditionalStepSchema: z.ZodType<any> =
  * Parallel step schema (recursive)
  * Executes multiple steps concurrently
  */
-export const WorkflowParallelStepSchema: z.ZodType<any> =
+export const WorkflowParallelStepSchema: z.ZodType<unknown> =
   WorkflowBaseStepSchema.extend({
     /** Step type - 'parallel' */
     type: z.literal('parallel'),
@@ -168,7 +169,7 @@ export const WorkflowParallelStepSchema: z.ZodType<any> =
  * Sequential step schema (recursive)
  * Executes multiple steps in order
  */
-export const WorkflowSequentialStepSchema: z.ZodType<any> =
+export const WorkflowSequentialStepSchema: z.ZodType<unknown> =
   WorkflowBaseStepSchema.extend({
     /** Step type - 'sequential' */
     type: z.literal('sequential'),
@@ -180,7 +181,7 @@ export const WorkflowSequentialStepSchema: z.ZodType<any> =
  * Union of all step types (discriminated by 'type' field)
  * Forward declared for recursive types
  */
-export const WorkflowStepSchema: z.ZodType<any> = WorkflowAgentStepSchema;
+export const WorkflowStepSchema: z.ZodType<unknown> = WorkflowAgentStepSchema;
 // export const WorkflowStepSchema: z.ZodType<any> = z.union([
 //   WorkflowAgentStepSchema,
 //   // CommandStepSchema,
