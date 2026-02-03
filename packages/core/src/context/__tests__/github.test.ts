@@ -268,7 +268,9 @@ describe('GitHubProvider', () => {
       await expect(provider.build()).rejects.toThrow('No git remote found');
     });
 
-    it('should throw for unparseable remote URL', async () => {
+    it('should accept any git remote URL (user declared github: intent)', async () => {
+      // The github: URI scheme declares user intent - we accept any remote format
+      // and let the gh CLI validate if it's actually a GitHub repo
       MockGit.mockImplementation(
         () =>
           ({
@@ -276,12 +278,135 @@ describe('GitHubProvider', () => {
           }) as unknown as Git
       );
 
-      const provider = new GitHubProvider(new URL('github:issue/15'), {
-        originalUri: 'github:issue/15',
+      const issueResponse = {
+        number: 15,
+        title: 'Test Issue',
+        body: 'Issue body',
+        state: 'open',
+        labels: [],
+        assignees: [],
+        author: { login: 'testuser' },
+        comments: [],
+        createdAt: '2024-01-15T10:00:00Z',
+        updatedAt: '2024-01-20T15:30:00Z',
+      };
+
+      mockLaunchSync.mockImplementation((cmd, args) => {
+        if (cmd === 'gh' && args?.[0] === '--version') {
+          return { exitCode: 0 } as ReturnType<typeof launchSync>;
+        }
+        if (cmd === 'gh' && args?.[0] === 'issue' && args?.[1] === 'view') {
+          // Verify we extracted owner/repo from the "gitlab" URL
+          expect(args).toContain('owner/repo');
+          return {
+            exitCode: 0,
+            stdout: JSON.stringify(issueResponse),
+          } as ReturnType<typeof launchSync>;
+        }
+        return { exitCode: 1 } as ReturnType<typeof launchSync>;
       });
 
-      await expect(provider.build()).rejects.toThrow(ContextFetchError);
-      await expect(provider.build()).rejects.toThrow('Could not parse');
+      const provider = new GitHubProvider(new URL('github:issue/15'), {
+        originalUri: 'github:issue/15',
+        trustAllAuthors: true,
+      });
+
+      // Should succeed - we trust the user's github: declaration
+      const entries = await provider.build();
+      expect(entries).toHaveLength(1);
+    });
+
+    it('should support SSH aliases for multiple accounts', async () => {
+      MockGit.mockImplementation(
+        () =>
+          ({
+            remoteUrl: vi
+              .fn()
+              .mockReturnValue('git@github-personal:myorg/myrepo.git'),
+          }) as unknown as Git
+      );
+
+      const issueResponse = {
+        number: 15,
+        title: 'Test Issue',
+        body: 'Issue body',
+        state: 'open',
+        labels: [],
+        assignees: [],
+        author: { login: 'testuser' },
+        comments: [],
+        createdAt: '2024-01-15T10:00:00Z',
+        updatedAt: '2024-01-20T15:30:00Z',
+      };
+
+      mockLaunchSync.mockImplementation((cmd, args) => {
+        if (cmd === 'gh' && args?.[0] === '--version') {
+          return { exitCode: 0 } as ReturnType<typeof launchSync>;
+        }
+        if (cmd === 'gh' && args?.[0] === 'issue' && args?.[1] === 'view') {
+          expect(args).toContain('myorg/myrepo');
+          return {
+            exitCode: 0,
+            stdout: JSON.stringify(issueResponse),
+          } as ReturnType<typeof launchSync>;
+        }
+        return { exitCode: 1 } as ReturnType<typeof launchSync>;
+      });
+
+      const provider = new GitHubProvider(new URL('github:issue/15'), {
+        originalUri: 'github:issue/15',
+        trustAllAuthors: true,
+      });
+
+      const entries = await provider.build();
+      expect(entries).toHaveLength(1);
+    });
+
+    it('should support GitHub Enterprise URLs', async () => {
+      MockGit.mockImplementation(
+        () =>
+          ({
+            remoteUrl: vi
+              .fn()
+              .mockReturnValue('git@git.mycompany.com:team/project.git'),
+          }) as unknown as Git
+      );
+
+      const issueResponse = {
+        number: 42,
+        title: 'Enterprise Issue',
+        body: 'Issue body',
+        state: 'open',
+        labels: [],
+        assignees: [],
+        author: { login: 'employee' },
+        comments: [],
+        createdAt: '2024-01-15T10:00:00Z',
+        updatedAt: '2024-01-20T15:30:00Z',
+      };
+
+      mockLaunchSync.mockImplementation((cmd, args) => {
+        if (cmd === 'gh' && args?.[0] === '--version') {
+          return { exitCode: 0 } as ReturnType<typeof launchSync>;
+        }
+        if (cmd === 'gh' && args?.[0] === 'issue' && args?.[1] === 'view') {
+          expect(args).toContain('team/project');
+          return {
+            exitCode: 0,
+            stdout: JSON.stringify(issueResponse),
+          } as ReturnType<typeof launchSync>;
+        }
+        return { exitCode: 1 } as ReturnType<typeof launchSync>;
+      });
+
+      const provider = new GitHubProvider(new URL('github:issue/42'), {
+        originalUri: 'github:issue/42',
+        trustAllAuthors: true,
+      });
+
+      const entries = await provider.build();
+      expect(entries).toHaveLength(1);
+      expect(entries[0].name).toBe('Issue #42: Enterprise Issue');
     });
   });
 
