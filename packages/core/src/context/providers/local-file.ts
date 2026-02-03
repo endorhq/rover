@@ -4,6 +4,7 @@ import type {
   ContextEntry,
   ContextProvider,
   ProviderOptions,
+  FileMetadata,
 } from '../types.js';
 import { ContextFetchError } from '../errors.js';
 
@@ -169,6 +170,11 @@ export class LocalFileProvider implements ContextProvider {
 
     // 6. Return ContextEntry with filepath (not content)
     const basename = path.basename(this.resolvedPath);
+    const metadata: FileMetadata = {
+      type: 'file',
+      absolutePath: this.resolvedPath,
+      extension: path.extname(this.resolvedPath),
+    };
     const entry: ContextEntry = {
       name: basename,
       description: `Local file: ${this.resolvedPath}`,
@@ -176,6 +182,7 @@ export class LocalFileProvider implements ContextProvider {
       filepath: this.resolvedPath,
       source: this.uri,
       fetchedAt: new Date(),
+      metadata,
     };
 
     return [entry];

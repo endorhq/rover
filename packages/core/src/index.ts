@@ -99,6 +99,12 @@ export {
   type ContextProvider,
   type ContextProviderClass,
   type ProviderOptions,
+  type BaseContextMetadata,
+  type IssueMetadata,
+  type PRMetadata,
+  type PRDiffMetadata,
+  type FileMetadata,
+  type ContextMetadata,
   // Errors
   ContextError,
   ContextSchemeNotSupportedError,
@@ -114,4 +120,5 @@ export {
   // Providers
   registerBuiltInProviders,
   LocalFileProvider,
+  GitHubProvider,
 } from './context/index.js';

@@ -4,6 +4,12 @@ export type {
   ContextProvider,
   ContextProviderClass,
   ProviderOptions,
+  BaseContextMetadata,
+  IssueMetadata,
+  PRMetadata,
+  PRDiffMetadata,
+  FileMetadata,
+  ContextMetadata,
 } from './types.js';
 
 // Errors
@@ -28,4 +34,5 @@ export {
 export {
   registerBuiltInProviders,
   LocalFileProvider,
+  GitHubProvider,
 } from './providers/index.js';

@@ -4,6 +4,7 @@ import * as os from 'node:os';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { LocalFileProvider } from '../providers/local-file.js';
 import { ContextFetchError } from '../errors.js';
+import type { FileMetadata } from '../types.js';
 
 describe('LocalFileProvider', () => {
   let tempDir: string;
@@ -123,6 +124,13 @@ describe('LocalFileProvider', () => {
       expect(entries[0].fetchedAt).toBeInstanceOf(Date);
       // content should not be set (we use filepath instead)
       expect(entries[0].content).toBeUndefined();
+
+      // Check metadata
+      const metadata = entries[0].metadata as FileMetadata;
+      expect(metadata).toBeDefined();
+      expect(metadata.type).toBe('file');
+      expect(metadata.absolutePath).toBe(filePath);
+      expect(metadata.extension).toBe('.md');
     });
 
     it('should throw ContextFetchError for non-existent files', async () => {
@@ -285,6 +293,53 @@ describe('LocalFileProvider', () => {
       });
 
       expect(provider.supportedTypes).toEqual(['text']);
+    });
+  });
+
+  describe('Metadata', () => {
+    it('should include FileMetadata with type, absolutePath, and extension', async () => {
+      const filePath = path.join(tempDir, 'example.ts');
+      await fs.writeFile(filePath, 'export const x = 1;');
+
+      const provider = new LocalFileProvider(new URL(`file://${filePath}`), {
+        originalUri: `file://${filePath}`,
+      });
+
+      const entries = await provider.build();
+      const metadata = entries[0].metadata as FileMetadata;
+
+      expect(metadata).toBeDefined();
+      expect(metadata.type).toBe('file');
+      expect(metadata.absolutePath).toBe(filePath);
+      expect(metadata.extension).toBe('.ts');
+    });
+
+    it('should handle files with no extension', async () => {
+      const filePath = path.join(tempDir, 'Makefile');
+      await fs.writeFile(filePath, 'all: build');
+
+      const provider = new LocalFileProvider(new URL(`file://${filePath}`), {
+        originalUri: `file://${filePath}`,
+      });
+
+      const entries = await provider.build();
+      const metadata = entries[0].metadata as FileMetadata;
+
+      expect(metadata.extension).toBe('');
+    });
+
+    it('should handle files with multiple dots in name', async () => {
+      const filePath = path.join(tempDir, 'config.test.json');
+      await fs.writeFile(filePath, '{}');
+
+      const provider = new LocalFileProvider(new URL(`file://${filePath}`), {
+        originalUri: `file://${filePath}`,
+      });
+
+      const entries = await provider.build();
+      const metadata = entries[0].metadata as FileMetadata;
+
+      expect(metadata.extension).toBe('.json');
     });
   });
 });

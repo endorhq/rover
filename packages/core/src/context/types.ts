@@ -1,4 +1,78 @@
 /**
+ * Base metadata interface. All metadata types must have a `type` discriminator.
+ * Type values should be namespaced: 'github:issue', 'gitlab:mr', 'file', etc.
+ */
+export interface BaseContextMetadata {
+  type: string;
+}
+
+/**
+ * Generic metadata for issues (GitHub, GitLab, etc.).
+ * Use `type` to distinguish provider: 'github:issue', 'gitlab:issue', etc.
+ */
+export interface IssueMetadata extends BaseContextMetadata {
+  number: number;
+  state: string;
+  labels: string[];
+  assignees: string[];
+  milestone?: string;
+  author: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Generic metadata for pull/merge requests (GitHub PR, GitLab MR, etc.).
+ * Use `type` to distinguish provider: 'github:pr', 'gitlab:mr', etc.
+ */
+export interface PRMetadata extends BaseContextMetadata {
+  number: number;
+  state: string;
+  headBranch: string;
+  baseBranch: string;
+  isDraft: boolean;
+  mergeable?: boolean;
+  labels: string[];
+  assignees: string[];
+  reviewers: string[];
+  author: string;
+  createdAt: string;
+  updatedAt: string;
+  mergedAt?: string;
+  mergedBy?: string;
+}
+
+/**
+ * Generic metadata for PR/MR diffs.
+ * Use `type` to distinguish provider: 'github:pr-diff', 'gitlab:mr-diff', etc.
+ */
+export interface PRDiffMetadata extends BaseContextMetadata {
+  number: number;
+  headBranch: string;
+  baseBranch: string;
+}
+
+/**
+ * Metadata for local files.
+ */
+export interface FileMetadata extends BaseContextMetadata {
+  type: 'file';
+  absolutePath: string;
+  extension: string;
+}
+
+/**
+ * Union of all known metadata types.
+ * Use type guards to narrow: `if (metadata.type === 'github:pr') { ... }`
+ */
+export type ContextMetadata =
+  | IssueMetadata
+  | PRMetadata
+  | PRDiffMetadata
+  | FileMetadata
+  | BaseContextMetadata; // Fallback for unknown/custom types
+
+/**
  * Result entry from a context provider's build() method.
  * Each entry represents a piece of context to be stored.
  */
@@ -23,6 +97,9 @@ export type ContextEntry = {
 
   /** Timestamp when content was fetched */
   fetchedAt: Date;
+
+  /** Provider-specific metadata with type discriminator */
+  metadata?: ContextMetadata;
 };
 
 /**
