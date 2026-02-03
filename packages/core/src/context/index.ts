@@ -38,3 +38,9 @@ export {
   GitHubProvider,
   HTTPSProvider,
 } from './providers/index.js';
+
+// Manager
+export { ContextManager, type ContextManagerOptions } from './manager.js';
+
+// Index Generator
+export { generateContextIndex } from './index-generator.js';
