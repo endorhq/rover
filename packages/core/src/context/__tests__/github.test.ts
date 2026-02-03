@@ -570,7 +570,7 @@ describe('GitHubProvider', () => {
 
       const entries = await provider.build();
 
-      expect(entries[0].content).toContain('_No description provided._');
+      expect(entries[0].content).toContain('_No content provided._');
       expect(entries[0].content).not.toContain('**Labels:**');
       expect(entries[0].content).not.toContain('**Assignees:**');
       expect(entries[0].content).not.toContain('**Milestone:**');
@@ -743,15 +743,15 @@ index 0000000..1234567
 
       // But only Alice's review content should be included in the Reviews section
       expect(content).toContain('## Reviews');
-      expect(content).toContain('### @alice (approved');
+      expect(content).toContain('**@alice** (approved');
       expect(content).toContain('LGTM!');
 
       // Bob's review content should not be included
-      expect(content).not.toContain('### @bob');
+      expect(content).not.toContain('**@bob**');
       expect(content).not.toContain('Please fix the typo.');
 
       // Charlie's comment should not be included
-      expect(content).not.toContain('### @charlie');
+      expect(content).not.toContain('**@charlie**');
       expect(content).not.toContain('Looks good!');
     });
 
