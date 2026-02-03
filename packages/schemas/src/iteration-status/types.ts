@@ -3,8 +3,8 @@
  * All types are inferred from Zod schemas to ensure consistency
  */
 
-import { z } from 'zod';
-import { IterationStatusSchema, IterationStatusNameSchema } from './schema.js';
+import type { z } from 'zod';
+import type { IterationStatusSchema, IterationStatusNameSchema } from './schema.js';
 
 /**
  * Type representing a specific status name for the current iteration

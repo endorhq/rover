@@ -1,4 +1,4 @@
-import { ZodError } from 'zod';
+import type { ZodError } from 'zod';
 
 /**
  * Error class for workflow loading errors

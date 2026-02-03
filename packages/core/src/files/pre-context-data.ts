@@ -1,6 +1,10 @@
 /**
  * Pre-context data manager.
  * Provides methods to create, load, and manage pre-context data for workflow execution.
+ *
+ * @deprecated This class is deprecated and will be removed in a future version.
+ * Context is now tracked per-iteration in the iteration schema.
+ * See: packages/schemas/src/iteration/schema.ts
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -18,6 +22,10 @@ import {
 /**
  * Pre-context data manager. It provides the ability to load and manage
  * pre-context information for workflow execution.
+ *
+ * @deprecated This class is deprecated and will be removed in a future version.
+ * Context is now tracked per-iteration in the iteration schema.
+ * See: packages/schemas/src/iteration/schema.ts
  */
 export class PreContextDataManager {
   private data: PreContextData;

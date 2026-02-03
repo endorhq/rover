@@ -5,7 +5,7 @@
 import { z } from 'zod';
 
 // Current schema version
-export const CURRENT_ITERATION_SCHEMA_VERSION = '1.0';
+export const CURRENT_ITERATION_SCHEMA_VERSION = '1.1';
 
 // Filename constants
 export const ITERATION_FILENAME = 'iteration.json';
@@ -20,6 +20,60 @@ export const IterationPreviousContextSchema = z.object({
   summary: z.string().optional(),
   /** Previous iteration number */
   iterationNumber: z.number().optional(),
+});
+
+/**
+ * Trust settings for context fetching.
+ */
+export const TrustSettingsSchema = z.object({
+  /** Trust all authors for this context source */
+  trustAllAuthors: z.boolean().optional(),
+  /** List of trusted author identifiers */
+  trustedAuthors: z.array(z.string()).optional(),
+});
+
+/**
+ * Provenance tracking for context entries.
+ */
+export const ProvenanceSchema = z.object({
+  /** Iteration number when this context was first added */
+  addedIn: z.number().int().positive(),
+  /** Iteration number when this context was last updated */
+  updatedIn: z.number().int().positive().optional(),
+});
+
+/**
+ * Metadata from context providers.
+ * Stored as flexible record to support different provider types.
+ */
+export const ContextMetadataSchema = z
+  .object({
+    /** Context type identifier (e.g., 'github:issue', 'file', 'https:resource') */
+    type: z.string(),
+  })
+  .passthrough(); // Allow additional provider-specific fields
+
+/**
+ * Context entry in iteration schema.
+ * References files in iterations/{n}/context/ folder.
+ */
+export const IterationContextEntrySchema = z.object({
+  /** URI identifying the context source */
+  uri: z.string().min(1),
+  /** ISO datetime when the context was fetched */
+  fetchedAt: z.string().datetime(),
+  /** Relative path to the content file in the context folder */
+  file: z.string().min(1),
+  /** Trust settings for this context source */
+  trustSettings: TrustSettingsSchema.optional(),
+  /** Provenance tracking */
+  provenance: ProvenanceSchema,
+  /** Human-readable name for the context */
+  name: z.string(),
+  /** Description of the context content */
+  description: z.string(),
+  /** Provider-specific metadata */
+  metadata: ContextMetadataSchema.optional(),
 });
 
 /**
@@ -41,4 +95,6 @@ export const IterationSchema = z.object({
   createdAt: z.string().datetime(),
   /** Previous iteration context */
   previousContext: IterationPreviousContextSchema,
+  /** Context entries for this iteration */
+  context: z.array(IterationContextEntrySchema).optional(),
 });

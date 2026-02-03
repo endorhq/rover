@@ -10,7 +10,11 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { IterationManager } from '../iteration.js';
-import { ITERATION_FILENAME, type Iteration } from 'rover-schemas';
+import {
+  ITERATION_FILENAME,
+  CURRENT_ITERATION_SCHEMA_VERSION,
+  type Iteration,
+} from 'rover-schemas';
 
 describe('IterationManager', () => {
   let testDir: string;
@@ -716,11 +720,11 @@ describe('IterationManager', () => {
 
       // Migration should add version field
       const loaded = IterationManager.load(iterationPath);
-      expect(loaded.version).toBe('1.0');
+      expect(loaded.version).toBe(CURRENT_ITERATION_SCHEMA_VERSION);
 
       // Verify it was saved with the version
       const savedData = JSON.parse(readFileSync(iterationFilePath, 'utf8'));
-      expect(savedData.version).toBe('1.0');
+      expect(savedData.version).toBe(CURRENT_ITERATION_SCHEMA_VERSION);
     });
   });
 

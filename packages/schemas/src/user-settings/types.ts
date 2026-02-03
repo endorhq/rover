@@ -2,8 +2,8 @@
  * TypeScript types inferred from Zod schemas
  */
 
-import { z } from 'zod';
-import {
+import type { z } from 'zod';
+import type {
   AiAgentSchema,
   UserDefaultsSchema,
   UserSettingsSchema,
