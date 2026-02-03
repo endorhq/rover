@@ -6,7 +6,7 @@ export class RubySandboxPackage extends SandboxPackage {
 
   installScript(): string {
     // Install ruby. If build base is required, the agent will take care of installing it
-    return `sudo apk add --no-cache ruby ruby-dev`;
+    return `sudo apt-get update && sudo apt-get install -y --no-install-recommends ruby ruby-dev`;
   }
 
   initScript(): string {

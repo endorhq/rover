@@ -5,7 +5,7 @@ export class NpmSandboxPackage extends SandboxPackage {
   name = 'npm';
 
   installScript(): string {
-    // npm is already included in node:alpine base image
+    // npm is already included in the node base image
     return ``;
   }
 

@@ -6,7 +6,7 @@ export class JustSandboxPackage extends SandboxPackage {
 
   installScript(): string {
     // Install just command runner
-    return `sudo apk add just`;
+    return `curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin`;
   }
 
   initScript(): string {

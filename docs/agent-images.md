@@ -1,6 +1,6 @@
 # Agent images
 
-Agents in Rover run in isolated environments ([sandbox](https://docs.endor.dev/rover/concepts/sandbox/)). These environments give agents a way to modify the environment to improve, implement, build, check, and test a given project, without impacting the host machine. Rover uses Alpine linux as the base image for the default sandbox images we provide. The main reason is to keep these images minimal and give agents access to a rich package ecosystem (`apk`).
+Agents in Rover run in isolated environments ([sandbox](https://docs.endor.dev/rover/concepts/sandbox/)). These environments give agents a way to modify the environment to improve, implement, build, check, and test a given project, without impacting the host machine. Rover uses Debian Linux as the base image for the default sandbox images we provide. The main reason is to keep these images minimal and give agents access to a rich package ecosystem (`apt-get`).
 
 ## Agent images
 
@@ -8,17 +8,13 @@ There are two types of images: development and tagged images. In general, the de
 
 ### Base image
 
-The base image is Alpine Linux as it is a good fit for Agents in the spirit of being developer friendly, using less disk space, and because it's built for simplicity. It also has a very rich [package offering](https://pkgs.alpinelinux.org/packages).
+The base image is Debian as it is a good fit for Agents in the spirit of being developer friendly, and because it uses glibc natively which ensures broad compatibility with prebuilt binaries and tools. It also has a very rich [package offering](https://packages.debian.org/).
 
 The base image is built with the following [Dockerfile](../images/agent/Dockerfile).
 
 #### Agent installation
 
 In general, when a new agent session is requested within the container, we install it with `npm install -g` or with the instructions provided by the Agent maintainers.
-
-In some circumstances this has not been possible, because of incompatibilities. Such as an example is the [Cursor Agent](https://forum.cursor.com/t/cursor-agent-does-not-work-with-non-glibc-based-distributions-such-as-alpine-linux/141571). For those cases, we have `nix` based setup (package also installed with the `Dockerfile`).
-
-By having the `cursor-agent` through `nix`, we are able to pull a compatible glibc, and use that without any issues.
 
 ### Development images
 
@@ -83,7 +79,7 @@ The contents of this files will depend on the default groups present in the base
 Rover will remove `/etc/sudoers.d/1-agent-setup` before handing control to the agent. From that point on, the
 `/etc/sudoers.d/2-agent-cleanup` will determine what the agent is able to do with `sudo`: it is highly recommended to reduce the list of commands that could be executed with root permissions without password.
 
-An example for `node:24-alpine` follows:
+An example for `node:current` follows:
 
 <details>
 
@@ -100,38 +96,45 @@ An example for `node:24-alpine` follows:
 # within the container.
 
 %root ALL=(ALL) NOPASSWD: ALL
-%bin ALL=(ALL) NOPASSWD: ALL
 %daemon ALL=(ALL) NOPASSWD: ALL
+%bin ALL=(ALL) NOPASSWD: ALL
 %sys ALL=(ALL) NOPASSWD: ALL
 %adm ALL=(ALL) NOPASSWD: ALL
 %tty ALL=(ALL) NOPASSWD: ALL
 %disk ALL=(ALL) NOPASSWD: ALL
 %lp ALL=(ALL) NOPASSWD: ALL
-%kmem ALL=(ALL) NOPASSWD: ALL
-%wheel ALL=(ALL) NOPASSWD: ALL
-%floppy ALL=(ALL) NOPASSWD: ALL
 %mail ALL=(ALL) NOPASSWD: ALL
 %news ALL=(ALL) NOPASSWD: ALL
-%uucp ALL=(ALL) NOPASSWD: ALL
-%cron ALL=(ALL) NOPASSWD: ALL
+%man ALL=(ALL) NOPASSWD: ALL
+%proxy ALL=(ALL) NOPASSWD: ALL
 %audio ALL=(ALL) NOPASSWD: ALL
 %cdrom ALL=(ALL) NOPASSWD: ALL
 %dialout ALL=(ALL) NOPASSWD: ALL
+%floppy ALL=(ALL) NOPASSWD: ALL
+%fax ALL=(ALL) NOPASSWD: ALL
+%voice ALL=(ALL) NOPASSWD: ALL
 %ftp ALL=(ALL) NOPASSWD: ALL
-%sshd ALL=(ALL) NOPASSWD: ALL
-%input ALL=(ALL) NOPASSWD: ALL
-%tape ALL=(ALL) NOPASSWD: ALL
+%dip ALL=(ALL) NOPASSWD: ALL
+%backup ALL=(ALL) NOPASSWD: ALL
+%operator ALL=(ALL) NOPASSWD: ALL
+%list ALL=(ALL) NOPASSWD: ALL
+%irc ALL=(ALL) NOPASSWD: ALL
+%gnats ALL=(ALL) NOPASSWD: ALL
+%src ALL=(ALL) NOPASSWD: ALL
 %video ALL=(ALL) NOPASSWD: ALL
-%netdev ALL=(ALL) NOPASSWD: ALL
-%kvm ALL=(ALL) NOPASSWD: ALL
+%sasl ALL=(ALL) NOPASSWD: ALL
+%plugdev ALL=(ALL) NOPASSWD: ALL
+%staff ALL=(ALL) NOPASSWD: ALL
 %games ALL=(ALL) NOPASSWD: ALL
 %shadow ALL=(ALL) NOPASSWD: ALL
+%sudo ALL=(ALL) NOPASSWD: ALL
 %www-data ALL=(ALL) NOPASSWD: ALL
 %users ALL=(ALL) NOPASSWD: ALL
-%ntp ALL=(ALL) NOPASSWD: ALL
-%abuild ALL=(ALL) NOPASSWD: ALL
-%utmp ALL=(ALL) NOPASSWD: ALL
-%ping ALL=(ALL) NOPASSWD: ALL
+%crontab ALL=(ALL) NOPASSWD: ALL
+%messagebus ALL=(ALL) NOPASSWD: ALL
+%_ssh ALL=(ALL) NOPASSWD: ALL
+%sgx ALL=(ALL) NOPASSWD: ALL
+%render ALL=(ALL) NOPASSWD: ALL
 %nogroup ALL=(ALL) NOPASSWD: ALL
 %nobody ALL=(ALL) NOPASSWD: ALL
 %node ALL=(ALL) NOPASSWD: ALL
@@ -156,38 +159,45 @@ An example for `node:24-alpine` follows:
 # within the container.
 
 %root ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
-%bin ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
 %daemon ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%bin ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
 %sys ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
 %adm ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
 %tty ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
 %disk ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
 %lp ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
-%kmem ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
-%wheel ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
-%floppy ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
 %mail ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
 %news ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
-%uucp ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
-%cron ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%man ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%proxy ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
 %audio ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
 %cdrom ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
 %dialout ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%floppy ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%fax ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%voice ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
 %ftp ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
-%sshd ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
-%input ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
-%tape ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%dip ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%backup ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%operator ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%list ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%irc ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%gnats ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%src ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
 %video ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
-%netdev ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
-%kvm ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%sasl ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%plugdev ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%staff ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
 %games ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
 %shadow ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%sudo ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
 %www-data ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
 %users ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
-%ntp ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
-%abuild ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
-%utmp ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
-%ping ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%crontab ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%messagebus ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%_ssh ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%sgx ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
+%render ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
 %nogroup ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
 %nobody ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee
 %node ALL=(ALL) NOPASSWD: /bin/chown,/bin/cp,/bin/mv,/usr/bin/tee

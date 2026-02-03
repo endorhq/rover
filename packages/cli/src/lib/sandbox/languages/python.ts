@@ -6,7 +6,7 @@ export class PythonSandboxPackage extends SandboxPackage {
 
   installScript(): string {
     // Install python-dev. Python is already installed in the base image
-    return `sudo apk add --no-cache python3-dev
+    return `sudo apt-get update && sudo apt-get install -y --no-install-recommends python3-dev
 sudo ln -sf python3 /usr/bin/python`;
   }
 
