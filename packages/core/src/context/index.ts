@@ -25,4 +25,7 @@ export {
 } from './registry.js';
 
 // Providers
-export { registerBuiltInProviders } from './providers/index.js';
+export {
+  registerBuiltInProviders,
+  LocalFileProvider,
+} from './providers/index.js';

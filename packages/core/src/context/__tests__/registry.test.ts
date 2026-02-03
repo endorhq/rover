@@ -142,7 +142,9 @@ describe('Context Registry', () => {
         options
       ) as TestProvider;
 
-      expect(provider.options).toEqual(options);
+      // originalUri is automatically added by createContextProvider
+      expect(provider.options).toMatchObject(options);
+      expect(provider.options.originalUri).toBe('test://resource');
     });
 
     it('should throw ContextUriParseError for malformed URI', () => {

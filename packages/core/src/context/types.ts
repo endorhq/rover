@@ -12,11 +12,11 @@ export type ContextEntry = {
   /** Storage filename, e.g., "github-issue-15.json" */
   filename: string;
 
-  /** The actual content (stringified JSON, markdown, text) */
-  content: string;
+  /** The actual content (stringified JSON, markdown, text). Optional when filepath is provided. */
+  content?: string;
 
-  /** Content type for rendering decisions */
-  type: 'json' | 'markdown' | 'text';
+  /** Path to the file on disk. Used for local file references. */
+  filepath?: string;
 
   /** Original URI for provenance tracking */
   source: string;
@@ -34,6 +34,15 @@ export type ProviderOptions = {
 
   /** Trust all authors (skip comment filtering) */
   trustAllAuthors?: boolean;
+
+  /** Current working directory for resolving relative paths */
+  cwd?: string;
+
+  /**
+   * Original URI string before URL parsing.
+   * Automatically set by createContextProvider().
+   */
+  originalUri?: string;
 };
 
 /**

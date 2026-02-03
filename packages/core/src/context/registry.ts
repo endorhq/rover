@@ -67,8 +67,12 @@ export function createContextProvider(
     throw new ContextSchemeNotSupportedError(scheme);
   }
 
-  // Instantiate provider with parsed URL (original URI available via url.href)
-  return new ProviderClass(url, options);
+  // Instantiate provider with parsed URL and original URI in options
+  const providerOptions: ProviderOptions = {
+    ...options,
+    originalUri: uri,
+  };
+  return new ProviderClass(url, providerOptions);
 }
 
 /**
