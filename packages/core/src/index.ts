@@ -104,6 +104,7 @@ export {
   type PRMetadata,
   type PRDiffMetadata,
   type FileMetadata,
+  type HTTPSResourceMetadata,
   type ContextMetadata,
   // Errors
   ContextError,
@@ -121,4 +122,5 @@ export {
   registerBuiltInProviders,
   LocalFileProvider,
   GitHubProvider,
+  HTTPSProvider,
 } from './context/index.js';

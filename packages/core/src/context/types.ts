@@ -62,6 +62,19 @@ export interface FileMetadata extends BaseContextMetadata {
 }
 
 /**
+ * Metadata for HTTPS resources.
+ */
+export interface HTTPSResourceMetadata extends BaseContextMetadata {
+  type: 'https:resource';
+  finalUrl: string;
+  contentType?: string;
+  isDownloaded: boolean;
+  extension: string;
+  statusCode: number;
+  contentLength?: number;
+}
+
+/**
  * Union of all known metadata types.
  * Use type guards to narrow: `if (metadata.type === 'github:pr') { ... }`
  */
@@ -70,6 +83,7 @@ export type ContextMetadata =
   | PRMetadata
   | PRDiffMetadata
   | FileMetadata
+  | HTTPSResourceMetadata
   | BaseContextMetadata; // Fallback for unknown/custom types
 
 /**
