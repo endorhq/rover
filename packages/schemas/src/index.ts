@@ -31,14 +31,14 @@ export {
 } from './workflow/schema.js';
 
 // Previous Iteration library
-export { type PreviousIteration } from './previous-iteration/types.js';
+export type { PreviousIteration } from './previous-iteration/types.js';
 
 export { PreviousIterationValidationError } from './previous-iteration/errors.js';
 
 // Pre-Context Data library
-export {
-  type PreContextData,
-  type InitialTask,
+export type {
+  PreContextData,
+  InitialTask,
 } from './pre-context-data/types.js';
 
 export {
@@ -53,9 +53,9 @@ export {
 } from './pre-context-data/schema.js';
 
 // Iteration Status library
-export {
-  type IterationStatus,
-  type IterationStatusName,
+export type {
+  IterationStatus,
+  IterationStatusName,
 } from './iteration-status/types.js';
 
 export {
@@ -69,9 +69,13 @@ export {
 } from './iteration-status/schema.js';
 
 // Iteration library
-export {
-  type Iteration,
-  type IterationPreviousContext,
+export type {
+  Iteration,
+  IterationPreviousContext,
+  TrustSettings,
+  Provenance,
+  ContextMetadata,
+  IterationContextEntry,
 } from './iteration/types.js';
 
 export {
@@ -83,17 +87,22 @@ export {
   ITERATION_FILENAME,
   CURRENT_ITERATION_SCHEMA_VERSION,
   IterationSchema,
+  IterationPreviousContextSchema,
+  TrustSettingsSchema,
+  ProvenanceSchema,
+  ContextMetadataSchema,
+  IterationContextEntrySchema,
 } from './iteration/schema.js';
 
 // Task Description library
-export {
-  type TaskStatus,
-  type TaskDescription,
-  type CreateTaskData,
-  type StatusMetadata,
-  type IterationMetadata,
-  type TaskSource,
-  type SourceType,
+export type {
+  TaskStatus,
+  TaskDescription,
+  CreateTaskData,
+  StatusMetadata,
+  IterationMetadata,
+  TaskSource,
+  SourceType,
 } from './task-description/types.js';
 
 export {
@@ -111,17 +120,17 @@ export {
 } from './task-description/schema.js';
 
 // Project Config library
-export {
-  type Language,
-  type MCP,
-  type PackageManager,
-  type TaskManager,
-  type NetworkMode,
-  type NetworkRule,
-  type NetworkConfig,
-  type SandboxConfig,
-  type HooksConfig,
-  type ProjectConfig,
+export type {
+  Language,
+  MCP,
+  PackageManager,
+  TaskManager,
+  NetworkMode,
+  NetworkRule,
+  NetworkConfig,
+  SandboxConfig,
+  HooksConfig,
+  ProjectConfig,
 } from './project-config/types.js';
 
 export {
@@ -138,10 +147,10 @@ export {
 } from './project-config/schema.js';
 
 // User Settings library
-export {
-  type AiAgent,
-  type UserDefaults,
-  type UserSettings,
+export type {
+  AiAgent,
+  UserDefaults,
+  UserSettings,
 } from './user-settings/types.js';
 
 export {
@@ -158,11 +167,11 @@ export {
 } from './user-settings/schema.js';
 
 // Global Config library
-export {
-  type AttributionStatus,
-  type TelemetryStatus,
-  type GlobalProject,
-  type GlobalConfig,
+export type {
+  AttributionStatus,
+  TelemetryStatus,
+  GlobalProject,
+  GlobalConfig,
 } from './global-config/types.js';
 
 export {
