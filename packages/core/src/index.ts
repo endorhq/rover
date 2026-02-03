@@ -113,4 +113,5 @@ export {
   clearContextProviders,
   // Providers
   registerBuiltInProviders,
+  LocalFileProvider,
 } from './context/index.js';
