@@ -255,6 +255,17 @@ export class IterationManager {
   }
 
   /**
+   * Set the context entries for this iteration.
+   * Used by ContextManager after fetching and storing context files.
+   *
+   * @param entries - Context entries to store
+   */
+  setContext(entries: IterationContextEntry[]): void {
+    this.data.context = entries;
+    this.save();
+  }
+
+  /**
    * Get raw JSON data
    */
   toJSON(): Iteration {
