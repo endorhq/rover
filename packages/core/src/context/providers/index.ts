@@ -1,8 +1,10 @@
 import { registerContextProvider } from '../registry.js';
 import { LocalFileProvider } from './local-file.js';
+import { GitHubProvider } from './github.js';
 
 // Re-export providers for direct access
 export { LocalFileProvider } from './local-file.js';
+export { GitHubProvider } from './github.js';
 
 /**
  * Register all built-in context providers.
@@ -10,5 +12,5 @@ export { LocalFileProvider } from './local-file.js';
  */
 export function registerBuiltInProviders(): void {
   registerContextProvider('file', LocalFileProvider);
-  // GitHubProvider: see task #486
+  registerContextProvider('github', GitHubProvider);
 }
