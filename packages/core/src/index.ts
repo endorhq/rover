@@ -106,6 +106,7 @@ export {
   type FileMetadata,
   type HTTPSResourceMetadata,
   type ContextMetadata,
+  type ContextManagerOptions,
   // Errors
   ContextError,
   ContextSchemeNotSupportedError,
@@ -123,4 +124,8 @@ export {
   LocalFileProvider,
   GitHubProvider,
   HTTPSProvider,
+  // Manager
+  ContextManager,
+  // Index Generator
+  generateContextIndex,
 } from './context/index.js';

@@ -8,7 +8,7 @@ import {
 import { parseCollectOptions } from '../lib/options.js';
 import { Runner, RunnerStepResult } from '../lib/runner.js';
 import { ACPRunner, ACPRunnerStepResult } from '../lib/acp-runner.js';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, cpSync, rmSync } from 'node:fs';
 
 /**
  * Helper function to display step results consistently for both ACP and standard runners
@@ -186,6 +186,112 @@ const handlePreContextInjection = (
 };
 
 /**
+ * Build context injection message from iteration.json context entries.
+ * Context files are in /workspace/.rover-context/
+ *
+ * @param outputPath - Path to the output directory containing iteration.json
+ * @returns Context message to prepend to prompts, or null if no context
+ */
+function buildContextMessage(outputPath: string): string | null {
+  const iterationFilePath = `${outputPath}/iteration.json`;
+  if (!existsSync(iterationFilePath)) return null;
+
+  try {
+    const iterationData = JSON.parse(readFileSync(iterationFilePath, 'utf-8'));
+    const contextEntries = iterationData.context ?? [];
+
+    if (contextEntries.length === 0) return null;
+
+    const lines = [
+      '\n\n**Context Sources:**',
+      'The following context files are available in `/workspace/.rover-context/`:',
+      '',
+    ];
+
+    for (const entry of contextEntries) {
+      lines.push(
+        `- \`/workspace/.rover-context/${entry.file}\`: ${entry.name} - ${entry.description}`
+      );
+    }
+
+    lines.push('');
+    lines.push(
+      '**Important:** Read the relevant context files before proceeding with the task.'
+    );
+    lines.push('');
+
+    return lines.join('\n');
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Copy context files from /output/context to /workspace/.rover-context
+ * for agent access. The .rover-context folder is cleaned up by entrypoint.sh.
+ *
+ * @param outputPath - Path to the output directory (e.g., /output)
+ * @param workspacePath - Path to the workspace directory (e.g., /workspace)
+ * @returns true if context was copied, false otherwise
+ */
+const copyContextToWorkspace = (
+  outputPath: string,
+  workspacePath: string
+): boolean => {
+  const contextDir = `${outputPath}/context`;
+  const targetDir = `${workspacePath}/.rover-context`;
+
+  if (!existsSync(contextDir)) {
+    return false;
+  }
+
+  try {
+    // Copy entire context folder to workspace
+    cpSync(contextDir, targetDir, { recursive: true });
+    console.log(colors.gray(`✓ Context files copied to ${targetDir}\n`));
+    return true;
+  } catch (err) {
+    console.log(
+      colors.yellow(
+        `\n⚠ Failed to copy context files: ${err instanceof Error ? err.message : String(err)}`
+      )
+    );
+    return false;
+  }
+};
+
+/**
+ * Inject context sources into workflow step prompts.
+ * Also copies context files from /output/context to /workspace/.rover-context.
+ *
+ * @param options - Run command options
+ * @param workflowManager - Workflow manager to inject context into
+ */
+const handleContextInjection = (
+  options: RunCommandOptions,
+  workflowManager: WorkflowManager
+): void => {
+  const outputPath = options.output || '/output';
+  const workspacePath = '/workspace';
+
+  // Copy context files to workspace for agent access
+  const hasCopiedContext = copyContextToWorkspace(outputPath, workspacePath);
+
+  // Build and inject context message into prompts
+  const contextMessage = buildContextMessage(outputPath);
+
+  if (contextMessage && workflowManager.steps.length > 0) {
+    console.log(
+      colors.gray('✓ Context sources injected into workflow steps\n')
+    );
+
+    for (const step of workflowManager.steps) {
+      step.prompt = contextMessage + step.prompt;
+    }
+  }
+};
+
+/**
  * Run a specific agent workflow file definition. It performs a set of validations
  * to confirm everything is ready and goes through the different steps.
  */
@@ -244,6 +350,9 @@ export const runCommand = async (
 
     // Handle pre-context injection
     handlePreContextInjection(options, workflowManager);
+
+    // Handle context sources injection
+    handleContextInjection(options, workflowManager);
 
     let providedInputs = new Map();
 

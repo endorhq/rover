@@ -1,6 +1,6 @@
 import colors from 'ansi-colors';
 import enquirer from 'enquirer';
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   AI_AGENT,
@@ -9,6 +9,10 @@ import {
   showProperties,
   showTitle,
   type TaskDescriptionManager,
+  ContextManager,
+  generateContextIndex,
+  ContextFetchError,
+  registerBuiltInProviders,
 } from 'rover-core';
 import { TaskNotFoundError } from 'rover-schemas';
 import {
@@ -53,6 +57,9 @@ interface IterateOptions {
   json?: boolean;
   interactive?: boolean;
   agent?: string;
+  context?: string[];
+  contextTrustAuthors?: string;
+  contextTrustAllAuthors?: boolean;
 }
 
 /**
@@ -406,6 +413,64 @@ const iterateCommand = async (
       );
 
       processManager?.completeLastItem();
+
+      // Fetch context if any URIs provided
+      if (options.context && options.context.length > 0) {
+        processManager?.addItem('Fetching context sources');
+
+        try {
+          // Register built-in providers
+          registerBuiltInProviders();
+
+          const trustedAuthors = options.contextTrustAuthors
+            ? options.contextTrustAuthors.split(',').map(s => s.trim())
+            : undefined;
+
+          const contextManager = new ContextManager(options.context, task, {
+            trustAllAuthors: options.contextTrustAllAuthors,
+            trustedAuthors,
+            cwd: project.path,
+          });
+
+          const entries = await contextManager.fetchAndStore();
+
+          // Store in iteration.json
+          const iteration = IterationManager.load(iterationPath);
+          iteration.setContext(entries);
+
+          // Write index.md
+          const indexContent = generateContextIndex(entries, task.iterations);
+          writeFileSync(
+            join(contextManager.getContextDir(), 'index.md'),
+            indexContent
+          );
+
+          processManager?.updateLastItem(
+            `Fetching context sources | ${entries.length} source(s) loaded`
+          );
+          processManager?.completeLastItem();
+
+          // Display context summary
+          if (!isJsonMode() && entries.length > 0) {
+            console.log(colors.gray('\nContext sources:'));
+            for (const entry of entries) {
+              console.log(
+                colors.gray(`  - ${entry.name}: ${entry.description}`)
+              );
+            }
+          }
+        } catch (error) {
+          processManager?.failLastItem();
+          if (error instanceof ContextFetchError) {
+            if (!isJsonMode()) {
+              console.error(
+                colors.red(`Error fetching context: ${error.message}`)
+              );
+            }
+          }
+          throw error;
+        }
+      }
 
       // Start sandbox container for task execution
       const sandbox = await createSandbox(task, processManager, {

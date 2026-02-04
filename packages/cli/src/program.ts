@@ -286,6 +286,20 @@ export function createProgram(
       (value: string, previous: string[] | undefined) =>
         previous ? [...previous, value] : [value]
     )
+    .option(
+      '-c, --context <uri>',
+      'Add context from URI (github:issue/15, file:./docs.md, https://...). Can be repeated.',
+      (value: string, previous: string[] | undefined) =>
+        previous ? [...previous, value] : [value]
+    )
+    .option(
+      '--context-trust-authors <users>',
+      'Comma-separated list of trusted authors for comment inclusion'
+    )
+    .option(
+      '--context-trust-all-authors',
+      'Trust all authors for comment inclusion (use with caution)'
+    )
     .option('--json', 'Output the result in JSON format')
     .option(
       '--sandbox-extra-args <args>',
@@ -385,6 +399,20 @@ export function createProgram(
     .option(
       '-a, --agent <agent>',
       'AI agent to use for this iteration (e.g., claude, claude:sonnet)'
+    )
+    .option(
+      '-c, --context <uri>',
+      'Add context from URI (github:issue/15, file:./docs.md, https://...). Can be repeated.',
+      (value: string, previous: string[] | undefined) =>
+        previous ? [...previous, value] : [value]
+    )
+    .option(
+      '--context-trust-authors <users>',
+      'Comma-separated list of trusted authors for comment inclusion'
+    )
+    .option(
+      '--context-trust-all-authors',
+      'Trust all authors for comment inclusion (use with caution)'
     )
     .action(iterateCmd.action);
 

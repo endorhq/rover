@@ -1,6 +1,6 @@
 import enquirer from 'enquirer';
 import colors from 'ansi-colors';
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import {
@@ -17,6 +17,10 @@ import {
   showProperties,
   Git,
   type ProjectManager,
+  ContextManager,
+  generateContextIndex,
+  ContextFetchError,
+  registerBuiltInProviders,
 } from 'rover-core';
 import type { NetworkConfig, NetworkMode } from 'rover-schemas';
 import {
@@ -192,6 +196,11 @@ interface TaskTaskOutput extends CLIJsonOutput {
   workspace?: string;
   branch?: string;
   savedTo?: string;
+  context?: Array<{
+    name: string;
+    uri: string;
+    description: string;
+  }>;
   tasks?: Array<{
     taskId: number;
     agent: string;
@@ -222,6 +231,9 @@ interface TaskOptions {
   networkMode?: NetworkMode;
   networkAllow?: string[];
   networkBlock?: string[];
+  context?: string[];
+  contextTrustAuthors?: string;
+  contextTrustAllAuthors?: boolean;
 }
 
 /**
@@ -317,6 +329,11 @@ const createTaskForAgent = async (
     url?: string;
     title?: string;
     ref?: Record<string, unknown>;
+  },
+  contextOptions?: {
+    context?: string[];
+    contextTrustAuthors?: string;
+    contextTrustAllAuthors?: boolean;
   }
 ): Promise<{
   taskId: number;
@@ -328,6 +345,7 @@ const createTaskForAgent = async (
   workspace: string;
   branch: string;
   savedTo: string;
+  context?: Array<{ name: string; uri: string; description: string }>;
 } | null> => {
   const { sourceBranch, targetBranch, fromGithub } = options;
 
@@ -429,6 +447,65 @@ const createTaskForAgent = async (
 
   processManager?.completeLastItem();
 
+  // Fetch context if any URIs provided
+  let contextEntries: Array<{
+    name: string;
+    uri: string;
+    description: string;
+  }> = [];
+
+  if (contextOptions?.context && contextOptions.context.length > 0) {
+    processManager?.addItem('Fetching context sources');
+
+    try {
+      // Register built-in providers
+      registerBuiltInProviders();
+
+      const trustedAuthors = contextOptions.contextTrustAuthors
+        ? contextOptions.contextTrustAuthors.split(',').map(s => s.trim())
+        : undefined;
+
+      const contextManager = new ContextManager(contextOptions.context, task, {
+        trustAllAuthors: contextOptions.contextTrustAllAuthors,
+        trustedAuthors,
+        cwd: projectPath,
+      });
+
+      const entries = await contextManager.fetchAndStore();
+
+      // Store in iteration.json
+      const iteration = IterationManager.load(iterationPath);
+      iteration.setContext(entries);
+
+      // Write index.md
+      const indexContent = generateContextIndex(entries, task.iterations);
+      writeFileSync(
+        join(contextManager.getContextDir(), 'index.md'),
+        indexContent
+      );
+
+      processManager?.updateLastItem(
+        `Fetching context sources | ${entries.length} source(s) loaded`
+      );
+      processManager?.completeLastItem();
+
+      // Store entries for return value and display
+      contextEntries = entries.map(entry => ({
+        name: entry.name,
+        uri: entry.uri,
+        description: entry.description,
+      }));
+    } catch (error) {
+      processManager?.failLastItem();
+      if (error instanceof ContextFetchError) {
+        if (!jsonMode) {
+          console.error(colors.red(`Error fetching context: ${error.message}`));
+        }
+      }
+      throw error;
+    }
+  }
+
   // Resolve and store the agent image that will be used for this task
   const projectConfig = ProjectConfigManager.load(projectPath);
   const agentImage = resolveAgentImage(projectConfig);
@@ -494,6 +571,7 @@ const createTaskForAgent = async (
     workspace: task.worktreePath,
     branch: task.branchName,
     savedTo: task.getBasePath(),
+    context: contextEntries.length > 0 ? contextEntries : undefined,
   };
 };
 
@@ -523,7 +601,7 @@ const createTaskForAgent = async (
 const taskCommand = async (initPrompt?: string, options: TaskOptions = {}) => {
   const telemetry = getTelemetry();
   // Extract options
-  const {
+  let {
     yes,
     json,
     fromGithub,
@@ -531,6 +609,9 @@ const taskCommand = async (initPrompt?: string, options: TaskOptions = {}) => {
     sourceBranch,
     targetBranch,
     agent,
+    context,
+    contextTrustAuthors,
+    contextTrustAllAuthors,
   } = options;
 
   // Set global JSON mode for tests and backwards compatibility
@@ -543,6 +624,33 @@ const taskCommand = async (initPrompt?: string, options: TaskOptions = {}) => {
   const jsonOutput: TaskTaskOutput = {
     success: false,
   };
+
+  // Deprecation: translate --from-github to --context
+  if (fromGithub) {
+    if (!json) {
+      console.warn(
+        colors.yellow(
+          'Warning: --from-github is deprecated. Use --context github:issue/<number> instead.'
+        )
+      );
+    }
+
+    // Translate to context URI
+    context = context ?? [];
+    context.push(`github:issue/${fromGithub}`);
+
+    // Translate --include-comments to --context-trust-all-authors
+    if (includeComments) {
+      if (!json) {
+        console.warn(
+          colors.yellow(
+            'Warning: --include-comments is deprecated. Use --context-trust-all-authors instead.'
+          )
+        );
+      }
+      contextTrustAllAuthors = contextTrustAllAuthors || includeComments;
+    }
+  }
 
   // Validate --include-comments requires --from-github
   if (includeComments && !fromGithub) {
@@ -983,6 +1091,7 @@ const taskCommand = async (initPrompt?: string, options: TaskOptions = {}) => {
       workspace: string;
       branch: string;
       savedTo: string;
+      context?: Array<{ name: string; uri: string; description: string }>;
     }> = [];
     const failedAgents: string[] = [];
 
@@ -1016,7 +1125,12 @@ const taskCommand = async (initPrompt?: string, options: TaskOptions = {}) => {
         git,
         json || false,
         networkConfig,
-        taskSource
+        taskSource,
+        {
+          context,
+          contextTrustAuthors,
+          contextTrustAllAuthors,
+        }
       );
 
       if (taskResult) {
@@ -1057,6 +1171,7 @@ const taskCommand = async (initPrompt?: string, options: TaskOptions = {}) => {
     jsonOutput.workspace = firstTask.workspace;
     jsonOutput.branch = firstTask.branch;
     jsonOutput.savedTo = firstTask.savedTo;
+    jsonOutput.context = firstTask.context;
     jsonOutput.success = true;
 
     // For multiple agents, include all task information in an array
