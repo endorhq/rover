@@ -476,7 +476,7 @@ export class ACPRunner {
     if (fileOutputs.length > 0) {
       instructions += '### File Creation\n\n';
       instructions +=
-        'You MUST create the following files with the exact content needed and print their content in the current session:\n\n';
+        'You MUST create the following files with the exact content needed:\n\n';
 
       fileOutputs.forEach(output => {
         instructions += `- **${output.name}**: ${output.description}\n`;
@@ -485,9 +485,7 @@ export class ACPRunner {
       });
 
       instructions +=
-        'IMPORTANT: All files must be created with appropriate content. Do not create empty or placeholder files.\n';
-      instructions +=
-        'IMPORTANT: Print the content in the session so next steps have all the context.\n\n';
+        'IMPORTANT: All files must be created with appropriate content. Do not create empty or placeholder files.\n\n';
     }
 
     instructions += '**CRITICAL**: Follow these output requirements exactly. ';
