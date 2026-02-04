@@ -7,7 +7,10 @@
  * - Updated in this iteration (re-fetched)
  * - From previous iterations (inherited)
  */
+import pupa from 'pupa';
 import type { IterationContextEntry } from 'rover-schemas';
+import TEMPLATE from './templates/context-index.md';
+import EMPTY_TEMPLATE from './templates/context-index-empty.md';
 
 /**
  * Options for generating the context index with iteration artifacts.
@@ -32,43 +35,12 @@ export function generateContextIndex(
   iterationNumber: number,
   options?: ContextIndexOptions
 ): string {
-  const lines: string[] = [];
-
-  lines.push(`# Context for Iteration ${iterationNumber}`);
-  lines.push('');
-
   const hasArtifacts =
     (options?.iterationSummaries?.length ?? 0) > 0 ||
     (options?.iterationPlans?.length ?? 0) > 0;
 
   if (entries.length === 0 && !hasArtifacts) {
-    lines.push('No context sources were provided for this iteration.');
-    return lines.join('\n');
-  }
-
-  // Previous iteration summaries
-  if (options?.iterationSummaries && options.iterationSummaries.length > 0) {
-    lines.push('## Previous Iteration Summaries');
-    lines.push('');
-    for (const summary of options.iterationSummaries) {
-      lines.push(`### Iteration ${summary.iteration}`);
-      lines.push('');
-      lines.push(summary.content);
-      lines.push('');
-    }
-  }
-
-  // Iteration plans
-  if (options?.iterationPlans && options.iterationPlans.length > 0) {
-    lines.push('## Iteration Plans');
-    for (const plan of options.iterationPlans) {
-      lines.push(`- \`${plan.file}\`: Plan from iteration ${plan.iteration}`);
-    }
-    lines.push('');
-  }
-
-  if (entries.length === 0) {
-    return lines.join('\n');
+    return pupa(EMPTY_TEMPLATE, { iterationNumber }, { ignoreMissing: true });
   }
 
   // Categorize entries
@@ -78,53 +50,130 @@ export function generateContextIndex(
 
   for (const entry of entries) {
     if (entry.provenance.addedIn === iterationNumber) {
-      // Newly added in this iteration
       newEntries.push(entry);
     } else if (entry.provenance.updatedIn === iterationNumber) {
-      // Re-fetched/updated in this iteration
       updatedEntries.push(entry);
     } else {
-      // Inherited from previous iteration
       inheritedEntries.push(entry);
     }
   }
 
-  // New entries section
-  if (newEntries.length > 0) {
-    lines.push('## New in this iteration');
-    for (const entry of newEntries) {
-      lines.push(
-        `- **${entry.name}** (\`${entry.file}\`) - ${entry.description}`
-      );
-    }
-    lines.push('');
-  }
+  // Pre-compute each section
+  const summariesSection = buildSummariesSection(
+    options?.iterationSummaries ?? []
+  );
+  const plansSection = buildPlansSection(options?.iterationPlans ?? []);
+  const newEntriesSection = buildNewEntriesSection(newEntries);
+  const updatedEntriesSection = buildUpdatedEntriesSection(updatedEntries);
+  const inheritedEntriesSection =
+    buildInheritedEntriesSection(inheritedEntries);
+  const sourcesSection =
+    entries.length > 0 ? buildSourcesSection(entries, iterationNumber) : '';
 
-  // Updated entries section
-  if (updatedEntries.length > 0) {
-    lines.push('## Updated in this iteration');
-    for (const entry of updatedEntries) {
-      lines.push(
-        `- **${entry.name}** (\`${entry.file}\`) - ${entry.description}, originally added in iteration ${entry.provenance.addedIn}`
-      );
-    }
-    lines.push('');
-  }
+  return pupa(
+    TEMPLATE,
+    {
+      iterationNumber,
+      summariesSection,
+      plansSection,
+      newEntriesSection,
+      updatedEntriesSection,
+      inheritedEntriesSection,
+      sourcesSection,
+    },
+    { ignoreMissing: true }
+  );
+}
 
-  // Inherited entries section
-  if (inheritedEntries.length > 0) {
-    lines.push('## From previous iterations');
-    for (const entry of inheritedEntries) {
-      lines.push(
-        `- **${entry.name}** (\`${entry.file}\`) - added in iteration ${entry.provenance.addedIn}`
-      );
-    }
-    lines.push('');
-  }
+/**
+ * Build the "Previous Iteration Summaries" section.
+ */
+function buildSummariesSection(
+  summaries: Array<{ iteration: number; content: string }>
+): string {
+  if (summaries.length === 0) return '';
 
-  // Detailed sources section
-  lines.push('## Sources');
+  const lines: string[] = ['## Previous Iteration Summaries', ''];
+  for (const summary of summaries) {
+    lines.push(`### Iteration ${summary.iteration}`, '', summary.content, '');
+  }
+  return lines.join('\n');
+}
+
+/**
+ * Build the "Iteration Plans" section.
+ */
+function buildPlansSection(
+  plans: Array<{ iteration: number; file: string }>
+): string {
+  if (plans.length === 0) return '';
+
+  const lines: string[] = ['## Iteration Plans'];
+  for (const plan of plans) {
+    lines.push(`- \`${plan.file}\`: Plan from iteration ${plan.iteration}`);
+  }
   lines.push('');
+  return lines.join('\n');
+}
+
+/**
+ * Build the "New in this iteration" section.
+ */
+function buildNewEntriesSection(entries: IterationContextEntry[]): string {
+  if (entries.length === 0) return '';
+
+  const lines: string[] = ['## New in this iteration'];
+  for (const entry of entries) {
+    lines.push(
+      `- **${entry.name}** (\`${entry.file}\`) - ${entry.description}`
+    );
+  }
+  lines.push('');
+  return lines.join('\n');
+}
+
+/**
+ * Build the "Updated in this iteration" section.
+ */
+function buildUpdatedEntriesSection(entries: IterationContextEntry[]): string {
+  if (entries.length === 0) return '';
+
+  const lines: string[] = ['## Updated in this iteration'];
+  for (const entry of entries) {
+    lines.push(
+      `- **${entry.name}** (\`${entry.file}\`) - ${entry.description}, originally added in iteration ${entry.provenance.addedIn}`
+    );
+  }
+  lines.push('');
+  return lines.join('\n');
+}
+
+/**
+ * Build the "From previous iterations" section.
+ */
+function buildInheritedEntriesSection(
+  entries: IterationContextEntry[]
+): string {
+  if (entries.length === 0) return '';
+
+  const lines: string[] = ['## From previous iterations'];
+  for (const entry of entries) {
+    lines.push(
+      `- **${entry.name}** (\`${entry.file}\`) - added in iteration ${entry.provenance.addedIn}`
+    );
+  }
+  lines.push('');
+  return lines.join('\n');
+}
+
+/**
+ * Build the detailed "Sources" section.
+ */
+function buildSourcesSection(
+  entries: IterationContextEntry[],
+  iterationNumber: number
+): string {
+  const lines: string[] = ['## Sources', ''];
 
   for (const entry of entries) {
     lines.push(`### ${entry.name}`);
@@ -154,9 +203,6 @@ function formatProvenance(
 ): string {
   if (provenance.updatedIn === currentIteration) {
     return `added in iteration ${provenance.addedIn}, updated in iteration ${provenance.updatedIn}`;
-  } else if (provenance.addedIn === currentIteration) {
-    return `added in iteration ${provenance.addedIn}`;
-  } else {
-    return `added in iteration ${provenance.addedIn}`;
   }
+  return `added in iteration ${provenance.addedIn}`;
 }
