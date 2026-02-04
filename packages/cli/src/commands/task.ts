@@ -21,6 +21,7 @@ import {
   generateContextIndex,
   ContextFetchError,
   registerBuiltInProviders,
+  type ContextIndexOptions,
 } from 'rover-core';
 import type { NetworkConfig, NetworkMode } from 'rover-schemas';
 import {
@@ -447,62 +448,64 @@ const createTaskForAgent = async (
 
   processManager?.completeLastItem();
 
-  // Fetch context if any URIs provided
+  // Fetch context and generate index.md
   let contextEntries: Array<{
     name: string;
     uri: string;
     description: string;
   }> = [];
 
-  if (contextOptions?.context && contextOptions.context.length > 0) {
-    processManager?.addItem('Fetching context sources');
+  processManager?.addItem('Fetching context sources');
 
-    try {
-      // Register built-in providers
-      registerBuiltInProviders();
+  try {
+    // Register built-in providers
+    registerBuiltInProviders();
 
-      const trustedAuthors = contextOptions.contextTrustAuthors
-        ? contextOptions.contextTrustAuthors.split(',').map(s => s.trim())
-        : undefined;
+    const trustedAuthors = contextOptions?.contextTrustAuthors
+      ? contextOptions.contextTrustAuthors.split(',').map(s => s.trim())
+      : undefined;
 
-      const contextManager = new ContextManager(contextOptions.context, task, {
-        trustAllAuthors: contextOptions.contextTrustAllAuthors,
+    const contextManager = new ContextManager(
+      contextOptions?.context ?? [],
+      task,
+      {
+        trustAllAuthors: contextOptions?.contextTrustAllAuthors,
         trustedAuthors,
         cwd: projectPath,
-      });
-
-      const entries = await contextManager.fetchAndStore();
-
-      // Store in iteration.json
-      iteration.setContext(entries);
-
-      // Write index.md
-      const indexContent = generateContextIndex(entries, task.iterations);
-      writeFileSync(
-        join(contextManager.getContextDir(), 'index.md'),
-        indexContent
-      );
-
-      processManager?.updateLastItem(
-        `Fetching context sources | ${entries.length} source(s) loaded`
-      );
-      processManager?.completeLastItem();
-
-      // Store entries for return value and display
-      contextEntries = entries.map(entry => ({
-        name: entry.name,
-        uri: entry.uri,
-        description: entry.description,
-      }));
-    } catch (error) {
-      processManager?.failLastItem();
-      if (error instanceof ContextFetchError) {
-        if (!jsonMode) {
-          console.error(colors.red(`Error fetching context: ${error.message}`));
-        }
       }
-      throw error;
+    );
+
+    const entries = await contextManager.fetchAndStore();
+
+    // Store in iteration.json
+    iteration.setContext(entries);
+
+    // Generate index.md (no previous artifacts for first iteration)
+    const indexContent = generateContextIndex(entries, task.iterations);
+    writeFileSync(
+      join(contextManager.getContextDir(), 'index.md'),
+      indexContent
+    );
+
+    processManager?.updateLastItem(
+      `Fetching context sources | ${entries.length} source(s) loaded`
+    );
+    processManager?.completeLastItem();
+
+    // Store entries for return value and display
+    contextEntries = entries.map(entry => ({
+      name: entry.name,
+      uri: entry.uri,
+      description: entry.description,
+    }));
+  } catch (error) {
+    processManager?.failLastItem();
+    if (error instanceof ContextFetchError) {
+      if (!jsonMode) {
+        console.error(colors.red(`Error fetching context: ${error.message}`));
+      }
     }
+    throw error;
   }
 
   // Resolve and store the agent image that will be used for this task

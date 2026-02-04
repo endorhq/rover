@@ -107,6 +107,7 @@ export {
   type HTTPSResourceMetadata,
   type ContextMetadata,
   type ContextManagerOptions,
+  type ContextIndexOptions,
   // Errors
   ContextError,
   ContextSchemeNotSupportedError,

@@ -13,6 +13,7 @@ import {
   generateContextIndex,
   ContextFetchError,
   registerBuiltInProviders,
+  type ContextIndexOptions,
 } from 'rover-core';
 import { TaskNotFoundError } from 'rover-schemas';
 import {
@@ -414,61 +415,78 @@ const iterateCommand = async (
 
       processManager?.completeLastItem();
 
-      // Fetch context if any URIs provided
-      if (options.context && options.context.length > 0) {
-        processManager?.addItem('Fetching context sources');
+      // Fetch context and collect artifacts from previous iterations
+      processManager?.addItem('Fetching context sources');
 
-        try {
-          // Register built-in providers
-          registerBuiltInProviders();
+      try {
+        // Register built-in providers
+        registerBuiltInProviders();
 
-          const trustedAuthors = options.contextTrustAuthors
-            ? options.contextTrustAuthors.split(',').map(s => s.trim())
-            : undefined;
+        const trustedAuthors = options.contextTrustAuthors
+          ? options.contextTrustAuthors.split(',').map(s => s.trim())
+          : undefined;
 
-          const contextManager = new ContextManager(options.context, task, {
-            trustAllAuthors: options.contextTrustAllAuthors,
-            trustedAuthors,
-            cwd: project.path,
-          });
+        const contextManager = new ContextManager(options.context ?? [], task, {
+          trustAllAuthors: options.contextTrustAllAuthors,
+          trustedAuthors,
+          cwd: project.path,
+        });
 
-          const entries = await contextManager.fetchAndStore();
+        const entries = await contextManager.fetchAndStore();
 
-          // Store in iteration.json
-          iteration.setContext(entries);
+        // Store in iteration.json
+        iteration.setContext(entries);
 
-          // Write index.md
-          const indexContent = generateContextIndex(entries, task.iterations);
+        // Gather artifacts from all previous iterations
+        const { summaries, plans } =
+          task.getIterationArtifacts(newIterationNumber);
+
+        // Copy plan files into context directory and build references
+        const iterationPlans: ContextIndexOptions['iterationPlans'] = [];
+        for (const plan of plans) {
+          const planFilename = `plan-iter-${plan.iteration}.md`;
           writeFileSync(
-            join(contextManager.getContextDir(), 'index.md'),
-            indexContent
+            join(contextManager.getContextDir(), planFilename),
+            plan.content
           );
-
-          processManager?.updateLastItem(
-            `Fetching context sources | ${entries.length} source(s) loaded`
-          );
-          processManager?.completeLastItem();
-
-          // Display context summary
-          if (!isJsonMode() && entries.length > 0) {
-            console.log(colors.gray('\nContext sources:'));
-            for (const entry of entries) {
-              console.log(
-                colors.gray(`  - ${entry.name}: ${entry.description}`)
-              );
-            }
-          }
-        } catch (error) {
-          processManager?.failLastItem();
-          if (error instanceof ContextFetchError) {
-            if (!isJsonMode()) {
-              console.error(
-                colors.red(`Error fetching context: ${error.message}`)
-              );
-            }
-          }
-          throw error;
+          iterationPlans.push({
+            iteration: plan.iteration,
+            file: planFilename,
+          });
         }
+
+        // Generate index.md with artifacts
+        const indexContent = generateContextIndex(entries, task.iterations, {
+          iterationSummaries: summaries,
+          iterationPlans,
+        });
+        writeFileSync(
+          join(contextManager.getContextDir(), 'index.md'),
+          indexContent
+        );
+
+        processManager?.updateLastItem(
+          `Fetching context sources | ${entries.length} source(s) loaded`
+        );
+        processManager?.completeLastItem();
+
+        // Display context summary
+        if (!isJsonMode() && entries.length > 0) {
+          console.log(colors.gray('\nContext sources:'));
+          for (const entry of entries) {
+            console.log(colors.gray(`  - ${entry.name}: ${entry.description}`));
+          }
+        }
+      } catch (error) {
+        processManager?.failLastItem();
+        if (error instanceof ContextFetchError) {
+          if (!isJsonMode()) {
+            console.error(
+              colors.red(`Error fetching context: ${error.message}`)
+            );
+          }
+        }
+        throw error;
       }
 
       // Start sandbox container for task execution

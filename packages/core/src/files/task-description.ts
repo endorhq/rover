@@ -537,6 +537,37 @@ export class TaskDescriptionManager {
   }
 
   /**
+   * Collect artifacts (summaries and plans) from all iterations before a given number.
+   * Returns artifacts sorted by iteration number (ascending).
+   */
+  getIterationArtifacts(beforeIteration: number): {
+    summaries: Array<{ iteration: number; content: string }>;
+    plans: Array<{ iteration: number; content: string }>;
+  } {
+    const summaries: Array<{ iteration: number; content: string }> = [];
+    const plans: Array<{ iteration: number; content: string }> = [];
+
+    const allIterations = this.getIterations()
+      .filter(iter => iter.iteration < beforeIteration)
+      .sort((a, b) => a.iteration - b.iteration);
+
+    for (const iter of allIterations) {
+      const artifacts = iter.getArtifacts();
+      if (artifacts.summary) {
+        summaries.push({
+          iteration: iter.iteration,
+          content: artifacts.summary,
+        });
+      }
+      if (artifacts.plan) {
+        plans.push({ iteration: iter.iteration, content: artifacts.plan });
+      }
+    }
+
+    return { summaries, plans };
+  }
+
+  /**
    * Update the task status based on the latest iteration
    */
   updateStatusFromIteration(): void {

@@ -273,6 +273,17 @@ export class IterationManager {
   }
 
   /**
+   * Get iteration artifacts (summary and plan content).
+   */
+  getArtifacts(): { summary?: string; plan?: string } {
+    const files = this.getMarkdownFiles(['summary.md', 'plan.md']);
+    return {
+      summary: files.get('summary.md'),
+      plan: files.get('plan.md'),
+    };
+  }
+
+  /**
    * Get available markdown files in this iteration directory
    */
   getMarkdownFiles(requestedFiles?: string[]): Map<string, string> {

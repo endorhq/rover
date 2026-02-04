@@ -208,6 +208,10 @@ function buildContextMessage(outputPath: string): string | null {
       '',
     ];
 
+    lines.push(
+      `- \`/workspace/.rover-context/index.md\`: Context index with full overview and previous iteration summaries`
+    );
+
     for (const entry of contextEntries) {
       lines.push(
         `- \`/workspace/.rover-context/${entry.file}\`: ${entry.name} - ${entry.description}`
