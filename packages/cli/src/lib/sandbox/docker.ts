@@ -77,7 +77,6 @@ export class DockerSandbox extends Sandbox {
     const entrypointScriptPath = setupBuilder.generateEntrypoint();
     const inputsPath = setupBuilder.generateInputs();
     const workflowPath = setupBuilder.saveWorkflow(this.task.workflowName);
-    const preContextPaths = setupBuilder.generatePreContextFiles();
 
     // Get agent-specific Docker mounts and environment variables
     const agent = getAIAgentTool(this.task.agent!);
@@ -157,13 +156,12 @@ export class DockerSandbox extends Sandbox {
       `${iteration.fileDescriptionPath}:/task/description.json:Z,ro`
     );
 
-    // Mount pre-context files
-    preContextPaths.forEach((preContextPath, index) => {
-      dockerArgs.push(
-        '-v',
-        `${preContextPath}:/__pre_context_${index}__.json:Z,ro`
-      );
-    });
+    // Mount context directory if available (read-only)
+    const contextDir = join(iteration.iterationPath, 'context');
+    const hasContext = existsSync(contextDir);
+    if (hasContext) {
+      dockerArgs.push('-v', `${contextDir}:/context:Z,ro`);
+    }
 
     // Mount initScript if provided in project config
     if (projectConfig?.initScript) {
@@ -210,6 +208,11 @@ export class DockerSandbox extends Sandbox {
       '/inputs.json'
     );
 
+    // Pass context directory argument if context was mounted
+    if (hasContext) {
+      dockerArgs.push('--context-dir', '/context');
+    }
+
     // Pass model if specified
     if (this.task.agentModel) {
       dockerArgs.push('--agent-model', this.task.agentModel);
@@ -219,11 +222,6 @@ export class DockerSandbox extends Sandbox {
     if (VERBOSE) {
       dockerArgs.push('-v');
     }
-
-    // Add pre-context file arguments
-    preContextPaths.forEach((_, index) => {
-      dockerArgs.push('--pre-context-file', `/__pre_context_${index}__.json`);
-    });
 
     return (
       (await launch('docker', dockerArgs)).stdout?.toString().trim() ||
@@ -274,8 +272,6 @@ export class DockerSandbox extends Sandbox {
       false,
       'entrypoint-iterate.sh'
     );
-    const preContextPaths = setupBuilder.generatePreContextFiles();
-
     // Get agent-specific Docker mounts and environment variables
     const agent = getAIAgentTool(this.task.agent!);
     const dockerMounts: string[] = agent.getContainerMounts();
@@ -345,13 +341,12 @@ export class DockerSandbox extends Sandbox {
       `${entrypointScriptPath}:/entrypoint.sh:Z,ro`
     );
 
-    // Mount pre-context files
-    preContextPaths.forEach((preContextPath, index) => {
-      dockerArgs.push(
-        '-v',
-        `${preContextPath}:/__pre_context_${index}__.json:Z,ro`
-      );
-    });
+    // Mount context directory if available (read-only)
+    const contextDir = join(iteration.iterationPath, 'context');
+    const hasContext = existsSync(contextDir);
+    if (hasContext) {
+      dockerArgs.push('-v', `${contextDir}:/context:Z,ro`);
+    }
 
     // Get extra args from CLI options and project config, merge them
     const configExtraArgs = normalizeExtraArgs(projectConfig?.sandboxExtraArgs);
@@ -375,6 +370,11 @@ export class DockerSandbox extends Sandbox {
       dockerArgs.push(initialPrompt);
     }
 
+    // Pass context directory argument if context was mounted
+    if (hasContext) {
+      dockerArgs.push('--context-dir', '/context');
+    }
+
     // Pass model if specified
     if (this.task.agentModel) {
       dockerArgs.push('--agent-model', this.task.agentModel);
@@ -384,11 +384,6 @@ export class DockerSandbox extends Sandbox {
     if (VERBOSE) {
       dockerArgs.push('-v');
     }
-
-    // Add pre-context file arguments
-    preContextPaths.forEach((_, index) => {
-      dockerArgs.push('--pre-context-file', `/__pre_context_${index}__.json`);
-    });
 
     // Use detached: false to ensure proper TTY signal handling and job control
     return launch('docker', dockerArgs, {
