@@ -16,6 +16,11 @@ fi
 # available in the $PATH.
 export PATH=/root/local/.bin:$PATH
 
+# Update package lists on Debian-based distributions
+if [[ -f /etc/debian_version ]]; then
+  sudo apt-get update
+fi
+
 # Initially, use sudo to ensure even users without permissions can
 # create this. Once we finish the setup, we will reduce the sudo
 # permissions to the minimal.

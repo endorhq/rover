@@ -70,12 +70,8 @@ export abstract class BaseAgent implements Agent {
     console.log(colors.gray('└── Command: ') + colors.cyan(command));
 
     try {
-      // Parse the command to get the executable and arguments
-      const parts = command.split(' ');
-      const executable = parts[0];
-      const args = parts.slice(1);
-
-      const result = launchSync(executable, args, { stdio: 'inherit' });
+      // Run the command in a shell so that pipes and other shell features work
+      const result = launchSync('sh', ['-c', command], { stdio: 'inherit' });
 
       if (result.failed) {
         const errorMessage = result.stderr || result.stdout || 'Unknown error';

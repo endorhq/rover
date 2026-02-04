@@ -6,7 +6,7 @@ export class PHPSandboxPackage extends SandboxPackage {
 
   installScript(): string {
     // Install php. If build base is required, the agent will take care of installing it
-    return `sudo apk add --no-cache php84 php84-dev`;
+    return `sudo apt-get install -y --no-install-recommends php php-dev`;
   }
 
   initScript(): string {
