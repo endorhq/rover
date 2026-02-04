@@ -326,7 +326,7 @@ export class ACPClient implements Client {
     if (VERBOSE) {
       console.log(
         colors.gray('[Client] Release terminal called with:'),
-          colors.cyan(JSON.stringify(params, jsonReplacer, 2))
+        colors.cyan(JSON.stringify(params, jsonReplacer, 2))
       );
     }
 
