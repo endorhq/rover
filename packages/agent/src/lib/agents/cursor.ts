@@ -154,7 +154,6 @@ export class CursorAgent extends BaseAgent {
     const args = [
       'agent',
       '--approve-mcps',
-      '--browser',
       '--force',
       '--print',
       '--output-format',
