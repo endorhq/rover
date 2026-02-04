@@ -485,7 +485,7 @@ export class DockerSandbox extends Sandbox {
       '-w',
       '/workspace',
       ...extraArgs,
-      'node:current',
+      'node:lts',
       '/bin/bash',
     ];
 

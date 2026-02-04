@@ -79,7 +79,7 @@ The contents of this files will depend on the default groups present in the base
 Rover will remove `/etc/sudoers.d/1-agent-setup` before handing control to the agent. From that point on, the
 `/etc/sudoers.d/2-agent-cleanup` will determine what the agent is able to do with `sudo`: it is highly recommended to reduce the list of commands that could be executed with root permissions without password.
 
-An example for `node:current` follows:
+An example for `node:lts` follows:
 
 <details>
 

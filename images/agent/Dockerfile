@@ -1,5 +1,5 @@
 ARG NIX_AI_TOOLS_REV=ea213e13fde802090a4cdec57631e3374d67d78f
-FROM node:current AS agent-builder
+FROM node:lts AS agent-builder
 COPY . /app
 WORKDIR /app
 
@@ -10,7 +10,7 @@ RUN npm install -g pnpm
 RUN pnpm install && pnpm build-libs && pnpm --filter @endorhq/agent build
 RUN cd ./packages/agent && pnpm pack && mv *.tgz /rover-agent.tgz
 
-FROM node:current
+FROM node:lts
 ARG NIX_AI_TOOLS_REV
 ARG TARGETARCH
 ARG PACKAGE_MANAGER_MCP_SERVER_VERSION="v0.3.0"

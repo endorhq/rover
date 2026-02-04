@@ -415,7 +415,7 @@ If you need network restrictions, you would need to:
 **Yes.** The AI agent can execute any commands within the container, including test runners.
 
 The container has:
-- Node.js runtime (base image is `node:current` or custom agent image)
+- Node.js runtime (base image is `node:lts` or custom agent image)
 - Full access to the workspace with your project files
 - Ability to install dependencies and run scripts
 
