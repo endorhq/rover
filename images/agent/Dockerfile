@@ -33,7 +33,7 @@ RUN apt-get update && \
 
 # Install Node dependencies
 COPY --from=agent-builder /rover-agent.tgz /rover-agent.tgz
-RUN npm install -g mcp-remote@0.1.29
+RUN npm install -g mcp-remote@0.1.37
 RUN npm install -g /rover-agent.tgz
 
 COPY ./images/agent/assets/1-sudoers-setup /etc/sudoers.d/1-agent-setup
