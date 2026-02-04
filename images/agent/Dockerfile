@@ -41,4 +41,3 @@ COPY ./images/agent/assets/2-sudoers-cleanup /etc/sudoers.d/2-agent-cleanup
 
 # Install agents with special requirements
 COPY ./images/agent/assets/nix/nix.conf /etc/nix/nix.conf
-COPY ./images/agent/assets/nix/ai-tool-wrapper /usr/local/bin/cursor-agent
