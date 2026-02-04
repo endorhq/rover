@@ -255,6 +255,22 @@ export class IterationManager {
   }
 
   /**
+   * Update the iteration title after AI expansion.
+   */
+  updateTitle(title: string): void {
+    this.data.title = title;
+    this.save();
+  }
+
+  /**
+   * Update the iteration description after AI expansion.
+   */
+  updateDescription(description: string): void {
+    this.data.description = description;
+    this.save();
+  }
+
+  /**
    * Set the context entries for this iteration.
    * Used by ContextManager after fetching and storing context files.
    *

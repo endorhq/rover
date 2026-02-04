@@ -70,13 +70,15 @@ const expandIterationInstructions = async (
   instructions: string,
   previousContext: IterationContext,
   aiAgent: AIAgentTool,
-  jsonMode: boolean
+  jsonMode: boolean,
+  contextContent?: string
 ): Promise<IPromptTask | null> => {
   try {
     const expanded = await aiAgent.expandIterationInstructions(
       instructions,
       previousContext.plan,
-      previousContext.changes
+      previousContext.changes,
+      contextContent
     );
     return expanded;
   } catch (error) {
@@ -347,39 +349,6 @@ const iterateCommand = async (
 
       processManager?.completeLastItem();
 
-      processManager?.addItem('Expanding new instructions with AI agent');
-
-      let expandedTask: IPromptTask | null = null;
-
-      try {
-        expandedTask = await expandIterationInstructions(
-          finalInstructions,
-          previousContext,
-          aiAgent,
-          options.json === true
-        );
-
-        if (expandedTask) {
-          processManager?.completeLastItem();
-        } else {
-          processManager?.failLastItem();
-        }
-      } catch (error) {
-        processManager?.failLastItem();
-      }
-
-      if (expandedTask == null) {
-        // Fallback approach
-        expandedTask = {
-          title: `${task.title} - Iteration refinement instructinos`,
-          description: `${task.description}\n\nAdditional requirements:\n${finalInstructions}`,
-        };
-      }
-
-      // TODO(angel): Is this required?
-      result.expandedTitle = expandedTask.title;
-      result.expandedDescription = expandedTask.description;
-
       result.worktreePath = task.worktreePath;
 
       processManager?.addItem('Creating the new iteration for the task');
@@ -403,13 +372,13 @@ const iterateCommand = async (
       task.incrementIteration();
       task.markIterating();
 
-      // Create new iteration config
+      // Create new iteration config with raw instructions (will be updated after expansion)
       const iteration = IterationManager.createIteration(
         iterationPath,
         newIterationNumber,
         task.id,
-        expandedTask.title,
-        expandedTask.description,
+        finalInstructions,
+        finalInstructions,
         previousContext
       );
 
@@ -417,6 +386,8 @@ const iterateCommand = async (
 
       // Fetch context and collect artifacts from previous iterations
       processManager?.addItem('Fetching context sources');
+
+      let contextContent: string | undefined;
 
       try {
         // Register built-in providers
@@ -465,6 +436,12 @@ const iterateCommand = async (
           indexContent
         );
 
+        // Read context content for AI expansion
+        const storedContent = contextManager.readStoredContent(entries);
+        if (storedContent) {
+          contextContent = storedContent;
+        }
+
         processManager?.updateLastItem(
           `Fetching context sources | ${entries.length} source(s) loaded`
         );
@@ -488,6 +465,45 @@ const iterateCommand = async (
         }
         throw error;
       }
+
+      // AI expansion with context content
+      processManager?.addItem('Expanding new instructions with AI agent');
+
+      let expandedTask: IPromptTask | null = null;
+
+      try {
+        expandedTask = await expandIterationInstructions(
+          finalInstructions,
+          previousContext,
+          aiAgent,
+          options.json === true,
+          contextContent
+        );
+
+        if (expandedTask) {
+          processManager?.completeLastItem();
+        } else {
+          processManager?.failLastItem();
+        }
+      } catch (error) {
+        processManager?.failLastItem();
+      }
+
+      if (expandedTask == null) {
+        // Fallback approach
+        expandedTask = {
+          title: `${task.title} - Iteration refinement instructinos`,
+          description: `${task.description}\n\nAdditional requirements:\n${finalInstructions}`,
+        };
+      }
+
+      // Update iteration with expanded values
+      iteration.updateTitle(expandedTask.title);
+      iteration.updateDescription(expandedTask.description);
+
+      // TODO(angel): Is this required?
+      result.expandedTitle = expandedTask.title;
+      result.expandedDescription = expandedTask.description;
 
       // Start sandbox container for task execution
       const sandbox = await createSandbox(task, processManager, {

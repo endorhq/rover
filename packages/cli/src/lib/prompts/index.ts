@@ -96,9 +96,12 @@ export class PromptBuilder {
    * // Use with AI agent: const result = await aiAgent.invoke(prompt, true);
    * // Then parse: const parsed = parseJsonResponse<IPromptTask>(result);
    */
-  expandTaskPrompt(briefDescription: string): string {
+  expandTaskPrompt(briefDescription: string, contextContent?: string): string {
     return this.loadTemplate(PROMPT_ID.ExpandTask, {
       briefDescription,
+      contextSection: contextContent
+        ? `\nContext Sources:\nThe following context was provided for this task. Use it to create a more accurate and detailed task description:\n\n${contextContent}\n`
+        : '',
     });
   }
 
@@ -122,7 +125,8 @@ export class PromptBuilder {
   expandIterationInstructionsPrompt(
     instructions: string,
     previousPlan?: string,
-    previousChanges?: string
+    previousChanges?: string,
+    contextContent?: string
   ): string {
     let contextSection = '';
 
@@ -136,6 +140,10 @@ export class PromptBuilder {
       if (previousChanges) {
         contextSection += `\nPrevious Changes Made:\n${previousChanges}\n`;
       }
+    }
+
+    if (contextContent) {
+      contextSection += `\nContext Sources:\nThe following context was provided for this iteration. Use it to create a more accurate and detailed description:\n\n${contextContent}\n`;
     }
 
     return this.loadTemplate(PROMPT_ID.ExpandIteration, {
