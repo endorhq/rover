@@ -241,11 +241,11 @@ export function createProgram(
     .description('Create and assign task to an AI Agent to complete it')
     .option(
       '--from-github <issue>',
-      'Fetch task description from a GitHub issue number'
+      '(Deprecated. Use --context) Fetch task description from a GitHub issue number'
     )
     .option(
       '--include-comments',
-      'Include issue comments in the task description (requires --from-github)'
+      '(Deprecated. Use --context-trust-all-authors) Include issue comments in the task description (requires --from-github)'
     )
     .addOption(
       new Option(
