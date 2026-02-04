@@ -6,7 +6,7 @@ export class GoSandboxPackage extends SandboxPackage {
 
   installScript(): string {
     // Install go
-    return `sudo apt-get update && sudo apt-get install -y --no-install-recommends golang-go`;
+    return `sudo apt-get install -y --no-install-recommends golang-go`;
   }
 
   initScript(): string {

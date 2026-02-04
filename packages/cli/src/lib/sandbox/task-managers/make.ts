@@ -6,7 +6,7 @@ export class MakeSandboxPackage extends SandboxPackage {
 
   installScript(): string {
     // Install GNU Make
-    return `sudo apt-get update && sudo apt-get install -y --no-install-recommends make`;
+    return `sudo apt-get install -y --no-install-recommends make`;
   }
 
   initScript(): string {

@@ -5,7 +5,7 @@ export class JustSandboxPackage extends SandboxPackage {
   name = 'just';
 
   installScript(): string {
-    return `sudo apt-get update && sudo apt-get install -y --no-install-recommends just`;
+    return `sudo apt-get install -y --no-install-recommends just`;
   }
 
   initScript(): string {

@@ -5,7 +5,7 @@ export class PoetrySandboxPackage extends SandboxPackage {
   name = 'poetry';
 
   installScript(): string {
-    return `sudo apt-get update && sudo apt-get install -y --no-install-recommends python3-poetry`;
+    return `sudo apt-get install -y --no-install-recommends python3-poetry`;
   }
 
   initScript(): string {
