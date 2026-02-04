@@ -403,7 +403,7 @@ const iterateCommand = async (
       task.markIterating();
 
       // Create new iteration config
-      IterationManager.createIteration(
+      const iteration = IterationManager.createIteration(
         iterationPath,
         newIterationNumber,
         task.id,
@@ -435,7 +435,6 @@ const iterateCommand = async (
           const entries = await contextManager.fetchAndStore();
 
           // Store in iteration.json
-          const iteration = IterationManager.load(iterationPath);
           iteration.setContext(entries);
 
           // Write index.md

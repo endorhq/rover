@@ -434,7 +434,7 @@ const createTaskForAgent = async (
   mkdirSync(iterationPath, { recursive: true });
 
   // Create initial iteration.json for the first iteration
-  IterationManager.createInitial(
+  const iteration = IterationManager.createInitial(
     iterationPath,
     task.id,
     task.title,
@@ -474,7 +474,6 @@ const createTaskForAgent = async (
       const entries = await contextManager.fetchAndStore();
 
       // Store in iteration.json
-      const iteration = IterationManager.load(iterationPath);
       iteration.setContext(entries);
 
       // Write index.md
