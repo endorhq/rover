@@ -64,7 +64,12 @@ async function cleanAction(options: CleanOptions): Promise<void> {
   const skipConfirmation = options.yes === true || isJsonMode();
 
   // Check if there's anything to clean
-  if (!dockerfileExists && !imageTag && !projectConfig.generatedFrom) {
+  if (
+    !dockerfileExists &&
+    !imageTag &&
+    !projectConfig.generatedFrom &&
+    !projectConfig.skipPackageInstall
+  ) {
     return exitWithError({
       success: false,
       error: 'No custom image configuration found.',
@@ -82,7 +87,7 @@ async function cleanAction(options: CleanOptions): Promise<void> {
     }
     if (options.resetConfig && (imageTag || projectConfig.generatedFrom)) {
       console.log(
-        '  - sandbox.agentImage and sandbox.generatedFrom from rover.json'
+        '  - sandbox.agentImage, sandbox.generatedFrom, and sandbox.skipPackageInstall from rover.json'
       );
     }
     console.log('');
@@ -154,6 +159,9 @@ async function cleanAction(options: CleanOptions): Promise<void> {
       }
       if (projectConfig.generatedFrom) {
         projectConfig.setGeneratedFrom(undefined);
+      }
+      if (projectConfig.skipPackageInstall) {
+        projectConfig.setSkipPackageInstall(false);
       }
       result.configReset = true;
       if (!isJsonMode()) {

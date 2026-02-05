@@ -206,14 +206,12 @@ export class SetupBuilder {
     }
 
     // Generate installation scripts for languages, package managers, and task managers
-    // Skip if using a custom image that was built with rover image build
-    const usingCustomImage = !!(
-      this.projectConfig.generatedFrom && this.projectConfig.agentImage
-    );
+    // Skip if skipPackageInstall is set (e.g., by rover image build)
+    const skipInstall = this.projectConfig.skipPackageInstall;
 
     let installAllPackages = '';
 
-    if (!usingCustomImage) {
+    if (!skipInstall) {
       const languagePackages = this.getLanguagePackages();
       const packageManagerPackages = this.getPackageManagerPackages();
       const taskManagerPackages = this.getTaskManagerPackages();

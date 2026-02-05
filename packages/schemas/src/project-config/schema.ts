@@ -124,6 +124,8 @@ export const SandboxConfigSchema = z.object({
   generatedFrom: GeneratedFromSchema.optional(),
   /** Suppress warnings about outdated custom images */
   suppressImageWarning: z.boolean().optional(),
+  /** Skip package installation in entrypoint (set by rover image build) */
+  skipPackageInstall: z.boolean().optional(),
 });
 
 /**
