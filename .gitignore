@@ -141,6 +141,9 @@ vite.config.ts.timestamp-*
 # Zed
 .zed
 
+# PNPM local store
+.pnpm-store
+
 # Rover
 .rover
 
