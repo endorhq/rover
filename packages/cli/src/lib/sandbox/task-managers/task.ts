@@ -7,7 +7,7 @@ export class TaskSandboxPackage extends SandboxPackage {
   installScript(): string {
     // Install Task (go-task) - a task runner / build tool written in Go
     // Download the install script and run it
-    return `curl --location https://taskfile.dev/install.sh | sh -s -- -d -b /usr/local/bin`;
+    return `curl --location https://taskfile.dev/install.sh | sudo sh -s -- -d -b /usr/local/bin`;
   }
 
   initScript(): string {
