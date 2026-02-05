@@ -16,7 +16,7 @@ export class CursorAgent extends BaseAgent {
   }
 
   getInstallCommand(): string {
-    return `nix build --no-link --accept-flake-config github:numtide/nix-ai-tools/${process.env.NIX_AI_TOOLS_REV}#cursor-agent`;
+    return `curl https://cursor.com/install -fsS | bash`;
   }
 
   getRequiredCredentials(): AgentCredentialFile[] {
@@ -154,7 +154,6 @@ export class CursorAgent extends BaseAgent {
     const args = [
       'agent',
       '--approve-mcps',
-      '--browser',
       '--force',
       '--print',
       '--output-format',

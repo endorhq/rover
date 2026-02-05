@@ -539,4 +539,6 @@ export const runCommand = async (
 
     console.log(colors.red(`\n✗ ${output.error}`));
   }
+
+  process.exit(output.success ? 0 : 1);
 };

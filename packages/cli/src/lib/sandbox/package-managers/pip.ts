@@ -6,7 +6,7 @@ export class PipSandboxPackage extends SandboxPackage {
 
   installScript(): string {
     // Install pip
-    return `sudo apk add --no-cache py3-pip`;
+    return `sudo apt-get install -y --no-install-recommends python3-pip`;
   }
 
   initScript(): string {

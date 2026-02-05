@@ -91,3 +91,36 @@ export {
   type AddWorkflowResult,
   type WorkflowEntry,
 } from './files/index.js';
+
+// Context providers
+export {
+  // Types
+  type ContextEntry,
+  type ContextProvider,
+  type ContextProviderClass,
+  type ProviderOptions,
+  type BaseContextMetadata,
+  type IssueMetadata,
+  type PRMetadata,
+  type PRDiffMetadata,
+  type FileMetadata,
+  type HTTPSResourceMetadata,
+  type ContextMetadata,
+  // Errors
+  ContextError,
+  ContextSchemeNotSupportedError,
+  ContextUriParseError,
+  ContextTypeNotSupportedError,
+  ContextFetchError,
+  // Registry
+  registerContextProvider,
+  createContextProvider,
+  isContextSchemeSupported,
+  getRegisteredSchemes,
+  clearContextProviders,
+  // Providers
+  registerBuiltInProviders,
+  LocalFileProvider,
+  GitHubProvider,
+  HTTPSProvider,
+} from './context/index.js';

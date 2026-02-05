@@ -15,6 +15,7 @@ import {
   IterationValidationError,
   type Iteration,
   type IterationPreviousContext,
+  type IterationContextEntry,
 } from 'rover-schemas';
 import { VERBOSE } from '../verbose.js';
 
@@ -52,6 +53,7 @@ export class IterationManager {
       description: description,
       createdAt: new Date().toISOString(),
       previousContext: {}, // Empty for first iteration
+      context: [], // Empty for new iterations
     };
 
     const filePath = join(iterationPath, ITERATION_FILENAME);
@@ -83,6 +85,7 @@ export class IterationManager {
       description,
       createdAt: new Date().toISOString(),
       previousContext,
+      context: [], // Empty for new iterations
     };
 
     const filePath = join(iterationPath, ITERATION_FILENAME);
@@ -151,11 +154,22 @@ export class IterationManager {
       return data as Iteration;
     }
 
-    // Add version if missing (create new object to trigger save)
+    // Add version and context if missing (create new object to trigger save)
     if (!data.version) {
       return {
         ...data,
         version: CURRENT_ITERATION_SCHEMA_VERSION,
+        context: data.context ?? [],
+      } as Iteration;
+    }
+
+    // Migrate from 1.0 to 1.1
+    // Add the mandatory `context` field with an empty array
+    if (data.version === '1.0') {
+      return {
+        ...data,
+        version: CURRENT_ITERATION_SCHEMA_VERSION,
+        context: [],
       } as Iteration;
     }
 
@@ -233,8 +247,22 @@ export class IterationManager {
   get previousContext(): IterationPreviousContext {
     return this.data.previousContext;
   }
+  get context(): IterationContextEntry[] {
+    return this.data.context;
+  }
   get fileDescriptionPath(): string {
     return this.filePath;
+  }
+
+  /**
+   * Set the context entries for this iteration.
+   * Used by ContextManager after fetching and storing context files.
+   *
+   * @param entries - Context entries to store
+   */
+  setContext(entries: IterationContextEntry[]): void {
+    this.data.context = entries;
+    this.save();
   }
 
   /**

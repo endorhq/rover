@@ -19,10 +19,17 @@ export const TaskStatusSchema = z.enum([
   'PUSHED',
 ]);
 
-// Source type schema for task origin tracking
+/**
+ * Source type schema for task origin tracking.
+ * @deprecated Use iteration context instead. Will be removed in a future version.
+ */
 export const SourceTypeSchema = z.enum(['github', 'manual']);
 
-// Task source schema - tracks where a task originated from
+/**
+ * Task source schema - tracks where a task originated from.
+ * @deprecated Use iteration context instead. Will be removed in a future version.
+ * Task origin is now tracked via context entries in the iteration schema.
+ */
 export const TaskSourceSchema = z.object({
   type: SourceTypeSchema,
   id: z.string().optional(),
@@ -82,7 +89,10 @@ export const TaskDescriptionSchema = z.object({
   // Network configuration override for this task
   networkConfig: NetworkConfigSchema.optional(),
 
-  // Task source (origin tracking - github, manual, etc.)
+  /**
+   * Task source (origin tracking - github, manual, etc.)
+   * @deprecated Use iteration context instead. Will be removed in a future version.
+   */
   source: TaskSourceSchema.optional(),
 
   // Hook tracking - stores the lastStatusCheck timestamp when onComplete hook was last fired

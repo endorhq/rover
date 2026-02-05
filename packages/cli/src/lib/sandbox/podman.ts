@@ -433,8 +433,8 @@ export class PodmanSandbox extends Sandbox {
       '-w',
       '/workspace',
       ...extraArgs,
-      'node:24-alpine',
-      '/bin/sh',
+      'node:lts',
+      '/bin/bash',
     ];
 
     // Start Podman container with direct stdio inheritance for true interactivity
