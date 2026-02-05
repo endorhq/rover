@@ -384,6 +384,14 @@ const iterateCommand = async (
 
       processManager?.completeLastItem();
 
+      // Validate mutual exclusivity of --context-trust-authors and --context-trust-all-authors
+      if (options.contextTrustAuthors && options.contextTrustAllAuthors) {
+        result.error =
+          '--context-trust-authors and --context-trust-all-authors are mutually exclusive';
+        exitWithError(result, { telemetry });
+        return;
+      }
+
       // Fetch context and collect artifacts from previous iterations
       processManager?.addItem('Fetching context sources');
 
@@ -410,7 +418,7 @@ const iterateCommand = async (
 
         // Gather artifacts from all previous iterations
         const { summaries, plans } =
-          task.getIterationArtifacts(newIterationNumber);
+          task.getPreviousIterationArtifacts(newIterationNumber);
 
         // Copy plan files into context directory and build references
         const iterationPlans: ContextIndexOptions['iterationPlans'] = [];
@@ -438,10 +446,11 @@ const iterateCommand = async (
 
         // Read context content for AI expansion
         // Skip PRs to avoid huge context.
-        const expansionEntries = entries.filter((entry) => {
-          !(entry.metadata?.type || '').includes('pr')
+        const expansionEntries = entries.filter(entry => {
+          !(entry.metadata?.type || '').includes('pr');
         });
-        const storedContent = contextManager.readStoredContent(expansionEntries);
+        const storedContent =
+          contextManager.readStoredContent(expansionEntries);
         if (storedContent) {
           contextContent = storedContent;
         }
