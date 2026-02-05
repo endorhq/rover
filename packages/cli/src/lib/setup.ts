@@ -215,6 +215,12 @@ if [[ -f /etc/debian_version ]]; then
 fi`;
     }
 
+    // Generate installation scripts for languages, package managers, and task managers
+    // Skip if using a custom image that was built with rover image build
+    const usingCustomImage = !!(
+      this.projectConfig.generatedFrom && this.projectConfig.agentImage
+    );
+
     // --- home setup ---
     let homeSetup = '';
     if (useCachedImage) {
@@ -240,7 +246,7 @@ source $HOME/.profile`;
 
     // --- package installation ---
     let installAllPackages = '';
-    if (!useCachedImage) {
+    if (!useCachedImage && !usingCustomImage) {
       // Generate installation scripts for languages, package managers, and task managers
       const languagePackages = this.getLanguagePackages();
       const packageManagerPackages = this.getPackageManagerPackages();
@@ -251,6 +257,7 @@ source $HOME/.profile`;
         ...packageManagerPackages,
         ...taskManagerPackages,
       ];
+
 
       if (allPackages.length > 0) {
         const installScripts: string[] = [];
@@ -290,6 +297,12 @@ ${installScripts.join('\n')}
 `;
         }
       }
+    } else {
+      installAllPackages = `
+echo -e "\\n======================================="
+echo "📦 Using pre-built custom image - skipping package installation"
+echo "======================================="
+`;
     }
 
     // --- agent install section ---
