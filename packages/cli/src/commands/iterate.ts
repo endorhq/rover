@@ -437,7 +437,11 @@ const iterateCommand = async (
         );
 
         // Read context content for AI expansion
-        const storedContent = contextManager.readStoredContent(entries);
+        // Skip PRs to avoid huge context.
+        const expansionEntries = entries.filter((entry) => {
+          !(entry.metadata?.type || '').includes('pr')
+        });
+        const storedContent = contextManager.readStoredContent(expansionEntries);
         if (storedContent) {
           contextContent = storedContent;
         }
