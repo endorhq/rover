@@ -514,9 +514,7 @@ const createTaskForAgent = async (
     if (imageStatus.status === 'outdated') {
       console.log(colors.yellow('\n⚠ Custom image may be outdated:'));
       imageStatus.issues?.forEach(issue => console.log(`  • ${issue}`));
-      console.log(
-        colors.dim('  Run `rover image status` for details\n')
-      );
+      console.log(colors.dim('  Run `rover image status` for details\n'));
     }
   }
 
