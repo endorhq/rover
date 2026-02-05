@@ -91,7 +91,9 @@ export class OpenCodeAgent extends BaseAgent {
         config = JSON.parse(content);
       } catch (err) {
         console.log(
-          colors.yellow(`Warning: Could not parse existing opencode.json, creating new one`)
+          colors.yellow(
+            `Warning: Could not parse existing opencode.json, creating new one`
+          )
         );
       }
     }
@@ -149,7 +151,9 @@ export class OpenCodeAgent extends BaseAgent {
             headersObj[match[1]] = match[2].trim();
           } else {
             console.log(
-              colors.yellow(` Invalid ${header} header. Use "KEY: VALUE" format`)
+              colors.yellow(
+                ` Invalid ${header} header. Use "KEY: VALUE" format`
+              )
             );
           }
         });
@@ -163,8 +167,14 @@ export class OpenCodeAgent extends BaseAgent {
 
     // Write updated config
     try {
-      writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n', 'utf-8');
-      console.log(colors.green(`✓ Added MCP server "${name}" to opencode.json`));
+      writeFileSync(
+        configPath,
+        JSON.stringify(config, null, 2) + '\n',
+        'utf-8'
+      );
+      console.log(
+        colors.green(`✓ Added MCP server "${name}" to opencode.json`)
+      );
     } catch (err) {
       throw new Error(
         `There was an error adding the ${name} MCP server to ${this.name}.\n${err}`
