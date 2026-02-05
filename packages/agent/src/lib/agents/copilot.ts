@@ -111,15 +111,17 @@ export class CopilotAgent extends BaseAgent {
       }
     });
 
-    // Build server configuration based on transport type
-    const serverConfig: any = {};
+    const serverConfig: any = {
+      tools: ['*'],
+    };
+
+    serverConfig.type = transport;
 
     if (transport === 'stdio') {
       const parts = commandOrUrl.split(' ');
       serverConfig.command = parts[0];
-      if (parts.length > 1) {
-        serverConfig.args = parts.slice(1);
-      }
+      // Copilot CLI requires 'args' array even if empty
+      serverConfig.args = parts.length > 1 ? parts.slice(1) : [];
       if (Object.keys(env).length > 0) {
         serverConfig.env = env;
       }
