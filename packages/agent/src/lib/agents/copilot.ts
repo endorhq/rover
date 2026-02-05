@@ -1,9 +1,15 @@
-import { existsSync, copyFileSync, cpSync } from 'node:fs';
+import {
+  existsSync,
+  copyFileSync,
+  cpSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
+import { homedir } from 'node:os';
 import colors from 'ansi-colors';
 import { AgentCredentialFile } from './types.js';
 import { BaseAgent } from './base.js';
-import { launch } from 'rover-core';
 
 export class CopilotAgent extends BaseAgent {
   name = 'Copilot';
@@ -54,49 +60,99 @@ export class CopilotAgent extends BaseAgent {
     envs: string[],
     headers: string[]
   ): Promise<void> {
-    const args = ['mcp', 'add', '--transport', transport];
+    const configPath = join(homedir(), '.copilot', 'mcp-config.json');
 
-    args.push(name);
+    // Read existing config or initialize with empty mcpServers
+    let config: { mcpServers: Record<string, any> } = { mcpServers: {} };
+    if (existsSync(configPath)) {
+      try {
+        const content = readFileSync(configPath, 'utf-8');
+        config = JSON.parse(content);
+        if (!config.mcpServers) {
+          config.mcpServers = {};
+        }
+      } catch (error: any) {
+        console.log(
+          colors.yellow(
+            `Warning: Could not parse existing config: ${error.message}`
+          )
+        );
+        config = { mcpServers: {} };
+      }
+    }
 
-    envs.forEach(env => {
-      if (/\w+=\w+/.test(env)) {
-        args.push(`--env=${env}`);
+    // Parse environment variables (KEY=VALUE format)
+    const env: Record<string, string> = {};
+    envs.forEach(envVar => {
+      const match = envVar.match(/^(\w+)=(.*)$/);
+      if (match) {
+        env[match[1]] = match[2];
       } else {
         console.log(
           colors.yellow(
-            ` Invalid ${env} environment variable. Use KEY=VALUE format`
+            `Warning: Invalid environment variable format: ${envVar} (expected KEY=VALUE)`
           )
         );
       }
     });
 
+    // Parse headers (KEY: VALUE format)
+    const headersObj: Record<string, string> = {};
     headers.forEach(header => {
-      if (/[\w\-]+\s*:\s*\w+/.test(header)) {
-        args.push('-H', header);
+      const match = header.match(/^([\w-]+)\s*:\s*(.+)$/);
+      if (match) {
+        headersObj[match[1]] = match[2];
       } else {
         console.log(
-          colors.yellow(` Invalid ${header} header. Use "KEY: VALUE" format`)
+          colors.yellow(
+            `Warning: Invalid header format: ${header} (expected "KEY: VALUE")`
+          )
         );
       }
     });
 
+    // Build server configuration based on transport type
+    const serverConfig: any = {};
+
     if (transport === 'stdio') {
-      args.push('--', ...commandOrUrl.split(' '));
+      const parts = commandOrUrl.split(' ');
+      serverConfig.command = parts[0];
+      if (parts.length > 1) {
+        serverConfig.args = parts.slice(1);
+      }
+      if (Object.keys(env).length > 0) {
+        serverConfig.env = env;
+      }
+    } else if (['http', 'sse'].includes(transport)) {
+      serverConfig.url = commandOrUrl;
+      if (Object.keys(headersObj).length > 0) {
+        serverConfig.headers = headersObj;
+      }
+      if (Object.keys(env).length > 0) {
+        serverConfig.env = env;
+      }
     } else {
-      args.push(commandOrUrl);
-    }
-
-    const result = await launch(this.binary, args);
-
-    if (result.exitCode !== 0) {
       throw new Error(
-        `There was an error adding the ${name} MCP server to ${this.name}.\n${result.stderr}`
+        `Unsupported transport type: ${transport}. Use 'stdio', 'http', or 'sse'.`
       );
     }
+
+    // Add or update the server configuration
+    config.mcpServers[name] = serverConfig;
+
+    // Ensure the .copilot directory exists
+    this.ensureDirectory(join(homedir(), '.copilot'));
+
+    // Write the configuration back to disk
+    writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
+
+    console.log(
+      colors.green(`✓ MCP server "${name}" configured for ${this.name}`)
+    );
   }
 
   toolArguments(): string[] {
-    const args = ['--dangerously-skip-permissions', '--output-format', 'json'];
+    const args = ['--allow-all-tools', '--silent'];
     if (this.model) {
       args.push('--model', this.model);
     }
@@ -108,12 +164,12 @@ export class CopilotAgent extends BaseAgent {
     precontext: string,
     initialPrompt?: string
   ): string[] {
-    const args = ['--append-system-prompt', precontext];
+    let prompt = precontext;
 
     if (initialPrompt) {
-      args.push(initialPrompt);
+      prompt += `\n\nInitial User Prompt:\n\n${initialPrompt}`;
     }
 
-    return args;
+    return ['-p', prompt];
   }
 }
