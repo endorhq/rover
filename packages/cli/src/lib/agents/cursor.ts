@@ -27,6 +27,11 @@ class CursorAI implements AIAgentTool {
   // constants
   public AGENT_BIN = 'cursor-agent';
   private promptBuilder = new PromptBuilder('cursor');
+  private model?: string;
+
+  constructor(model?: string) {
+    this.model = model;
+  }
 
   async checkAgent(): Promise<void> {
     try {
@@ -42,6 +47,11 @@ class CursorAI implements AIAgentTool {
     cwd?: string
   ): Promise<string> {
     const cursorArgs = ['agent', '--print'];
+
+    if (this.model) {
+      cursorArgs.push('--model', this.model);
+    }
+
     if (json) {
       cursorArgs.push('--output-format');
       cursorArgs.push('json');
@@ -143,6 +153,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
         .filter((line: string) => line.trim() !== '');
       return lines[0] || null;
     } catch (error) {
+      console.error('Failed to generate commit message with Cursor:', error);
       return null;
     }
   }
@@ -162,7 +173,28 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
 
       return response;
     } catch (err) {
-      return null;
+      throw err;
+    }
+  }
+
+  async resolveMergeConflictsRegions(
+    filePath: string,
+    diffContext: string,
+    conflictedContent: string,
+    regionCount: number
+  ): Promise<string | null> {
+    try {
+      const prompt = this.promptBuilder.resolveMergeConflictsRegionsPrompt(
+        filePath,
+        diffContext,
+        conflictedContent,
+        regionCount
+      );
+      const response = await this.invoke(prompt, false);
+
+      return response;
+    } catch (err) {
+      throw err;
     }
   }
 

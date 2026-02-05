@@ -21,6 +21,7 @@ import resetCmd from './commands/reset.js';
 import restartCmd from './commands/restart.js';
 import deleteCmd from './commands/delete.js';
 import mergeCmd from './commands/merge.js';
+import rebaseCmd from './commands/rebase.js';
 import colors from 'ansi-colors';
 import pushCmd from './commands/push.js';
 import stopCmd from './commands/stop.js';
@@ -56,6 +57,7 @@ const commands: CommandDefinition[] = [
   restartCmd,
   deleteCmd,
   mergeCmd,
+  rebaseCmd,
   pushCmd,
   stopCmd,
   mcpCmd,
@@ -440,9 +442,53 @@ export function createProgram(
     .command('merge')
     .description('Merge the task changes into your current branch')
     .argument('<taskId>', 'Task ID to merge')
+    .option(
+      '-a, --agent <agent>',
+      'AI agent with optional model (e.g., claude:sonnet)'
+    )
+    .option(
+      '-c, --concurrency <n>',
+      'Max parallel AI conflict resolutions',
+      '4'
+    )
     .option('-f, --force', 'Force merge without confirmation')
     .option('--json', 'Output in JSON format')
+    .option(
+      '--context-lines <n>',
+      'Lines of context around each conflict region',
+      '50'
+    )
+    .option(
+      '--send-full-file',
+      'Send full file content to AI instead of truncated context'
+    )
     .action(mergeCmd.action);
+
+  program
+    .command('rebase')
+    .description('Rebase the task branch onto your current branch')
+    .argument('<taskId>', 'Task ID to rebase')
+    .option(
+      '-a, --agent <agent>',
+      'AI agent with optional model (e.g., claude:sonnet)'
+    )
+    .option(
+      '-c, --concurrency <n>',
+      'Max parallel AI conflict resolutions',
+      '4'
+    )
+    .option('-f, --force', 'Force rebase without confirmation')
+    .option('--json', 'Output in JSON format')
+    .option(
+      '--context-lines <n>',
+      'Lines of context around each conflict region',
+      '50'
+    )
+    .option(
+      '--send-full-file',
+      'Send full file content to AI instead of truncated context'
+    )
+    .action(rebaseCmd.action);
 
   program
     .command('push')

@@ -75,6 +75,11 @@ class ClaudeAI implements AIAgentTool {
   // constants
   public AGENT_BIN = 'claude';
   private promptBuilder = new PromptBuilder('claude');
+  private model?: string;
+
+  constructor(model?: string) {
+    this.model = model;
+  }
 
   async checkAgent(): Promise<void> {
     try {
@@ -90,6 +95,10 @@ class ClaudeAI implements AIAgentTool {
     cwd?: string
   ): Promise<string> {
     const claudeArgs = ['-p'];
+
+    if (this.model) {
+      claudeArgs.push('--model', this.model);
+    }
 
     if (json) {
       claudeArgs.push('--output-format');
@@ -198,6 +207,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
         .filter((line: string) => line.trim() !== '');
       return lines[0] || null;
     } catch (error) {
+      console.error('Failed to generate commit message with Claude:', error);
       return null;
     }
   }
@@ -217,7 +227,28 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
 
       return response;
     } catch (err) {
-      return null;
+      throw err;
+    }
+  }
+
+  async resolveMergeConflictsRegions(
+    filePath: string,
+    diffContext: string,
+    conflictedContent: string,
+    regionCount: number
+  ): Promise<string | null> {
+    try {
+      const prompt = this.promptBuilder.resolveMergeConflictsRegionsPrompt(
+        filePath,
+        diffContext,
+        conflictedContent,
+        regionCount
+      );
+      const response = await this.invoke(prompt, false);
+
+      return response;
+    } catch (err) {
+      throw err;
     }
   }
 

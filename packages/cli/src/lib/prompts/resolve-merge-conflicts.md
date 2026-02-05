@@ -4,7 +4,7 @@ Analyze the following conflicted file and resolve the merge conflicts by choosin
 
 File: %filePath%
 
-Recent commit history for context:
+Commits that last modified the conflicted lines:
 %diffContext%
 
 Conflicted file content:
