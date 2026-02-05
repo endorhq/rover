@@ -237,6 +237,22 @@ describe('DockerfileBuilder', () => {
       // Should have proper && chain formatting
       expect(dockerfile).toMatch(/RUN .+ \\\n\s+&& /);
     });
+
+    it('handles shell control structures in install scripts (composer)', () => {
+      const config = createProjectConfig({
+        languages: ['php'],
+        packageManagers: ['composer'],
+      });
+      const builder = new DockerfileBuilder(config);
+      const dockerfile = builder.generate();
+
+      // Composer has if/then/fi - should use bash -c instead of && chains
+      expect(dockerfile).toContain('# Install composer');
+      expect(dockerfile).toContain("RUN bash -c '");
+      // Should NOT have broken && then && patterns
+      expect(dockerfile).not.toMatch(/&& then/);
+      expect(dockerfile).not.toMatch(/&& fi/);
+    });
   });
 
   describe('getImageTag', () => {

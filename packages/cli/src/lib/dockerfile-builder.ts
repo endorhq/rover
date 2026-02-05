@@ -39,13 +39,46 @@ import { MakeSandboxPackage } from './sandbox/task-managers/make.js';
 import { TaskSandboxPackage } from './sandbox/task-managers/task.js';
 
 /**
+ * Check if a script contains shell control structures that can't be
+ * safely split into && chains.
+ */
+function hasShellControlStructures(script: string): boolean {
+  // Match shell control keywords at word boundaries
+  const controlPatterns = [
+    /\bif\b.*\bthen\b/s, // if...then
+    /\bfor\b.*\bdo\b/s, // for...do
+    /\bwhile\b.*\bdo\b/s, // while...do
+    /\bcase\b.*\bin\b/s, // case...in
+    /\bfi\b/, // end of if
+    /\bdone\b/, // end of for/while
+    /\besac\b/, // end of case
+  ];
+  return controlPatterns.some(pattern => pattern.test(script));
+}
+
+/**
  * Format a shell script for use in a Dockerfile RUN command.
- * Converts multi-line scripts with semicolons into proper && chains.
+ * Converts multi-line scripts with semicolons into proper && chains,
+ * unless the script contains shell control structures.
  */
 function formatScriptForDockerfile(script: string): string {
+  const trimmed = script.trim();
+
+  if (trimmed.length === 0) {
+    return '';
+  }
+
+  // If script contains control structures (if/then/fi, for/do/done, etc.),
+  // use bash -c with the script as-is to preserve the structure
+  if (hasShellControlStructures(trimmed)) {
+    // Escape single quotes in the script for bash -c '...'
+    const escaped = trimmed.replace(/'/g, "'\"'\"'");
+    return `bash -c '${escaped}'`;
+  }
+
   // Normalize line endings and split into commands
   // Handle both newlines and semicolons as command separators
-  const commands = script
+  const commands = trimmed
     .split(/[;\n]+/)
     .map(cmd => cmd.trim())
     .filter(cmd => cmd.length > 0);
