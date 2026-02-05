@@ -476,8 +476,8 @@ const createTaskForAgent = async (
 
     // Read context content for AI expansion
     // Skip PRs to avoid huge context.
-    const expansionEntries = entries.filter((entry) => {
-      !(entry.metadata?.type || '').includes('pr')
+    const expansionEntries = entries.filter(entry => {
+      !(entry.metadata?.type || '').includes('pr');
     });
     const storedContent = contextManager.readStoredContent(expansionEntries);
     if (storedContent) {
@@ -687,6 +687,14 @@ const taskCommand = async (initPrompt?: string, options: TaskOptions = {}) => {
       ],
       telemetry: getTelemetry(),
     });
+    return;
+  }
+
+  // Validate mutual exclusivity of --context-trust-authors and --context-trust-all-authors
+  if (contextTrustAuthors && contextTrustAllAuthors) {
+    jsonOutput.error =
+      '--context-trust-authors and --context-trust-all-authors are mutually exclusive';
+    await exitWithError(jsonOutput, { telemetry: getTelemetry() });
     return;
   }
 

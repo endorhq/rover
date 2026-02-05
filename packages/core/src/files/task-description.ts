@@ -540,7 +540,7 @@ export class TaskDescriptionManager {
    * Collect artifacts (summaries and plans) from all iterations before a given number.
    * Returns artifacts sorted by iteration number (ascending).
    */
-  getIterationArtifacts(beforeIteration: number): {
+  getPreviousIterationArtifacts(beforeIteration: number): {
     summaries: Array<{ iteration: number; content: string }>;
     plans: Array<{ iteration: number; content: string }>;
   } {
