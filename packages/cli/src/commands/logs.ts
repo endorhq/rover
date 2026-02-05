@@ -5,7 +5,7 @@ import { launch, launchSync, type TaskDescriptionManager } from 'rover-core';
 import { TaskNotFoundError } from 'rover-schemas';
 import { getTelemetry } from '../lib/telemetry.js';
 import { showTips } from '../utils/display.js';
-import type { CLIJsonOutput } from '../types.js';
+import type { TaskLogsOutput } from '../output-types.js';
 import { exitWithError, exitWithWarn } from '../utils/exit.js';
 import {
   isJsonMode,
@@ -13,13 +13,6 @@ import {
   requireProjectContext,
 } from '../lib/context.js';
 import type { CommandDefinition } from '../types.js';
-
-/**
- * Interface for JSON output
- */
-interface TaskLogsOutput extends CLIJsonOutput {
-  logs: string;
-}
 
 /**
  * Get available iterations for a task

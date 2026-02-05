@@ -1,16 +1,8 @@
+export type { CLIJsonOutput, CLIJsonOutputWithErrors } from './output-types.js';
+
 export interface ProjectInstructions {
   runDev: string;
   interaction: string;
-}
-
-export interface CLIJsonOutput {
-  success: boolean;
-  error?: string;
-}
-
-export interface CLIJsonOutputWithErrors {
-  success: boolean;
-  errors: string[];
 }
 
 export interface Task {

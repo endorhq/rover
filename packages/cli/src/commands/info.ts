@@ -10,35 +10,9 @@ import {
 } from 'rover-core';
 import { isJsonMode } from '../lib/context.js';
 import { getTelemetry } from '../lib/telemetry.js';
-import { CLIJsonOutput } from '../types.js';
+import type { InfoCommandOutput, ProjectInfo } from '../output-types.js';
 import { exitWithError, exitWithSuccess } from '../utils/exit.js';
 import type { CommandDefinition } from '../types.js';
-
-/**
- * Project information in the info command output
- */
-interface ProjectInfo {
-  /** Project ID */
-  id: string;
-  /** Project repository name */
-  name: string;
-  /** Filesystem path to the project */
-  path: string;
-  /** Number of tasks for this project */
-  taskCount: number;
-}
-
-/**
- * JSON output format for the info command
- */
-interface InfoCommandOutput extends CLIJsonOutput {
-  /** Path to the Rover data store */
-  storePath: string;
-  /** Number of registered projects */
-  projectCount: number;
-  /** Per-project breakdown */
-  projects: ProjectInfo[];
-}
 
 /**
  * Count tasks for a project by looking at the tasks directory
