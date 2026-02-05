@@ -14,7 +14,9 @@ vi.mock('rover-core', async () => {
   const actual = await vi.importActual('rover-core');
   return {
     ...actual,
-    launch: vi.fn(() => Promise.resolve({ exitCode: 0, stdout: '', stderr: '' })),
+    launch: vi.fn(() =>
+      Promise.resolve({ exitCode: 0, stdout: '', stderr: '' })
+    ),
   };
 });
 
@@ -27,7 +29,7 @@ vi.mock('../../../lib/context.js', () => ({
 
 // Mock exit utilities
 vi.mock('../../../utils/exit.js', () => ({
-  exitWithError: vi.fn((result) => {
+  exitWithError: vi.fn(result => {
     throw new Error(result.error);
   }),
   exitWithSuccess: vi.fn(),

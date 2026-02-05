@@ -9,7 +9,9 @@ vi.mock('rover-core', async () => {
   return {
     ...actual,
     getVersion: vi.fn(() => '1.0.0'),
-    launch: vi.fn(() => Promise.resolve({ exitCode: 0, stdout: '', stderr: '' })),
+    launch: vi.fn(() =>
+      Promise.resolve({ exitCode: 0, stdout: '', stderr: '' })
+    ),
   };
 });
 
@@ -25,7 +27,7 @@ vi.mock('../../../lib/sandbox/container-common.js', () => ({
 
 // Mock exit utilities
 vi.mock('../../../utils/exit.js', () => ({
-  exitWithError: vi.fn((result) => {
+  exitWithError: vi.fn(result => {
     throw new Error(result.error);
   }),
   exitWithSuccess: vi.fn(),
@@ -47,11 +49,13 @@ describe('rover image build', () => {
     rmSync(testDir, { recursive: true, force: true });
   });
 
-  function createProjectConfig(config: Partial<{
-    languages: string[];
-    packageManagers: string[];
-    taskManagers: string[];
-  }> = {}): void {
+  function createProjectConfig(
+    config: Partial<{
+      languages: string[];
+      packageManagers: string[];
+      taskManagers: string[];
+    }> = {}
+  ): void {
     const roverJson = {
       version: '1.3',
       languages: config.languages || [],
