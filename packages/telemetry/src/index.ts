@@ -89,6 +89,9 @@ class Telemetry {
     this.client = new PostHog(config.apiKey, {
       host: config.host,
       disabled: disableTelemetry,
+      requestTimeout: 3000,
+      fetchRetryCount: 1,
+      fetchRetryDelay: 1000,
     });
   }
 
@@ -237,7 +240,17 @@ class Telemetry {
   // Other methods
 
   async shutdown() {
-    await this.client.shutdown();
+    // Suppress PostHog's unconditional console.error in logFlushError
+    const origError = console.error;
+    console.error = () => {};
+    try {
+      await Promise.race([
+        this.client.shutdown().catch(() => {}),
+        new Promise(resolve => setTimeout(resolve, 2000)),
+      ]);
+    } finally {
+      console.error = origError;
+    }
   }
 
   getUserId(): string {
