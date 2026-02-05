@@ -10,6 +10,7 @@ import {
   checkCursor,
   checkDocker,
   checkGemini,
+  checkOpenCode,
   checkQwen,
   checkGit,
 } from '../utils/system.js';
@@ -157,10 +158,18 @@ const initCommand = async (path: string = '.', options: { yes?: boolean }) => {
 
   const qwenInstalled = await checkQwen();
 
+  reqSpinner.text = 'Checking OpenCode';
+
+  const opencodeInstalled = await checkOpenCode();
+
   const completeInstallation =
     gitInstalled &&
     dockerInstalled &&
-    (claudeInstalled || codexInstalled || geminiInstalled || qwenInstalled);
+    (claudeInstalled ||
+      codexInstalled ||
+      geminiInstalled ||
+      opencodeInstalled ||
+      qwenInstalled);
 
   if (completeInstallation) {
     reqSpinner.succeed('Your system is ready!');
@@ -188,6 +197,9 @@ const initCommand = async (path: string = '.', options: { yes?: boolean }) => {
   );
   console.log(
     `├── Gemini: ${geminiInstalled ? colors.green('✓ Installed') : colors.red('✗ Missing')}`
+  );
+  console.log(
+    `├── OpenCode: ${opencodeInstalled ? colors.green('✓ Installed') : colors.red('✗ Missing')}`
   );
   console.log(
     `└── Qwen: ${qwenInstalled ? colors.green('✓ Installed') : colors.red('✗ Missing')}`
@@ -260,6 +272,10 @@ const initCommand = async (path: string = '.', options: { yes?: boolean }) => {
 
     if (qwenInstalled) {
       availableAgents.push(AI_AGENT.Qwen);
+    }
+
+    if (opencodeInstalled) {
+      availableAgents.push(AI_AGENT.OpenCode);
     }
 
     // If multiple AI agents are available, ask user to select one

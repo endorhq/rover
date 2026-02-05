@@ -33,6 +33,12 @@ describe('parseAgentString', () => {
       expect(result.agent).toBe(AI_AGENT.Cursor);
       expect(result.model).toBeUndefined();
     });
+
+    it('should parse "opencode" as opencode agent with no model', () => {
+      const result = parseAgentString('opencode');
+      expect(result.agent).toBe(AI_AGENT.OpenCode);
+      expect(result.model).toBeUndefined();
+    });
   });
 
   describe('parsing agent with model', () => {
@@ -70,6 +76,12 @@ describe('parseAgentString', () => {
       const result = parseAgentString('qwen:plus');
       expect(result.agent).toBe(AI_AGENT.Qwen);
       expect(result.model).toBe('plus');
+    });
+
+    it('should parse "opencode:opus" correctly', () => {
+      const result = parseAgentString('opencode:opus');
+      expect(result.agent).toBe(AI_AGENT.OpenCode);
+      expect(result.model).toBe('opus');
     });
 
     it('should handle model names with hyphens', () => {

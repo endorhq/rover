@@ -64,6 +64,7 @@ export const WorkflowAgentToolSchema = z.enum([
   'claude',
   'gemini',
   'codex',
+  'opencode',
   'qwen',
 ]);
 
