@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { IterationContextEntry } from 'rover-schemas';
-import { generateContextIndex } from '../index-generator.js';
+import {
+  generateContextIndex,
+  type ContextIndexOptions,
+} from '../index-generator.js';
 
 describe('generateContextIndex', () => {
   describe('empty entries', () => {
@@ -332,6 +335,111 @@ describe('generateContextIndex', () => {
       // Names and descriptions are included as-is (no escaping)
       expect(result).toContain('Fix `code` in **markdown**');
       expect(result).toContain('Issue with <html> tags');
+    });
+  });
+
+  describe('iteration artifacts (ContextIndexOptions)', () => {
+    it('should render previous iteration summaries', () => {
+      const options: ContextIndexOptions = {
+        iterationSummaries: [
+          { iteration: 1, content: 'Implemented the login page.' },
+          { iteration: 2, content: 'Added validation to the login form.' },
+        ],
+      };
+
+      const result = generateContextIndex([], 3, options);
+
+      expect(result).toContain('# Context for Iteration 3');
+      expect(result).toContain('## Previous Iteration Summaries');
+      expect(result).toContain('### Iteration 1');
+      expect(result).toContain('Implemented the login page.');
+      expect(result).toContain('### Iteration 2');
+      expect(result).toContain('Added validation to the login form.');
+      // Should NOT show "No context sources" since we have artifacts
+      expect(result).not.toContain('No context sources were provided');
+    });
+
+    it('should render iteration plan references', () => {
+      const options: ContextIndexOptions = {
+        iterationPlans: [
+          { iteration: 1, file: 'plan-iter-1.md' },
+          { iteration: 2, file: 'plan-iter-2.md' },
+        ],
+      };
+
+      const result = generateContextIndex([], 3, options);
+
+      expect(result).toContain('## Iteration Plans');
+      expect(result).toContain('`plan-iter-1.md`: Plan from iteration 1');
+      expect(result).toContain('`plan-iter-2.md`: Plan from iteration 2');
+      expect(result).not.toContain('No context sources were provided');
+    });
+
+    it('should render both summaries and plans with context entries', () => {
+      const entries: IterationContextEntry[] = [
+        {
+          uri: 'github:issue/10',
+          fetchedAt: '2024-01-15T10:30:00Z',
+          file: 'github-issue-10.md',
+          name: 'Feature request',
+          description: 'GitHub Issue #10',
+          provenance: { addedIn: 3 },
+        },
+      ];
+
+      const options: ContextIndexOptions = {
+        iterationSummaries: [
+          { iteration: 1, content: 'Set up project scaffolding.' },
+        ],
+        iterationPlans: [{ iteration: 1, file: 'plan-iter-1.md' }],
+      };
+
+      const result = generateContextIndex(entries, 3, options);
+
+      // Summaries section should come before context entries
+      const lines = result.split('\n');
+      const summariesIndex = lines.findIndex(l =>
+        l.includes('## Previous Iteration Summaries')
+      );
+      const plansIndex = lines.findIndex(l => l.includes('## Iteration Plans'));
+      const newIndex = lines.findIndex(l =>
+        l.includes('## New in this iteration')
+      );
+
+      expect(summariesIndex).toBeGreaterThan(-1);
+      expect(plansIndex).toBeGreaterThan(summariesIndex);
+      expect(newIndex).toBeGreaterThan(plansIndex);
+
+      expect(result).toContain('Feature request');
+      expect(result).toContain('Set up project scaffolding.');
+      expect(result).toContain('plan-iter-1.md');
+    });
+
+    it('should show "No context" when entries and artifacts are both empty', () => {
+      const result = generateContextIndex([], 2, {});
+
+      expect(result).toContain(
+        'No context sources were provided for this iteration.'
+      );
+    });
+
+    it('should show "No context" when options is undefined and entries are empty', () => {
+      const result = generateContextIndex([], 2);
+
+      expect(result).toContain(
+        'No context sources were provided for this iteration.'
+      );
+    });
+
+    it('should show "No context" when artifact arrays are empty', () => {
+      const result = generateContextIndex([], 2, {
+        iterationSummaries: [],
+        iterationPlans: [],
+      });
+
+      expect(result).toContain(
+        'No context sources were provided for this iteration.'
+      );
     });
   });
 });

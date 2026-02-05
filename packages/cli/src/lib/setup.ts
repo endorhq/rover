@@ -395,10 +395,12 @@ echo "======================================="
    * Generate the inputs file to store task inputs and simplify loading them.
    */
   generateInputs(): string {
-    // For now, we only pass the task title and description as inputs
+    // Use the current iteration's expanded title/description when available,
+    // falling back to the original task-level values for the first iteration.
+    const currentIteration = this.task.getLastIteration();
     const inputs = {
-      title: this.task.title,
-      description: this.task.description,
+      title: currentIteration?.title ?? this.task.title,
+      description: currentIteration?.description ?? this.task.description,
     };
 
     const inputsPath = join(this.iterationPath, 'inputs.json');

@@ -1,7 +1,7 @@
 Given this brief task description and project context, create a clear, actionable task title and expanded description.
 
 Brief Description: %briefDescription%
-
+%contextSection%
 Respond ONLY with valid JSON in this exact format:
 {
 "title": "Concise, action-oriented title (max 10 words)",

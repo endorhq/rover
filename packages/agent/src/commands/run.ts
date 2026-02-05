@@ -1,10 +1,6 @@
 import { CommandOutput } from '../cli.js';
 import colors from 'ansi-colors';
-import {
-  WorkflowManager,
-  IterationStatusManager,
-  PreContextDataManager,
-} from 'rover-core';
+import { WorkflowManager, IterationStatusManager } from 'rover-core';
 import { parseCollectOptions } from '../lib/options.js';
 import { Runner, RunnerStepResult } from '../lib/runner.js';
 import { ACPRunner, ACPRunnerStepResult } from '../lib/acp-runner.js';
@@ -79,110 +75,60 @@ interface RunCommandOptions {
   statusFile?: string;
   // Optional output directory
   output?: string;
-  // Paths to pre-context JSON files
-  preContextFile: string[];
+  // Path to the context directory
+  contextDir?: string;
 }
 
 interface RunCommandOutput extends CommandOutput {}
 
 /**
- * Handles pre-context file loading, validation, and injection into workflow steps.
- * Skips injection on the first iteration.
+ * Build context injection message from the context directory.
+ * The context directory contains an index.md file and individual context source files.
  *
- * @param options - Run command options containing pre-context file paths
- * @param workflowManager - Workflow manager to inject pre-context into
- * @returns Array of validated pre-context file paths
+ * @param contextDir - Path to the context directory
+ * @returns Context message to prepend to prompts, or null if no context
  */
-const handlePreContextInjection = (
+function buildContextMessage(contextDir: string): string | null {
+  const indexPath = `${contextDir}/index.md`;
+  if (!existsSync(indexPath)) return null;
+
+  const lines = [
+    '\n\n**Context Sources:**',
+    `The context directory at \`${contextDir}/\` contains reference materials for this task.`,
+    `Read the index file at \`${contextDir}/index.md\` for a complete overview of all available context sources and their descriptions.`,
+    '',
+    '**Important:** Read the context index before proceeding with the task.',
+    '',
+  ];
+
+  return lines.join('\n');
+}
+
+/**
+ * Inject context sources into workflow step prompts.
+ * Reads from the context directory mounted at the path specified by --context-dir.
+ *
+ * @param options - Run command options
+ * @param workflowManager - Workflow manager to inject context into
+ */
+const handleContextInjection = (
   options: RunCommandOptions,
   workflowManager: WorkflowManager
-): string[] => {
-  const preContextFilePaths: string[] = [];
+): void => {
+  const contextDir = options.contextDir;
+  if (!contextDir || !existsSync(contextDir)) return;
 
-  // Load and validate pre-context files
-  if (options.preContextFile && options.preContextFile.length > 0) {
-    for (const preContextFilePath of options.preContextFile) {
-      if (!existsSync(preContextFilePath)) {
-        console.log(
-          colors.yellow(
-            `\n⚠ Pre-context file not found at ${preContextFilePath}. Skipping this file.`
-          )
-        );
-      } else {
-        try {
-          // Load and validate pre-context data using PreContextDataManager
-          const rawData = readFileSync(preContextFilePath, 'utf-8');
-          const parsedData = JSON.parse(rawData);
-          // Validate by creating a PreContextDataManager instance
-          new PreContextDataManager(parsedData, preContextFilePath);
+  const contextMessage = buildContextMessage(contextDir);
 
-          // Track the file path for later use
-          preContextFilePaths.push(preContextFilePath);
-        } catch (err) {
-          console.log(
-            colors.yellow(
-              `\n⚠ Failed to load pre-context file ${preContextFilePath}: ${err instanceof Error ? err.message : String(err)}. Skipping this file.`
-            )
-          );
-        }
-      }
+  if (contextMessage && workflowManager.steps.length > 0) {
+    console.log(
+      colors.gray('✓ Context sources injected into workflow steps\n')
+    );
+
+    for (const step of workflowManager.steps) {
+      step.prompt = contextMessage + step.prompt;
     }
   }
-
-  // Add pre-context file location information to all workflow steps
-  // Only inject if this is not the first iteration
-  if (preContextFilePaths.length > 0 && workflowManager.steps.length > 0) {
-    let shouldInjectPreContext = true;
-
-    // Check if this is the first iteration
-    const iterationFilePath = options.output
-      ? `${options.output}/iteration.json`
-      : '/output/iteration.json';
-
-    if (existsSync(iterationFilePath)) {
-      try {
-        const iterationData = JSON.parse(
-          readFileSync(iterationFilePath, 'utf-8')
-        );
-        if (iterationData.iteration === 1) {
-          shouldInjectPreContext = false;
-          console.log(
-            colors.gray(
-              '⚠ Skipping pre-context injection for first iteration\n'
-            )
-          );
-        }
-      } catch (err) {
-        console.log(
-          colors.yellow(
-            `\n⚠ Failed to read iteration file ${iterationFilePath}: ${err instanceof Error ? err.message : String(err)}. Proceeding with pre-context injection.`
-          )
-        );
-      }
-    }
-
-    if (shouldInjectPreContext) {
-      // Build the pre-context file paths message
-      const preContextMessage =
-        preContextFilePaths.length === 1
-          ? `\n\n**Important:** Pre-context information (JSON file containing task and iterations instructions) is available at: \`${preContextFilePaths[0]}\``
-          : `\n\n**Important:** Pre-context information (JSON files containing task and iterations instructions) are available at the following locations:\n${preContextFilePaths.map(path => `- \`${path}\``).join('\n')}`;
-
-      // Prepend pre-context file location to each step's prompt
-      for (const step of workflowManager.steps) {
-        console.log(
-          colors.gray(`✓ Pre-context file location added to step ${step.id}\n`)
-        );
-
-        step.prompt =
-          preContextMessage +
-          '\n\n**USE** pre-context information to identify the current iteration and **PRIORITIZE** its instructions (at `currentIteration` in the JSON), taking into account previous iterations instructions (at `previousIterations` in the JSON).\n\n---\n\n' +
-          step.prompt;
-      }
-    }
-  }
-
-  return preContextFilePaths;
 };
 
 /**
@@ -191,7 +137,7 @@ const handlePreContextInjection = (
  */
 export const runCommand = async (
   workflowPath: string,
-  options: RunCommandOptions = { input: [], preContextFile: [] }
+  options: RunCommandOptions = { input: [] }
 ) => {
   const output: RunCommandOutput = {
     success: false,
@@ -242,8 +188,8 @@ export const runCommand = async (
     // Load the agent workflow
     const workflowManager = WorkflowManager.load(workflowPath);
 
-    // Handle pre-context injection
-    handlePreContextInjection(options, workflowManager);
+    // Handle context sources injection
+    handleContextInjection(options, workflowManager);
 
     let providedInputs = new Map();
 

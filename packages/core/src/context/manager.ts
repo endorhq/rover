@@ -7,7 +7,13 @@
  * 3. Writing context files to the iteration's context folder
  * 4. Tracking provenance (when context was added/updated)
  */
-import { existsSync, mkdirSync, writeFileSync, copyFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+  copyFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import type {
   IterationContextEntry,
@@ -79,6 +85,24 @@ export class ContextManager {
 
     // Combine inherited and new entries
     return [...inheritedEntries, ...newEntries];
+  }
+
+  /**
+   * Read the content of all stored context files and return as a single string.
+   * Call after fetchAndStore() to get the actual content for AI expansion.
+   */
+  readStoredContent(entries: IterationContextEntry[]): string {
+    const parts: string[] = [];
+
+    for (const entry of entries) {
+      const filePath = join(this.contextDir, entry.file);
+      if (existsSync(filePath)) {
+        const content = readFileSync(filePath, 'utf8');
+        parts.push(`## ${entry.name}\n\n${content}`);
+      }
+    }
+
+    return parts.join('\n\n');
   }
 
   /**
