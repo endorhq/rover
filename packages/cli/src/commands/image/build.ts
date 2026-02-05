@@ -22,6 +22,7 @@ interface BuildOptions {
   build?: boolean;
   force?: boolean;
   tag?: string;
+  withAgent?: string;
   json?: boolean;
 }
 
@@ -65,7 +66,9 @@ async function buildAction(options: BuildOptions): Promise<void> {
   }
 
   // Generate Dockerfile
-  const builder = new DockerfileBuilder(projectConfig);
+  const builder = new DockerfileBuilder(projectConfig, {
+    withAgent: options.withAgent,
+  });
   const dockerfileContent = builder.generate();
   const imageTag = options.tag || builder.getImageTag();
   const baseImage = builder.getBaseImage();

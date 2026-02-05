@@ -63,6 +63,14 @@ export abstract class BaseAgent implements Agent {
   }
 
   async install(): Promise<void> {
+    // Check if already installed to avoid unnecessary downloads
+    const alreadyInstalled = await this.isInstalled();
+    if (alreadyInstalled) {
+      console.log(colors.bold(`\n${this.name} CLI already installed`));
+      console.log(colors.green(`✓ Skipping installation (already present)`));
+      return;
+    }
+
     const command = this.getInstallCommand();
 
     showTitle(`Installing ${this.name} CLI`);

@@ -100,6 +100,8 @@ export interface DockerfileBuilderOptions {
   installDeps?: boolean;
   /** Custom base image override */
   baseImage?: string;
+  /** Pre-install AI agent CLI (claude, gemini, etc.) */
+  withAgent?: string;
 }
 
 /**
@@ -325,6 +327,30 @@ export class DockerfileBuilder {
     // Add init commands
     if (initCommands.length > 0) {
       lines.push(...initCommands);
+    }
+
+    // Add agent installation if requested
+    if (this.options.withAgent) {
+      const agent = this.options.withAgent.toLowerCase();
+      lines.push(`# Pre-install ${agent} agent CLI`);
+
+      switch (agent) {
+        case 'claude':
+          lines.push('RUN npm install -g @anthropic-ai/claude-code@latest');
+          break;
+        case 'gemini':
+          lines.push('RUN npm install -g @google/gemini-cli@latest');
+          break;
+        case 'codex':
+          lines.push('RUN npm install -g @openai/codex@latest');
+          break;
+        case 'qwen':
+          lines.push('RUN npm install -g @qwen-code/qwen-code@latest');
+          break;
+        default:
+          lines.push(`# Unknown agent: ${agent} - skipping`);
+      }
+      lines.push('');
     }
 
     // Add labels
