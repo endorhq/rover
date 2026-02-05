@@ -126,6 +126,8 @@ export const SandboxConfigSchema = z.object({
   suppressImageWarning: z.boolean().optional(),
   /** Skip package installation in entrypoint (set by rover image build) */
   skipPackageInstall: z.boolean().optional(),
+  /** List of agent CLIs pre-installed in the custom image */
+  preinstalledAgents: z.array(z.string()).optional(),
 });
 
 /**

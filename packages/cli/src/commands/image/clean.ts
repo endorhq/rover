@@ -163,6 +163,9 @@ async function cleanAction(options: CleanOptions): Promise<void> {
       if (projectConfig.skipPackageInstall) {
         projectConfig.setSkipPackageInstall(false);
       }
+      if (projectConfig.preinstalledAgents) {
+        projectConfig.setPreinstalledAgents(undefined);
+      }
       result.configReset = true;
       if (!isJsonMode()) {
         console.log(colors.green('✓ Reset image configuration in rover.json'));

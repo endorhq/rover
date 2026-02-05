@@ -253,6 +253,44 @@ describe('DockerfileBuilder', () => {
       expect(dockerfile).not.toMatch(/&& then/);
       expect(dockerfile).not.toMatch(/&& fi/);
     });
+
+    it('pre-installs single agent when withAgents is specified', () => {
+      const config = createProjectConfig({});
+      const builder = new DockerfileBuilder(config, {
+        withAgents: ['claude'],
+      });
+      const dockerfile = builder.generate();
+
+      expect(dockerfile).toContain('# Pre-install agent CLI(s)');
+      expect(dockerfile).toContain('@anthropic-ai/claude-code@latest');
+    });
+
+    it('pre-installs multiple agents when withAgents has multiple values', () => {
+      const config = createProjectConfig({});
+      const builder = new DockerfileBuilder(config, {
+        withAgents: ['claude', 'gemini'],
+      });
+      const dockerfile = builder.generate();
+
+      expect(dockerfile).toContain('# Pre-install agent CLI(s)');
+      expect(dockerfile).toContain('@anthropic-ai/claude-code@latest');
+      expect(dockerfile).toContain('@google/gemini-cli@latest');
+      // Should be a single RUN command with both packages
+      expect(dockerfile).toMatch(
+        /RUN npm install -g @anthropic-ai\/claude-code@latest @google\/gemini-cli@latest/
+      );
+    });
+
+    it('handles unknown agents gracefully', () => {
+      const config = createProjectConfig({});
+      const builder = new DockerfileBuilder(config, {
+        withAgents: ['claude', 'unknown-agent'],
+      });
+      const dockerfile = builder.generate();
+
+      expect(dockerfile).toContain('@anthropic-ai/claude-code@latest');
+      expect(dockerfile).toContain('# Unknown agent: unknown-agent - skipping');
+    });
   });
 
   describe('getImageTag', () => {
