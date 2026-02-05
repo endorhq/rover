@@ -282,6 +282,9 @@ export class ProjectConfigManager {
   get suppressImageWarning(): boolean {
     return this.data.sandbox?.suppressImageWarning ?? false;
   }
+  get skipPackageInstall(): boolean {
+    return this.data.sandbox?.skipPackageInstall ?? false;
+  }
 
   // Data Modification (Setters)
   addLanguage(language: Language): void {
@@ -370,6 +373,14 @@ export class ProjectConfigManager {
       this.data.sandbox = {};
     }
     this.data.sandbox.suppressImageWarning = value;
+    this.save();
+  }
+
+  setSkipPackageInstall(value: boolean): void {
+    if (!this.data.sandbox) {
+      this.data.sandbox = {};
+    }
+    this.data.sandbox.skipPackageInstall = value;
     this.save();
   }
 

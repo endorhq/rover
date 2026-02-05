@@ -121,6 +121,8 @@ async function buildAction(options: BuildOptions): Promise<void> {
         packagesHash: computePackagesHash(projectConfig),
         generatedAt: new Date().toISOString(),
       });
+      // Skip package installation in entrypoint since they're pre-installed in the image
+      projectConfig.setSkipPackageInstall(true);
     } catch (error) {
       return exitWithError({
         success: false,
