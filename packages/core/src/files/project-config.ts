@@ -288,6 +288,9 @@ export class ProjectConfigManager {
   get skipPackageInstall(): boolean {
     return this.data.sandbox?.skipPackageInstall ?? false;
   }
+  get preinstalledAgents(): string[] | undefined {
+    return this.data.sandbox?.preinstalledAgents;
+  }
 
   // Data Modification (Setters)
   addLanguage(language: Language): void {
@@ -384,6 +387,14 @@ export class ProjectConfigManager {
       this.data.sandbox = {};
     }
     this.data.sandbox.skipPackageInstall = value;
+    this.save();
+  }
+
+  setPreinstalledAgents(agents: string[] | undefined): void {
+    if (!this.data.sandbox) {
+      this.data.sandbox = {};
+    }
+    this.data.sandbox.preinstalledAgents = agents;
     this.save();
   }
 

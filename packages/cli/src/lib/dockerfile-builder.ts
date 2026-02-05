@@ -100,8 +100,8 @@ export interface DockerfileBuilderOptions {
   installDeps?: boolean;
   /** Custom base image override */
   baseImage?: string;
-  /** Pre-install AI agent CLI (claude, gemini, etc.) */
-  withAgent?: string;
+  /** Pre-install AI agent CLIs (claude, gemini, etc.) */
+  withAgents?: string[];
 }
 
 /**
@@ -330,25 +330,31 @@ export class DockerfileBuilder {
     }
 
     // Add agent installation if requested
-    if (this.options.withAgent) {
-      const agent = this.options.withAgent.toLowerCase();
-      lines.push(`# Pre-install ${agent} agent CLI`);
+    if (this.options.withAgents && this.options.withAgents.length > 0) {
+      lines.push('# Pre-install agent CLI(s)');
 
-      switch (agent) {
-        case 'claude':
-          lines.push('RUN npm install -g @anthropic-ai/claude-code@latest');
-          break;
-        case 'gemini':
-          lines.push('RUN npm install -g @google/gemini-cli@latest');
-          break;
-        case 'codex':
-          lines.push('RUN npm install -g @openai/codex@latest');
-          break;
-        case 'qwen':
-          lines.push('RUN npm install -g @qwen-code/qwen-code@latest');
-          break;
-        default:
-          lines.push(`# Unknown agent: ${agent} - skipping`);
+      const agentPackages: string[] = [];
+      for (const agent of this.options.withAgents) {
+        switch (agent) {
+          case 'claude':
+            agentPackages.push('@anthropic-ai/claude-code@latest');
+            break;
+          case 'gemini':
+            agentPackages.push('@google/gemini-cli@latest');
+            break;
+          case 'codex':
+            agentPackages.push('@openai/codex@latest');
+            break;
+          case 'qwen':
+            agentPackages.push('@qwen-code/qwen-code@latest');
+            break;
+          default:
+            lines.push(`# Unknown agent: ${agent} - skipping`);
+        }
+      }
+
+      if (agentPackages.length > 0) {
+        lines.push(`RUN npm install -g ${agentPackages.join(' ')}`);
       }
       lines.push('');
     }

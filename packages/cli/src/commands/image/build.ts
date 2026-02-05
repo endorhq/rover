@@ -65,9 +65,17 @@ async function buildAction(options: BuildOptions): Promise<void> {
     });
   }
 
+  // Parse agents (comma-separated)
+  const agents = options.withAgent
+    ? options.withAgent
+        .split(',')
+        .map(a => a.trim().toLowerCase())
+        .filter(a => a.length > 0)
+    : [];
+
   // Generate Dockerfile
   const builder = new DockerfileBuilder(projectConfig, {
-    withAgent: options.withAgent,
+    withAgents: agents,
   });
   const dockerfileContent = builder.generate();
   const imageTag = options.tag || builder.getImageTag();
@@ -126,6 +134,10 @@ async function buildAction(options: BuildOptions): Promise<void> {
       });
       // Skip package installation in entrypoint since they're pre-installed in the image
       projectConfig.setSkipPackageInstall(true);
+      // Store which agents are pre-installed
+      if (agents.length > 0) {
+        projectConfig.setPreinstalledAgents(agents);
+      }
     } catch (error) {
       return exitWithError({
         success: false,

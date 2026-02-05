@@ -19,7 +19,10 @@ export const addImageCommands = (program: Command) => {
     .option('--no-build', 'Only generate Dockerfile, skip docker build')
     .option('-f, --force', 'Overwrite existing Dockerfile.rover')
     .option('--tag <tag>', 'Custom image tag')
-    .option('--with-agent <agent>', 'Pre-install AI agent CLI (claude, gemini)')
+    .option(
+      '--with-agent <agents>',
+      'Pre-install AI agent CLI(s), comma-separated (claude,gemini,codex,qwen)'
+    )
     .option('--json', 'Output the result in JSON format')
     .action(buildCmd.action);
 
