@@ -26,9 +26,14 @@ import pushCmd from './commands/push.js';
 import stopCmd from './commands/stop.js';
 import mcpCmd from './commands/mcp.js';
 import { addWorkflowCommands } from './commands/workflows/index.js';
+import { addImageCommands } from './commands/image/index.js';
 import workflowAddCmd from './commands/workflows/add.js';
 import workflowListCmd from './commands/workflows/list.js';
 import workflowInspectCmd from './commands/workflows/inspect.js';
+import imageBuildCmd from './commands/image/build.js';
+import imageRebuildCmd from './commands/image/rebuild.js';
+import imageStatusCmd from './commands/image/status.js';
+import imageCleanCmd from './commands/image/clean.js';
 import {
   getCLIContext,
   getProjectPath,
@@ -62,6 +67,10 @@ const commands: CommandDefinition[] = [
   workflowAddCmd,
   workflowListCmd,
   workflowInspectCmd,
+  imageBuildCmd,
+  imageRebuildCmd,
+  imageStatusCmd,
+  imageCleanCmd,
 ];
 
 /**
@@ -458,6 +467,11 @@ export function createProgram(
 
   // Add all subcommands
   addWorkflowCommands(program);
+
+  program.commandsGroup(colors.cyan('Custom images:'));
+
+  // Add image subcommands
+  addImageCommands(program);
 
   program.commandsGroup(colors.cyan('Model Context Protocol:'));
 

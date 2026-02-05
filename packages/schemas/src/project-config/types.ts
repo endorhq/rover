@@ -11,6 +11,7 @@ import type {
   NetworkModeSchema,
   NetworkRuleSchema,
   NetworkConfigSchema,
+  GeneratedFromSchema,
   SandboxConfigSchema,
   HooksConfigSchema,
   ProjectConfigSchema,
@@ -24,6 +25,7 @@ export type TaskManager = z.infer<typeof TaskManagerSchema>;
 export type NetworkMode = z.infer<typeof NetworkModeSchema>;
 export type NetworkRule = z.infer<typeof NetworkRuleSchema>;
 export type NetworkConfig = z.infer<typeof NetworkConfigSchema>;
+export type GeneratedFrom = z.infer<typeof GeneratedFromSchema>;
 export type SandboxConfig = z.infer<typeof SandboxConfigSchema>;
 export type HooksConfig = z.infer<typeof HooksConfigSchema>;
 export type ProjectConfig = z.infer<typeof ProjectConfigSchema>;
