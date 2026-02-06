@@ -73,7 +73,15 @@ function formatScriptForDockerfile(script: string): string {
   if (hasShellControlStructures(trimmed)) {
     // Escape single quotes in the script for bash -c '...'
     const escaped = trimmed.replace(/'/g, "'\"'\"'");
-    return `bash -c '${escaped}'`;
+    // Replace newlines with ; to keep everything on one line for Dockerfile
+    // but don't add ; after then/do/else (shell syntax doesn't allow it)
+    const singleLine = escaped
+      .replace(/\n/g, '; ')
+      .replace(/;(\s*;)+/g, ';')
+      .replace(/\bthen\s*;/g, 'then ')
+      .replace(/\bdo\s*;/g, 'do ')
+      .replace(/\belse\s*;/g, 'else ');
+    return `bash -c '${singleLine}'`;
   }
 
   // Normalize line endings and split into commands
