@@ -27,14 +27,34 @@ export const AGENT_MODELS: Record<AI_AGENT, AgentModelConfig[]> = {
     { name: 'opus', description: 'Highest capability' },
     { name: 'haiku', description: 'Fastest and cheapest' },
   ],
+  // Copilot models from: https://docs.github.com/en/copilot/reference/ai-models/supported-models
   [AI_AGENT.Copilot]: [
+    // OpenAI models
     {
-      name: 'gpt-4o',
-      description: 'High capability multimodal model',
+      name: 'gpt-5.2-codex',
+      description: 'Latest code-specialized model',
       isDefault: true,
     },
-    { name: 'claude-3.5-sonnet', description: 'Claude 3.5 Sonnet' },
-    { name: 'o1', description: 'Advanced reasoning model' },
+    { name: 'gpt-5.2', description: 'Latest general model' },
+    { name: 'gpt-5.1-codex-max', description: 'High-capacity coding model' },
+    { name: 'gpt-5.1-codex', description: 'Code-focused model' },
+    { name: 'gpt-5.1-codex-mini', description: 'Lightweight coding model' },
+    { name: 'gpt-5.1', description: 'Improved general model' },
+    { name: 'gpt-5-mini', description: 'Efficient variant' },
+    { name: 'gpt-4.1', description: 'General-purpose model' },
+    // Anthropic Claude models
+    { name: 'claude-opus-4.6', description: 'Latest high-performance Claude' },
+    { name: 'claude-opus-4.5', description: 'Enhanced capability Claude' },
+    { name: 'claude-sonnet-4.5', description: 'Balanced Claude variant' },
+    { name: 'claude-sonnet-4', description: 'Balanced capability Claude' },
+    { name: 'claude-haiku-4.5', description: 'Fast, efficient Claude' },
+    // Google Gemini models
+    { name: 'gemini-3-pro', description: 'Professional-grade Gemini' },
+    { name: 'gemini-3-flash', description: 'Speed-optimized Gemini' },
+    { name: 'gemini-2.5-pro', description: 'Advanced multimodal Gemini' },
+    // Other providers
+    { name: 'grok-code-fast-1', description: 'Speed-optimized coding (xAI)' },
+    { name: 'raptor-mini', description: 'Fine-tuned GPT-5 mini variant' },
   ],
   [AI_AGENT.Gemini]: [
     {
