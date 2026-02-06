@@ -71,20 +71,18 @@ class OpenCodeAI implements AIAgentTool {
     json: boolean = false,
     cwd?: string
   ): Promise<string> {
-    // OpenCode uses: echo "prompt" | opencode run [--format json]
+    // OpenCode uses: echo "prompt" | opencode run
     // See: https://opencode.ai/docs/cli/
+    // Note: We don't use --format json because it outputs streaming JSON events,
+    // not a single result object. Instead, we rely on prompt instructions for JSON output.
     if (json) {
       prompt = `${prompt}
 
 You MUST output a valid JSON string as an output. Just output the JSON string and nothing else. If you had any error, still return a JSON string with an "error" property.`;
     }
 
-    // Build arguments: run [--format json]
+    // Build arguments: run
     const opencodeArgs = ['run'];
-
-    if (json) {
-      opencodeArgs.push('--format', 'json');
-    }
 
     try {
       const { stdout } = await launch(this.AGENT_BIN, opencodeArgs, {
@@ -93,19 +91,10 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
         env: process.env,
       });
 
-      // Result
+      // Result - OpenCode outputs plain text when not using --format json
       const result = stdout?.toString().trim() || '';
 
-      if (json) {
-        try {
-          const parsed = JSON.parse(result);
-          return `${parsed.result}`;
-        } catch (_err) {
-          throw new InvokeAIAgentError(this.AGENT_BIN, 'Invalid JSON output');
-        }
-      } else {
-        return result;
-      }
+      return result;
     } catch (error) {
       throw new InvokeAIAgentError(this.AGENT_BIN, error);
     }
