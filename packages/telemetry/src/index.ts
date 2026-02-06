@@ -250,16 +250,20 @@ class Telemetry {
     console.error = () => {};
 
     // Store the timeout
-    let timeoutId;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
     try {
       await Promise.race([
         this.client.shutdown().catch(() => {}),
-        new Promise(resolve => (timeoutId = setTimeout(resolve, 2000))),
+        new Promise(resolve => {
+          timeoutId = setTimeout(resolve, 2000);
+        }),
       ]);
     } finally {
       console.error = origError;
-      clearTimeout(timeoutId);
+      if (timeoutId !== undefined) {
+        clearTimeout(timeoutId);
+      }
     }
   }
 
