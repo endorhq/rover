@@ -10,6 +10,7 @@ import {
   setJsonMode,
   requireProjectContext,
 } from '../lib/context.js';
+import type { TaskDiffOutput } from '../output-types.js';
 import type { CommandDefinition } from '../types.js';
 
 /**
@@ -188,7 +189,7 @@ const diffCommand = async (
           });
 
           if (isJsonMode()) {
-            const jsonOutput = {
+            const jsonOutput: TaskDiffOutput = {
               success: true,
               taskId: numericTaskId,
               title: task.title,
@@ -243,7 +244,7 @@ const diffCommand = async (
           const diffOutput = diffResult.stdout?.toString();
 
           if (isJsonMode()) {
-            const jsonOutput = {
+            const jsonOutput: TaskDiffOutput = {
               success: true,
               taskId: numericTaskId,
               title: task.title,
@@ -294,7 +295,7 @@ const diffCommand = async (
         if (gitError.status === 1 && gitError.stderr.toString().trim() === '') {
           // Exit code 1 with no stderr usually means no differences
           if (isJsonMode()) {
-            const jsonOutput = {
+            const jsonOutput: TaskDiffOutput = {
               success: true,
               taskId: numericTaskId,
               title: task.title,

@@ -23,6 +23,7 @@ import {
 import { executeHooks } from '../lib/hooks.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { formatTaskStatus, statusColor } from '../utils/task-status.js';
+import type { ListTasksOutput } from '../output-types.js';
 import type { CommandDefinition } from '../types.js';
 
 /**
@@ -306,12 +307,7 @@ const listCommand = async (
 
     // JSON output mode
     if (isJsonMode()) {
-      const jsonOutput: Array<
-        TaskDescription & {
-          iterationsData: IterationManager[];
-          projectId?: string;
-        }
-      > = [];
+      const jsonOutput: ListTasksOutput = [];
 
       for (const { task, project: projectData } of tasksWithProjects) {
         let iterationsData: IterationManager[] = [];

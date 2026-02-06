@@ -27,23 +27,12 @@ import { isJsonMode, requireProjectContext } from '../lib/context.js';
 import type { IPromptTask } from '../lib/prompts/index.js';
 import { createSandbox } from '../lib/sandbox/index.js';
 import { getTelemetry } from '../lib/telemetry.js';
-import type { CLIJsonOutput } from '../types.js';
+import type { IterateOutput } from '../output-types.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
 import { readFromStdin, stdinIsAvailable } from '../utils/stdin.js';
 import type { CommandDefinition } from '../types.js';
 
 const { prompt } = enquirer;
-
-interface IterateResult extends CLIJsonOutput {
-  taskId: number;
-  taskTitle: string;
-  iterationNumber: number;
-  expandedTitle?: string;
-  expandedDescription?: string;
-  instructions: string;
-  worktreePath?: string;
-  iterationPath?: string;
-}
 
 type IterationContext = {
   plan?: string;
@@ -112,7 +101,7 @@ const iterateCommand = async (
   options: IterateOptions = {}
 ): Promise<void> => {
   const telemetry = getTelemetry();
-  const result: IterateResult = {
+  const result: IterateOutput = {
     success: false,
     taskId: 0,
     taskTitle: '',

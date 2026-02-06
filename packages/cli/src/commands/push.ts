@@ -5,7 +5,7 @@ import { existsSync } from 'node:fs';
 import { ProjectConfigManager, Git } from 'rover-core';
 import { TaskNotFoundError } from 'rover-schemas';
 import { getTelemetry } from '../lib/telemetry.js';
-import type { CLIJsonOutput } from '../types.js';
+import type { TaskPushOutput } from '../output-types.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
 import {
   isJsonMode,
@@ -47,16 +47,6 @@ const getGitHubRepoInfo = (
   return null;
 };
 
-interface PushResult extends CLIJsonOutput {
-  taskId: number;
-  taskTitle: string;
-  branchName: string;
-  hasChanges: boolean;
-  committed: boolean;
-  commitMessage?: string;
-  pushed: boolean;
-}
-
 /**
  * Commit and push a task's changes to the remote repository.
  *
@@ -78,7 +68,7 @@ const pushCommand = async (taskId: string, options: PushOptions) => {
 
   const telemetry = getTelemetry();
   const json = options.json === true;
-  const result: PushResult = {
+  const result: TaskPushOutput = {
     success: false,
     taskId: 0,
     taskTitle: '',

@@ -15,7 +15,7 @@ import { executeHooks } from '../lib/hooks.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { showRoverChat, showTips } from '../utils/display.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
-import type { CLIJsonOutput } from '../types.js';
+import type { TaskMergeOutput } from '../output-types.js';
 import {
   isJsonMode,
   setJsonMode,
@@ -187,23 +187,6 @@ const resolveMergeConflicts = async (
 interface MergeOptions {
   force?: boolean;
   json?: boolean;
-}
-
-/**
- * Interface for JSON output
- */
-interface TaskMergeOutput extends CLIJsonOutput {
-  taskId?: number;
-  taskTitle?: string;
-  branchName?: string;
-  currentBranch?: string;
-  hasWorktreeChanges?: boolean;
-  hasUnmergedCommits?: boolean;
-  committed?: boolean;
-  commitMessage?: string;
-  merged?: boolean;
-  conflictsResolved?: boolean;
-  cleanedUp?: boolean;
 }
 
 /**

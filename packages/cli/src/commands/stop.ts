@@ -4,7 +4,7 @@ import { createSandbox } from '../lib/sandbox/index.js';
 import { TaskNotFoundError } from 'rover-schemas';
 import { launch, ProcessManager } from 'rover-core';
 import { exitWithError, exitWithSuccess } from '../utils/exit.js';
-import type { CLIJsonOutput } from '../types.js';
+import type { TaskStopOutput } from '../output-types.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import {
   isJsonMode,
@@ -12,16 +12,6 @@ import {
   requireProjectContext,
 } from '../lib/context.js';
 import type { CommandDefinition } from '../types.js';
-
-/**
- * Interface for JSON output
- */
-interface TaskStopOutput extends CLIJsonOutput {
-  taskId?: number;
-  title?: string;
-  status?: string;
-  stoppedAt?: string;
-}
 
 /**
  * Stop a running task and optionally clean up its resources.

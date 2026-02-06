@@ -3,7 +3,7 @@
  */
 import colors from 'ansi-colors';
 import { WorkflowStore, WorkflowStoreError } from 'rover-core';
-import { CLIJsonOutput } from '../../types.js';
+import type { AddWorkflowOutput } from '../../output-types.js';
 import { exitWithError, exitWithSuccess } from '../../utils/exit.js';
 import { getTelemetry } from '../../lib/telemetry.js';
 import { getProjectPath, isJsonMode, setJsonMode } from '../../lib/context.js';
@@ -20,17 +20,6 @@ interface AddWorkflowCommandOptions {
   global?: boolean;
   // Output format
   json: boolean;
-}
-
-/**
- * Interface for JSON output
- */
-interface AddWorkflowOutput extends CLIJsonOutput {
-  workflow?: {
-    name: string;
-    path: string;
-    store: 'local' | 'global';
-  };
 }
 
 /**
