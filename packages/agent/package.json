@@ -1,7 +1,7 @@
 {
   "name": "@endorhq/agent",
   "private": true,
-  "version": "0.0.0-dev",
+  "version": "2.1.0",
   "description": "Provide a library to define and manage AI agent workflows for Rover",
   "main": "dist/index.mjs",
   "types": "dist/index.d.mts",
@@ -9,7 +9,10 @@
   "bin": {
     "rover-agent": "dist/cli.mjs"
   },
-  "files": ["LICENSE.md", "dist/*"],
+  "files": [
+    "LICENSE.md",
+    "dist/*"
+  ],
   "scripts": {
     "build": "tsdown --env.TSUP_DEV=false --config-loader unrun",
     "build-dev": "tsdown --env.TSUP_DEV=true --config-loader unrun",
