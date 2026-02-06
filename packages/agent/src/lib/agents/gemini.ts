@@ -7,7 +7,7 @@ import {
   AgentRecoveryResult,
 } from './types.js';
 import { BaseAgent } from './base.js';
-import { launch } from 'rover-core';
+import { launch, VERBOSE } from 'rover-core';
 import { containsGeminiYoloWarning } from '../utils/gemini.js';
 
 export class GeminiAgent extends BaseAgent {
@@ -123,6 +123,9 @@ export class GeminiAgent extends BaseAgent {
     const args = ['--yolo', '--output-format', 'json'];
     if (this.model) {
       args.push('--model', this.model);
+    }
+    if (VERBOSE) {
+      args.push('--verbose');
     }
     return args;
   }

@@ -75,11 +75,16 @@ export class ACPClient implements Client {
       );
     }
 
-    // Allow for now
+    // Allow for now - use the optionId from the 'allow_always' option in the request
+    const allowAlwaysOption = params.options.find(
+      opt => opt.kind === 'allow_always'
+    );
+    const optionId = allowAlwaysOption?.optionId ?? 'always';
+
     return Promise.resolve({
       outcome: {
         outcome: 'selected',
-        optionId: 'allow_always',
+        optionId,
       },
     });
   }

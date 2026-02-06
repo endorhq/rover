@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import colors from 'ansi-colors';
 import { AgentCredentialFile } from './types.js';
 import { BaseAgent } from './base.js';
-import { launch } from 'rover-core';
+import { launch, VERBOSE } from 'rover-core';
 
 export class QwenAgent extends BaseAgent {
   name = 'Qwen';
@@ -118,6 +118,9 @@ export class QwenAgent extends BaseAgent {
     const args = ['--yolo'];
     if (this.model) {
       args.push('--model', this.model);
+    }
+    if (VERBOSE) {
+      args.push('--verbose');
     }
     args.push('-p');
     return args;

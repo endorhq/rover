@@ -15,6 +15,7 @@ import {
   requiredClaudeCredentials,
   requiredBedrockCredentials,
   requiredVertexAiCredentials,
+  VERBOSE,
 } from 'rover-core';
 
 export class ClaudeAgent extends BaseAgent {
@@ -180,6 +181,9 @@ export class ClaudeAgent extends BaseAgent {
     const args = ['--dangerously-skip-permissions', '--output-format', 'json'];
     if (this.model) {
       args.push('--model', this.model);
+    }
+    if (VERBOSE) {
+      args.push('--verbose');
     }
     args.push('-p');
     return args;

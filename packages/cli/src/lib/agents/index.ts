@@ -2,6 +2,7 @@ import ClaudeAI from './claude.js';
 import CodexAI from './codex.js';
 import CursorAI from './cursor.js';
 import GeminiAI from './gemini.js';
+import OpenCodeAI from './opencode.js';
 import QwenAI from './qwen.js';
 import type { IPromptTask } from '../prompts/index.js';
 import { UserSettingsManager, AI_AGENT, launchSync } from 'rover-core';
@@ -104,6 +105,8 @@ export const getAIAgentTool = (agent: string): AIAgentTool => {
       return new CursorAI();
     case 'gemini':
       return new GeminiAI();
+    case 'opencode':
+      return new OpenCodeAI();
     case 'qwen':
       return new QwenAI();
     default:

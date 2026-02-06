@@ -4,5 +4,6 @@ export enum AI_AGENT {
   Codex = 'codex',
   Cursor = 'cursor',
   Gemini = 'gemini',
+  OpenCode = 'opencode',
   Qwen = 'qwen',
 }
