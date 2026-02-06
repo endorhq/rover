@@ -68,7 +68,16 @@ export abstract class BaseAgent implements Agent {
 
   async install(): Promise<void> {
     // Check if already installed to avoid unnecessary downloads
+    console.log(
+      colors.gray(`Checking if ${this.name} CLI is already installed...`)
+    );
     const alreadyInstalled = await this.isInstalled();
+    console.log(
+      colors.gray(
+        `  ${this.binary} --version: ${alreadyInstalled ? 'OK' : 'not found'}`
+      )
+    );
+
     if (alreadyInstalled) {
       console.log(colors.bold(`\n${this.name} CLI already installed`));
       console.log(colors.green(`✓ Skipping installation (already present)`));
@@ -117,9 +126,13 @@ export abstract class BaseAgent implements Agent {
   }
 
   async isInstalled(): Promise<boolean> {
-    const result = await launch(this.binary, ['--version']);
-
-    return result.exitCode === 0;
+    try {
+      const result = await launch(this.binary, ['--version']);
+      return result.exitCode === 0;
+    } catch {
+      // If launch throws (e.g., binary not found), return false
+      return false;
+    }
   }
 
   /**
