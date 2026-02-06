@@ -73,7 +73,6 @@ export class PodmanSandbox extends Sandbox {
     const entrypointScriptPath = setupBuilder.generateEntrypoint();
     const inputsPath = setupBuilder.generateInputs();
     const workflowPath = setupBuilder.saveWorkflow(this.task.workflowName);
-    const preContextPaths = setupBuilder.generatePreContextFiles();
 
     // Get agent-specific container mounts
     const agent = getAIAgentTool(this.task.agent!);
@@ -137,13 +136,12 @@ export class PodmanSandbox extends Sandbox {
       `${iteration.fileDescriptionPath}:/task/description.json:Z,ro`
     );
 
-    // Mount pre-context files
-    preContextPaths.forEach((preContextPath, index) => {
-      podmanArgs.push(
-        '-v',
-        `${preContextPath}:/__pre_context_${index}__.json:Z,ro`
-      );
-    });
+    // Mount context directory if available (read-only)
+    const contextDir = join(iteration.iterationPath, 'context');
+    const hasContext = existsSync(contextDir);
+    if (hasContext) {
+      podmanArgs.push('-v', `${contextDir}:/context:Z,ro`);
+    }
 
     // Mount initScript if provided in project config
     if (projectConfig?.initScript) {
@@ -190,6 +188,11 @@ export class PodmanSandbox extends Sandbox {
       '/inputs.json'
     );
 
+    // Pass context directory argument if context was mounted
+    if (hasContext) {
+      podmanArgs.push('--context-dir', '/context');
+    }
+
     // Pass model if specified
     if (this.task.agentModel) {
       podmanArgs.push('--agent-model', this.task.agentModel);
@@ -199,11 +202,6 @@ export class PodmanSandbox extends Sandbox {
     if (VERBOSE) {
       podmanArgs.push('-v');
     }
-
-    // Add pre-context file arguments
-    preContextPaths.forEach((_, index) => {
-      podmanArgs.push('--pre-context-file', `/__pre_context_${index}__.json`);
-    });
 
     return (
       (await launch('podman', podmanArgs)).stdout?.toString().trim() ||
@@ -256,8 +254,6 @@ export class PodmanSandbox extends Sandbox {
       false,
       'entrypoint-iterate.sh'
     );
-    const preContextPaths = setupBuilder.generatePreContextFiles();
-
     // Get agent-specific container mounts and environment variables
     const agent = getAIAgentTool(this.task.agent!);
     const containerMounts: string[] = agent.getContainerMounts();
@@ -310,13 +306,12 @@ export class PodmanSandbox extends Sandbox {
       `${entrypointScriptPath}:/entrypoint.sh:Z,ro`
     );
 
-    // Mount pre-context files
-    preContextPaths.forEach((preContextPath, index) => {
-      podmanArgs.push(
-        '-v',
-        `${preContextPath}:/__pre_context_${index}__.json:Z,ro`
-      );
-    });
+    // Mount context directory if available (read-only)
+    const contextDir = join(iteration.iterationPath, 'context');
+    const hasContext = existsSync(contextDir);
+    if (hasContext) {
+      podmanArgs.push('-v', `${contextDir}:/context:Z,ro`);
+    }
 
     // Get extra args from CLI options and project config, merge them
     const configExtraArgs = normalizeExtraArgs(projectConfig?.sandboxExtraArgs);
@@ -340,6 +335,11 @@ export class PodmanSandbox extends Sandbox {
       podmanArgs.push(initialPrompt);
     }
 
+    // Pass context directory argument if context was mounted
+    if (hasContext) {
+      podmanArgs.push('--context-dir', '/context');
+    }
+
     // Pass model if specified
     if (this.task.agentModel) {
       podmanArgs.push('--agent-model', this.task.agentModel);
@@ -349,11 +349,6 @@ export class PodmanSandbox extends Sandbox {
     if (VERBOSE) {
       podmanArgs.push('-v');
     }
-
-    // Add pre-context file arguments
-    preContextPaths.forEach((_, index) => {
-      podmanArgs.push('--pre-context-file', `/__pre_context_${index}__.json`);
-    });
 
     // Use detached: false to ensure proper TTY signal handling and job control
     return launch('podman', podmanArgs, {

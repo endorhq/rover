@@ -97,6 +97,13 @@ export const AGENT_MODELS: Record<AI_AGENT, AgentModelConfig[]> = {
     { name: 'gpt-5.1', description: 'GPT-5.1' },
     { name: 'grok', description: 'Grok' },
   ],
+  [AI_AGENT.OpenCode]: [
+    {
+      name: 'zen',
+      description: 'OpenCode native model',
+      isDefault: true,
+    },
+  ],
 };
 
 /**

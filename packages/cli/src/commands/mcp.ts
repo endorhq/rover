@@ -104,6 +104,10 @@ const mcpCommand = async () => {
     sourceBranch: z.string().optional(),
     targetBranch: z.string().optional(),
     agent: z.nativeEnum(AI_AGENT).optional(),
+    // New context fields
+    context: z.array(z.string()).optional(),
+    contextTrustAuthors: z.string().optional(),
+    contextTrustAllAuthors: z.boolean().optional(),
   });
 
   server.registerTool(
@@ -122,6 +126,9 @@ const mcpCommand = async () => {
         sourceBranch: parsed.sourceBranch,
         targetBranch: parsed.targetBranch,
         agent: parsed.agent,
+        context: parsed.context,
+        contextTrustAuthors: parsed.contextTrustAuthors,
+        contextTrustAllAuthors: parsed.contextTrustAllAuthors,
         debug: false,
       });
     }
@@ -279,6 +286,10 @@ const mcpCommand = async () => {
   const iterateSchema = z.object({
     taskId: z.string(),
     instructions: z.string().optional(),
+    // New context fields
+    context: z.array(z.string()).optional(),
+    contextTrustAuthors: z.string().optional(),
+    contextTrustAllAuthors: z.boolean().optional(),
   });
 
   server.registerTool(
@@ -291,10 +302,15 @@ const mcpCommand = async () => {
     },
     async args => {
       const parsed = iterateSchema.parse(args);
-      return runCommand(iterateCmd.action, [
-        parsed.taskId,
-        parsed.instructions,
-      ]);
+      return runCommand(
+        iterateCmd.action,
+        [parsed.taskId, parsed.instructions],
+        {
+          context: parsed.context,
+          contextTrustAuthors: parsed.contextTrustAuthors,
+          contextTrustAllAuthors: parsed.contextTrustAllAuthors,
+        }
+      );
     }
   );
 

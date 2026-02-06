@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import colors from 'ansi-colors';
 import { AgentCredentialFile } from './types.js';
 import { BaseAgent } from './base.js';
-import { launch } from 'rover-core';
+import { launch, VERBOSE } from 'rover-core';
 
 export class CodexAgent extends BaseAgent {
   name = 'Codex';
@@ -132,6 +132,9 @@ export class CodexAgent extends BaseAgent {
     ];
     if (this.model) {
       args.push('--model', this.model);
+    }
+    if (VERBOSE) {
+      args.push('--verbose');
     }
     args.push('-');
     return args;

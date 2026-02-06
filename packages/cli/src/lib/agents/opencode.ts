@@ -1,4 +1,4 @@
-import { launch, launchSync } from 'rover-core';
+import { launch } from 'rover-core';
 import {
   AIAgentTool,
   InvokeAIAgentError,
@@ -11,29 +11,52 @@ import { join } from 'node:path';
 import { existsSync } from 'node:fs';
 import type { WorkflowInput } from 'rover-schemas';
 
-// Environment variables reference:
-// - https://raw.githubusercontent.com/QwenLM/qwen-code/refs/heads/main/docs/cli/configuration.md
-const QWEN_ENV_VARS = [
-  // Sandbox and debugging
-  'GEMINI_SANDBOX',
-  'SEATBELT_PROFILE',
-  'DEBUG',
-  'DEBUG_MODE',
-  'BUILD_SANDBOX',
-
+// Environment variables reference for OpenCode:
+// - https://opencode.ai/docs/providers/#environment-variables-quick-start
+const OPENCODE_ENV_VARS = [
   // General configuration
   'NO_COLOR',
-  'CLI_TITLE',
-  'CODE_ASSIST_ENDPOINT',
+  'DEBUG',
 
-  // Web search configuration
-  'TAVILY_API_KEY',
+  // AWS/Amazon Bedrock
+  'AWS_ACCESS_KEY_ID',
+  'AWS_SECRET_ACCESS_KEY',
+  'AWS_PROFILE',
+  'AWS_BEARER_TOKEN_BEDROCK',
+  'AWS_WEB_IDENTITY_TOKEN_FILE',
+  'AWS_ROLE_ARN',
+  'AWS_REGION',
+
+  // Azure
+  'AZURE_RESOURCE_NAME',
+  'AZURE_COGNITIVE_SERVICES_RESOURCE_NAME',
+
+  // Cloudflare
+  'CLOUDFLARE_ACCOUNT_ID',
+  'CLOUDFLARE_GATEWAY_ID',
+  'CLOUDFLARE_API_TOKEN',
+
+  // Google Cloud/Vertex AI
+  'GOOGLE_CLOUD_PROJECT',
+  'VERTEX_LOCATION',
+  'GOOGLE_APPLICATION_CREDENTIALS',
+
+  // GitLab
+  'GITLAB_TOKEN',
+  'GITLAB_INSTANCE_URL',
+  'GITLAB_AI_GATEWAY_URL',
+  'GITLAB_OAUTH_CLIENT_ID',
+
+  // SAP AI Core
+  'AICORE_SERVICE_KEY',
+  'AICORE_DEPLOYMENT_ID',
+  'AICORE_RESOURCE_GROUP',
 ];
 
-class QwenAI implements AIAgentTool {
+class OpenCodeAI implements AIAgentTool {
   // constants
-  public AGENT_BIN = 'qwen';
-  private promptBuilder = new PromptBuilder('qwen');
+  public AGENT_BIN = 'opencode';
+  private promptBuilder = new PromptBuilder('opencode');
 
   async checkAgent(): Promise<void> {
     try {
@@ -48,22 +71,30 @@ class QwenAI implements AIAgentTool {
     json: boolean = false,
     cwd?: string
   ): Promise<string> {
-    const qwenArgs = ['-p'];
-
+    // OpenCode uses: echo "prompt" | opencode run
+    // See: https://opencode.ai/docs/cli/
+    // Note: We don't use --format json because it outputs streaming JSON events,
+    // not a single result object. Instead, we rely on prompt instructions for JSON output.
     if (json) {
-      // Qwen does not have any way to force the JSON output at CLI level.
-      // Trying to force it via prompting
       prompt = `${prompt}
 
 You MUST output a valid JSON string as an output. Just output the JSON string and nothing else. If you had any error, still return a JSON string with an "error" property.`;
     }
 
+    // Build arguments: run
+    const opencodeArgs = ['run'];
+
     try {
-      const { stdout } = await launch(this.AGENT_BIN, qwenArgs, {
+      const { stdout } = await launch(this.AGENT_BIN, opencodeArgs, {
         input: prompt,
         cwd,
+        env: process.env,
       });
-      return stdout?.toString().trim() || '';
+
+      // Result - OpenCode outputs plain text when not using --format json
+      const result = stdout?.toString().trim() || '';
+
+      return result;
     } catch (error) {
       throw new InvokeAIAgentError(this.AGENT_BIN, error);
     }
@@ -83,7 +114,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
       const response = await this.invoke(prompt, true, projectPath);
       return parseJsonResponse<IPromptTask>(response);
     } catch (error) {
-      console.error('Failed to expand task with Qwen:', error);
+      console.error('Failed to expand task with OpenCode:', error);
       return null;
     }
   }
@@ -106,7 +137,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
       return parseJsonResponse<IPromptTask>(response);
     } catch (error) {
       console.error(
-        'Failed to expand iteration instructions with Qwen:',
+        'Failed to expand iteration instructions with OpenCode:',
         error
       );
       return null;
@@ -174,18 +205,29 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
       const response = await this.invoke(prompt, true);
       return parseJsonResponse<Record<string, any>>(response);
     } catch (error) {
-      console.error('Failed to extract GitHub inputs with Qwen:', error);
+      console.error('Failed to extract GitHub inputs with OpenCode:', error);
       return null;
     }
   }
 
   getContainerMounts(): string[] {
     const dockerMounts: string[] = [];
-    const qwenFolder = join(homedir(), '.qwen');
 
-    // Only mount if the folder exists
-    if (existsSync(qwenFolder)) {
-      dockerMounts.push(`-v`, `${qwenFolder}:/.qwen:Z,ro`);
+    // OpenCode stores config in ~/.config/opencode/ directory
+    // See: https://opencode.ai/docs/providers/#config
+    const opencodeConfigFolder = join(homedir(), '.config', 'opencode');
+    if (existsSync(opencodeConfigFolder)) {
+      dockerMounts.push(`-v`, `${opencodeConfigFolder}:/.config/opencode:Z,ro`);
+    }
+
+    // OpenCode stores credentials in ~/.local/share/opencode/auth.json
+    // See: https://opencode.ai/docs/providers/#credentials
+    const opencodeDataFolder = join(homedir(), '.local', 'share', 'opencode');
+    if (existsSync(opencodeDataFolder)) {
+      dockerMounts.push(
+        `-v`,
+        `${opencodeDataFolder}:/.local/share/opencode:Z,ro`
+      );
     }
 
     return dockerMounts;
@@ -193,18 +235,37 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
 
   getEnvironmentVariables(): string[] {
     const envVars: string[] = [];
+    const addedKeys = new Set<string>();
 
-    // Look for any QWEN_* and OPENAI_* env vars
+    // Common provider prefixes
+    const providerPrefixes = [
+      'OPENCODE_',
+      'ANTHROPIC_',
+      'OPENAI_',
+      'AZURE_',
+      'AWS_',
+      'GOOGLE_',
+      'VERTEX_',
+      'GITLAB_',
+      'CLOUDFLARE_',
+      'AICORE_',
+    ];
+
+    // Look for any provider-prefixed env vars
     for (const key in process.env) {
-      if (key.startsWith('QWEN_') || key.startsWith('OPENAI_')) {
-        envVars.push('-e', key);
+      if (providerPrefixes.some(prefix => key.startsWith(prefix))) {
+        if (!addedKeys.has(key)) {
+          envVars.push('-e', key);
+          addedKeys.add(key);
+        }
       }
     }
 
-    // Add other specific environment variables from QWEN_ENV_VARS
-    for (const key of QWEN_ENV_VARS) {
-      if (process.env[key] !== undefined) {
+    // Add other specific environment variables from OPENCODE_ENV_VARS
+    for (const key of OPENCODE_ENV_VARS) {
+      if (process.env[key] !== undefined && !addedKeys.has(key)) {
         envVars.push('-e', key);
+        addedKeys.add(key);
       }
     }
 
@@ -212,4 +273,4 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
   }
 }
 
-export default QwenAI;
+export default OpenCodeAI;

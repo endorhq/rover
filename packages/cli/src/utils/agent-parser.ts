@@ -50,6 +50,9 @@ export function parseAgentString(agentString: string): ParsedAgent {
     case 'qwen':
       normalizedAgent = AI_AGENT.Qwen;
       break;
+    case 'opencode':
+      normalizedAgent = AI_AGENT.OpenCode;
+      break;
     default:
       throw new Error(
         `Invalid agent: ${agentName}. Valid options are: ${Object.values(AI_AGENT).join(', ')}`

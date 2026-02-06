@@ -24,6 +24,7 @@ vi.mock('../../utils/system.js', async () => {
     checkCursor: vi.fn().mockResolvedValue(false),
     checkQwen: vi.fn().mockResolvedValue(false),
     checkGemini: vi.fn().mockResolvedValue(false),
+    checkOpenCode: vi.fn().mockResolvedValue(false),
     checkGitHubCLI: vi.fn().mockResolvedValue(false),
   };
 });
@@ -247,13 +248,20 @@ describe('init command', () => {
   });
 
   it('should require at least one AI agent to be installed', async () => {
-    const { checkClaude, checkCodex, checkCursor, checkQwen, checkGemini } =
-      await import('../../utils/system.js');
+    const {
+      checkClaude,
+      checkCodex,
+      checkCursor,
+      checkQwen,
+      checkGemini,
+      checkOpenCode,
+    } = await import('../../utils/system.js');
     vi.mocked(checkClaude).mockResolvedValueOnce(false);
     vi.mocked(checkCodex).mockResolvedValueOnce(false);
     vi.mocked(checkCursor).mockResolvedValueOnce(false);
     vi.mocked(checkQwen).mockResolvedValueOnce(false);
     vi.mocked(checkGemini).mockResolvedValueOnce(false);
+    vi.mocked(checkOpenCode).mockResolvedValueOnce(false);
 
     await initCommand('.', { yes: true });
 
@@ -262,13 +270,20 @@ describe('init command', () => {
   });
 
   it('should handle multiple AI agents being available', async () => {
-    const { checkClaude, checkCodex, checkCursor, checkQwen, checkGemini } =
-      await import('../../utils/system.js');
+    const {
+      checkClaude,
+      checkCodex,
+      checkCursor,
+      checkQwen,
+      checkGemini,
+      checkOpenCode,
+    } = await import('../../utils/system.js');
     vi.mocked(checkClaude).mockResolvedValueOnce(true);
     vi.mocked(checkCodex).mockResolvedValueOnce(false);
     vi.mocked(checkCursor).mockResolvedValueOnce(false);
     vi.mocked(checkQwen).mockResolvedValueOnce(false);
     vi.mocked(checkGemini).mockResolvedValueOnce(true);
+    vi.mocked(checkOpenCode).mockResolvedValueOnce(false);
 
     // Create a simple project file for environment detection
     writeFileSync('package.json', JSON.stringify({ name: 'test' }, null, 2));

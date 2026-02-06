@@ -1,6 +1,6 @@
 import colors from 'ansi-colors';
 import enquirer from 'enquirer';
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   AI_AGENT,
@@ -9,6 +9,11 @@ import {
   showProperties,
   showTitle,
   type TaskDescriptionManager,
+  ContextManager,
+  generateContextIndex,
+  ContextFetchError,
+  registerBuiltInProviders,
+  type ContextIndexOptions,
 } from 'rover-core';
 import { TaskNotFoundError } from 'rover-schemas';
 import {
@@ -53,6 +58,9 @@ interface IterateOptions {
   json?: boolean;
   interactive?: boolean;
   agent?: string;
+  context?: string[];
+  contextTrustAuthors?: string;
+  contextTrustAllAuthors?: boolean;
 }
 
 /**
@@ -62,13 +70,15 @@ const expandIterationInstructions = async (
   instructions: string,
   previousContext: IterationContext,
   aiAgent: AIAgentTool,
-  jsonMode: boolean
+  jsonMode: boolean,
+  contextContent?: string
 ): Promise<IPromptTask | null> => {
   try {
     const expanded = await aiAgent.expandIterationInstructions(
       instructions,
       previousContext.plan,
-      previousContext.changes
+      previousContext.changes,
+      contextContent
     );
     return expanded;
   } catch (error) {
@@ -339,39 +349,6 @@ const iterateCommand = async (
 
       processManager?.completeLastItem();
 
-      processManager?.addItem('Expanding new instructions with AI agent');
-
-      let expandedTask: IPromptTask | null = null;
-
-      try {
-        expandedTask = await expandIterationInstructions(
-          finalInstructions,
-          previousContext,
-          aiAgent,
-          options.json === true
-        );
-
-        if (expandedTask) {
-          processManager?.completeLastItem();
-        } else {
-          processManager?.failLastItem();
-        }
-      } catch (error) {
-        processManager?.failLastItem();
-      }
-
-      if (expandedTask == null) {
-        // Fallback approach
-        expandedTask = {
-          title: `${task.title} - Iteration refinement instructinos`,
-          description: `${task.description}\n\nAdditional requirements:\n${finalInstructions}`,
-        };
-      }
-
-      // TODO(angel): Is this required?
-      result.expandedTitle = expandedTask.title;
-      result.expandedDescription = expandedTask.description;
-
       result.worktreePath = task.worktreePath;
 
       processManager?.addItem('Creating the new iteration for the task');
@@ -395,17 +372,151 @@ const iterateCommand = async (
       task.incrementIteration();
       task.markIterating();
 
-      // Create new iteration config
-      IterationManager.createIteration(
+      // Create new iteration config with raw instructions (will be updated after expansion)
+      const iteration = IterationManager.createIteration(
         iterationPath,
         newIterationNumber,
         task.id,
-        expandedTask.title,
-        expandedTask.description,
+        finalInstructions,
+        finalInstructions,
         previousContext
       );
 
       processManager?.completeLastItem();
+
+      // Validate mutual exclusivity of --context-trust-authors and --context-trust-all-authors
+      if (options.contextTrustAuthors && options.contextTrustAllAuthors) {
+        result.error =
+          '--context-trust-authors and --context-trust-all-authors are mutually exclusive';
+        exitWithError(result, { telemetry });
+        return;
+      }
+
+      // Fetch context and collect artifacts from previous iterations
+      processManager?.addItem('Fetching context sources');
+
+      let contextContent: string | undefined;
+
+      try {
+        // Register built-in providers
+        registerBuiltInProviders();
+
+        const trustedAuthors = options.contextTrustAuthors
+          ? options.contextTrustAuthors.split(',').map(s => s.trim())
+          : undefined;
+
+        const contextManager = new ContextManager(options.context ?? [], task, {
+          trustAllAuthors: options.contextTrustAllAuthors,
+          trustedAuthors,
+          cwd: project.path,
+        });
+
+        const entries = await contextManager.fetchAndStore();
+
+        // Store in iteration.json
+        iteration.setContext(entries);
+
+        // Gather artifacts from all previous iterations
+        const { summaries, plans } =
+          task.getPreviousIterationArtifacts(newIterationNumber);
+
+        // Copy plan files into context directory and build references
+        const iterationPlans: ContextIndexOptions['iterationPlans'] = [];
+        for (const plan of plans) {
+          const planFilename = `plan-iter-${plan.iteration}.md`;
+          writeFileSync(
+            join(contextManager.getContextDir(), planFilename),
+            plan.content
+          );
+          iterationPlans.push({
+            iteration: plan.iteration,
+            file: planFilename,
+          });
+        }
+
+        // Generate index.md with artifacts
+        const indexContent = generateContextIndex(entries, task.iterations, {
+          iterationSummaries: summaries,
+          iterationPlans,
+        });
+        writeFileSync(
+          join(contextManager.getContextDir(), 'index.md'),
+          indexContent
+        );
+
+        // Read context content for AI expansion
+        // Skip PRs to avoid huge context.
+        const expansionEntries = entries.filter(entry => {
+          !(entry.metadata?.type || '').includes('pr');
+        });
+        const storedContent =
+          contextManager.readStoredContent(expansionEntries);
+        if (storedContent) {
+          contextContent = storedContent;
+        }
+
+        processManager?.updateLastItem(
+          `Fetching context sources | ${entries.length} source(s) loaded`
+        );
+        processManager?.completeLastItem();
+
+        // Display context summary
+        if (!isJsonMode() && entries.length > 0) {
+          console.log(colors.gray('\nContext sources:'));
+          for (const entry of entries) {
+            console.log(colors.gray(`  - ${entry.name}: ${entry.description}`));
+          }
+        }
+      } catch (error) {
+        processManager?.failLastItem();
+        if (error instanceof ContextFetchError) {
+          if (!isJsonMode()) {
+            console.error(
+              colors.red(`Error fetching context: ${error.message}`)
+            );
+          }
+        }
+        throw error;
+      }
+
+      // AI expansion with context content
+      processManager?.addItem('Expanding new instructions with AI agent');
+
+      let expandedTask: IPromptTask | null = null;
+
+      try {
+        expandedTask = await expandIterationInstructions(
+          finalInstructions,
+          previousContext,
+          aiAgent,
+          options.json === true,
+          contextContent
+        );
+
+        if (expandedTask) {
+          processManager?.completeLastItem();
+        } else {
+          processManager?.failLastItem();
+        }
+      } catch (error) {
+        processManager?.failLastItem();
+      }
+
+      if (expandedTask == null) {
+        // Fallback approach
+        expandedTask = {
+          title: `${task.title} - Iteration refinement instructinos`,
+          description: `${task.description}\n\nAdditional requirements:\n${finalInstructions}`,
+        };
+      }
+
+      // Update iteration with expanded values
+      iteration.updateTitle(expandedTask.title);
+      iteration.updateDescription(expandedTask.description);
+
+      // TODO(angel): Is this required?
+      result.expandedTitle = expandedTask.title;
+      result.expandedDescription = expandedTask.description;
 
       // Start sandbox container for task execution
       const sandbox = await createSandbox(task, processManager, {

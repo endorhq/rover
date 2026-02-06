@@ -3,6 +3,7 @@ import CodexAI from './codex.js';
 import CopilotAI from './copilot.js';
 import CursorAI from './cursor.js';
 import GeminiAI from './gemini.js';
+import OpenCodeAI from './opencode.js';
 import QwenAI from './qwen.js';
 import type { IPromptTask } from '../prompts/index.js';
 import { UserSettingsManager, AI_AGENT, launchSync } from 'rover-core';
@@ -29,14 +30,16 @@ export interface AIAgentTool {
   // Expand a brief task description into a full task with title and description
   expandTask(
     briefDescription: string,
-    projectPath: string
+    projectPath: string,
+    contextContent?: string
   ): Promise<IPromptTask | null>;
 
   // Expand iteration instructions based on previous work
   expandIterationInstructions(
     instructions: string,
     previousPlan?: string,
-    previousChanges?: string
+    previousChanges?: string,
+    contextContent?: string
   ): Promise<IPromptTask | null>;
 
   // Generate a git commit message based on the task and recent commits
@@ -105,6 +108,8 @@ export const getAIAgentTool = (agent: string): AIAgentTool => {
       return new CursorAI();
     case 'gemini':
       return new GeminiAI();
+    case 'opencode':
+      return new OpenCodeAI();
     case 'qwen':
       return new QwenAI();
     default:

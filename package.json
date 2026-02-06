@@ -10,6 +10,7 @@
   "workspaces": ["packages/*"],
   "scripts": {
     "dev": "pnpm --filter './packages/*' -r --parallel dev",
+    "rover": "node ./packages/cli/dist/index.mjs",
     "build": "pnpm -r --filter './packages/*' build",
     "build-libs": "pnpm -r --filter './packages/schemas' --filter './packages/telemetry' --filter './packages/core' build",
     "build-dev": "pnpm -r --filter './packages/*' build-dev",
