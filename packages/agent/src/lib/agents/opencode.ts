@@ -1,4 +1,5 @@
 import { existsSync, copyFileSync, readFileSync, writeFileSync } from 'node:fs';
+import { VERBOSE } from 'rover-core';
 import { join } from 'node:path';
 import colors from 'ansi-colors';
 import { AgentCredentialFile, AgentUsageStats } from './types.js';
@@ -183,12 +184,12 @@ export class OpenCodeAgent extends BaseAgent {
   }
 
   toolArguments(): string[] {
-    // OpenCode uses: echo "prompt" | opencode run [--format json] [--model <model>]
-    // Note: OpenCode doesn't have a --dangerously-skip-permissions flag
-    // See: https://opencode.ai/docs/cli/
     const args = ['run', '--format', 'json'];
     if (this.model) {
       args.push('--model', this.model);
+    }
+    if (VERBOSE) {
+      args.push('--verbose');
     }
     return args;
   }
