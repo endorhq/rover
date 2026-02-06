@@ -11,6 +11,7 @@ import {
   ClientSideConnection,
   ndJsonStream,
   PROTOCOL_VERSION,
+  type ContentBlock,
 } from '@agentclientprotocol/sdk';
 import colors from 'ansi-colors';
 import { existsSync, readFileSync } from 'node:fs';
@@ -50,6 +51,11 @@ function getACPSpawnCommand(tool: string): { command: string; args: string[] } {
       return {
         command: 'npx',
         args: ['-y', '@zed-industries/claude-code-acp'],
+      };
+    case 'copilot':
+      return {
+        command: 'copilot',
+        args: ['--acp'],
       };
     case 'opencode':
       return {
@@ -207,9 +213,26 @@ export class ACPRunner {
   /**
    * Send a prompt to the current session
    * Maps to the ACP session/prompt method
+   *
+   * Supports text, images (base64 or file:// URIs), and embedded resources.
    */
   async sendPrompt(
-    prompt: string
+    prompt: string,
+    options?: {
+      /** Image attachments (base64 data or file:// URIs) */
+      images?: Array<{
+        data: string;
+        mimeType: string;
+        uri?: string;
+      }>;
+      /** Embedded text or blob resources */
+      resources?: Array<{
+        uri: string;
+        mimeType?: string;
+        text?: string;
+        blob?: string;
+      }>;
+    }
   ): Promise<{ stopReason: string; response: string }> {
     if (!this.isConnectionInitialized || !this.connection) {
       throw new Error(
@@ -229,14 +252,54 @@ export class ACPRunner {
       // Start capturing agent messages
       this.client.startCapturing();
 
+      // Build prompt content array
+      const promptContent: ContentBlock[] = [
+        {
+          type: 'text',
+          text: prompt,
+        },
+      ];
+
+      // Add image attachments if provided
+      if (options?.images) {
+        for (const image of options.images) {
+          promptContent.push({
+            type: 'image',
+            data: image.data,
+            mimeType: image.mimeType,
+            uri: image.uri,
+          });
+        }
+      }
+
+      // Add embedded resources if provided
+      if (options?.resources) {
+        for (const resource of options.resources) {
+          if (resource.text !== undefined) {
+            promptContent.push({
+              type: 'resource',
+              resource: {
+                uri: resource.uri,
+                mimeType: resource.mimeType,
+                text: resource.text,
+              },
+            });
+          } else if (resource.blob !== undefined) {
+            promptContent.push({
+              type: 'resource',
+              resource: {
+                uri: resource.uri,
+                mimeType: resource.mimeType,
+                blob: resource.blob,
+              },
+            });
+          }
+        }
+      }
+
       const promptResult = await this.connection.prompt({
         sessionId: this.sessionId,
-        prompt: [
-          {
-            type: 'text',
-            text: prompt,
-          },
-        ],
+        prompt: promptContent,
       });
 
       // Stop capturing and get the accumulated response
@@ -248,6 +311,69 @@ export class ACPRunner {
       this.client.stopCapturing();
       throw new Error(
         `Failed to send prompt: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
+  /**
+   * Set the model for the current session
+   * Maps to the ACP session/set_model method (experimental)
+   *
+   * Allows changing the AI model used for subsequent prompts in the session.
+   */
+  async setModel(modelId: string): Promise<void> {
+    if (!this.isConnectionInitialized || !this.connection) {
+      throw new Error(
+        'Connection not initialized. Call initializeConnection() first.'
+      );
+    }
+
+    if (!this.isSessionCreated || !this.sessionId) {
+      throw new Error('No active session. Call createSession() first.');
+    }
+
+    try {
+      await this.connection.unstable_setSessionModel({
+        sessionId: this.sessionId,
+        modelId,
+      });
+
+      console.log(colors.gray(`🔄 Model changed to: ${modelId}`));
+    } catch (error) {
+      throw new Error(
+        `Failed to set model: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
+  /**
+   * Cancel an ongoing prompt operation
+   * Maps to the ACP session/cancel notification
+   *
+   * Aborts any running language model requests and tool calls.
+   */
+  async cancelPrompt(): Promise<void> {
+    if (!this.isConnectionInitialized || !this.connection) {
+      throw new Error(
+        'Connection not initialized. Call initializeConnection() first.'
+      );
+    }
+
+    if (!this.isSessionCreated || !this.sessionId) {
+      throw new Error('No active session. Call createSession() first.');
+    }
+
+    try {
+      await this.connection.cancel({
+        sessionId: this.sessionId,
+      });
+
+      console.log(
+        colors.yellow(`⚠️  Prompt cancelled for session: ${this.sessionId}`)
+      );
+    } catch (error) {
+      throw new Error(
+        `Failed to cancel prompt: ${error instanceof Error ? error.message : String(error)}`
       );
     }
   }

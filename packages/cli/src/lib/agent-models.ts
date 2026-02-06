@@ -27,6 +27,30 @@ export const AGENT_MODELS: Record<AI_AGENT, AgentModelConfig[]> = {
     { name: 'opus', description: 'Highest capability' },
     { name: 'haiku', description: 'Fastest and cheapest' },
   ],
+  // Copilot models: run `copilot --help | grep -A 10 "model"` to get the list
+  [AI_AGENT.Copilot]: [
+    // OpenAI models
+    {
+      name: 'gpt-5.2-codex',
+      description: 'Latest code-specialized model',
+      isDefault: true,
+    },
+    { name: 'gpt-5.2', description: 'Latest general model' },
+    { name: 'gpt-5.1-codex-max', description: 'High-capacity coding model' },
+    { name: 'gpt-5.1-codex', description: 'Code-focused model' },
+    { name: 'gpt-5.1-codex-mini', description: 'Lightweight coding model' },
+    { name: 'gpt-5.1', description: 'Improved general model' },
+    { name: 'gpt-5', description: 'Base GPT-5 model' },
+    { name: 'gpt-5-mini', description: 'Efficient variant' },
+    { name: 'gpt-4.1', description: 'General-purpose model' },
+    // Anthropic Claude models
+    { name: 'claude-sonnet-4.5', description: 'Balanced Claude variant' },
+    { name: 'claude-haiku-4.5', description: 'Fast, efficient Claude' },
+    { name: 'claude-opus-4.5', description: 'High capability Claude' },
+    { name: 'claude-sonnet-4', description: 'Balanced capability Claude' },
+    // Google Gemini models
+    { name: 'gemini-3-pro-preview', description: 'Professional-grade Gemini' },
+  ],
   [AI_AGENT.Gemini]: [
     {
       name: 'flash',

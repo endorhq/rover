@@ -28,6 +28,12 @@ describe('parseAgentString', () => {
       expect(result.model).toBeUndefined();
     });
 
+    it('should parse "copilot" as copilot agent with no model', () => {
+      const result = parseAgentString('copilot');
+      expect(result.agent).toBe(AI_AGENT.Copilot);
+      expect(result.model).toBeUndefined();
+    });
+
     it('should parse "cursor" as cursor agent with no model', () => {
       const result = parseAgentString('cursor');
       expect(result.agent).toBe(AI_AGENT.Cursor);
