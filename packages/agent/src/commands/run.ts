@@ -290,11 +290,8 @@ export const runCommand = async (
 
       // Temporarily ACP usage decision during ACP migration process:
       // force Claude, Copilot, and OpenCode to always use ACP mode
-      const toolLower = tool.toLowerCase();
-      const useACPMode =
-        toolLower === 'claude' ||
-        toolLower === 'copilot' ||
-        toolLower === 'opencode';
+      const acpEnabledTools = ['claude', 'copilot', 'opencode'];
+      const useACPMode = acpEnabledTools.includes(tool.toLowerCase());
 
       if (useACPMode) {
         console.log(colors.cyan('\n🔗 ACP Mode enabled'));
