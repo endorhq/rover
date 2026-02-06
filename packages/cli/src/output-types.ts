@@ -41,6 +41,12 @@ export interface TaskTaskOutputItem {
   savedTo: string;
 }
 
+export interface TaskTaskOutputContextItem {
+  name: string;
+  uri: string;
+  description: string;
+}
+
 export interface TaskTaskOutput extends CLIJsonOutput {
   taskId?: number;
   title?: string;
@@ -51,6 +57,7 @@ export interface TaskTaskOutput extends CLIJsonOutput {
   workspace?: string;
   branch?: string;
   savedTo?: string;
+  context?: TaskTaskOutputContextItem[];
   tasks?: TaskTaskOutputItem[];
 }
 
