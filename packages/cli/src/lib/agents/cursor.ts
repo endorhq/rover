@@ -76,9 +76,13 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
 
   async expandTask(
     briefDescription: string,
-    projectPath: string
+    projectPath: string,
+    contextContent?: string
   ): Promise<IPromptTask | null> {
-    const prompt = this.promptBuilder.expandTaskPrompt(briefDescription);
+    const prompt = this.promptBuilder.expandTaskPrompt(
+      briefDescription,
+      contextContent
+    );
 
     try {
       const response = await this.invoke(prompt, true, projectPath);
@@ -92,12 +96,14 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
   async expandIterationInstructions(
     instructions: string,
     previousPlan?: string,
-    previousChanges?: string
+    previousChanges?: string,
+    contextContent?: string
   ): Promise<IPromptTask | null> {
     const prompt = this.promptBuilder.expandIterationInstructionsPrompt(
       instructions,
       previousPlan,
-      previousChanges
+      previousChanges,
+      contextContent
     );
 
     try {

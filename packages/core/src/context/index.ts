@@ -43,4 +43,7 @@ export {
 export { ContextManager, type ContextManagerOptions } from './manager.js';
 
 // Index Generator
-export { generateContextIndex } from './index-generator.js';
+export {
+  generateContextIndex,
+  type ContextIndexOptions,
+} from './index-generator.js';

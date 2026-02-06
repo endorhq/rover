@@ -44,12 +44,14 @@ export interface TaskExpansion {
 export interface AIProvider {
   expandTask(
     briefDescription: string,
-    projectPath: string
+    projectPath: string,
+    contextContent?: string
   ): Promise<TaskExpansion | null>;
   expandIterationInstructions(
     instructions: string,
     previousPlan?: string,
-    previousChanges?: string
+    previousChanges?: string,
+    contextContent?: string
   ): Promise<TaskExpansion | null>;
   generateCommitMessage(
     taskTitle: string,

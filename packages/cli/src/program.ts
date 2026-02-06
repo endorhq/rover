@@ -241,11 +241,11 @@ export function createProgram(
     .description('Create and assign task to an AI Agent to complete it')
     .option(
       '--from-github <issue>',
-      'Fetch task description from a GitHub issue number'
+      '(Deprecated. Use --context) Fetch task description from a GitHub issue number'
     )
     .option(
       '--include-comments',
-      'Include issue comments in the task description (requires --from-github)'
+      '(Deprecated. Use --context-trust-all-authors) Include issue comments in the task description (requires --from-github)'
     )
     .addOption(
       new Option(
@@ -285,6 +285,20 @@ export function createProgram(
       'Block network access to host (domain, IP, or CIDR). Can be repeated.',
       (value: string, previous: string[] | undefined) =>
         previous ? [...previous, value] : [value]
+    )
+    .option(
+      '-c, --context <uri>',
+      'Add context from URI (github:issue/15, file:./docs.md, https://...). Can be repeated.',
+      (value: string, previous: string[] | undefined) =>
+        previous ? [...previous, value] : [value]
+    )
+    .option(
+      '--context-trust-authors <users>',
+      'Comma-separated list of trusted authors for comment inclusion'
+    )
+    .option(
+      '--context-trust-all-authors',
+      'Trust all authors for comment inclusion (use with caution)'
     )
     .option('--json', 'Output the result in JSON format')
     .option(
@@ -385,6 +399,20 @@ export function createProgram(
     .option(
       '-a, --agent <agent>',
       'AI agent to use for this iteration (e.g., claude, claude:sonnet)'
+    )
+    .option(
+      '-c, --context <uri>',
+      'Add context from URI (github:issue/15, file:./docs.md, https://...). Can be repeated.',
+      (value: string, previous: string[] | undefined) =>
+        previous ? [...previous, value] : [value]
+    )
+    .option(
+      '--context-trust-authors <users>',
+      'Comma-separated list of trusted authors for comment inclusion'
+    )
+    .option(
+      '--context-trust-all-authors',
+      'Trust all authors for comment inclusion (use with caution)'
     )
     .action(iterateCmd.action);
 

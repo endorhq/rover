@@ -23,6 +23,7 @@ describe('Git', () => {
       cwd: testDir,
     });
     launchSync('git', ['config', 'user.name', 'Test User'], { cwd: testDir });
+    launchSync('git', ['config', 'commit.gpgsign', 'false'], { cwd: testDir });
 
     git = new Git({ cwd: testDir });
   });

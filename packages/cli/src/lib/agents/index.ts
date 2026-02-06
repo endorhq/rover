@@ -28,14 +28,16 @@ export interface AIAgentTool {
   // Expand a brief task description into a full task with title and description
   expandTask(
     briefDescription: string,
-    projectPath: string
+    projectPath: string,
+    contextContent?: string
   ): Promise<IPromptTask | null>;
 
   // Expand iteration instructions based on previous work
   expandIterationInstructions(
     instructions: string,
     previousPlan?: string,
-    previousChanges?: string
+    previousChanges?: string,
+    contextContent?: string
   ): Promise<IPromptTask | null>;
 
   // Generate a git commit message based on the task and recent commits

@@ -26,6 +26,7 @@
     "boxen": "^8.0.1",
     "execa": "catalog:runtime",
     "log-update": "^7.0.1",
+    "pupa": "^3.3.0",
     "rover-schemas": "workspace:*",
     "rover-telemetry": "workspace:*",
     "yaml": "^2.8.1"
