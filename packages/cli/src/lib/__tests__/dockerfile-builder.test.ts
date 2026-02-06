@@ -163,6 +163,16 @@ describe('DockerfileBuilder', () => {
       expect(dockerfile).toContain('FROM ${BASE_IMAGE}');
     });
 
+    it('generates Dockerfile with sudoers configuration for node group', () => {
+      const config = createProjectConfig({});
+      const builder = new DockerfileBuilder(config);
+      const dockerfile = builder.generate();
+
+      // Should configure passwordless sudo for node group (uid=1000 maps to node in container)
+      expect(dockerfile).toContain('%node ALL=(ALL) NOPASSWD: ALL');
+      expect(dockerfile).toContain('/etc/sudoers.d/node-group');
+    });
+
     it('generates Dockerfile with project labels', () => {
       const config = createProjectConfig({});
       const builder = new DockerfileBuilder(config);
@@ -172,15 +182,17 @@ describe('DockerfileBuilder', () => {
       expect(dockerfile).toContain('LABEL rover.project=');
     });
 
-    it('generates empty Dockerfile for project with no packages', () => {
+    it('generates minimal Dockerfile for project with no packages', () => {
       const config = createProjectConfig({});
       const builder = new DockerfileBuilder(config);
       const dockerfile = builder.generate();
 
-      // Should not have apt-get install
+      // Should not have apt-get install (no language/package manager packages)
       expect(dockerfile).not.toContain('apt-get install');
-      // Should not have RUN commands except in labels section
+      // Should not have npm install commands (no agents or package managers)
       expect(dockerfile).not.toContain('RUN npm');
+      // Should still have the sudoers setup
+      expect(dockerfile).toContain('sudoers.d/node-group');
     });
 
     it('combines apt-get packages into single RUN command', () => {

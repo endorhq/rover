@@ -264,6 +264,10 @@ export class DockerfileBuilder {
       `ARG BASE_IMAGE=${baseImage}`,
       'FROM ${BASE_IMAGE}',
       '',
+      '# Ensure node group (gid=1000) has passwordless sudo access',
+      '# This is needed when the container runs with --user matching host uid/gid',
+      "RUN echo '%node ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers.d/node-group",
+      '',
     ];
 
     // Collect all apt-get install commands
