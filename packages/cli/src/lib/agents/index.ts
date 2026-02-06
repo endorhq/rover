@@ -94,18 +94,18 @@ export class InvokeAIAgentError extends Error {
 /**
  * Retrieve the AIAgentTool instance based on the agent name.
  */
-export const getAIAgentTool = (agent: string): AIAgentTool => {
+export const getAIAgentTool = (agent: string, model?: string): AIAgentTool => {
   switch (agent.toLowerCase()) {
     case 'claude':
-      return new ClaudeAI();
+      return new ClaudeAI(model);
     case 'codex':
-      return new CodexAI();
+      return new CodexAI(model);
     case 'cursor':
-      return new CursorAI();
+      return new CursorAI(model);
     case 'gemini':
-      return new GeminiAI();
+      return new GeminiAI(model);
     case 'qwen':
-      return new QwenAI();
+      return new QwenAI(model);
     default:
       throw new Error(`Unknown AI agent: ${agent}`);
   }
