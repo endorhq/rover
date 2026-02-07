@@ -128,6 +128,7 @@ export type {
   NetworkMode,
   NetworkRule,
   NetworkConfig,
+  GeneratedFrom,
   SandboxConfig,
   HooksConfig,
   ProjectConfig,
