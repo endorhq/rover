@@ -237,7 +237,6 @@ export interface TaskDiffFileItem {
   deletions: number;
 }
 
-
 export interface TaskDiffOutput extends CLIJsonOutput {
   taskId: number;
   title: string;
