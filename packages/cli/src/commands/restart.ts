@@ -13,7 +13,7 @@ import {
 import { TaskNotFoundError } from 'rover-schemas';
 import { exitWithError, exitWithSuccess } from '../utils/exit.js';
 import { createSandbox } from '../lib/sandbox/index.js';
-import type { CLIJsonOutput } from '../types.js';
+import type { TaskRestartOutput } from '../output-types.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import {
   isJsonMode,
@@ -23,17 +23,6 @@ import {
 import yoctoSpinner from 'yocto-spinner';
 import { copyEnvironmentFiles } from '../utils/env-files.js';
 import type { CommandDefinition } from '../types.js';
-
-/**
- * Interface for JSON output
- */
-interface TaskRestartOutput extends CLIJsonOutput {
-  taskId?: number;
-  title?: string;
-  description?: string;
-  status?: string;
-  restartedAt?: string;
-}
 
 /**
  * Restart a task that is in NEW or FAILED status.

@@ -4,9 +4,8 @@
 import colors from 'ansi-colors';
 import { initWorkflowStore } from '../../lib/workflow.js';
 import { Table, TableColumn, WorkflowSource } from 'rover-core';
-import { CLIJsonOutput } from '../../types.js';
+import type { ListWorkflowsOutput } from '../../output-types.js';
 import { exitWithError, exitWithSuccess } from '../../utils/exit.js';
-import { Workflow } from 'rover-schemas';
 import { getTelemetry } from '../../lib/telemetry.js';
 import { getProjectPath, isJsonMode, setJsonMode } from '../../lib/context.js';
 import type { CommandDefinition } from '../../types.js';
@@ -14,20 +13,6 @@ import type { CommandDefinition } from '../../types.js';
 interface ListWorkflowsCommandOptions {
   // Output format
   json: boolean;
-}
-
-/**
- * Interface for workflow data with source for JSON output
- */
-interface WorkflowWithSource extends Workflow {
-  source: WorkflowSource;
-}
-
-/**
- * Interface for JSON output
- */
-interface ListWorkflowsOutput extends CLIJsonOutput {
-  workflows: WorkflowWithSource[];
 }
 
 /**

@@ -35,7 +35,7 @@ import { generateBranchName } from '../utils/branch-name.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { NewTaskProvider } from 'rover-telemetry';
 import { readFromStdin, stdinIsAvailable } from '../utils/stdin.js';
-import type { CLIJsonOutput } from '../types.js';
+import type { TaskTaskOutput } from '../output-types.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
 import { GitHub, GitHubError } from '../lib/github.js';
 import { copyEnvironmentFiles } from '../utils/env-files.js';
@@ -183,38 +183,6 @@ const updateTaskMetadata = (
     }
   }
 };
-
-/**
- * Interface for the JSON output
- */
-interface TaskTaskOutput extends CLIJsonOutput {
-  taskId?: number;
-  title?: string;
-  description?: string;
-  status?: string;
-  createdAt?: string;
-  startedAt?: string;
-  workspace?: string;
-  branch?: string;
-  savedTo?: string;
-  context?: Array<{
-    name: string;
-    uri: string;
-    description: string;
-  }>;
-  tasks?: Array<{
-    taskId: number;
-    agent: string;
-    title: string;
-    description: string;
-    status: string;
-    createdAt: string;
-    startedAt: string;
-    workspace: string;
-    branch: string;
-    savedTo: string;
-  }>;
-}
 
 /**
  * Command options

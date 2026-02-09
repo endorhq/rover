@@ -20,103 +20,14 @@ import {
   requireProjectContext,
 } from '../lib/context.js';
 import { exitWithError, exitWithSuccess } from '../utils/exit.js';
+import type {
+  FileChangeStat,
+  RawFileOutput,
+  TaskInspectionOutput,
+} from '../output-types.js';
 import type { CommandDefinition } from '../types.js';
 
 const DEFAULT_FILE_CONTENTS = 'summary.md';
-
-/**
- * File change statistics for a single file
- */
-interface FileChangeStat {
-  /** File path relative to worktree */
-  path: string;
-  /** Number of lines added */
-  insertions: number;
-  /** Number of lines deleted */
-  deletions: number;
-}
-
-/**
- * JSON output format for task inspection containing task metadata, status, and iteration details
- */
-interface TaskInspectionOutput {
-  /** Whether the operation was successful */
-  success: boolean;
-  /** AI agent used for the task */
-  agent?: string;
-  /** The base commit hash when the worktree was created */
-  baseCommit?: string;
-  /** Git branch name for the task worktree */
-  branchName: string;
-  /** ISO timestamp when task was completed */
-  completedAt?: string;
-  /** ISO timestamp when task was created */
-  createdAt: string;
-  /** Full description of the task */
-  description: string;
-  /** Error message if task failed */
-  error?: string;
-  /** ISO timestamp when task failed */
-  failedAt?: string;
-  /** List of file changes with insertions/deletions stats */
-  fileChanges?: FileChangeStat[];
-  /** List of files in the current iteration directory */
-  files?: string[];
-  /** Human-readable status string */
-  formattedStatus: string;
-  /** Numeric task identifier */
-  id: number;
-  /** List of markdown files in the iteration directory */
-  iterationFiles?: string[];
-  /** Total number of iterations for this task */
-  iterations: number;
-  /** ISO timestamp of the most recent iteration */
-  lastIterationAt?: string;
-  /** The source branch from which this task was created */
-  sourceBranch?: string;
-  /** ISO timestamp when task execution started */
-  startedAt?: string;
-  /** Current task status */
-  status: TaskStatus;
-  /** Whether the task status has been updated */
-  statusUpdated: boolean;
-  /** Content of summary.md file if available */
-  summary?: string;
-  /** Path to task directory in .rover/tasks */
-  taskDirectory: string;
-  /** Short title of the task */
-  title: string;
-  /** Unique identifier for the task */
-  uuid: string;
-  /** Workflow name */
-  workflowName: string;
-  /** Path to the git worktree for this task */
-  worktreePath: string;
-  /** Model used by the AI agent */
-  agentModel?: string;
-  /** Combined agent:model display string */
-  agentDisplay?: string;
-  /** Task source (origin tracking - github, manual, etc.) */
-  source?: {
-    type: 'github' | 'manual';
-    id?: string;
-    url?: string;
-    title?: string;
-    ref?: Record<string, unknown>;
-  };
-}
-
-/**
- * JSON output format for raw file content
- */
-interface RawFileOutput {
-  /** Whether the files were successfully read */
-  success: boolean;
-  /** List of files */
-  files: Array<{ filename: string; content: string }>;
-  /** Error reading the file */
-  error?: string;
-}
 
 /**
  * Build the error JSON output with consistent TaskInspectionOutput shape

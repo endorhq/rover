@@ -13,7 +13,7 @@ import {
   exitWithSuccess,
   exitWithWarn,
 } from '../utils/exit.js';
-import type { CLIJsonOutputWithErrors } from '../types.js';
+import type { TaskDeleteOutput } from '../output-types.js';
 import {
   isJsonMode,
   setJsonMode,
@@ -22,11 +22,6 @@ import {
 import type { CommandDefinition } from '../types.js';
 
 const { prompt } = enquirer;
-
-/**
- * Interface for JSON output
- */
-interface TaskDeleteOutput extends CLIJsonOutputWithErrors {}
 
 /**
  * Delete one or more tasks from a Rover project.
