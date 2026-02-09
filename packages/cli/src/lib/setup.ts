@@ -195,7 +195,8 @@ export class SetupBuilder {
    */
   generateEntrypoint(
     includeTaskSetup: boolean = true,
-    entrypointFilename: string = 'entrypoint.sh'
+    entrypointFilename: string = 'entrypoint.sh',
+    useCachedImage: boolean = false
   ): string {
     let recoverPermissions = '';
 
@@ -205,92 +206,181 @@ export class SetupBuilder {
     sudo chown -R root:root /output || true\n`;
     }
 
-    // Generate installation scripts for languages, package managers, and task managers
-    const languagePackages = this.getLanguagePackages();
-    const packageManagerPackages = this.getPackageManagerPackages();
-    const taskManagerPackages = this.getTaskManagerPackages();
+    // --- apt-get update ---
+    let aptGetUpdate = '';
+    if (!useCachedImage) {
+      aptGetUpdate = `# Update package lists on Debian-based distributions
+if [[ -f /etc/debian_version ]]; then
+  sudo apt-get update
+fi`;
+    }
 
+    // --- home setup ---
+    let homeSetup = '';
+    if (useCachedImage) {
+      // Cached image already has HOME dirs; just fix ownership of bind-mounts
+      homeSetup = `sudo chown -R $(id -u):$(id -g) /workspace
+sudo chown -R $(id -u):$(id -g) /output
+
+source $HOME/.profile`;
+    } else {
+      homeSetup = `# Initially, use sudo to ensure even users without permissions can
+# create this. Once we finish the setup, we will reduce the sudo
+# permissions to the minimal.
+sudo mkdir -p $HOME
+sudo mkdir -p $HOME/.config
+sudo mkdir -p $HOME/.local/bin
+echo 'export PATH="$HOME/.local/bin:$HOME/.local/npm/bin:$PATH"' >> $HOME/.profile
+sudo chown -R $(id -u):$(id -g) $HOME
+sudo chown -R $(id -u):$(id -g) /workspace
+sudo chown -R $(id -u):$(id -g) /output
+
+source $HOME/.profile`;
+    }
+
+    // --- package installation ---
     let installAllPackages = '';
-    const allPackages = [
-      ...languagePackages,
-      ...packageManagerPackages,
-      ...taskManagerPackages,
-    ];
+    if (!useCachedImage) {
+      // Generate installation scripts for languages, package managers, and task managers
+      const languagePackages = this.getLanguagePackages();
+      const packageManagerPackages = this.getPackageManagerPackages();
+      const taskManagerPackages = this.getTaskManagerPackages();
 
-    if (allPackages.length > 0) {
-      const installScripts: string[] = [];
+      const allPackages = [
+        ...languagePackages,
+        ...packageManagerPackages,
+        ...taskManagerPackages,
+      ];
 
-      for (const pkg of allPackages) {
-        const script = pkg.installScript();
-        if (script.trim()) {
-          installScripts.push(`echo "📦 Installing ${pkg.name}..."`);
-          installScripts.push(script);
-          installScripts.push(`if [ $? -eq 0 ]; then
+      if (allPackages.length > 0) {
+        const installScripts: string[] = [];
+
+        for (const pkg of allPackages) {
+          const script = pkg.installScript();
+          if (script.trim()) {
+            installScripts.push(`echo "📦 Installing ${pkg.name}..."`);
+            installScripts.push(script);
+            installScripts.push(`if [ $? -eq 0 ]; then
   echo "✅ ${pkg.name} installed successfully"
 else
   echo "❌ Failed to install ${pkg.name}"
   safe_exit 1
 fi`);
-        }
+          }
 
-        const initScript = pkg.initScript();
-        if (initScript.trim()) {
-          installScripts.push(`echo "🔧 Initializing ${pkg.name}..."`);
-          installScripts.push(initScript);
-          installScripts.push(`if [ $? -eq 0 ]; then
+          const initScript = pkg.initScript();
+          if (initScript.trim()) {
+            installScripts.push(`echo "🔧 Initializing ${pkg.name}..."`);
+            installScripts.push(initScript);
+            installScripts.push(`if [ $? -eq 0 ]; then
   echo "✅ ${pkg.name} initialized successfully"
 else
   echo "❌ Failed to initialize ${pkg.name}"
   safe_exit 1
 fi`);
+          }
         }
-      }
 
-      if (installScripts.length > 0) {
-        installAllPackages = `
+        if (installScripts.length > 0) {
+          installAllPackages = `
 echo -e "\\n======================================="
 echo "📦 Installing Languages, Package Managers, and Task Managers"
 echo "======================================="
 ${installScripts.join('\n')}
 `;
+        }
       }
     }
 
-    // Generate MCP configuration commands from rover.json
-    const mcps = this.projectConfig.mcps;
-    let configureAllMCPCommands: string[] = [];
+    // --- agent install section ---
+    let agentInstallSection = '';
+    if (!useCachedImage) {
+      agentInstallSection = `# Agent-specific CLI installation and credential setup
+echo -e "\\n📦 Installing Agent CLI and setting up credentials"
+# Pass the environment variables to ensure it loads the right credentials
+sudo -E rover-agent install $AGENT --user-dir $HOME
+# Set the right permissions after installing and moving credentials
+sudo chown -R $(id -u):$(id -g) $HOME
 
-    if (mcps && mcps.length > 0) {
-      configureAllMCPCommands.push('echo "✅ Configuring custom MCPs"');
-      for (const mcp of mcps) {
-        const transport = mcp.transport || 'stdio';
-        let cmd = `rover-agent config mcp ${this.agent} "${mcp.name}" --transport "${mcp.transport}"`;
+if [ $? -eq 0 ]; then
+    echo "✅ $AGENT was installed successfully."
+else
+    echo "❌ $AGENT could not be installed"
+    safe_exit 1
+fi
 
-        if (mcp.envs && mcp.envs.length > 0) {
-          for (const env of mcp.envs) {
-            cmd += ` --env "${env}"`;
-          }
-        }
-
-        if (mcp.headers && mcp.headers.length > 0) {
-          for (const header of mcp.headers) {
-            cmd += ` --header "${header}"`;
-          }
-        }
-
-        cmd += ` "${mcp.commandOrUrl}"`;
-
-        configureAllMCPCommands.push(cmd);
-      }
-    } else {
-      configureAllMCPCommands.push(
-        'echo "✅ No MCPs defined in rover.json, skipping custom MCP configuration"'
-      );
+echo -e "\\n📦 Done installing agent"`;
     }
 
-    // Generate initScript execution code if initScript is provided
+    // --- MCP config section ---
+    let mcpConfigSection = '';
+    if (!useCachedImage) {
+      // Generate MCP configuration commands from rover.json
+      const mcps = this.projectConfig.mcps;
+      let configureAllMCPCommands: string[] = [];
+
+      if (mcps && mcps.length > 0) {
+        configureAllMCPCommands.push('echo "✅ Configuring custom MCPs"');
+        for (const mcp of mcps) {
+          let cmd = `rover-agent config mcp ${this.agent} "${mcp.name}" --transport "${mcp.transport}"`;
+
+          if (mcp.envs && mcp.envs.length > 0) {
+            for (const env of mcp.envs) {
+              cmd += ` --env "${env}"`;
+            }
+          }
+
+          if (mcp.headers && mcp.headers.length > 0) {
+            for (const header of mcp.headers) {
+              cmd += ` --header "${header}"`;
+            }
+          }
+
+          cmd += ` "${mcp.commandOrUrl}"`;
+
+          configureAllMCPCommands.push(cmd);
+        }
+      } else {
+        configureAllMCPCommands.push(
+          'echo "✅ No MCPs defined in rover.json, skipping custom MCP configuration"'
+        );
+      }
+
+      mcpConfigSection = `echo -e "\\n📦 Installing MCP servers"
+# Configure built-in MCPs
+rover-agent config mcp $AGENT package-manager --transport "http" http://127.0.0.1:8090/mcp
+
+# Configure MCPs from rover.json if mcps array exists
+#
+# TODO(ereslibre): replace with \`rover-agent config mcps\` that by
+# default will read /workspace/rover.json.
+configure_all_mcps() {
+  # Fail as soon as the configuration of one of the provided MCP's
+  # fail. This is because results might not be close to what the user
+  # expects without the required MCP's.
+
+  set -e
+  trap 'warn_mcp_configuration_failed; return 1' ERR
+
+  ${configureAllMCPCommands.join('\n  ')}
+
+  trap - ERR
+  set +e
+}
+
+warn_mcp_configuration_failed() {
+  echo "❌ Failed to configure MCP servers"
+  safe_exit 1
+}
+
+configure_all_mcps
+
+echo -e "\\n📦 Done installing MCP servers"`;
+    }
+
+    // --- initScript execution ---
     let initScriptExecution = '';
-    if (this.projectConfig.initScript) {
+    if (!useCachedImage && this.projectConfig.initScript) {
       initScriptExecution = `
 echo -e "\\n======================================="
 echo "🔧 Running initialization script"
@@ -306,7 +396,17 @@ fi
 `;
     }
 
-    // Generate network filtering configuration
+    // --- sudoers removal ---
+    // Only needed on the first (non-cached) run. The committed image already
+    // has this file removed, so the cached image only has the base-image
+    // sudoers profile with restricted permissions.
+    const sudoersRemoval = useCachedImage
+      ? ''
+      : `# Remove ourselves from sudoers
+echo -e "\\n👤 Removing privileges after completing the setup!"
+sudo rm /etc/sudoers.d/1-agent-setup`;
+
+    // Generate network filtering configuration (always runs — iptables are runtime state)
     const effectiveNetworkConfig = mergeNetworkConfig(
       this.projectConfig.network,
       this.task.networkConfig
@@ -369,10 +469,14 @@ echo "======================================="
     // Generate script content
     const scriptContent = pupa(entrypointScript, {
       agent: this.agent,
-      configureAllMCPCommands: configureAllMCPCommands.join('\n  '),
       recoverPermissions,
+      aptGetUpdate,
+      homeSetup,
       installAllPackages,
+      agentInstallSection,
+      mcpConfigSection,
       initScriptExecution,
+      sudoersRemoval,
       networkConfigSection,
       validateTaskFileFunction,
       validateTaskFileCall,

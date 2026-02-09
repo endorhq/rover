@@ -17,6 +17,7 @@ import {
   tmpUserGroupFiles,
   normalizeExtraArgs,
 } from './container-common.js';
+import { checkImageCache, waitForInitAndCommit } from './image-cache.js';
 import { mergeNetworkConfig } from '../network-config.js';
 import { isJsonMode } from '../context.js';
 import { isPathWithin } from '../../utils/path-utils.js';
@@ -24,6 +25,10 @@ import colors from 'ansi-colors';
 
 export class PodmanSandbox extends Sandbox {
   backend = ContainerBackend.Podman;
+
+  private cacheTag?: string;
+  private shouldCommitCache = false;
+  private initMode = false;
 
   constructor(
     task: TaskDescriptionManager,
@@ -64,13 +69,39 @@ export class PodmanSandbox extends Sandbox {
       );
     }
 
+    // Resolve the agent image from env var, stored task image, config, or default
+    const agentImage = resolveAgentImage(projectConfig, this.task.agentImage);
+
+    // Check image cache
+    const { hasCachedImage, cacheTag } = checkImageCache(
+      ContainerBackend.Podman,
+      projectConfig,
+      agentImage,
+      this.task.agent!
+    );
+
+    this.cacheTag = cacheTag;
+    this.shouldCommitCache = !hasCachedImage;
+
+    const effectiveImage = hasCachedImage ? cacheTag : agentImage;
+
+    if (hasCachedImage && !isJsonMode()) {
+      console.log(
+        colors.green('Using cached setup image ') + colors.cyan(cacheTag)
+      );
+    }
+
     // Generate setup script using SetupBuilder
     const setupBuilder = new SetupBuilder(
       this.task,
       this.task.agent!,
       projectConfig
     );
-    const entrypointScriptPath = setupBuilder.generateEntrypoint();
+    const entrypointScriptPath = setupBuilder.generateEntrypoint(
+      true,
+      'entrypoint.sh',
+      hasCachedImage
+    );
     const inputsPath = setupBuilder.generateInputs();
     const workflowPath = setupBuilder.saveWorkflow(this.task.workflowName);
 
@@ -94,14 +125,12 @@ export class PodmanSandbox extends Sandbox {
 
     const userInfo_ = userInfo();
 
-    // Resolve the agent image from env var, stored task image, config, or default
-    const agentImage = resolveAgentImage(projectConfig, this.task.agentImage);
     // Warn if using a custom agent image
     warnIfCustomImage(projectConfig);
 
     const [etcPasswd, etcGroup] = await tmpUserGroupFiles(
       ContainerBackend.Podman,
-      agentImage,
+      effectiveImage,
       userInfo_
     );
 
@@ -171,36 +200,44 @@ export class PodmanSandbox extends Sandbox {
       '/workspace',
       '--entrypoint',
       '/entrypoint.sh',
-      ...extraArgs,
-      agentImage,
-      'rover-agent',
-      'run',
-      '/workflow.yml',
-      '--agent-tool',
-      this.task.agent!,
-      '--task-id',
-      this.task.id.toString(),
-      '--status-file',
-      '/output/status.json',
-      '--output',
-      '/output',
-      '--inputs-json',
-      '/inputs.json'
+      ...extraArgs
     );
 
-    // Pass context directory argument if context was mounted
-    if (hasContext) {
-      podmanArgs.push('--context-dir', '/context');
-    }
+    if (this.initMode) {
+      // Init-only container: run setup then exit successfully
+      podmanArgs.push(effectiveImage, 'true');
+    } else {
+      podmanArgs.push(
+        effectiveImage,
+        'rover-agent',
+        'run',
+        '/workflow.yml',
+        '--agent-tool',
+        this.task.agent!,
+        '--task-id',
+        this.task.id.toString(),
+        '--status-file',
+        '/output/status.json',
+        '--output',
+        '/output',
+        '--inputs-json',
+        '/inputs.json'
+      );
 
-    // Pass model if specified
-    if (this.task.agentModel) {
-      podmanArgs.push('--agent-model', this.task.agentModel);
-    }
+      // Pass context directory argument if context was mounted
+      if (hasContext) {
+        podmanArgs.push('--context-dir', '/context');
+      }
 
-    // Forward verbose flag to rover-agent if enabled
-    if (VERBOSE) {
-      podmanArgs.push('-v');
+      // Pass model if specified
+      if (this.task.agentModel) {
+        podmanArgs.push('--agent-model', this.task.agentModel);
+      }
+
+      // Forward verbose flag to rover-agent if enabled
+      if (VERBOSE) {
+        podmanArgs.push('-v');
+      }
     }
 
     return (
@@ -217,6 +254,86 @@ export class PodmanSandbox extends Sandbox {
         ?.toString()
         .trim() || this.sandboxName
     );
+  }
+
+  /**
+   * Pre-compute image cache state so createAndStart() can decide
+   * whether to run a two-phase init before calling create().
+   */
+  private checkCacheState(): void {
+    const projectConfig = ProjectConfigManager.load(this.options?.projectPath!);
+    const agentImage = resolveAgentImage(projectConfig, this.task.agentImage);
+
+    const { hasCachedImage, cacheTag } = checkImageCache(
+      ContainerBackend.Podman,
+      projectConfig,
+      agentImage,
+      this.task.agent!
+    );
+
+    this.cacheTag = cacheTag;
+    this.shouldCommitCache = !hasCachedImage;
+  }
+
+  async createAndStart(): Promise<string> {
+    this.checkCacheState();
+
+    if (this.shouldCommitCache && this.cacheTag) {
+      // Phase 1: init-only container to build the cached image
+      this.initMode = true;
+      this.processManager?.addItem(
+        `Initialize sandbox (${this.backend}) | Name: ${this.sandboxName}`
+      );
+      try {
+        await this.create();
+        this.processManager?.completeLastItem();
+        this.processManager?.addItem(
+          `Run initialization (${this.backend}) | Name: ${this.sandboxName}`
+        );
+        await this.start();
+        const committed = await waitForInitAndCommit(
+          ContainerBackend.Podman,
+          this.sandboxName,
+          this.cacheTag
+        );
+        this.processManager?.completeLastItem();
+
+        if (!committed) {
+          this.processManager?.finish();
+          throw new Error('Init container did not exit successfully');
+        }
+      } catch (err) {
+        this.processManager?.failLastItem();
+        this.processManager?.finish();
+        throw err;
+      }
+
+      // Phase 2: create + start the real container from cached image
+      this.initMode = false;
+      this.shouldCommitCache = false;
+      this.cacheTag = undefined;
+    }
+
+    // Cache-hit path (or phase 2 after init)
+    let sandboxId = '';
+    this.processManager?.addItem(
+      `Prepare sandbox (${this.backend}) | Name: ${this.sandboxName}`
+    );
+    try {
+      sandboxId = await this.create();
+      this.processManager?.completeLastItem();
+      this.processManager?.addItem(
+        `Start sandbox (${this.backend}) | Name: ${this.sandboxName}`
+      );
+      await this.start();
+      this.processManager?.completeLastItem();
+    } catch (err) {
+      this.processManager?.failLastItem();
+      this.processManager?.finish();
+      throw err;
+    }
+    this.processManager?.finish();
+    return sandboxId;
   }
 
   async runInteractive(
@@ -244,6 +361,25 @@ export class PodmanSandbox extends Sandbox {
       );
     }
 
+    // Resolve the agent image from env var, stored task image, config, or default
+    const agentImage = resolveAgentImage(projectConfig, this.task.agentImage);
+
+    // Check image cache for interactive mode
+    const { hasCachedImage, cacheTag } = checkImageCache(
+      ContainerBackend.Podman,
+      projectConfig,
+      agentImage,
+      this.task.agent!
+    );
+
+    const effectiveImage = hasCachedImage ? cacheTag : agentImage;
+
+    if (hasCachedImage && !isJsonMode()) {
+      console.log(
+        colors.green('Using cached setup image ') + colors.cyan(cacheTag)
+      );
+    }
+
     // Generate setup script using SetupBuilder
     const setupBuilder = new SetupBuilder(
       this.task,
@@ -252,7 +388,8 @@ export class PodmanSandbox extends Sandbox {
     );
     const entrypointScriptPath = setupBuilder.generateEntrypoint(
       false,
-      'entrypoint-iterate.sh'
+      'entrypoint-iterate.sh',
+      hasCachedImage
     );
     // Get agent-specific container mounts and environment variables
     const agent = getAIAgentTool(this.task.agent!);
@@ -267,14 +404,12 @@ export class PodmanSandbox extends Sandbox {
 
     const userInfo_ = userInfo();
 
-    // Resolve the agent image from env var, stored task image, config, or default
-    const agentImage = resolveAgentImage(projectConfig, this.task.agentImage);
     // Warn if using a custom agent image
     warnIfCustomImage(projectConfig);
 
     const [etcPasswd, etcGroup] = await tmpUserGroupFiles(
       ContainerBackend.Podman,
-      agentImage,
+      effectiveImage,
       userInfo_
     );
 
@@ -325,7 +460,7 @@ export class PodmanSandbox extends Sandbox {
       '--entrypoint',
       '/entrypoint.sh',
       ...extraArgs,
-      agentImage,
+      effectiveImage,
       'rover-agent',
       'session',
       this.task.agent!
