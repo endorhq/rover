@@ -311,7 +311,9 @@ export class DockerSandbox extends Sandbox {
         const committed = await waitForInitAndCommit(
           ContainerBackend.Docker,
           this.sandboxName,
-          this.cacheTag
+          this.cacheTag,
+          this.options?.projectPath!,
+          this.options?.sandboxMetadata
         );
         this.processManager?.completeLastItem();
 

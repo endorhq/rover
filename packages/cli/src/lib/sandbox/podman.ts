@@ -294,7 +294,9 @@ export class PodmanSandbox extends Sandbox {
         const committed = await waitForInitAndCommit(
           ContainerBackend.Podman,
           this.sandboxName,
-          this.cacheTag
+          this.cacheTag,
+          this.options?.projectPath!,
+          this.options?.sandboxMetadata
         );
         this.processManager?.completeLastItem();
 

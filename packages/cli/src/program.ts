@@ -8,6 +8,7 @@ import {
 } from 'rover-core';
 import { NETWORK_MODE_VALUES } from 'rover-schemas';
 import initCmd from './commands/init.js';
+import cleanupCmd from './commands/cleanup.js';
 import infoCmd from './commands/info.js';
 import listCmd from './commands/list.js';
 import { exitWithError } from './utils/exit.js';
@@ -44,6 +45,7 @@ import type { CommandDefinition } from './types.js';
 // Registry of all commands for metadata lookup
 const commands: CommandDefinition[] = [
   initCmd,
+  cleanupCmd,
   infoCmd,
   listCmd,
   taskCmd,
@@ -472,6 +474,13 @@ export function createProgram(
     .description('Show information about the Rover global store')
     .option('--json', 'Output in JSON format')
     .action(infoCmd.action);
+
+  program
+    .command('cleanup')
+    .description('Remove stale container cache images')
+    .option('--json', 'Output in JSON format')
+    .option('--dry-run', 'Preview what would be removed without deleting')
+    .action(cleanupCmd.action);
 
   return program;
 }
