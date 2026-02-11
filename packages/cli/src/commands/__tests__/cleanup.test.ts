@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { afterEach, describe, it, expect, beforeEach, vi } from 'vitest';
 import { cleanupCommand } from '../cleanup.js';
 import type { CacheImageInfo } from '../../lib/sandbox/container-image-cache.js';
 
