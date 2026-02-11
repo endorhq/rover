@@ -17,7 +17,10 @@ import {
   tmpUserGroupFiles,
   normalizeExtraArgs,
 } from './container-common.js';
-import { checkImageCache, waitForInitAndCommit } from './image-cache.js';
+import {
+  checkImageCache,
+  waitForInitAndCommit,
+} from './container-image-cache.js';
 import { mergeNetworkConfig } from '../network-config.js';
 import { isJsonMode } from '../context.js';
 import { isPathWithin } from '../../utils/path-utils.js';

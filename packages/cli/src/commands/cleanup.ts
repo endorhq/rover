@@ -1,6 +1,6 @@
 import colors from 'ansi-colors';
 import { existsSync } from 'node:fs';
-import { ProjectStore, showProperties, showTitle } from 'rover-core';
+import { ProjectStore, showList, showProperties, showTitle } from 'rover-core';
 import { isJsonMode } from '../lib/context.js';
 import { getAvailableSandboxBackend } from '../lib/sandbox/index.js';
 import { ContainerBackend } from '../lib/sandbox/container-common.js';
@@ -8,7 +8,7 @@ import {
   listCacheImages,
   removeCacheImage,
   type CacheImageInfo,
-} from '../lib/sandbox/image-cache.js';
+} from '../lib/sandbox/container-image-cache.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import type {
   CleanupCommandOutput,
@@ -82,6 +82,31 @@ function classifyImages(
   return result;
 }
 
+function formatImageItem(
+  img: CleanupOutputImage,
+  options: { all?: boolean }
+): string {
+  const tag = colors.cyan(img.tag);
+  const project = img.projectPath
+    ? colors.gray(img.projectPath)
+    : colors.gray('—');
+
+  if (img.kept) {
+    return `${tag} ${project}`;
+  }
+
+  let reason: string;
+  if (options.all) {
+    reason = 'all';
+  } else if (img.projectPath === null) {
+    reason = 'unlabeled';
+  } else {
+    reason = 'stale';
+  }
+
+  return `${tag} ${colors.gray(`(${reason})`)} ${project}`;
+}
+
 /**
  * Collect every unique DOCKER_HOST value stored in task sandboxMetadata
  * across all registered projects.  The returned set uses `undefined` to
@@ -91,6 +116,12 @@ function collectDockerHosts(store: ProjectStore): Set<string | undefined> {
   const hosts = new Set<string | undefined>();
   // Always include the default host (current DOCKER_HOST or daemon default)
   hosts.add(undefined);
+  // Also include the explicit DOCKER_HOST value so cleanup reaches that
+  // daemon even when no task metadata references it (e.g. tasks were created
+  // without DOCKER_HOST set, but images live on the host the env now points to).
+  if (process.env.DOCKER_HOST) {
+    hosts.add(process.env.DOCKER_HOST);
+  }
 
   for (const project of store.list()) {
     try {
@@ -111,7 +142,7 @@ function collectDockerHosts(store: ProjectStore): Set<string | undefined> {
 }
 
 const cleanupCommand = async (
-  options: { json?: boolean; dryRun?: boolean } = {}
+  options: { json?: boolean; dryRun?: boolean; all?: boolean } = {}
 ) => {
   const jsonOutput: CleanupCommandOutput = {
     success: true,
@@ -175,7 +206,15 @@ const cleanupCommand = async (
     }
 
     // 4. Classify images
-    const classified = classifyImages(allImages, registeredPaths);
+    const classified = options.all
+      ? allImages.map(img => ({
+          tag: img.tag,
+          imageId: img.id,
+          projectPath: img.projectPath,
+          createdAt: img.createdAt,
+          kept: false,
+        }))
+      : classifyImages(allImages, registeredPaths);
     jsonOutput.images = classified;
     jsonOutput.keptCount = classified.filter(i => i.kept).length;
 
@@ -201,22 +240,24 @@ const cleanupCommand = async (
           'Images to keep': jsonOutput.keptCount.toString(),
         });
 
-        console.log('');
-        for (const img of toRemove) {
-          const reason = img.projectPath === null ? 'unlabeled' : 'stale';
-          console.log(
-            `  ${colors.red('remove')} ${colors.cyan(img.tag)} ${colors.gray(`(${reason})`)}`
+        const toKeep = classified.filter(i => i.kept);
+
+        if (toRemove.length > 0) {
+          showList(
+            toRemove.map(img => formatImageItem(img, options)),
+            {
+              title: 'Images to remove',
+            }
           );
         }
 
-        const kept = classified.filter(i => i.kept);
-        if (kept.length > 0) {
-          console.log('');
-          for (const img of kept) {
-            console.log(
-              `  ${colors.green('keep  ')} ${colors.cyan(img.tag)} ${colors.gray(`(${img.projectPath})`)}`
-            );
-          }
+        if (toKeep.length > 0) {
+          showList(
+            toKeep.map(img => formatImageItem(img, options)),
+            {
+              title: 'Images to keep',
+            }
+          );
         }
       }
 
@@ -226,24 +267,44 @@ const cleanupCommand = async (
     }
 
     // Actual removal — use the right sandboxMetadata per image
-    let removedCount = 0;
+    const removedImages: CleanupOutputImage[] = [];
     for (const img of toRemove) {
       const metadata = imageMetadataMap.get(img.imageId);
       const removed = await removeCacheImage(backend, img.imageId, metadata);
       if (removed) {
-        removedCount++;
+        removedImages.push(img);
       }
     }
 
-    jsonOutput.removedCount = removedCount;
+    jsonOutput.removedCount = removedImages.length;
 
     if (!isJsonMode()) {
       showTitle('Cleanup Results');
 
       showProperties({
-        'Images removed': removedCount.toString(),
+        'Images removed': removedImages.length.toString(),
         'Images kept': jsonOutput.keptCount.toString(),
       });
+
+      const toKeep = classified.filter(i => i.kept);
+
+      if (removedImages.length > 0) {
+        showList(
+          removedImages.map(img => formatImageItem(img, options)),
+          {
+            title: 'Removed',
+          }
+        );
+      }
+
+      if (toKeep.length > 0) {
+        showList(
+          toKeep.map(img => formatImageItem(img, options)),
+          {
+            title: 'Kept',
+          }
+        );
+      }
     }
 
     await exitWithSuccess(null, jsonOutput, { telemetry });

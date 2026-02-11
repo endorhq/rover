@@ -299,7 +299,7 @@ export async function removeCacheImage(
   const env = envFromSandboxMetadata(sandboxMetadata);
   const opts = env ? { env } : undefined;
   try {
-    await launch(backend, ['rmi', imageId], opts);
+    await launch(backend, ['rmi', '--force', imageId], opts);
     return true;
   } catch {
     return false;

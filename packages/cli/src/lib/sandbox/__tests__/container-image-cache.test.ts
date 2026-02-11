@@ -8,7 +8,7 @@ import {
   removeCacheImage,
   waitForInitAndCommit,
   type SetupHashInputs,
-} from '../image-cache.js';
+} from '../container-image-cache.js';
 import { ContainerBackend } from '../container-common.js';
 
 vi.mock('rover-core', async () => {
@@ -496,7 +496,7 @@ describe('removeCacheImage', () => {
     expect(result).toBe(true);
     expect(mockedLaunch).toHaveBeenCalledWith(
       ContainerBackend.Docker,
-      ['rmi', 'sha256:abc'],
+      ['rmi', '--force', 'sha256:abc'],
       undefined
     );
   });

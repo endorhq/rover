@@ -480,6 +480,7 @@ export function createProgram(
     .description('Remove stale container cache images')
     .option('--json', 'Output in JSON format')
     .option('--dry-run', 'Preview what would be removed without deleting')
+    .option('-a, --all', 'Remove all cache images, including current ones')
     .action(cleanupCmd.action);
 
   return program;

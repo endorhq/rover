@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { cleanupCommand } from '../cleanup.js';
-import type { CacheImageInfo } from '../../lib/sandbox/image-cache.js';
+import type { CacheImageInfo } from '../../lib/sandbox/container-image-cache.js';
 
 // Mock sandbox backend detection
 const mockGetAvailableSandboxBackend = vi.fn();
@@ -9,10 +9,10 @@ vi.mock('../../lib/sandbox/index.js', () => ({
     mockGetAvailableSandboxBackend(...args),
 }));
 
-// Mock image-cache functions
+// Mock container-image-cache functions
 const mockListCacheImages = vi.fn();
 const mockRemoveCacheImage = vi.fn();
-vi.mock('../../lib/sandbox/image-cache.js', () => ({
+vi.mock('../../lib/sandbox/container-image-cache.js', () => ({
   listCacheImages: (...args: any[]) => mockListCacheImages(...args),
   removeCacheImage: (...args: any[]) => mockRemoveCacheImage(...args),
 }));
@@ -63,12 +63,23 @@ vi.mock('node:fs', async () => {
 });
 
 describe('cleanup command', () => {
+  let savedDockerHost: string | undefined;
+
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetAvailableSandboxBackend.mockResolvedValue('docker');
     mockListCacheImages.mockResolvedValue([]);
     mockRemoveCacheImage.mockResolvedValue(true);
     mockExistsSync.mockReturnValue(true);
+    // Isolate tests from the host environment
+    savedDockerHost = process.env.DOCKER_HOST;
+    delete process.env.DOCKER_HOST;
+  });
+
+  afterEach(() => {
+    if (savedDockerHost !== undefined) {
+      process.env.DOCKER_HOST = savedDockerHost;
+    }
   });
 
   it('exits with error when no backend is available', async () => {
@@ -343,6 +354,44 @@ describe('cleanup command', () => {
       'docker',
       'sha256:local',
       undefined
+    );
+  });
+
+  it('scans the current DOCKER_HOST when set in the environment', async () => {
+    const { ProjectStore } = await import('rover-core');
+    vi.mocked(ProjectStore).mockImplementation(
+      () =>
+        ({
+          list: vi.fn().mockReturnValue([]),
+          get: vi.fn().mockReturnValue(null),
+        }) as any
+    );
+
+    process.env.DOCKER_HOST = 'unix:///var/run/docker.sock';
+
+    // Default (undefined) returns nothing, explicit DOCKER_HOST returns one image
+    mockListCacheImages.mockResolvedValueOnce([]).mockResolvedValueOnce([
+      {
+        id: 'sha256:env-host',
+        tag: 'rover-cache:envhost1',
+        createdAt: '2025-01-01T00:00:00Z',
+        projectPath: null,
+      },
+    ]);
+
+    await cleanupCommand();
+
+    expect(mockListCacheImages).toHaveBeenCalledTimes(2);
+    expect(mockListCacheImages).toHaveBeenCalledWith('docker', undefined);
+    expect(mockListCacheImages).toHaveBeenCalledWith('docker', {
+      dockerHost: 'unix:///var/run/docker.sock',
+    });
+
+    expect(mockRemoveCacheImage).toHaveBeenCalledTimes(1);
+    expect(mockRemoveCacheImage).toHaveBeenCalledWith(
+      'docker',
+      'sha256:env-host',
+      { dockerHost: 'unix:///var/run/docker.sock' }
     );
   });
 
