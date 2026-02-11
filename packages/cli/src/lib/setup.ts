@@ -206,54 +206,66 @@ export class SetupBuilder {
     }
 
     // Generate installation scripts for languages, package managers, and task managers
-    const languagePackages = this.getLanguagePackages();
-    const packageManagerPackages = this.getPackageManagerPackages();
-    const taskManagerPackages = this.getTaskManagerPackages();
+    // Skip if skipPackageInstall is set (e.g., by rover image build)
+    const skipInstall = this.projectConfig.skipPackageInstall;
 
     let installAllPackages = '';
-    const allPackages = [
-      ...languagePackages,
-      ...packageManagerPackages,
-      ...taskManagerPackages,
-    ];
 
-    if (allPackages.length > 0) {
-      const installScripts: string[] = [];
+    if (!skipInstall) {
+      const languagePackages = this.getLanguagePackages();
+      const packageManagerPackages = this.getPackageManagerPackages();
+      const taskManagerPackages = this.getTaskManagerPackages();
 
-      for (const pkg of allPackages) {
-        const script = pkg.installScript();
-        if (script.trim()) {
-          installScripts.push(`echo "📦 Installing ${pkg.name}..."`);
-          installScripts.push(script);
-          installScripts.push(`if [ $? -eq 0 ]; then
+      const allPackages = [
+        ...languagePackages,
+        ...packageManagerPackages,
+        ...taskManagerPackages,
+      ];
+
+      if (allPackages.length > 0) {
+        const installScripts: string[] = [];
+
+        for (const pkg of allPackages) {
+          const script = pkg.installScript();
+          if (script.trim()) {
+            installScripts.push(`echo "📦 Installing ${pkg.name}..."`);
+            installScripts.push(script);
+            installScripts.push(`if [ $? -eq 0 ]; then
   echo "✅ ${pkg.name} installed successfully"
 else
   echo "❌ Failed to install ${pkg.name}"
   safe_exit 1
 fi`);
-        }
+          }
 
-        const initScript = pkg.initScript();
-        if (initScript.trim()) {
-          installScripts.push(`echo "🔧 Initializing ${pkg.name}..."`);
-          installScripts.push(initScript);
-          installScripts.push(`if [ $? -eq 0 ]; then
+          const initScript = pkg.initScript();
+          if (initScript.trim()) {
+            installScripts.push(`echo "🔧 Initializing ${pkg.name}..."`);
+            installScripts.push(initScript);
+            installScripts.push(`if [ $? -eq 0 ]; then
   echo "✅ ${pkg.name} initialized successfully"
 else
   echo "❌ Failed to initialize ${pkg.name}"
   safe_exit 1
 fi`);
+          }
         }
-      }
 
-      if (installScripts.length > 0) {
-        installAllPackages = `
+        if (installScripts.length > 0) {
+          installAllPackages = `
 echo -e "\\n======================================="
 echo "📦 Installing Languages, Package Managers, and Task Managers"
 echo "======================================="
 ${installScripts.join('\n')}
 `;
+        }
       }
+    } else {
+      installAllPackages = `
+echo -e "\\n======================================="
+echo "📦 Using pre-built custom image - skipping package installation"
+echo "======================================="
+`;
     }
 
     // Generate MCP configuration commands from rover.json
