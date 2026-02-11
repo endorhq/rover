@@ -651,21 +651,23 @@ export class TaskDescriptionManager {
   }
 
   /**
-   * Get path to this task's logs directory: {projectDir}/logs/{taskId}
+   * Get path to this task's logs directory:
+   *   {projectDir}/logs/tasks/{taskId}
    *
    * basePath is {projectDir}/tasks/{taskId}, so we go up to {projectDir}
-   * and then into logs/{taskId}.
+   * and then into logs/tasks/{taskId}.
    */
   logsPath(): string {
     const projectDir = dirname(dirname(this.basePath));
-    return join(projectDir, 'logs', this.data.id.toString());
+    return join(projectDir, 'logs', 'tasks', this.data.id.toString());
   }
 
   /**
-   * Get path to the current iteration's logs directory: {projectDir}/logs/{taskId}/{iteration}
+   * Get path to the current iteration's logs directory:
+   *   {projectDir}/logs/tasks/{taskId}/iterations/{iteration}
    */
   getIterationLogsPath(): string {
-    return join(this.logsPath(), this.data.iterations.toString());
+    return join(this.logsPath(), 'iterations', this.data.iterations.toString());
   }
 
   // ============================================================

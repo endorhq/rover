@@ -191,6 +191,10 @@ export const runCommand = async (
   let statusManager: IterationStatusManager | undefined;
   let totalDuration = 0;
 
+  // Determine the logs directory. Prefer /logs (bind-mounted by the sandbox
+  // to the project-level logs directory), fall back to the output directory.
+  const logsDir = existsSync('/logs') ? '/logs' : options.output;
+
   try {
     // Validate status tracking options
     if (options.statusFile && !options.taskId) {
@@ -228,10 +232,6 @@ export const runCommand = async (
         return;
       }
     }
-
-    // Determine the logs directory. Prefer /logs (bind-mounted by the sandbox
-    // to the project-level logs directory), fall back to the output directory.
-    const logsDir = existsSync('/logs') ? '/logs' : options.output;
 
     // Load the agent workflow
     const workflowManager = WorkflowManager.load(workflowPath);
