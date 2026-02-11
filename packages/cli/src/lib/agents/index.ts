@@ -68,6 +68,10 @@ export interface AIAgentTool {
 
   // Get Container environment variables for this tool
   getEnvironmentVariables(): string[];
+
+  // Get paths inside the container where this agent writes JSONL logs.
+  // Returns an empty array if the agent does not produce JSONL logs.
+  getContainerLogPaths(): string[];
 }
 
 export class MissingAIAgentError extends Error {

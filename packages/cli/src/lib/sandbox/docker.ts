@@ -8,7 +8,7 @@ import {
 import { Sandbox, SandboxOptions } from './types.js';
 import { SetupBuilder } from '../setup.js';
 import { generateRandomId, launch, ProcessManager, VERBOSE } from 'rover-core';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import { userInfo } from 'node:os';
 import {
   ContainerBackend,
@@ -175,7 +175,15 @@ export class DockerSandbox extends Sandbox {
       '-v',
       `${worktreePath}:/workspace:Z,rw`,
       '-v',
-      `${iteration.iterationPath}:/output:Z,rw`,
+      `${iteration.iterationPath}:/output:Z,rw`
+    );
+
+    // Mount project-level logs directory
+    const iterationLogsPath = this.task.getIterationLogsPath();
+    mkdirSync(iterationLogsPath, { recursive: true });
+    dockerArgs.push('-v', `${iterationLogsPath}:/logs:Z,rw`);
+
+    dockerArgs.push(
       ...dockerMounts,
       '-v',
       `${entrypointScriptPath}:/entrypoint.sh:Z,ro`,
@@ -541,6 +549,17 @@ export class DockerSandbox extends Sandbox {
       return { ...process.env, DOCKER_HOST: dockerHost };
     }
     return process.env;
+  }
+
+  protected async copyFromContainer(
+    containerPath: string,
+    hostPath: string
+  ): Promise<void> {
+    await launch(
+      'docker',
+      ['cp', `${this.sandboxName}:${containerPath}`, hostPath],
+      { env: this.getDockerEnv() }
+    );
   }
 
   protected async remove(): Promise<string> {

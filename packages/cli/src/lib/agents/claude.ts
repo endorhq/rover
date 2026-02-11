@@ -304,6 +304,10 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
 
     return envVars;
   }
+
+  getContainerLogPaths(): string[] {
+    return [];
+  }
 }
 
 export default ClaudeAI;

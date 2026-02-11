@@ -1,6 +1,7 @@
 import colors from 'ansi-colors';
 import { rmSync } from 'node:fs';
 import { createSandbox } from '../lib/sandbox/index.js';
+import { getAIAgentTool } from '../lib/agents/index.js';
 import { TaskNotFoundError } from 'rover-schemas';
 import { launch, ProcessManager } from 'rover-core';
 import { exitWithError, exitWithSuccess } from '../utils/exit.js';
@@ -87,7 +88,13 @@ const stopCommand = async (
       const sandbox = await createSandbox(task, processManager, {
         sandboxMetadata: task.sandboxMetadata,
       });
-      await sandbox.stopAndRemove();
+
+      // Collect agent logs before removing the container
+      const agentLogPaths = task.agent
+        ? getAIAgentTool(task.agent).getContainerLogPaths()
+        : [];
+
+      await sandbox.stopAndRemove(agentLogPaths, task.getIterationLogsPath());
     }
 
     processManager?.completeLastItem();

@@ -8,7 +8,7 @@ import {
 import { Sandbox, SandboxOptions } from './types.js';
 import { SetupBuilder } from '../setup.js';
 import { generateRandomId, launch, ProcessManager, VERBOSE } from 'rover-core';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import { userInfo } from 'node:os';
 import {
   ContainerBackend,
@@ -156,7 +156,15 @@ export class PodmanSandbox extends Sandbox {
       '-v',
       `${worktreePath}:/workspace:Z,rw`,
       '-v',
-      `${iteration.iterationPath}:/output:Z,rw`,
+      `${iteration.iterationPath}:/output:Z,rw`
+    );
+
+    // Mount project-level logs directory
+    const iterationLogsPath = this.task.getIterationLogsPath();
+    mkdirSync(iterationLogsPath, { recursive: true });
+    podmanArgs.push('-v', `${iterationLogsPath}:/logs:Z,rw`);
+
+    podmanArgs.push(
       ...containerMounts,
       '-v',
       `${entrypointScriptPath}:/entrypoint.sh:Z,ro`,
@@ -497,6 +505,17 @@ export class PodmanSandbox extends Sandbox {
       reject: false,
       detached: false,
     });
+  }
+
+  protected async copyFromContainer(
+    containerPath: string,
+    hostPath: string
+  ): Promise<void> {
+    await launch(
+      'podman',
+      ['cp', `${this.sandboxName}:${containerPath}`, hostPath],
+      { stdio: 'pipe' }
+    );
   }
 
   protected async remove(): Promise<string> {
