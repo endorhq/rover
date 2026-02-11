@@ -191,7 +191,7 @@ const restartCommand = async (
     // Track restart event
     telemetry?.eventRestartTask();
 
-    // Check if user provided a custom agent image via environment variable
+    // Override agent image from environment variable if set
     if (process.env.ROVER_AGENT_IMAGE) {
       task.setAgentImage(process.env.ROVER_AGENT_IMAGE);
     }
