@@ -21,8 +21,8 @@ import type { CommandDefinition } from '../types.js';
  * Determine which cache images to keep and which to remove.
  *
  * Strategy:
- * - Group labeled images by project path
- * - Keep only the most recent image per project
+ * - Group labeled images by (project path, agent)
+ * - Keep only the most recent image per (project, agent) pair
  * - Remove images whose project path no longer exists on disk
  *   or isn't registered in the project store
  * - Remove all unlabeled images (legacy caches)
@@ -31,20 +31,22 @@ function classifyImages(
   images: CacheImageInfo[],
   registeredPaths: Set<string>
 ): CleanupOutputImage[] {
-  // Group by project path (null = unlabeled)
-  const byProject = new Map<string | null, CacheImageInfo[]>();
+  // Group by (project path, agent) — null projectPath = unlabeled
+  const byProjectAgent = new Map<string, CacheImageInfo[]>();
 
   for (const img of images) {
-    const key = img.projectPath;
-    if (!byProject.has(key)) {
-      byProject.set(key, []);
+    const key = `${img.projectPath ?? ''}\0${img.agent ?? ''}`;
+    if (!byProjectAgent.has(key)) {
+      byProjectAgent.set(key, []);
     }
-    byProject.get(key)!.push(img);
+    byProjectAgent.get(key)!.push(img);
   }
 
   const result: CleanupOutputImage[] = [];
 
-  for (const [projectPath, group] of byProject) {
+  for (const [, group] of byProjectAgent) {
+    const projectPath = group[0].projectPath;
+
     // Sort newest first by createdAt string (ISO-like or docker's format)
     group.sort(
       (a, b) =>
@@ -65,7 +67,7 @@ function classifyImages(
         // Project no longer exists on disk or isn't registered
         kept = false;
       } else {
-        // Keep the most recent, remove the rest
+        // Keep the most recent per (project, agent), remove the rest
         kept = i === 0;
       }
 
@@ -73,6 +75,7 @@ function classifyImages(
         tag: img.tag,
         imageId: img.id,
         projectPath: img.projectPath,
+        agent: img.agent,
         createdAt: img.createdAt,
         kept,
       });
@@ -211,6 +214,7 @@ const cleanupCommand = async (
           tag: img.tag,
           imageId: img.id,
           projectPath: img.projectPath,
+          agent: img.agent,
           createdAt: img.createdAt,
           kept: false,
         }))

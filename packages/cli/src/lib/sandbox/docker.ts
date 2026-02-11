@@ -316,6 +316,7 @@ export class DockerSandbox extends Sandbox {
           this.sandboxName,
           this.cacheTag,
           this.options?.projectPath!,
+          this.task.agent,
           this.options?.sandboxMetadata
         );
         this.processManager?.completeLastItem();

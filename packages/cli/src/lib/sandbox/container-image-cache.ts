@@ -113,6 +113,7 @@ export async function waitForInitAndCommit(
   containerName: string,
   cacheTag: string,
   projectPath?: string,
+  agent?: string,
   sandboxMetadata?: Record<string, unknown>
 ): Promise<boolean> {
   const env = envFromSandboxMetadata(sandboxMetadata);
@@ -126,6 +127,9 @@ export async function waitForInitAndCommit(
       const commitArgs = ['commit'];
       if (projectPath) {
         commitArgs.push('--change', `LABEL rover.project.path=${projectPath}`);
+      }
+      if (agent) {
+        commitArgs.push('--change', `LABEL rover.agent=${agent}`);
       }
       commitArgs.push(containerName, cacheTag);
       await launch(backend, commitArgs, opts);
@@ -193,6 +197,7 @@ export interface CacheImageInfo {
   tag: string;
   createdAt: string;
   projectPath: string | null;
+  agent: string | null;
 }
 
 /**
@@ -253,6 +258,7 @@ export async function listCacheImages(
         tag,
         createdAt: entry.CreatedAt || entry.CreatedSince || '',
         projectPath: labels['rover.project.path'] || null,
+        agent: labels['rover.agent'] || null,
       });
     }
 

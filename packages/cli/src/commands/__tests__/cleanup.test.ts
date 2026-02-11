@@ -120,6 +120,7 @@ describe('cleanup command', () => {
         tag: 'rover-cache:abc123',
         createdAt: '2025-01-01T00:00:00Z',
         projectPath: null,
+        agent: null,
       },
     ];
 
@@ -160,12 +161,14 @@ describe('cleanup command', () => {
         tag: 'rover-cache:newer',
         createdAt: '2025-02-01T00:00:00Z',
         projectPath: '/home/user/project-a',
+        agent: 'claude',
       },
       {
         id: 'sha256:old',
         tag: 'rover-cache:older',
         createdAt: '2025-01-01T00:00:00Z',
         projectPath: '/home/user/project-a',
+        agent: 'claude',
       },
     ];
 
@@ -189,6 +192,103 @@ describe('cleanup command', () => {
     );
   });
 
+  it('keeps the latest image per agent for the same project', async () => {
+    const { ProjectStore } = await import('rover-core');
+    vi.mocked(ProjectStore).mockImplementation(
+      () =>
+        ({
+          list: vi.fn().mockReturnValue([{ path: '/home/user/project-a' }]),
+          get: vi.fn().mockReturnValue(null),
+        }) as any
+    );
+
+    const images: CacheImageInfo[] = [
+      {
+        id: 'sha256:claude-img',
+        tag: 'rover-cache:claude1',
+        createdAt: '2025-01-01T00:00:00Z',
+        projectPath: '/home/user/project-a',
+        agent: 'claude',
+      },
+      {
+        id: 'sha256:codex-img',
+        tag: 'rover-cache:codex1',
+        createdAt: '2025-01-02T00:00:00Z',
+        projectPath: '/home/user/project-a',
+        agent: 'codex',
+      },
+    ];
+
+    mockListCacheImages.mockResolvedValue(images);
+
+    await cleanupCommand();
+
+    // Both images should be kept — one per agent
+    expect(mockRemoveCacheImage).not.toHaveBeenCalled();
+    expect(mockExitWithSuccess).toHaveBeenCalledWith(
+      null,
+      expect.objectContaining({
+        keptCount: 2,
+      }),
+      expect.anything()
+    );
+  });
+
+  it('removes older images per agent while keeping latest for each', async () => {
+    const { ProjectStore } = await import('rover-core');
+    vi.mocked(ProjectStore).mockImplementation(
+      () =>
+        ({
+          list: vi.fn().mockReturnValue([{ path: '/home/user/project-a' }]),
+          get: vi.fn().mockReturnValue(null),
+        }) as any
+    );
+
+    const images: CacheImageInfo[] = [
+      {
+        id: 'sha256:claude-new',
+        tag: 'rover-cache:claude-new',
+        createdAt: '2025-02-01T00:00:00Z',
+        projectPath: '/home/user/project-a',
+        agent: 'claude',
+      },
+      {
+        id: 'sha256:claude-old',
+        tag: 'rover-cache:claude-old',
+        createdAt: '2025-01-01T00:00:00Z',
+        projectPath: '/home/user/project-a',
+        agent: 'claude',
+      },
+      {
+        id: 'sha256:codex-img',
+        tag: 'rover-cache:codex1',
+        createdAt: '2025-01-15T00:00:00Z',
+        projectPath: '/home/user/project-a',
+        agent: 'codex',
+      },
+    ];
+
+    mockListCacheImages.mockResolvedValue(images);
+
+    await cleanupCommand();
+
+    // Only the older claude image should be removed
+    expect(mockRemoveCacheImage).toHaveBeenCalledTimes(1);
+    expect(mockRemoveCacheImage).toHaveBeenCalledWith(
+      'docker',
+      'sha256:claude-old',
+      undefined
+    );
+    expect(mockExitWithSuccess).toHaveBeenCalledWith(
+      null,
+      expect.objectContaining({
+        removedCount: 1,
+        keptCount: 2,
+      }),
+      expect.anything()
+    );
+  });
+
   it('removes images whose project path no longer exists', async () => {
     mockExistsSync.mockReturnValue(false);
 
@@ -198,6 +298,7 @@ describe('cleanup command', () => {
         tag: 'rover-cache:orphaned',
         createdAt: '2025-01-01T00:00:00Z',
         projectPath: '/home/user/deleted-project',
+        agent: 'claude',
       },
     ];
 
@@ -223,6 +324,7 @@ describe('cleanup command', () => {
         tag: 'rover-cache:unregistered',
         createdAt: '2025-01-01T00:00:00Z',
         projectPath: '/home/user/unregistered-project',
+        agent: 'claude',
       },
     ];
 
@@ -240,6 +342,7 @@ describe('cleanup command', () => {
         tag: 'rover-cache:abc123',
         createdAt: '2025-01-01T00:00:00Z',
         projectPath: null,
+        agent: null,
       },
     ];
 
@@ -274,6 +377,7 @@ describe('cleanup command', () => {
         tag: 'rover-cache:current1',
         createdAt: '2025-01-01T00:00:00Z',
         projectPath: '/home/user/project-a',
+        agent: 'claude',
       },
     ];
 
@@ -328,6 +432,7 @@ describe('cleanup command', () => {
           tag: 'rover-cache:local1',
           createdAt: '2025-01-01T00:00:00Z',
           projectPath: '/home/user/project-a',
+          agent: 'claude',
         },
       ])
       .mockResolvedValueOnce([
@@ -336,6 +441,7 @@ describe('cleanup command', () => {
           tag: 'rover-cache:remote1',
           createdAt: '2025-01-02T00:00:00Z',
           projectPath: '/home/user/project-a',
+          agent: 'claude',
         },
       ]);
 
@@ -376,6 +482,7 @@ describe('cleanup command', () => {
         tag: 'rover-cache:envhost1',
         createdAt: '2025-01-01T00:00:00Z',
         projectPath: null,
+        agent: null,
       },
     ]);
 
@@ -421,6 +528,7 @@ describe('cleanup command', () => {
         tag: 'rover-cache:legacy1',
         createdAt: '2025-01-01T00:00:00Z',
         projectPath: null,
+        agent: null,
       },
     ]);
 

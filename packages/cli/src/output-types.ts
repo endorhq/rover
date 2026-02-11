@@ -235,6 +235,7 @@ export interface CleanupOutputImage {
   tag: string;
   imageId: string;
   projectPath: string | null;
+  agent: string | null;
   createdAt: string;
   kept: boolean;
 }

@@ -267,6 +267,38 @@ describe('waitForInitAndCommit', () => {
     );
   });
 
+  it('includes agent LABEL when agent is provided', async () => {
+    mockedLaunch.mockResolvedValueOnce({
+      stdout: '0\n',
+    } as any);
+    mockedLaunch.mockResolvedValueOnce({} as any); // commit
+    mockedLaunch.mockResolvedValueOnce({} as any); // rm -f
+
+    const result = await waitForInitAndCommit(
+      ContainerBackend.Docker,
+      'test-container',
+      'rover-cache:abc123',
+      '/home/user/my-project',
+      'claude'
+    );
+
+    expect(result).toBe(true);
+    expect(mockedLaunch).toHaveBeenNthCalledWith(
+      2,
+      ContainerBackend.Docker,
+      [
+        'commit',
+        '--change',
+        'LABEL rover.project.path=/home/user/my-project',
+        '--change',
+        'LABEL rover.agent=claude',
+        'test-container',
+        'rover-cache:abc123',
+      ],
+      undefined
+    );
+  });
+
   it('forwards DOCKER_HOST via sandboxMetadata to all launch calls', async () => {
     mockedLaunch.mockResolvedValueOnce({
       stdout: '0\n',
@@ -280,6 +312,7 @@ describe('waitForInitAndCommit', () => {
       'test-container',
       'rover-cache:abc123',
       '/home/user/proj',
+      'claude',
       metadata
     );
 
@@ -379,12 +412,14 @@ describe('listCacheImages', () => {
       tag: 'rover-cache:abcdef0123456789',
       createdAt: '2025-01-01T00:00:00Z',
       projectPath: '/home/user/proj1',
+      agent: null,
     });
     expect(result[1]).toEqual({
       id: 'sha256:def456',
       tag: 'rover-cache:1234567890abcdef',
       createdAt: '2025-01-02T00:00:00Z',
       projectPath: null,
+      agent: null,
     });
   });
 
@@ -407,6 +442,7 @@ describe('listCacheImages', () => {
 
     expect(result).toHaveLength(1);
     expect(result[0].projectPath).toBe('/tmp/proj');
+    expect(result[0].agent).toBeNull();
   });
 
   it('returns empty array on error', async () => {
