@@ -87,7 +87,6 @@ export {
   WorkflowStoreError,
   WorkflowSource,
   WorkflowManager,
-  JsonlLogger,
   type WorkflowMetadata,
   type AddWorkflowResult,
   type WorkflowEntry,

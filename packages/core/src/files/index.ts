@@ -14,4 +14,3 @@ export {
   type WorkflowEntry,
 } from './workflow-store.js';
 export { WorkflowManager } from './workflow.js';
-export { JsonlLogger } from './jsonl-logger.js';
