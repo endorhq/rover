@@ -177,33 +177,81 @@ describe('restart command', async () => {
     });
 
     it('should reuse stored agent image on restart', async () => {
-      // Create a task with a specific agent image
-      const taskId = 555;
-      const taskDir = join(testDir, '.rover', 'tasks', taskId.toString());
+      const savedEnv = process.env.ROVER_AGENT_IMAGE;
+      delete process.env.ROVER_AGENT_IMAGE;
 
-      const task = TaskDescriptionManager.create(taskDir, {
-        id: taskId,
-        title: 'Test Task',
-        description: 'A test task',
-        inputs: new Map(),
-        workflowName: 'swe',
-      });
+      try {
+        // Create a task with a specific agent image
+        const taskId = 555;
+        const taskDir = join(testDir, '.rover', 'tasks', taskId.toString());
 
-      // Set a custom agent image
-      const customImage = 'ghcr.io/endorhq/rover/agent:v1.2.3';
-      task.setAgentImage(customImage);
+        const task = TaskDescriptionManager.create(taskDir, {
+          id: taskId,
+          title: 'Test Task',
+          description: 'A test task',
+          inputs: new Map(),
+          workflowName: 'swe',
+        });
 
-      // Verify it was stored
-      expect(task.agentImage).toBe(customImage);
+        // Set a custom agent image
+        const customImage = 'ghcr.io/endorhq/rover/agent:v1.2.3';
+        task.setAgentImage(customImage);
 
-      // Mark task as failed and restart it
-      task.markFailed('This task failed');
-      await restartCommand(taskId.toString(), { json: true });
+        // Verify it was stored
+        expect(task.agentImage).toBe(customImage);
 
-      // Reload and verify the agent image is still stored
-      const reloadedTask = TaskDescriptionManager.load(taskDir, taskId);
-      expect(reloadedTask.agentImage).toBe(customImage);
-      expect(reloadedTask.status).toBe('IN_PROGRESS');
+        // Mark task as failed and restart it
+        task.markFailed('This task failed');
+        await restartCommand(taskId.toString(), { json: true });
+
+        // Reload and verify the agent image is still stored
+        const reloadedTask = TaskDescriptionManager.load(taskDir, taskId);
+        expect(reloadedTask.agentImage).toBe(customImage);
+        expect(reloadedTask.status).toBe('IN_PROGRESS');
+      } finally {
+        if (savedEnv !== undefined) {
+          process.env.ROVER_AGENT_IMAGE = savedEnv;
+        }
+      }
+    });
+
+    it('should override stored agent image when ROVER_AGENT_IMAGE is set', async () => {
+      const savedEnv = process.env.ROVER_AGENT_IMAGE;
+      process.env.ROVER_AGENT_IMAGE =
+        'ghcr.io/endorhq/rover/agent:env-override';
+
+      try {
+        const taskId = 556;
+        const taskDir = join(testDir, '.rover', 'tasks', taskId.toString());
+
+        const task = TaskDescriptionManager.create(taskDir, {
+          id: taskId,
+          title: 'Test Task',
+          description: 'A test task',
+          inputs: new Map(),
+          workflowName: 'swe',
+        });
+
+        // Set a custom agent image
+        task.setAgentImage('ghcr.io/endorhq/rover/agent:v1.2.3');
+
+        // Mark task as failed and restart it
+        task.markFailed('This task failed');
+        await restartCommand(taskId.toString(), { json: true });
+
+        // Reload and verify the env var image takes priority
+        const reloadedTask = TaskDescriptionManager.load(taskDir, taskId);
+        expect(reloadedTask.agentImage).toBe(
+          'ghcr.io/endorhq/rover/agent:env-override'
+        );
+        expect(reloadedTask.status).toBe('IN_PROGRESS');
+      } finally {
+        if (savedEnv !== undefined) {
+          process.env.ROVER_AGENT_IMAGE = savedEnv;
+        } else {
+          delete process.env.ROVER_AGENT_IMAGE;
+        }
+      }
     });
   });
 
