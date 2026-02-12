@@ -1,7 +1,11 @@
 import { CommandOutput } from '../cli.js';
 import colors from 'ansi-colors';
-import { WorkflowManager, IterationStatusManager } from 'rover-core';
-import { AGENT_LOGS_DIR } from 'rover-schemas';
+import {
+  WorkflowManager,
+  IterationStatusManager,
+  JsonlLogger,
+} from 'rover-core';
+import { ROVER_LOG_FILENAME, AGENT_LOGS_DIR } from 'rover-schemas';
 import { parseCollectOptions } from '../lib/options.js';
 import { Runner, RunnerStepResult } from '../lib/runner.js';
 import { ACPRunner, ACPRunnerStepResult } from '../lib/acp-runner.js';
@@ -195,6 +199,20 @@ export const runCommand = async (
   // to the project-level logs directory), fall back to the output directory.
   const logsDir = existsSync('/logs') ? '/logs' : options.output;
 
+  // Create JSONL logger for rover-specific structured logs.
+  let logger: JsonlLogger | undefined;
+  if (logsDir) {
+    try {
+      logger = new JsonlLogger(join(logsDir, ROVER_LOG_FILENAME));
+    } catch (error) {
+      console.log(
+        colors.yellow(
+          `Warning: Failed to initialize JSONL logger: ${error instanceof Error ? error.message : String(error)}`
+        )
+      );
+    }
+  }
+
   try {
     // Validate status tracking options
     if (options.statusFile && !options.taskId) {
@@ -330,6 +348,19 @@ export const runCommand = async (
       const totalSteps = workflowManager.steps.length;
       const stepResults: RunnerStepResult[] = [];
 
+      // Log workflow start
+      logger?.info(
+        'workflow_start',
+        `Starting workflow: ${workflowManager.name}`,
+        {
+          taskId: options.taskId,
+          metadata: {
+            workflowName: workflowManager.name,
+            totalSteps,
+          },
+        }
+      );
+
       // Determine which tool to use
       // Priority: workflow defaults > CLI flag > fallback to claude
       // (per-step tool configuration takes precedence, handled in Runner/ACPRunner)
@@ -352,6 +383,7 @@ export const runCommand = async (
           defaultModel: options.agentModel,
           statusManager,
           outputDir: options.output,
+          logger,
         });
 
         try {
@@ -434,7 +466,8 @@ export const runCommand = async (
             options.agentModel,
             statusManager,
             totalSteps,
-            stepIndex
+            stepIndex,
+            logger
           );
 
           runSteps++;
@@ -518,9 +551,27 @@ export const runCommand = async (
       // Mark workflow as completed in status file
       if (failedSteps > 0) {
         output.success = false;
+        logger?.error('workflow_fail', 'Workflow completed with errors', {
+          taskId: options.taskId,
+          duration: totalDuration,
+          metadata: {
+            successfulSteps,
+            failedSteps,
+            skippedSteps,
+          },
+        });
       } else {
         output.success = true;
         statusManager?.complete('Workflow completed successfully');
+        logger?.info('workflow_complete', 'Workflow completed successfully', {
+          taskId: options.taskId,
+          duration: totalDuration,
+          metadata: {
+            successfulSteps,
+            failedSteps: 0,
+            skippedSteps,
+          },
+        });
       }
     }
   } catch (err) {
@@ -530,6 +581,11 @@ export const runCommand = async (
 
   if (!output.success) {
     statusManager?.fail('Workflow execution', output.error || 'Unknown error');
+    logger?.error('workflow_fail', output.error || 'Unknown error', {
+      taskId: options.taskId,
+      error: output.error,
+      duration: totalDuration,
+    });
 
     console.log(colors.red(`\n✗ ${output.error}`));
   }

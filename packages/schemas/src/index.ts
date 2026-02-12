@@ -186,8 +186,26 @@ export {
   GlobalConfigSchema,
 } from './global-config/schema.js';
 
-// Agent Logs
-export { AGENT_LOGS_DIR } from './jsonl-log/schema.js';
+// JSONL Log library
+export type {
+  JsonlLogEntry,
+  LogLevel,
+  LogEvent,
+} from './jsonl-log/types.js';
+
+export {
+  JsonlLogWriteError,
+  JsonlLogReadError,
+  JsonlLogValidationError,
+} from './jsonl-log/errors.js';
+
+export {
+  ROVER_LOG_FILENAME,
+  AGENT_LOGS_DIR,
+  LogLevelSchema,
+  LogEventSchema,
+  JsonlLogEntrySchema,
+} from './jsonl-log/schema.js';
 
 // Rexport some Zod utilities so consumers do not need to depend on Zod
 export { ZodError } from 'zod';
