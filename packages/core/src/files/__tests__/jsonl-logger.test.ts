@@ -96,6 +96,7 @@ describe('JsonlLogger', () => {
         event: 'step_fail',
         message: 'Step failed',
         taskId: 'task-1',
+        sessionId: 'sess-abc-123',
         stepId: 'step-1',
         stepName: 'Build',
         agent: 'claude',
@@ -113,6 +114,7 @@ describe('JsonlLogger', () => {
       const content = readFileSync(logFilePath, 'utf8');
       const parsed = JSON.parse(content.trim());
       expect(parsed.taskId).toBe('task-1');
+      expect(parsed.sessionId).toBe('sess-abc-123');
       expect(parsed.duration).toBe(10.5);
       expect(parsed.tokens).toBe(500);
       expect(parsed.metadata).toEqual({ retry: 1 });

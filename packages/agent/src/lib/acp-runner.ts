@@ -418,6 +418,7 @@ export class ACPRunner {
 
       // Log step start
       this.logger?.info('step_start', `Starting step: ${step.name}`, {
+        sessionId: this.sessionId ?? undefined,
         stepId: step.id,
         stepName: step.name,
         agent: this.tool,
@@ -470,6 +471,7 @@ export class ACPRunner {
 
       // Log step completion
       this.logger?.info('step_complete', `Step completed: ${step.name}`, {
+        sessionId: this.sessionId ?? undefined,
         stepId: step.id,
         stepName: step.name,
         agent: this.tool,
@@ -494,6 +496,7 @@ export class ACPRunner {
 
       // Log step failure
       this.logger?.error('step_fail', `Step failed: ${step.name}`, {
+        sessionId: this.sessionId ?? undefined,
         stepId: step.id,
         stepName: step.name,
         agent: this.tool,

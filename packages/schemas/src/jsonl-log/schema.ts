@@ -48,6 +48,9 @@ export const JsonlLogEntrySchema = z.object({
   /** Task ID */
   taskId: z.string().optional(),
 
+  /** Session ID (ACP session identifier) */
+  sessionId: z.string().optional(),
+
   /** Step ID */
   stepId: z.string().optional(),
 
