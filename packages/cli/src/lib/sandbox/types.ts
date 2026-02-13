@@ -45,6 +45,7 @@ export abstract class Sandbox {
 
   abstract isBackendAvailable(): Promise<boolean>;
   abstract openShellAtWorktree(): Promise<void>;
+  abstract inspect(): Promise<{ status: string } | null>;
 
   protected abstract create(): Promise<string>;
   protected abstract start(): Promise<string>;
