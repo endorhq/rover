@@ -2,7 +2,13 @@ import colors from 'ansi-colors';
 import enquirer from 'enquirer';
 import { existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { launchSync, type ProjectManager } from 'rover-core';
+import {
+  launchSync,
+  showTitle,
+  showProperties,
+  showList,
+  type ProjectManager,
+} from 'rover-core';
 import yoctoSpinner from 'yocto-spinner';
 import { TaskNotFoundError } from 'rover-schemas';
 import { getTelemetry } from '../lib/telemetry.js';
@@ -65,25 +71,31 @@ const resetCommand = async (
     }
     const taskPath = project.getTaskPath(numericTaskId);
 
-    console.log(colors.bold('\n🔄 Reset Task\n'));
-    console.log(colors.gray('ID: ') + colors.cyan(taskId));
-    console.log(colors.gray('Title: ') + task.title);
-    console.log(colors.gray('Status: ') + colors.yellow(task.status));
+    showTitle('🔄 Reset Task');
 
+    const props: Record<string, string> = {
+      ID: colors.cyan(taskId),
+      Title: task.title,
+      Status: colors.yellow(task.status),
+    };
     if (existsSync(task.worktreePath)) {
-      console.log(colors.gray('Workspace: ') + colors.cyan(task.worktreePath));
+      props['Workspace'] = colors.cyan(task.worktreePath);
     }
     if (task.branchName) {
-      console.log(colors.gray('Branch: ') + colors.cyan(task.branchName));
+      props['Branch'] = colors.cyan(task.branchName);
     }
+    showProperties(props);
 
-    console.log(colors.red('\nThis will:'));
-    console.log(colors.red('  • Reset task status to NEW'));
-    console.log(colors.red('  • Remove the git workspace'));
-    console.log(colors.red('  • Remove the iterations metadata'));
-    console.log(colors.red('  • Delete the git branch'));
-    console.log(colors.red('  • Clear all execution metadata'));
-    console.log('');
+    showList(
+      [
+        colors.red('Reset task status to NEW'),
+        colors.red('Remove the git workspace'),
+        colors.red('Remove the iterations metadata'),
+        colors.red('Delete the git branch'),
+        colors.red('Clear all execution metadata'),
+      ],
+      { title: colors.red('This will:'), addLineBreak: true }
+    );
 
     // Confirm reset unless force flag is used
     if (!options.force) {

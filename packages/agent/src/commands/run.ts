@@ -1,6 +1,11 @@
 import { CommandOutput } from '../cli.js';
 import colors from 'ansi-colors';
-import { WorkflowManager, IterationStatusManager } from 'rover-core';
+import {
+  WorkflowManager,
+  IterationStatusManager,
+  showProperties,
+  showList,
+} from 'rover-core';
 import { parseCollectOptions } from '../lib/options.js';
 import { Runner, RunnerStepResult } from '../lib/runner.js';
 import { ACPRunner, ACPRunnerStepResult } from '../lib/acp-runner.js';
@@ -15,18 +20,15 @@ function displayStepResults(
   _totalDuration: number
 ): void {
   console.log(colors.bold(`\n📊 Step Results: ${stepName}`));
-  console.log(colors.gray('├── ID: ') + colors.cyan(result.id));
-  console.log(
-    colors.gray('├── Status: ') +
-      (result.success ? colors.green('✓ Success') : colors.red('✗ Failed'))
-  );
-  console.log(
-    colors.gray('├── Duration: ') +
-      colors.yellow(`${result.duration.toFixed(2)}s`)
-  );
+
+  const props: Record<string, string> = {
+    ID: colors.cyan(result.id),
+    Status: result.success ? colors.green('✓ Success') : colors.red('✗ Failed'),
+    Duration: colors.yellow(`${result.duration.toFixed(2)}s`),
+  };
 
   if (result.error) {
-    console.log(colors.gray('├── Error: ') + colors.red(result.error));
+    props['Error'] = colors.red(result.error);
   }
 
   // Display outputs
@@ -40,24 +42,20 @@ function displayStepResults(
   );
 
   if (outputEntries.length > 0) {
-    console.log(colors.gray('└── Outputs:'));
-    outputEntries.forEach(([key, value], idx) => {
-      const prefix = idx === outputEntries.length - 1 ? '    └──' : '    ├──';
-      // Truncate long values for display
+    const outputLines = outputEntries.map(([key, value]) => {
       let displayValue =
         value.length > 100 ? value.substring(0, 100) + '...' : value;
-
       if (displayValue.includes('\n')) {
         displayValue = displayValue.split('\n')[0] + '...';
       }
-
-      console.log(
-        colors.gray(`${prefix} ${key}: `) + colors.cyan(displayValue)
-      );
+      return `${key}: ${colors.cyan(displayValue)}`;
     });
+    props['Outputs'] = outputLines.join('\n');
   } else {
-    console.log(colors.gray('└── No outputs extracted'));
+    props['Outputs'] = 'No outputs extracted';
   }
+
+  showProperties(props);
 }
 
 interface RunCommandOptions {
@@ -236,28 +234,30 @@ export const runCommand = async (
     }
 
     console.log(colors.bold('Agent Workflow'));
-    console.log(colors.gray('├── Name: ') + colors.cyan(workflowManager.name));
-    console.log(colors.gray('└── Description: ') + workflowManager.description);
-
-    console.log(colors.bold('\nUser inputs'));
-    const inputEntries = Array.from(inputs.entries());
-    inputEntries.forEach(([key, value], idx) => {
-      const prefix = idx == inputEntries.length - 1 ? '└──' : '├──';
-      const isDefault = defaultInputs.includes(key);
-      const suffix = isDefault ? colors.gray(' (default)') : '';
-      console.log(`${prefix} ${key}=` + colors.cyan(`${value}`) + suffix);
+    showProperties({
+      Name: colors.cyan(workflowManager.name),
+      Description: workflowManager.description,
     });
+
+    const inputEntries = Array.from(inputs.entries());
+    showList(
+      inputEntries.map(([key, value]) => {
+        const isDefault = defaultInputs.includes(key);
+        const suffix = isDefault ? colors.gray(' (default)') : '';
+        return `${key}=` + colors.cyan(`${value}`) + suffix;
+      }),
+      { title: colors.bold('\nUser inputs') }
+    );
 
     // Validate inputs against workflow requirements
     const validation = workflowManager.validateInputs(inputs);
 
     // Display warnings if any
     if (validation.warnings.length > 0) {
-      console.log(colors.yellow.bold('\nWarnings'));
-      validation.warnings.forEach((warning, idx) => {
-        const prefix = idx == validation.warnings.length - 1 ? '└──' : '├──';
-        console.log(colors.yellow(`${prefix} ${warning}`));
-      });
+      showList(
+        validation.warnings.map(warning => colors.yellow(warning)),
+        { title: colors.yellow.bold('\nWarnings') }
+      );
     }
 
     // Check for validation errors
@@ -272,11 +272,10 @@ export const runCommand = async (
       const stepsOutput: Map<string, Map<string, string>> = new Map();
 
       // Print Steps
-      console.log(colors.bold('\nSteps'));
-      workflowManager.steps.forEach((step, idx) => {
-        const prefix = idx == workflowManager.steps.length - 1 ? '└──' : '├──';
-        console.log(`${prefix} ${idx}. ` + `${step.name}`);
-      });
+      showList(
+        workflowManager.steps.map((step, idx) => `${idx}. ${step.name}`),
+        { title: colors.bold('\nSteps') }
+      );
 
       let runSteps = 0;
       const totalSteps = workflowManager.steps.length;
@@ -428,35 +427,11 @@ export const runCommand = async (
       }
 
       // Display workflow completion summary
-      console.log(colors.bold('\n🎉 Workflow Execution Summary'));
-      console.log(
-        colors.gray('├── Duration: ') +
-          colors.cyan(totalDuration.toFixed(2) + 's')
-      );
-      console.log(
-        colors.gray('├── Total Steps: ') +
-          colors.cyan(workflowManager.steps.length.toString())
-      );
-
       const successfulSteps = Array.from(stepsOutput.keys()).length;
-      console.log(
-        colors.gray('├── Successful Steps: ') +
-          colors.green(successfulSteps.toString())
-      );
-
       const failedSteps = runSteps - successfulSteps;
-      console.log(
-        colors.gray('├── Failed Steps: ') + colors.red(failedSteps.toString())
-      );
-
       const skippedSteps = workflowManager.steps.length - runSteps;
-      console.log(
-        colors.gray('├── Skipped Steps: ') +
-          colors.yellow(failedSteps.toString())
-      );
 
       let status = colors.green('✓ Workflow Completed Successfully');
-
       if (failedSteps > 0) {
         status = colors.red('✗ Workflow Completed with Errors');
       } else if (skippedSteps > 0) {
@@ -465,7 +440,15 @@ export const runCommand = async (
           colors.yellow('(Some steps were skipped)');
       }
 
-      console.log(colors.gray('└── Status: ') + status);
+      console.log(colors.bold('\n🎉 Workflow Execution Summary'));
+      showProperties({
+        Duration: colors.cyan(totalDuration.toFixed(2) + 's'),
+        'Total Steps': colors.cyan(workflowManager.steps.length.toString()),
+        'Successful Steps': colors.green(successfulSteps.toString()),
+        'Failed Steps': colors.red(failedSteps.toString()),
+        'Skipped Steps': colors.yellow(failedSteps.toString()),
+        Status: status,
+      });
 
       // Mark workflow as completed in status file
       if (failedSteps > 0) {
