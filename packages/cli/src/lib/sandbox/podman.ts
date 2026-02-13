@@ -499,6 +499,20 @@ export class PodmanSandbox extends Sandbox {
     });
   }
 
+  async inspect(): Promise<{ status: string } | null> {
+    try {
+      const result = await launch(
+        'podman',
+        ['inspect', '--format', '{{.State.Status}}', this.sandboxName],
+        { stdio: 'pipe' }
+      );
+      const status = result.stdout?.toString().trim();
+      return status ? { status } : null;
+    } catch {
+      return null;
+    }
+  }
+
   protected async remove(): Promise<string> {
     return (
       (
