@@ -543,6 +543,20 @@ export class DockerSandbox extends Sandbox {
     return process.env;
   }
 
+  async inspect(): Promise<{ status: string } | null> {
+    try {
+      const result = await launch(
+        'docker',
+        ['inspect', '--format', '{{.State.Status}}', this.sandboxName],
+        { env: this.getDockerEnv() }
+      );
+      const status = result.stdout?.toString().trim();
+      return status ? { status } : null;
+    } catch {
+      return null;
+    }
+  }
+
   protected async remove(): Promise<string> {
     return (
       (
