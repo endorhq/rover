@@ -4,14 +4,11 @@ import {
   ProjectConfigManager,
   TaskDescriptionManager,
 } from 'rover-core';
-import { AGENT_LOGS_DIR } from 'rover-schemas';
 import { AIAgentTool } from '../agents/index.js';
 import {
   loadEnvsFile,
   parseCustomEnvironmentVariables,
 } from '../../utils/env-variables.js';
-import { existsSync, mkdirSync } from 'node:fs';
-import { join } from 'node:path';
 
 export interface SandboxOptions {
   /** Extra arguments to pass to Docker/Podman from CLI */
@@ -60,11 +57,6 @@ export abstract class Sandbox {
     initialPrompt?: string
   ): Promise<ReturnType<typeof launch>>;
 
-  protected abstract copyFromContainer(
-    containerPath: string,
-    hostPath: string
-  ): Promise<void>;
-
   protected get sandboxName(): string {
     return `rover-task-${this.task.id}-${this.task.iterations}`;
   }
@@ -91,34 +83,7 @@ export abstract class Sandbox {
     return sandboxId;
   }
 
-  /**
-   * Copy agent-produced logs from the container to the host.
-   * Each log path is placed under {logsDir}/agent-logs/.
-   */
-  async collectAgentLogs(
-    agentLogPaths: string[],
-    logsDir: string
-  ): Promise<void> {
-    if (agentLogPaths.length === 0) return;
-
-    const targetDir = join(logsDir, AGENT_LOGS_DIR);
-    if (!existsSync(targetDir)) {
-      mkdirSync(targetDir, { recursive: true });
-    }
-
-    for (const containerPath of agentLogPaths) {
-      try {
-        await this.copyFromContainer(containerPath, targetDir);
-      } catch {
-        // Gracefully skip files that don't exist or can't be copied
-      }
-    }
-  }
-
-  async stopAndRemove(
-    agentLogPaths?: string[],
-    logsDir?: string
-  ): Promise<string> {
+  async stopAndRemove(): Promise<string> {
     let sandboxId = '';
     this.processManager?.addItem(
       `Stopping sandbox (${this.backend}) | Name: ${this.sandboxName}`
@@ -130,11 +95,6 @@ export abstract class Sandbox {
       this.processManager?.failLastItem();
     } finally {
       this.processManager?.finish();
-    }
-
-    // Collect agent logs after stopping but before removing the container
-    if (agentLogPaths && agentLogPaths.length > 0 && logsDir) {
-      await this.collectAgentLogs(agentLogPaths, logsDir);
     }
 
     this.processManager?.addItem(

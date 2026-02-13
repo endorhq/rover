@@ -507,17 +507,6 @@ export class PodmanSandbox extends Sandbox {
     });
   }
 
-  protected async copyFromContainer(
-    containerPath: string,
-    hostPath: string
-  ): Promise<void> {
-    await launch(
-      'podman',
-      ['cp', `${this.sandboxName}:${containerPath}`, hostPath],
-      { stdio: 'pipe' }
-    );
-  }
-
   protected async remove(): Promise<string> {
     return (
       (

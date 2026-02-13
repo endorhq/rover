@@ -7,6 +7,7 @@ import {
   cpSync,
 } from 'node:fs';
 import path, { basename, join } from 'node:path';
+import { homedir } from 'node:os';
 import colors from 'ansi-colors';
 import { AgentCredentialFile, AgentUsageStats } from './types.js';
 import { BaseAgent } from './base.js';
@@ -253,5 +254,12 @@ export class ClaudeAgent extends BaseAgent {
     }
 
     return usage;
+  }
+
+  override getLogSources(): string[] {
+    // Claude Code writes conversation JSONL logs under
+    // ~/.claude/projects/{mangled-cwd}/. The working directory inside
+    // the container is /workspace, so the mangled path is "-workspace".
+    return [join(homedir(), '.claude', 'projects', '-workspace')];
   }
 }

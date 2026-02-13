@@ -15,6 +15,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { getProjectLogsDir } from '../paths.js';
 import {
   CURRENT_TASK_DESCRIPTION_SCHEMA_VERSION,
   TaskDescriptionSchema,
@@ -655,11 +656,15 @@ export class TaskDescriptionManager {
    *   {projectDir}/logs/tasks/{taskId}
    *
    * basePath is {projectDir}/tasks/{taskId}, so we go up to {projectDir}
-   * and then into logs/tasks/{taskId}.
+   * and use the centralized getProjectLogsDir helper.
    */
   logsPath(): string {
     const projectDir = dirname(dirname(this.basePath));
-    return join(projectDir, 'logs', 'tasks', this.data.id.toString());
+    return join(
+      getProjectLogsDir(projectDir),
+      'tasks',
+      this.data.id.toString()
+    );
   }
 
   /**

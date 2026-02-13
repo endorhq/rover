@@ -58,6 +58,7 @@ export {
   getConfigDir,
   getDataDir,
   getCacheDir,
+  getProjectLogsDir,
   ensureDirectories,
 } from './paths.js';
 

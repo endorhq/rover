@@ -551,17 +551,6 @@ export class DockerSandbox extends Sandbox {
     return process.env;
   }
 
-  protected async copyFromContainer(
-    containerPath: string,
-    hostPath: string
-  ): Promise<void> {
-    await launch(
-      'docker',
-      ['cp', `${this.sandboxName}:${containerPath}`, hostPath],
-      { env: this.getDockerEnv() }
-    );
-  }
-
   protected async remove(): Promise<string> {
     return (
       (
