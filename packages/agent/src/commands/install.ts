@@ -1,4 +1,5 @@
 import colors from 'ansi-colors';
+import { showProperties, showList } from 'rover-core';
 import { CommandOutput } from '../cli.js';
 import { createAgent } from '../lib/agents/index.js';
 
@@ -31,8 +32,10 @@ export const installCommand = async (
 
   try {
     console.log(colors.bold('Agent Installation'));
-    console.log(colors.gray('├── Agent: ') + colors.cyan(agentName));
-    console.log(colors.gray('└── Version: ') + colors.cyan(options.version));
+    showProperties({
+      Agent: colors.cyan(agentName),
+      Version: colors.cyan(options.version),
+    });
 
     // Create agent instance
     const agent = createAgent(agentName, options.version);
@@ -44,10 +47,9 @@ export const installCommand = async (
 
     if (!validation.valid) {
       console.log(colors.red('\n✗ Credential validation failed'));
-      validation.missing.forEach((missing, idx) => {
-        const prefix = idx === validation.missing.length - 1 ? '└──' : '├──';
-        console.log(colors.red(`${prefix} Missing: ${missing}`));
-      });
+      showList(
+        validation.missing.map(missing => colors.red(`Missing: ${missing}`))
+      );
 
       console.log(
         colors.yellow(

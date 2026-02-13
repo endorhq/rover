@@ -1,6 +1,6 @@
 import colors from 'ansi-colors';
 import { existsSync } from 'node:fs';
-import { Git, showList, showTitle } from 'rover-core';
+import { Git, showList, showTitle, showProperties } from 'rover-core';
 import { TaskNotFoundError } from 'rover-schemas';
 import { getTelemetry } from '../lib/telemetry.js';
 import { showTips } from '../utils/display.js';
@@ -157,21 +157,21 @@ const diffCommand = async (
     }
 
     if (!isJsonMode()) {
-      console.log(colors.bold(`Task ${numericTaskId} Changes`));
-      console.log(colors.gray('├── Title: ') + task.title);
-      console.log(colors.gray('├── Workspace: ') + task.worktreePath);
-
+      showTitle(`Task ${numericTaskId} Changes`);
+      const props: Record<string, string> = {
+        Title: task.title,
+        Workspace: task.worktreePath,
+      };
       if (compareRef) {
-        console.log(colors.gray('├── Task Branch: ') + task.branchName);
+        props['Task Branch'] = task.branchName;
         const compareLabel = options.base
           ? `base commit (${compareRef.substring(0, 7)})`
           : compareRef;
-        console.log(
-          colors.gray('└── Comparing with: ') + colors.cyan(compareLabel)
-        );
+        props['Comparing with'] = colors.cyan(compareLabel);
       } else {
-        console.log(colors.gray('└── Task Branch: ') + task.branchName);
+        props['Task Branch'] = task.branchName;
       }
+      showProperties(props);
     }
 
     telemetry?.eventDiff();

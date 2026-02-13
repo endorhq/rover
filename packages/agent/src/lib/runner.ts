@@ -10,6 +10,7 @@ import {
   VERBOSE,
   WorkflowManager,
   IterationStatusManager,
+  showList,
 } from 'rover-core';
 import colors from 'ansi-colors';
 import {
@@ -783,11 +784,10 @@ export class Runner {
 
     // Display warnings if any
     if (warnings.length > 0) {
-      console.log(colors.yellow.bold('\nPrompt Template Warnings:'));
-      warnings.forEach((warning, idx) => {
-        const prefix = idx === warnings.length - 1 ? '└──' : '├──';
-        console.log(colors.yellow(`${prefix} ${warning}`));
-      });
+      showList(
+        warnings.map(warning => colors.yellow(warning)),
+        { title: colors.yellow.bold('\nPrompt Template Warnings:') }
+      );
     }
 
     return finalPrompt;

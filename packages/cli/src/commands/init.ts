@@ -3,7 +3,12 @@ import { join, resolve } from 'node:path';
 import colors from 'ansi-colors';
 import ora from 'ora';
 import enquirer from 'enquirer';
-import { detectEnvironment, Git, type EnvironmentResult } from 'rover-core';
+import {
+  detectEnvironment,
+  Git,
+  showList,
+  type EnvironmentResult,
+} from 'rover-core';
 import {
   checkClaude,
   checkCodex,
@@ -177,32 +182,27 @@ const initCommand = async (path: string = '.', options: { yes?: boolean }) => {
     reqSpinner.fail('Your system misses some required tools');
   }
 
-  console.log(colors.bold('\nRequired Tools'));
-  console.log(
-    `├── Git: ${gitInstalled ? colors.green('✓ Installed') : colors.red('✗ Missing')}`
-  );
-  console.log(
-    `└── Docker: ${dockerInstalled ? colors.green('✓ Installed') : colors.red('✗ Missing')}`
+  const statusLabel = (installed: boolean) =>
+    installed ? colors.green('✓ Installed') : colors.red('✗ Missing');
+
+  showList(
+    [
+      `Git: ${statusLabel(gitInstalled)}`,
+      `Docker: ${statusLabel(dockerInstalled)}`,
+    ],
+    { title: colors.bold('Required Tools'), addLineBreak: true }
   );
 
-  console.log(colors.bold('\nAI Agents (at least one)'));
-  console.log(
-    `├── Claude: ${claudeInstalled ? colors.green('✓ Installed') : colors.red('✗ Missing')}`
-  );
-  console.log(
-    `├── Codex: ${codexInstalled ? colors.green('✓ Installed') : colors.red('✗ Missing')}`
-  );
-  console.log(
-    `├── Cursor: ${cursorInstalled ? colors.green('✓ Installed') : colors.red('✗ Missing')}`
-  );
-  console.log(
-    `├── Gemini: ${geminiInstalled ? colors.green('✓ Installed') : colors.red('✗ Missing')}`
-  );
-  console.log(
-    `├── OpenCode: ${opencodeInstalled ? colors.green('✓ Installed') : colors.red('✗ Missing')}`
-  );
-  console.log(
-    `└── Qwen: ${qwenInstalled ? colors.green('✓ Installed') : colors.red('✗ Missing')}`
+  showList(
+    [
+      `Claude: ${statusLabel(claudeInstalled)}`,
+      `Codex: ${statusLabel(codexInstalled)}`,
+      `Cursor: ${statusLabel(cursorInstalled)}`,
+      `Gemini: ${statusLabel(geminiInstalled)}`,
+      `OpenCode: ${statusLabel(opencodeInstalled)}`,
+      `Qwen: ${statusLabel(qwenInstalled)}`,
+    ],
+    { title: colors.bold('AI Agents (at least one)'), addLineBreak: true }
   );
 
   if (!completeInstallation) {
@@ -239,11 +239,10 @@ const initCommand = async (path: string = '.', options: { yes?: boolean }) => {
   try {
     await ensureGitignore(projectRoot);
   } catch (error) {
-    console.log(colors.bold('\n.gitignore'));
-    console.log(
-      `└── ${colors.yellow('⚠ Could not update .gitignore:')}`,
-      error
-    );
+    showList([`${colors.yellow('⚠ Could not update .gitignore:')} ${error}`], {
+      title: colors.bold('.gitignore'),
+      addLineBreak: true,
+    });
   }
 
   // Detect environment
@@ -311,18 +310,17 @@ const initCommand = async (path: string = '.', options: { yes?: boolean }) => {
     let attribution = true;
 
     if (!options.yes) {
-      console.log(colors.bold('\nAttribution'));
       // Confirm attribution
-      console.log(
-        colors.gray(
-          '├── Rover can add itself as a co-author on commits it helps create'
-        )
+      showList(
+        [
+          colors.gray(
+            'Rover can add itself as a co-author on commits it helps create'
+          ),
+          colors.gray('This helps track AI-assisted work in your repository'),
+        ],
+        { title: colors.bold('Attribution'), addLineBreak: true }
       );
-      console.log(
-        colors.gray(
-          '└── This helps track AI-assisted work in your repository\n'
-        )
-      );
+      console.log('');
       try {
         const { confirm } = await prompt<{ confirm: boolean }>({
           type: 'confirm',
@@ -396,10 +394,10 @@ const initCommand = async (path: string = '.', options: { yes?: boolean }) => {
       }
 
       console.log(colors.green('✓ Rover initialization complete!'));
-      console.log(`├── ${colors.gray('Project config:')} rover.json`);
-      console.log(
-        `└── ${colors.gray('User settings:')} .rover/settings.json (.rover/settings.local.json added to .gitignore)`
-      );
+      showList([
+        `${colors.gray('Project config:')} rover.json`,
+        `${colors.gray('User settings:')} .rover/settings.json (.rover/settings.local.json added to .gitignore)`,
+      ]);
 
       showTips(
         [
