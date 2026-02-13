@@ -1,6 +1,6 @@
 import { createReadStream } from 'node:fs';
 import { launchSync } from './os.js';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 export class GitError extends Error {
   constructor(reason: string) {
@@ -88,7 +88,9 @@ export class Git {
   }
 
   /**
-   * Get the root directory of the Git repository
+   * Get the root directory of the Git repository.
+   * Note: Inside a worktree, this returns the worktree root, not the main repo root.
+   * Use getMainRepositoryRoot() to always get the main repository root.
    */
   getRepositoryRoot(): string | null {
     const result = launchSync('git', ['rev-parse', '--show-toplevel'], {
@@ -99,6 +101,87 @@ export class Git {
       return result.stdout?.toString().trim() || null;
     }
     return null;
+  }
+
+  /**
+   * Detect whether the current working directory is inside a git worktree
+   * (as opposed to the main checkout).
+   *
+   * Compares `--git-dir` (per-worktree git dir) with `--git-common-dir`
+   * (shared .git directory). In a worktree, --git-dir returns something like
+   * `<main-repo>/.git/worktrees/<name>` while --git-common-dir returns
+   * `<main-repo>/.git`. In the main checkout, they are the same.
+   */
+  isWorktree(): boolean {
+    try {
+      const effectiveCwd = this.cwd ?? process.cwd();
+
+      const gitDirResult = launchSync('git', ['rev-parse', '--git-dir'], {
+        reject: false,
+        cwd: this.cwd,
+      });
+      if (gitDirResult.exitCode !== 0) return false;
+
+      const commonDirResult = launchSync(
+        'git',
+        ['rev-parse', '--git-common-dir'],
+        { reject: false, cwd: this.cwd }
+      );
+      if (commonDirResult.exitCode !== 0) return false;
+
+      const rawGitDir = gitDirResult.stdout?.toString().trim();
+      const rawCommonDir = commonDirResult.stdout?.toString().trim();
+      if (!rawGitDir || !rawCommonDir) return false;
+
+      // Resolve relative paths (git may return relative paths like ".git")
+      const gitDir = resolve(effectiveCwd, rawGitDir);
+      const commonDir = resolve(effectiveCwd, rawCommonDir);
+
+      // In a worktree, --git-dir and --git-common-dir differ
+      return gitDir !== commonDir;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Get the root directory of the main repository, even when inside a worktree.
+   *
+   * Uses `git rev-parse --git-common-dir` to find the shared .git directory,
+   * then derives the main repo root by stripping the `/.git` suffix.
+   * Falls back to getRepositoryRoot() if detection fails.
+   */
+  getMainRepositoryRoot(): string | null {
+    try {
+      const commonDirResult = launchSync(
+        'git',
+        ['rev-parse', '--git-common-dir'],
+        { reject: false, cwd: this.cwd }
+      );
+      if (commonDirResult.exitCode !== 0) {
+        return this.getRepositoryRoot();
+      }
+
+      const rawCommonDir = commonDirResult.stdout?.toString().trim();
+      if (!rawCommonDir) {
+        return this.getRepositoryRoot();
+      }
+
+      // Resolve relative paths
+      const effectiveCwd = this.cwd ?? process.cwd();
+      const commonDir = resolve(effectiveCwd, rawCommonDir);
+
+      // --git-common-dir returns <main-repo>/.git — strip the /.git suffix
+      const gitDirMatch = commonDir.match(/^(.+)\/\.git$/);
+      if (gitDirMatch) {
+        return gitDirMatch[1];
+      }
+
+      // Fallback
+      return this.getRepositoryRoot();
+    } catch {
+      return this.getRepositoryRoot();
+    }
   }
 
   hasCommits(): boolean {
