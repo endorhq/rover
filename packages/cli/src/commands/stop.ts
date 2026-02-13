@@ -87,6 +87,7 @@ const stopCommand = async (
       const sandbox = await createSandbox(task, processManager, {
         sandboxMetadata: task.sandboxMetadata,
       });
+
       await sandbox.stopAndRemove();
     }
 

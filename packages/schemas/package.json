@@ -14,10 +14,10 @@
     "start": "echo 'Schemas package is not a CLI'",
     "clean": "rm -rf dist",
     "check": "tsc --noEmit",
-    "test": "echo 'No tests for schemas package'",
-    "test:watch": "echo 'No tests for schemas package'",
-    "test:ui": "echo 'No tests for schemas package'",
-    "test:coverage": "echo 'No tests for schemas package'"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage"
   },
   "author": "The Endor team",
   "dependencies": {

@@ -9,6 +9,7 @@ import type {
 } from 'rover-schemas';
 import type { GlobalConfigManager } from '../files/global-config.js';
 import { TaskDescriptionManager } from '../files/task-description.js';
+import { getProjectLogsDir } from '../paths.js';
 
 /**
  * Manager for a single project. Provides access to project
@@ -199,7 +200,7 @@ export class ProjectManager {
 
   /** Path to the project's logs directory */
   get logsPath(): string {
-    return join(this.basePath, this.project.id, 'logs');
+    return getProjectLogsDir(join(this.basePath, this.project.id));
   }
 
   /**

@@ -58,6 +58,7 @@ export {
   getConfigDir,
   getDataDir,
   getCacheDir,
+  getProjectLogsDir,
   ensureDirectories,
 } from './paths.js';
 
@@ -87,6 +88,7 @@ export {
   WorkflowStoreError,
   WorkflowSource,
   WorkflowManager,
+  JsonlLogger,
   type WorkflowMetadata,
   type AddWorkflowResult,
   type WorkflowEntry,

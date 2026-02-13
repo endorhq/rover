@@ -63,6 +63,15 @@ export function getDataDir(): string {
 }
 
 /**
+ * Get the logs directory for a project.
+ * @param projectDir - The project base directory (e.g. ~/.rover/projects/{projectId})
+ * @returns The logs directory path ({projectDir}/logs)
+ */
+export function getProjectLogsDir(projectDir: string): string {
+  return join(projectDir, 'logs');
+}
+
+/**
  * Ensure all Rover directories exist with proper permissions
  * Creates directories with mode 0o700 (rwx------)
  */

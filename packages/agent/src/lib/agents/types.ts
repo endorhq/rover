@@ -53,4 +53,10 @@ export interface Agent {
     context: AgentErrorRecoveryContext
   ): Promise<AgentRecoveryResult | null> | AgentRecoveryResult | null;
   extractUsageStats?(parsedResponse: unknown): AgentUsageStats | undefined;
+
+  /**
+   * Returns directories where this agent writes its own logs.
+   * Paths are resolved using $HOME so they work regardless of UID mapping.
+   */
+  getLogSources(): string[];
 }
