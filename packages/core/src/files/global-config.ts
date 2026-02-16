@@ -14,13 +14,13 @@ import {
   GlobalConfigSchema,
   CURRENT_GLOBAL_CONFIG_VERSION,
   GLOBAL_CONFIG_FILENAME,
+  PROJECT_CONFIG_FILENAME,
   type AttributionStatus,
   type GlobalConfig,
   type GlobalProject,
   type TelemetryStatus,
 } from 'rover-schemas';
 import { getConfigDir } from '../paths.js';
-import { ProjectConfigManager } from './project-config.js';
 import { UserSettingsManager } from './user-settings.js';
 // Using deprecated findProjectRoot here because GlobalConfigManager.createDefault()
 // is called during migration/initialization when no explicit project context exists.
@@ -96,14 +96,21 @@ export class GlobalConfigManager {
     // Try to derive agents from user settings
     let agents: AI_AGENT[] = [];
 
-    // Try to derive settings from an existing project in the current directory
+    // Try to derive settings from an existing project in the current directory.
+    // Read rover.json directly instead of going through ProjectConfigManager.load()
+    // to avoid runtime recursion: load() -> GlobalConfigManager.load() ->
+    // createDefault() -> load().
     // Using deprecated findProjectRoot() because this runs during global config
     // initialization when no explicit project context is available.
     try {
       const projectRoot = findProjectRoot();
-      const projectConfig = ProjectConfigManager.maybeLoad(projectRoot);
-      if (projectConfig) {
-        attribution = projectConfig.attribution ? 'enabled' : 'disabled';
+      const roverJsonPath = join(projectRoot, PROJECT_CONFIG_FILENAME);
+      if (existsSync(roverJsonPath)) {
+        const rawData = readFileSync(roverJsonPath, 'utf8');
+        const parsedData = JSON.parse(rawData);
+        if (parsedData.attribution !== undefined) {
+          attribution = parsedData.attribution ? 'enabled' : 'disabled';
+        }
       }
     } catch (error) {
       // Ignore errors and keep attribution as 'unknown'

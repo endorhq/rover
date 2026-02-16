@@ -252,7 +252,7 @@ const mergeCommand = async (taskId: string, options: MergeOptions = {}) => {
   let projectConfig;
 
   // Load config
-  projectConfig = ProjectConfigManager.maybeLoad(project.path);
+  projectConfig = ProjectConfigManager.load(project.path);
 
   // Load user preferences
   try {

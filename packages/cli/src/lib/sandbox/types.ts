@@ -119,30 +119,28 @@ export abstract class Sandbox {
    */
   getSandboxEnvironmentVariables(
     agent: AIAgentTool,
-    projectConfig: ProjectConfigManager | undefined
+    projectConfig: ProjectConfigManager
   ): string[] {
     const envVariables: string[] = agent.getEnvironmentVariables();
 
     // Load project config and merge custom environment variables
     let customEnvVariables: string[] = [];
 
-    if (projectConfig) {
-      try {
-        // Parse custom envs array
-        if (projectConfig.envs && projectConfig.envs.length > 0) {
-          customEnvVariables = parseCustomEnvironmentVariables(
-            projectConfig.envs
-          );
-        }
-
-        // Load envs from file
-        if (projectConfig.envsFile) {
-          const fileEnvVariables = loadEnvsFile(projectConfig);
-          customEnvVariables = [...customEnvVariables, ...fileEnvVariables];
-        }
-      } catch (error) {
-        // Silently skip if there's an error loading project config
+    try {
+      // Parse custom envs array
+      if (projectConfig.envs && projectConfig.envs.length > 0) {
+        customEnvVariables = parseCustomEnvironmentVariables(
+          projectConfig.envs
+        );
       }
+
+      // Load envs from file
+      if (projectConfig.envsFile) {
+        const fileEnvVariables = loadEnvsFile(projectConfig);
+        customEnvVariables = [...customEnvVariables, ...fileEnvVariables];
+      }
+    } catch (error) {
+      // Silently skip if there's an error loading project config
     }
 
     // Merge agent environment variables with custom environment variables

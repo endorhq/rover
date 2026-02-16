@@ -362,9 +362,9 @@ const createTaskForAgent = async (
     copyEnvironmentFiles(projectPath, worktreePath);
 
     // Configure sparse checkout to exclude files matching exclude patterns
-    const sparseConfig = ProjectConfigManager.maybeLoad(projectPath);
+    const sparseConfig = ProjectConfigManager.load(projectPath);
     if (
-      sparseConfig?.excludePatterns &&
+      sparseConfig.excludePatterns &&
       sparseConfig.excludePatterns.length > 0
     ) {
       git.setupSparseCheckout(worktreePath, sparseConfig.excludePatterns);
@@ -498,7 +498,7 @@ const createTaskForAgent = async (
   }
 
   // Resolve and store the agent image that will be used for this task
-  const projectConfig = ProjectConfigManager.maybeLoad(projectPath);
+  const projectConfig = ProjectConfigManager.load(projectPath);
   const agentImage = resolveAgentImage(projectConfig);
   task.setAgentImage(agentImage);
 

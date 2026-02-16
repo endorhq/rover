@@ -104,7 +104,7 @@ const pushCommand = async (taskId: string, options: PushOptions) => {
   let projectConfig;
 
   // Load config
-  projectConfig = ProjectConfigManager.maybeLoad(project.path);
+  projectConfig = ProjectConfigManager.load(project.path);
 
   try {
     // Load task using ProjectManager

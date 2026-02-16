@@ -157,12 +157,12 @@ export async function waitForInitAndCommit(
  */
 export function checkImageCache(
   backend: ContainerBackend,
-  projectConfig: ProjectConfigManager | undefined,
+  projectConfig: ProjectConfigManager,
   agentImage: string,
   agent: string
 ): { hasCachedImage: boolean; cacheTag: string } {
   let initScriptContent = '';
-  if (projectConfig?.initScript) {
+  if (projectConfig.initScript) {
     try {
       const initScriptAbsPath = join(
         projectConfig.projectRoot,
@@ -177,13 +177,13 @@ export function checkImageCache(
 
   const hash = computeSetupHash({
     agentImage,
-    languages: projectConfig?.languages ?? [],
-    packageManagers: projectConfig?.packageManagers ?? [],
-    taskManagers: projectConfig?.taskManagers ?? [],
+    languages: projectConfig.languages,
+    packageManagers: projectConfig.packageManagers,
+    taskManagers: projectConfig.taskManagers,
     agent,
     roverVersion: getVersion(),
     initScriptContent,
-    mcps: projectConfig?.mcps ?? [],
+    mcps: projectConfig.mcps,
   });
 
   const cacheTag = getCacheImageTag(hash);

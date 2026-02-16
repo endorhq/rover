@@ -9,6 +9,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { clearProjectRootCache } from '../../project-root.js';
 
 // Store mock config directory path
 let mockConfigDir: string;
@@ -18,10 +19,12 @@ vi.mock('../../paths.js', () => ({
   getConfigDir: () => mockConfigDir,
 }));
 
-// Mock ProjectConfigManager to prevent loading real project config
+// Mock ProjectConfigManager — no longer needed by GlobalConfigManager.createDefault()
+// but kept as a safety net to prevent loading real project config during tests.
 vi.mock('../project-config.js', () => ({
   ProjectConfigManager: {
-    maybeLoad: () => undefined,
+    load: () => undefined,
+    exists: () => false,
   },
 }));
 
@@ -63,14 +66,26 @@ import {
 
 describe('GlobalConfigManager', () => {
   let testDir: string;
+  let originalCwd: string;
 
   beforeEach(() => {
     // Create temp directory for testing
     testDir = mkdtempSync(join(tmpdir(), 'rover-global-config-test-'));
     mockConfigDir = testDir;
+
+    // chdir into the temp directory (which is NOT a git repo) so that
+    // findProjectRoot() in createDefault() throws and attribution
+    // defaults to 'unknown'.
+    originalCwd = process.cwd();
+    process.chdir(testDir);
+    clearProjectRootCache();
   });
 
   afterEach(() => {
+    // Restore original working directory
+    process.chdir(originalCwd);
+    clearProjectRootCache();
+
     // Clean up temp directory
     rmSync(testDir, { recursive: true, force: true });
   });
@@ -154,42 +169,67 @@ describe('GlobalConfigManager', () => {
     });
 
     it('should derive attribution and agents from existing project config and user settings', async () => {
-      // Re-mock ProjectConfigManager to return valid config with attribution enabled
-      vi.doMock('../project-config.js', () => ({
-        ProjectConfigManager: {
-          maybeLoad: () => ({
-            attribution: true,
-          }),
-        },
-      }));
-
-      // Re-mock UserSettingsManager to return valid settings with agents
-      vi.doMock('../user-settings.js', () => ({
-        UserSettingsManager: {
-          load: () => ({
-            aiAgents: [AI_AGENT.Claude, AI_AGENT.Gemini],
-          }),
-        },
-      }));
-
-      // Reset modules to pick up new mocks
-      vi.resetModules();
-
-      const { GlobalConfigManager: FreshManager } = await import(
-        '../global-config.js'
+      // Create a temporary git repo with rover.json containing attribution: true
+      const projectDir = mkdtempSync(
+        join(tmpdir(), 'rover-global-project-test-')
       );
-      const config = FreshManager.createDefault();
+      const { launchSync } = await import('../../os.js');
+      launchSync('git', ['init'], { cwd: projectDir });
+      launchSync('git', ['config', 'user.email', 'test@test.com'], {
+        cwd: projectDir,
+      });
+      launchSync('git', ['config', 'user.name', 'Test User'], {
+        cwd: projectDir,
+      });
+      writeFileSync(
+        join(projectDir, 'rover.json'),
+        JSON.stringify({ version: '1.3', attribution: true })
+      );
 
-      // Should derive attribution from ProjectConfigManager
-      expect(config.attribution).toBe('enabled');
+      const originalCwd = process.cwd();
+      process.chdir(projectDir);
 
-      // Should derive agents from UserSettingsManager
-      expect(config.agents).toEqual([AI_AGENT.Claude, AI_AGENT.Gemini]);
+      try {
+        // Re-mock UserSettingsManager to return valid settings with agents
+        vi.doMock('../user-settings.js', () => ({
+          UserSettingsManager: {
+            load: () => ({
+              aiAgents: [AI_AGENT.Claude, AI_AGENT.Gemini],
+            }),
+          },
+        }));
 
-      // Restore original mocks
-      vi.doUnmock('../project-config.js');
-      vi.doUnmock('../user-settings.js');
-      vi.resetModules();
+        // Reset modules to pick up new mocks
+        vi.resetModules();
+
+        // Clear the project root cache so findProjectRoot() picks up new cwd
+        const { clearProjectRootCache } = await import('../../project-root.js');
+        clearProjectRootCache();
+
+        const { GlobalConfigManager: FreshManager } = await import(
+          '../global-config.js'
+        );
+        const config = FreshManager.createDefault();
+
+        // Should derive attribution from rover.json
+        expect(config.attribution).toBe('enabled');
+
+        // Should derive agents from UserSettingsManager
+        expect(config.agents).toEqual([AI_AGENT.Claude, AI_AGENT.Gemini]);
+      } finally {
+        process.chdir(originalCwd);
+        rmSync(projectDir, { recursive: true, force: true });
+
+        // Restore original mocks
+        vi.doUnmock('../user-settings.js');
+        vi.resetModules();
+
+        // Clear cache again so subsequent tests are not affected
+        const { clearProjectRootCache: clearCache } = await import(
+          '../../project-root.js'
+        );
+        clearCache();
+      }
     });
   });
 

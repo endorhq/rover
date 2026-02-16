@@ -263,7 +263,7 @@ const listCommand = async (
         // Load project config for hooks per project
         let projectConfig: ProjectConfigManager | undefined;
         if (projectData) {
-          projectConfig = ProjectConfigManager.maybeLoad(projectData.path);
+          projectConfig = ProjectConfigManager.load(projectData.path);
         }
 
         // Execute onComplete hooks if configured and not already fired for this status
