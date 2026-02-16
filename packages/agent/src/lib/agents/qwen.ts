@@ -1,5 +1,6 @@
 import { existsSync, copyFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { homedir } from 'node:os';
 import colors from 'ansi-colors';
 import { AgentCredentialFile } from './types.js';
 import { BaseAgent } from './base.js';
@@ -120,7 +121,7 @@ export class QwenAgent extends BaseAgent {
       args.push('--model', this.model);
     }
     if (VERBOSE) {
-      args.push('--verbose');
+      args.push('--debug');
     }
     args.push('-p');
     return args;
@@ -137,5 +138,12 @@ export class QwenAgent extends BaseAgent {
     }
 
     return ['-i', prompt];
+  }
+
+  override getLogSources(): string[] {
+    // Qwen Code writes conversation JSONL logs under
+    // ~/.qwen/projects/{mangled-cwd}/. The working directory inside
+    // the container is /workspace, so the mangled path is "-workspace".
+    return [join(homedir(), '.qwen', 'projects', '-workspace')];
   }
 }

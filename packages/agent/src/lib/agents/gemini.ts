@@ -1,5 +1,6 @@
 import { existsSync, copyFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { homedir } from 'node:os';
 import colors from 'ansi-colors';
 import {
   AgentCredentialFile,
@@ -125,7 +126,7 @@ export class GeminiAgent extends BaseAgent {
       args.push('--model', this.model);
     }
     if (VERBOSE) {
-      args.push('--verbose');
+      args.push('--debug');
     }
     return args;
   }
@@ -178,5 +179,12 @@ export class GeminiAgent extends BaseAgent {
     }
 
     return '';
+  }
+
+  override getLogSources(): string[] {
+    // Gemini CLI writes conversation JSONL logs under
+    // ~/.gemini/projects/{mangled-cwd}/. The working directory inside
+    // the container is /workspace, so the mangled path is "-workspace".
+    return [join(homedir(), '.gemini', 'projects', '-workspace')];
   }
 }
