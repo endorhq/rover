@@ -119,4 +119,8 @@ export abstract class BaseAgent implements Agent {
   extractUsageStats(_parsedResponse: unknown): AgentUsageStats | undefined {
     return undefined;
   }
+
+  getLogSources(): string[] {
+    return [];
+  }
 }

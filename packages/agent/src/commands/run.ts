@@ -3,14 +3,18 @@ import colors from 'ansi-colors';
 import {
   WorkflowManager,
   IterationStatusManager,
+  JsonlLogger,
   showTitle,
   showProperties,
   showList,
 } from 'rover-core';
+import { ROVER_LOG_FILENAME, AGENT_LOGS_DIR } from 'rover-schemas';
 import { parseCollectOptions } from '../lib/options.js';
 import { Runner, RunnerStepResult } from '../lib/runner.js';
 import { ACPRunner, ACPRunnerStepResult } from '../lib/acp-runner.js';
-import { existsSync, readFileSync } from 'node:fs';
+import { createAgent } from '../lib/agents/index.js';
+import { cpSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 /**
  * Helper function to display step results consistently for both ACP and standard runners
@@ -59,6 +63,34 @@ function displayStepResults(
     showList(outputItems, { title: colors.gray('Outputs:') });
   } else {
     console.log(colors.gray('No outputs extracted'));
+  }
+}
+
+/**
+ * Copy agent-produced logs from their source locations into the logs
+ * directory so they are persisted on the host alongside rover.jsonl.
+ */
+function collectAgentLogs(logsDir: string, agentTool?: string): void {
+  if (!agentTool) return;
+
+  let sources: string[];
+  try {
+    sources = createAgent(agentTool).getLogSources();
+  } catch {
+    return;
+  }
+  if (sources.length === 0) return;
+
+  const targetDir = join(logsDir, AGENT_LOGS_DIR);
+
+  for (const src of sources) {
+    if (!existsSync(src)) continue;
+    try {
+      mkdirSync(targetDir, { recursive: true });
+      cpSync(src, targetDir, { recursive: true });
+    } catch {
+      // Best-effort: don't fail the workflow for log collection errors
+    }
   }
 }
 
@@ -148,6 +180,24 @@ export const runCommand = async (
   // Declare status manager outside try block so it's accessible in catch
   let statusManager: IterationStatusManager | undefined;
   let totalDuration = 0;
+
+  // Determine the logs directory. Prefer /logs (bind-mounted by the sandbox
+  // to the project-level logs directory), fall back to the output directory.
+  const logsDir = existsSync('/logs') ? '/logs' : options.output;
+
+  // Create JSONL logger for rover-specific structured logs.
+  let logger: JsonlLogger | undefined;
+  if (logsDir) {
+    try {
+      logger = new JsonlLogger(join(logsDir, ROVER_LOG_FILENAME));
+    } catch (error) {
+      console.log(
+        colors.yellow(
+          `Warning: Failed to initialize JSONL logger: ${error instanceof Error ? error.message : String(error)}`
+        )
+      );
+    }
+  }
 
   try {
     // Validate status tracking options
@@ -285,6 +335,19 @@ export const runCommand = async (
       const totalSteps = workflowManager.steps.length;
       const stepResults: RunnerStepResult[] = [];
 
+      // Log workflow start
+      logger?.info(
+        'workflow_start',
+        `Starting workflow: ${workflowManager.name}`,
+        {
+          taskId: options.taskId,
+          metadata: {
+            workflowName: workflowManager.name,
+            totalSteps,
+          },
+        }
+      );
+
       // Determine which tool to use
       // Priority: workflow defaults > CLI flag > fallback to claude
       // (per-step tool configuration takes precedence, handled in Runner/ACPRunner)
@@ -307,6 +370,7 @@ export const runCommand = async (
           defaultModel: options.agentModel,
           statusManager,
           outputDir: options.output,
+          logger,
         });
 
         try {
@@ -389,7 +453,8 @@ export const runCommand = async (
             options.agentModel,
             statusManager,
             totalSteps,
-            stepIndex
+            stepIndex,
+            logger
           );
 
           runSteps++;
@@ -457,9 +522,27 @@ export const runCommand = async (
       // Mark workflow as completed in status file
       if (failedSteps > 0) {
         output.success = false;
+        logger?.error('workflow_fail', 'Workflow completed with errors', {
+          taskId: options.taskId,
+          duration: totalDuration,
+          metadata: {
+            successfulSteps,
+            failedSteps,
+            skippedSteps,
+          },
+        });
       } else {
         output.success = true;
         statusManager?.complete('Workflow completed successfully');
+        logger?.info('workflow_complete', 'Workflow completed successfully', {
+          taskId: options.taskId,
+          duration: totalDuration,
+          metadata: {
+            successfulSteps,
+            failedSteps: 0,
+            skippedSteps,
+          },
+        });
       }
     }
   } catch (err) {
@@ -469,8 +552,18 @@ export const runCommand = async (
 
   if (!output.success) {
     statusManager?.fail('Workflow execution', output.error || 'Unknown error');
+    logger?.error('workflow_fail', output.error || 'Unknown error', {
+      taskId: options.taskId,
+      error: output.error,
+      duration: totalDuration,
+    });
 
     console.log(colors.red(`\n✗ ${output.error}`));
+  }
+
+  // Collect agent-specific logs into the logs directory
+  if (logsDir) {
+    collectAgentLogs(logsDir, options.agentTool);
   }
 
   process.exit(output.success ? 0 : 1);

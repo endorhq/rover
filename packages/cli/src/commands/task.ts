@@ -507,6 +507,10 @@ const createTaskForAgent = async (
     const sandbox = await createSandbox(task, processManager, {
       extraArgs: options.sandboxExtraArgs,
       projectPath,
+      iterationLogsPath: project.getTaskIterationLogsPath(
+        task.id,
+        task.iterations
+      ),
     });
     const containerId = await sandbox.createAndStart();
 

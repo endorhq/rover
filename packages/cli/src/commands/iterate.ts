@@ -209,6 +209,10 @@ const iterateCommand = async (
       // Start sandbox container for task execution
       const sandbox = await createSandbox(task, undefined, {
         projectPath: project.path,
+        iterationLogsPath: project.getTaskIterationLogsPath(
+          task.id,
+          task.iterations
+        ),
       });
       // TODO: ADD INITIAL PROMPT!
       await sandbox.runInteractive();
@@ -510,6 +514,10 @@ const iterateCommand = async (
       // Start sandbox container for task execution
       const sandbox = await createSandbox(task, processManager, {
         projectPath: project.path,
+        iterationLogsPath: project.getTaskIterationLogsPath(
+          task.id,
+          task.iterations
+        ),
       });
       const containerId = await sandbox.createAndStart();
 

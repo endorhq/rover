@@ -1,5 +1,6 @@
 import { existsSync, copyFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { homedir } from 'node:os';
 import colors from 'ansi-colors';
 import { AgentCredentialFile } from './types.js';
 import { BaseAgent } from './base.js';
@@ -153,5 +154,11 @@ export class CodexAgent extends BaseAgent {
     }
 
     return [prompt];
+  }
+
+  override getLogSources(): string[] {
+    // Codex CLI writes session JSONL logs under
+    // ~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl
+    return [join(homedir(), '.codex', 'sessions')];
   }
 }

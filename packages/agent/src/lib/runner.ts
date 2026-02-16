@@ -10,6 +10,7 @@ import {
   VERBOSE,
   WorkflowManager,
   IterationStatusManager,
+  JsonlLogger,
   showList,
 } from 'rover-core';
 import colors from 'ansi-colors';
@@ -85,7 +86,8 @@ export class Runner {
     private defaultModel: string | undefined,
     private statusManager?: IterationStatusManager,
     private totalSteps: number = 0,
-    private currentStepIndex: number = 0
+    private currentStepIndex: number = 0,
+    private logger?: JsonlLogger
   ) {
     // Get the step from the workflow
     this.step = this.workflow.getStep(stepId);
@@ -150,6 +152,14 @@ export class Runner {
 
     // Update status before executing step
     this.statusManager?.update('running', this.step.name, currentProgress);
+
+    // Log step start
+    this.logger?.info('step_start', `Starting step: ${this.step.name}`, {
+      stepId: this.step.id,
+      stepName: this.step.name,
+      agent: this.tool,
+      progress: currentProgress,
+    });
 
     // Get the processed prompt
     const finalPrompt = this.prompt();
@@ -223,6 +233,11 @@ export class Runner {
         'Agent requires authentication - process was terminated',
         this.tool
       );
+      this.logger?.error('agent_auth_error', 'Agent requires authentication', {
+        stepId: this.step.id,
+        stepName: this.step.name,
+        agent: this.tool,
+      });
     } else if (result.exitCode === 0) {
       // Success case - capture raw output
       rawOutput = result.stdout ? result.stdout.toString() : '';
@@ -236,6 +251,15 @@ export class Runner {
       if (recoveryResult) {
         rawOutput = recoveryResult.rawOutput;
         recoveryNotice = recoveryResult.notice;
+        this.logger?.warn(
+          'agent_recovery',
+          `Agent error recovered for step: ${this.step.name}`,
+          {
+            stepId: this.step.id,
+            stepName: this.step.name,
+            agent: this.tool,
+          }
+        );
       } else {
         // Recovery failed - parse the error
         const stderr = result.stderr ? result.stderr.toString() : '';
@@ -247,6 +271,16 @@ export class Runner {
           agentError = new TimeoutError(
             `Step '${this.step.name}' exceeded timeout of ${this.workflow.getStepTimeout(this.step.id)}s`,
             this.workflow.getStepTimeout(this.step.id) * 1000
+          );
+          this.logger?.error(
+            'agent_timeout',
+            `Step '${this.step.name}' timed out`,
+            {
+              stepId: this.step.id,
+              stepName: this.step.name,
+              agent: this.tool,
+              duration: this.workflow.getStepTimeout(this.step.id),
+            }
           );
         } else if (result.isCanceled) {
           // Process was canceled (likely due to auth prompt)
@@ -327,16 +361,40 @@ export class Runner {
       outputs.set('error_retryable', String(agentError.isRetryable));
     }
 
+    const duration = (performance.now() - start) / 1000; // Convert to seconds
     const runnerResult: RunnerStepResult = {
       id: this.step.id,
       success: !outputs.has('error'), // Success if no error was stored
       error: outputs.get('error'),
-      duration: (performance.now() - start) / 1000, // Convert to seconds
+      duration,
       tokens: usageStats?.tokens,
       cost: usageStats?.cost,
       model: usageStats?.model,
       outputs,
     };
+
+    // Log step completion or failure
+    if (runnerResult.success) {
+      this.logger?.info('step_complete', `Step completed: ${this.step.name}`, {
+        stepId: this.step.id,
+        stepName: this.step.name,
+        agent: this.tool,
+        duration,
+        tokens: usageStats?.tokens,
+        cost: usageStats?.cost,
+        model: usageStats?.model,
+      });
+    } else {
+      this.logger?.error('step_fail', `Step failed: ${this.step.name}`, {
+        stepId: this.step.id,
+        stepName: this.step.name,
+        agent: this.tool,
+        duration,
+        error: agentError?.message,
+        errorCode: agentError?.code,
+        errorRetryable: agentError?.isRetryable,
+      });
+    }
 
     return runnerResult;
   }

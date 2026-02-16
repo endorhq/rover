@@ -167,9 +167,6 @@ export class CursorAgent extends BaseAgent {
     if (this.model) {
       args.push('--model', this.model);
     }
-    if (VERBOSE) {
-      args.push('--verbose');
-    }
     return args;
   }
 

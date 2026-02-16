@@ -1,6 +1,7 @@
 import { existsSync, copyFileSync, readFileSync, writeFileSync } from 'node:fs';
 import { VERBOSE, showList } from 'rover-core';
 import { join } from 'node:path';
+import { homedir } from 'node:os';
 import colors from 'ansi-colors';
 import { AgentCredentialFile, AgentUsageStats } from './types.js';
 import { BaseAgent } from './base.js';
@@ -228,5 +229,14 @@ export class OpenCodeAgent extends BaseAgent {
     _parsedResponse: unknown
   ): AgentUsageStats | undefined {
     return undefined;
+  }
+
+  override getLogSources(): string[] {
+    // OpenCode writes debug logs under ~/.local/share/opencode/log/
+    // and session/message data under ~/.local/share/opencode/storage/
+    return [
+      join(homedir(), '.local', 'share', 'opencode', 'log'),
+      join(homedir(), '.local', 'share', 'opencode', 'storage'),
+    ];
   }
 }

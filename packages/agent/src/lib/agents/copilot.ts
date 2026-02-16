@@ -11,6 +11,7 @@ import colors from 'ansi-colors';
 import { showList } from 'rover-core';
 import { AgentCredentialFile } from './types.js';
 import { BaseAgent } from './base.js';
+import { VERBOSE } from 'rover-core';
 
 export class CopilotAgent extends BaseAgent {
   name = 'Copilot';
@@ -164,6 +165,9 @@ export class CopilotAgent extends BaseAgent {
     if (this.model) {
       args.push('--model', this.model);
     }
+    if (VERBOSE) {
+      args.push('--log-level', 'all');
+    }
     args.push('-p');
     return args;
   }
@@ -179,5 +183,11 @@ export class CopilotAgent extends BaseAgent {
     }
 
     return ['-p', prompt];
+  }
+
+  override getLogSources(): string[] {
+    // Copilot CLI writes session event logs under
+    // ~/.copilot/session-state/<session-id>/events.jsonl
+    return [join(homedir(), '.copilot', 'session-state')];
   }
 }

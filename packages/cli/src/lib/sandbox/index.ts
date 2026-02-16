@@ -37,6 +37,8 @@ export interface CreateSandboxOptions {
   projectPath?: string;
   /** Sandbox-specific metadata (from task metadata) */
   sandboxMetadata?: Record<string, unknown>;
+  /** Path to mount as /logs inside the container for this iteration */
+  iterationLogsPath?: string;
 }
 
 /**
