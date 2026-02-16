@@ -51,15 +51,18 @@
     "commander": "catalog:runtime",
     "dotenv": "^16.4.7",
     "enquirer": "^2.4.1",
+    "ink": "^6.7.0",
     "nanoid": "^5.0.9",
     "ora": "^8.2.0",
     "pupa": "^3.3.0",
+    "react": "^19.2.4",
     "tmp": "^0.2.5",
     "yocto-spinner": "^1.0.0",
     "zod": "catalog:runtime"
   },
   "devDependencies": {
     "@types/node": "catalog:build",
+    "@types/react": "^19.1.9",
     "@types/tmp": "^0.2.6",
     "@vitest/ui": "catalog:build",
     "execa": "catalog:runtime",
