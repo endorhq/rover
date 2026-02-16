@@ -29,6 +29,16 @@ vi.mock('../../lib/context.js', () => ({
       },
       getWorkspacePath: (taskId: number) =>
         join(testDir, '.rover', 'tasks', taskId.toString(), 'workspace'),
+      getTaskIterationLogsPath: (taskId: number, iteration: number) =>
+        join(
+          testDir,
+          '.rover',
+          'tasks',
+          taskId.toString(),
+          'iterations',
+          iteration.toString(),
+          'logs'
+        ),
     });
   }),
   isJsonMode: vi.fn().mockReturnValue(false),
