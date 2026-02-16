@@ -179,9 +179,10 @@ export class DockerSandbox extends Sandbox {
     );
 
     // Mount project-level logs directory
-    const iterationLogsPath = this.task.getIterationLogsPath();
-    mkdirSync(iterationLogsPath, { recursive: true });
-    dockerArgs.push('-v', `${iterationLogsPath}:/logs:Z,rw`);
+    if (this.options?.iterationLogsPath) {
+      mkdirSync(this.options.iterationLogsPath, { recursive: true });
+      dockerArgs.push('-v', `${this.options.iterationLogsPath}:/logs:Z,rw`);
+    }
 
     dockerArgs.push(
       ...dockerMounts,
@@ -549,6 +550,20 @@ export class DockerSandbox extends Sandbox {
       return { ...process.env, DOCKER_HOST: dockerHost };
     }
     return process.env;
+  }
+
+  async inspect(): Promise<{ status: string } | null> {
+    try {
+      const result = await launch(
+        'docker',
+        ['inspect', '--format', '{{.State.Status}}', this.sandboxName],
+        { env: this.getDockerEnv() }
+      );
+      const status = result.stdout?.toString().trim();
+      return status ? { status } : null;
+    } catch {
+      return null;
+    }
   }
 
   protected async remove(): Promise<string> {

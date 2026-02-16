@@ -17,6 +17,8 @@ export interface SandboxOptions {
   projectPath?: string;
   /** Sandbox-specific metadata (from task metadata) */
   sandboxMetadata?: Record<string, unknown>;
+  /** Path to mount as /logs inside the container for this iteration */
+  iterationLogsPath?: string;
 }
 
 export abstract class SandboxPackage {
@@ -45,6 +47,7 @@ export abstract class Sandbox {
 
   abstract isBackendAvailable(): Promise<boolean>;
   abstract openShellAtWorktree(): Promise<void>;
+  abstract inspect(): Promise<{ status: string } | null>;
 
   protected abstract create(): Promise<string>;
   protected abstract start(): Promise<string>;

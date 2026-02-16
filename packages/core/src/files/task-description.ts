@@ -14,8 +14,7 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { getProjectLogsDir } from '../paths.js';
+import { join } from 'node:path';
 import {
   CURRENT_TASK_DESCRIPTION_SCHEMA_VERSION,
   TaskDescriptionSchema,
@@ -649,30 +648,6 @@ export class TaskDescriptionManager {
    */
   getBasePath(): string {
     return this.basePath;
-  }
-
-  /**
-   * Get path to this task's logs directory:
-   *   {projectDir}/logs/tasks/{taskId}
-   *
-   * basePath is {projectDir}/tasks/{taskId}, so we go up to {projectDir}
-   * and use the centralized getProjectLogsDir helper.
-   */
-  logsPath(): string {
-    const projectDir = dirname(dirname(this.basePath));
-    return join(
-      getProjectLogsDir(projectDir),
-      'tasks',
-      this.data.id.toString()
-    );
-  }
-
-  /**
-   * Get path to the current iteration's logs directory:
-   *   {projectDir}/logs/tasks/{taskId}/iterations/{iteration}
-   */
-  getIterationLogsPath(): string {
-    return join(this.logsPath(), 'iterations', this.data.iterations.toString());
   }
 
   // ============================================================

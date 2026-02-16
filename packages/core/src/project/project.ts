@@ -204,6 +204,26 @@ export class ProjectManager {
   }
 
   /**
+   * Get path to a specific task's logs directory:
+   *   {projectDir}/logs/tasks/{taskId}
+   */
+  getTaskLogsPath(taskId: number): string {
+    return join(this.logsPath, 'tasks', taskId.toString());
+  }
+
+  /**
+   * Get path to a specific task iteration's logs directory:
+   *   {projectDir}/logs/tasks/{taskId}/iterations/{iteration}
+   */
+  getTaskIterationLogsPath(taskId: number, iteration: number): string {
+    return join(
+      this.getTaskLogsPath(taskId),
+      'iterations',
+      iteration.toString()
+    );
+  }
+
+  /**
    * Get path to a specific task directory (central store).
    *
    * @param taskId - Task ID

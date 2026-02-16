@@ -160,9 +160,10 @@ export class PodmanSandbox extends Sandbox {
     );
 
     // Mount project-level logs directory
-    const iterationLogsPath = this.task.getIterationLogsPath();
-    mkdirSync(iterationLogsPath, { recursive: true });
-    podmanArgs.push('-v', `${iterationLogsPath}:/logs:Z,rw`);
+    if (this.options?.iterationLogsPath) {
+      mkdirSync(this.options.iterationLogsPath, { recursive: true });
+      podmanArgs.push('-v', `${this.options.iterationLogsPath}:/logs:Z,rw`);
+    }
 
     podmanArgs.push(
       ...containerMounts,
@@ -505,6 +506,20 @@ export class PodmanSandbox extends Sandbox {
       reject: false,
       detached: false,
     });
+  }
+
+  async inspect(): Promise<{ status: string } | null> {
+    try {
+      const result = await launch(
+        'podman',
+        ['inspect', '--format', '{{.State.Status}}', this.sandboxName],
+        { stdio: 'pipe' }
+      );
+      const status = result.stdout?.toString().trim();
+      return status ? { status } : null;
+    } catch {
+      return null;
+    }
   }
 
   protected async remove(): Promise<string> {
