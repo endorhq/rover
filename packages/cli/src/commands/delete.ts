@@ -2,6 +2,7 @@ import colors from 'ansi-colors';
 import enquirer from 'enquirer';
 import {
   Git,
+  showList,
   type TaskDescriptionManager,
   type ProjectManager,
 } from 'rover-core';
@@ -122,20 +123,19 @@ const deleteCommand = async (
       colors.bold(`Task${tasksToDelete.length > 1 ? 's' : ''} to delete`)
     );
 
-    tasksToDelete.forEach((task, index) => {
-      const colorFunc = statusColor(task.status);
-      const isLast = index === tasksToDelete.length - 1;
-      const prefix = isLast ? '└──' : '├──';
-
-      console.log(
-        colors.gray(`${prefix} ID: `) +
+    showList(
+      tasksToDelete.map(task => {
+        const colorFunc = statusColor(task.status);
+        return (
+          colors.gray('ID: ') +
           colors.cyan(task.id.toString()) +
           colors.gray(' | Title: ') +
           task.title +
           colors.gray(' | Status: ') +
           colorFunc(task.status)
-      );
-    });
+        );
+      })
+    );
 
     console.log(
       '\n' +

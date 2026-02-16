@@ -430,7 +430,7 @@ describe('logs command', () => {
         expect.stringContaining('Console Output Task')
       );
       expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Iteration:')
+        expect.stringContaining('Iteration')
       );
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining('Execution Log')

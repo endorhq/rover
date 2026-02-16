@@ -1,4 +1,5 @@
 import colors from 'ansi-colors';
+import { showProperties } from 'rover-core';
 import { CommandOutput } from '../../cli.js';
 import { createAgent } from '../../lib/agents/index.js';
 import ora from 'ora';
@@ -36,12 +37,12 @@ export const mcpInstallCommand = async (
 
   try {
     console.log(colors.bold('MCP Server to install'));
-    console.log(colors.gray('├── Agent: ') + agentName);
-    console.log(colors.gray('├── MCP Name: ') + colors.cyan(mcpName));
-    console.log(
-      colors.gray('├── MCP Command or URL: ') + colors.cyan(commandOrUrl)
-    );
-    console.log(colors.gray('└── MCP Transport: ') + options.transport);
+    showProperties({
+      Agent: agentName,
+      'MCP Name': colors.cyan(mcpName),
+      'MCP Command or URL': colors.cyan(commandOrUrl),
+      'MCP Transport': options.transport,
+    });
 
     console.log();
     spinner.text = `Checking agent`;

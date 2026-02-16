@@ -1,6 +1,6 @@
 import colors from 'ansi-colors';
 import { existsSync } from 'node:fs';
-import { launch, launchSync } from 'rover-core';
+import { launch, launchSync, showTitle, showProperties } from 'rover-core';
 import yoctoSpinner from 'yocto-spinner';
 import { statusColor } from '../utils/task-status.js';
 import { TaskNotFoundError } from 'rover-schemas';
@@ -65,10 +65,12 @@ const shellCommand = async (
 
     const colorFunc = statusColor(task.status);
 
-    console.log(colors.bold('Task details'));
-    console.log(colors.gray('├── ID: ') + colors.cyan(task.id.toString()));
-    console.log(colors.gray('├── Title: ') + task.title);
-    console.log(colors.gray('└── Status: ') + colorFunc(task.status) + '\n');
+    showTitle('Task details');
+    showProperties({
+      ID: colors.cyan(task.id.toString()),
+      Title: task.title,
+      Status: colorFunc(task.status),
+    });
 
     // Check if worktree exists
     if (!task.worktreePath || !existsSync(task.worktreePath)) {
