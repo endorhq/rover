@@ -32,10 +32,10 @@ export class ProjectConfigManager {
   ) {}
 
   /**
-   * Load an existing configuration from disk
-   * @param projectPath - The project root path where rover.json is located
+   * Load an existing configuration from disk.
+   * This is private — external callers should use maybeLoad() instead.
    */
-  static load(projectPath: string): ProjectConfigManager {
+  private static load(projectPath: string): ProjectConfigManager {
     const projectRoot = projectPath;
     const filePath = join(projectRoot, PROJECT_CONFIG_FILENAME);
 
@@ -94,6 +94,18 @@ export class ProjectConfigManager {
     const instance = new ProjectConfigManager(schema, projectRoot);
     instance.save();
     return instance;
+  }
+
+  /**
+   * Load a configuration if it exists on disk, returning undefined otherwise.
+   * Use this in commands where the project configuration is not mandatory.
+   * @param projectPath - The project root path where rover.json may be located
+   */
+  static maybeLoad(projectPath: string): ProjectConfigManager | undefined {
+    if (!ProjectConfigManager.exists(projectPath)) {
+      return undefined;
+    }
+    return ProjectConfigManager.load(projectPath);
   }
 
   /**

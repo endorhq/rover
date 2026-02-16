@@ -21,9 +21,7 @@ vi.mock('../../paths.js', () => ({
 // Mock ProjectConfigManager to prevent loading real project config
 vi.mock('../project-config.js', () => ({
   ProjectConfigManager: {
-    load: () => {
-      throw new Error('No project config in test');
-    },
+    maybeLoad: () => undefined,
   },
 }));
 
@@ -159,7 +157,7 @@ describe('GlobalConfigManager', () => {
       // Re-mock ProjectConfigManager to return valid config with attribution enabled
       vi.doMock('../project-config.js', () => ({
         ProjectConfigManager: {
-          load: () => ({
+          maybeLoad: () => ({
             attribution: true,
           }),
         },

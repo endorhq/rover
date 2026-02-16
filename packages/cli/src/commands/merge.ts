@@ -252,13 +252,7 @@ const mergeCommand = async (taskId: string, options: MergeOptions = {}) => {
   let projectConfig;
 
   // Load config
-  try {
-    projectConfig = ProjectConfigManager.load(project.path);
-  } catch (err) {
-    if (!isJsonMode()) {
-      console.log(colors.yellow('⚠ Could not load project settings'));
-    }
-  }
+  projectConfig = ProjectConfigManager.maybeLoad(project.path);
 
   // Load user preferences
   try {

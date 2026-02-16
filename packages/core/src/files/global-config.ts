@@ -101,8 +101,10 @@ export class GlobalConfigManager {
     // initialization when no explicit project context is available.
     try {
       const projectRoot = findProjectRoot();
-      const projectConfig = ProjectConfigManager.load(projectRoot);
-      attribution = projectConfig.attribution ? 'enabled' : 'disabled';
+      const projectConfig = ProjectConfigManager.maybeLoad(projectRoot);
+      if (projectConfig) {
+        attribution = projectConfig.attribution ? 'enabled' : 'disabled';
+      }
     } catch (error) {
       // Ignore errors and keep attribution as 'unknown'
     }

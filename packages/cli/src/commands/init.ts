@@ -358,7 +358,7 @@ const initCommand = async (path: string = '.', options: { yes?: boolean }) => {
       let projectConfig: ProjectConfigManager;
 
       if (ProjectConfigManager.exists(projectRoot)) {
-        projectConfig = ProjectConfigManager.load(projectRoot);
+        projectConfig = ProjectConfigManager.maybeLoad(projectRoot)!;
         // Update with detected values
         environment.languages.forEach(lang => projectConfig.addLanguage(lang));
         environment.packageManagers.forEach(pm =>

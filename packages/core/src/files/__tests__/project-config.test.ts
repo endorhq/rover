@@ -77,7 +77,7 @@ describe('ProjectConfigManager - Environment Variable Configuration', () => {
       )
     );
 
-    const config = ProjectConfigManager.load(testDir);
+    const config = ProjectConfigManager.maybeLoad(testDir)!;
 
     expect(config.envs).toEqual(['NODE_ENV', 'API_KEY=test-key', 'DEBUG']);
     expect(config.envsFile).toBeUndefined();
@@ -100,7 +100,7 @@ describe('ProjectConfigManager - Environment Variable Configuration', () => {
       )
     );
 
-    const config = ProjectConfigManager.load(testDir);
+    const config = ProjectConfigManager.maybeLoad(testDir)!;
 
     expect(config.envsFile).toBe('.env.rover');
     expect(config.envs).toBeUndefined();
@@ -124,7 +124,7 @@ describe('ProjectConfigManager - Environment Variable Configuration', () => {
       )
     );
 
-    const config = ProjectConfigManager.load(testDir);
+    const config = ProjectConfigManager.maybeLoad(testDir)!;
 
     expect(config.envs).toEqual(['NODE_ENV', 'DEBUG=true']);
     expect(config.envsFile).toBe('.env.rover');
@@ -146,7 +146,7 @@ describe('ProjectConfigManager - Environment Variable Configuration', () => {
       )
     );
 
-    const config = ProjectConfigManager.load(testDir);
+    const config = ProjectConfigManager.maybeLoad(testDir)!;
 
     // Should be migrated to 1.2
     expect(config.version).toBe('1.3');
@@ -180,7 +180,7 @@ describe('ProjectConfigManager - Environment Variable Configuration', () => {
       )
     );
 
-    const config = ProjectConfigManager.load(testDir);
+    const config = ProjectConfigManager.maybeLoad(testDir)!;
 
     // Should be migrated to 1.2
     expect(config.version).toBe('1.3');
@@ -213,7 +213,7 @@ describe('ProjectConfigManager - Environment Variable Configuration', () => {
       )
     );
 
-    const config = ProjectConfigManager.load(testDir);
+    const config = ProjectConfigManager.maybeLoad(testDir)!;
 
     expect(config.version).toBe('1.3');
 
@@ -239,7 +239,7 @@ describe('ProjectConfigManager - Environment Variable Configuration', () => {
       )
     );
 
-    const config = ProjectConfigManager.load(testDir);
+    const config = ProjectConfigManager.maybeLoad(testDir)!;
 
     expect(config.version).toBe('1.3');
     expect(config.languages).toEqual(['typescript', 'python']);
@@ -265,7 +265,7 @@ describe('ProjectConfigManager - Environment Variable Configuration', () => {
       )
     );
 
-    const config = ProjectConfigManager.load(testDir);
+    const config = ProjectConfigManager.maybeLoad(testDir)!;
 
     expect(config.envs).toEqual([]);
   });
@@ -292,7 +292,7 @@ describe('ProjectConfigManager - Environment Variable Configuration', () => {
       )
     );
 
-    const config = ProjectConfigManager.load(testDir);
+    const config = ProjectConfigManager.maybeLoad(testDir)!;
 
     expect(config.envs).toEqual([
       'SIMPLE_VAR',
@@ -321,7 +321,7 @@ describe('ProjectConfigManager - Environment Variable Configuration', () => {
       )
     );
 
-    const config = ProjectConfigManager.load(testDir);
+    const config = ProjectConfigManager.maybeLoad(testDir)!;
 
     // Should remain at version 1.2
     expect(config.version).toBe('1.3');
@@ -378,7 +378,7 @@ describe('ProjectConfigManager - Environment Variable Configuration', () => {
       )
     );
 
-    const config = ProjectConfigManager.load(testDir);
+    const config = ProjectConfigManager.maybeLoad(testDir)!;
 
     expect(config.agentImage).toBe('custom/agent:v2.0.0');
     expect(config.initScript).toBeUndefined();
@@ -404,7 +404,7 @@ describe('ProjectConfigManager - Environment Variable Configuration', () => {
       )
     );
 
-    const config = ProjectConfigManager.load(testDir);
+    const config = ProjectConfigManager.maybeLoad(testDir)!;
 
     expect(config.initScript).toBe('scripts/init.sh');
     expect(config.agentImage).toBeUndefined();
@@ -431,7 +431,7 @@ describe('ProjectConfigManager - Environment Variable Configuration', () => {
       )
     );
 
-    const config = ProjectConfigManager.load(testDir);
+    const config = ProjectConfigManager.maybeLoad(testDir)!;
 
     expect(config.agentImage).toBe('custom/agent:v2.0.0');
     expect(config.initScript).toBe('scripts/init.sh');
@@ -455,7 +455,7 @@ describe('ProjectConfigManager - Environment Variable Configuration', () => {
       )
     );
 
-    const config = ProjectConfigManager.load(testDir);
+    const config = ProjectConfigManager.maybeLoad(testDir)!;
 
     // Should be migrated to 1.2
     expect(config.version).toBe('1.3');
@@ -488,7 +488,7 @@ describe('ProjectConfigManager - Environment Variable Configuration', () => {
       )
     );
 
-    const config = ProjectConfigManager.load(testDir);
+    const config = ProjectConfigManager.maybeLoad(testDir)!;
 
     expect(config.version).toBe('1.3');
     expect(config.agentImage).toBe('ghcr.io/custom/rover:v1.0');
@@ -519,7 +519,7 @@ describe('ProjectConfigManager - Environment Variable Configuration', () => {
       )
     );
 
-    const config = ProjectConfigManager.load(testDir);
+    const config = ProjectConfigManager.maybeLoad(testDir)!;
 
     expect(config.version).toBe('1.3');
     expect(config.languages).toEqual(['typescript', 'python']);
@@ -565,7 +565,7 @@ describe('ProjectConfigManager - Environment Variable Configuration', () => {
       )
     );
 
-    const config = ProjectConfigManager.load(testDir);
+    const config = ProjectConfigManager.maybeLoad(testDir)!;
 
     expect(config.hooks).toEqual({
       onMerge: ['echo "merged"', 'npm run lint'],
@@ -594,7 +594,7 @@ describe('ProjectConfigManager - Environment Variable Configuration', () => {
       )
     );
 
-    const config = ProjectConfigManager.load(testDir);
+    const config = ProjectConfigManager.maybeLoad(testDir)!;
 
     expect(config.hooks).toEqual({
       onPush: ['echo "pushed"'],
@@ -624,7 +624,7 @@ describe('ProjectConfigManager - Environment Variable Configuration', () => {
       )
     );
 
-    const config = ProjectConfigManager.load(testDir);
+    const config = ProjectConfigManager.maybeLoad(testDir)!;
 
     expect(config.hooks).toEqual({
       onMerge: ['npm run test'],
@@ -651,7 +651,7 @@ describe('ProjectConfigManager - Environment Variable Configuration', () => {
       )
     );
 
-    const config = ProjectConfigManager.load(testDir);
+    const config = ProjectConfigManager.maybeLoad(testDir)!;
 
     // Should be migrated to 1.2
     expect(config.version).toBe('1.3');
@@ -690,7 +690,7 @@ describe('ProjectConfigManager - Environment Variable Configuration', () => {
       )
     );
 
-    const config = ProjectConfigManager.load(testDir);
+    const config = ProjectConfigManager.maybeLoad(testDir)!;
 
     expect(config.hooks?.onMerge).toEqual([]);
     expect(config.hooks?.onPush).toEqual([]);
@@ -720,7 +720,7 @@ describe('ProjectConfigManager - Environment Variable Configuration', () => {
       )
     );
 
-    const config = ProjectConfigManager.load(testDir);
+    const config = ProjectConfigManager.maybeLoad(testDir)!;
 
     expect(config.version).toBe('1.3');
     expect(config.languages).toEqual(['typescript', 'python']);
@@ -772,7 +772,7 @@ describe('ProjectConfigManager - Environment Variable Configuration', () => {
       )
     );
 
-    const config = ProjectConfigManager.load(testDir);
+    const config = ProjectConfigManager.maybeLoad(testDir)!;
 
     // Should be migrated to 1.3
     expect(config.version).toBe('1.3');
@@ -804,7 +804,7 @@ describe('ProjectConfigManager - Environment Variable Configuration', () => {
       )
     );
 
-    const config = ProjectConfigManager.load(testDir);
+    const config = ProjectConfigManager.maybeLoad(testDir)!;
 
     expect(config.excludePatterns).toEqual([]);
   });
@@ -834,7 +834,7 @@ describe('ProjectConfigManager - Environment Variable Configuration', () => {
       )
     );
 
-    const config = ProjectConfigManager.load(testDir);
+    const config = ProjectConfigManager.maybeLoad(testDir)!;
 
     expect(config.version).toBe('1.3');
     expect(config.languages).toEqual(['typescript', 'python']);
@@ -872,7 +872,7 @@ describe('ProjectConfigManager - Environment Variable Configuration', () => {
       )
     );
 
-    const config = ProjectConfigManager.load(testDir);
+    const config = ProjectConfigManager.maybeLoad(testDir)!;
 
     // Should remain at version 1.3
     expect(config.version).toBe('1.3');

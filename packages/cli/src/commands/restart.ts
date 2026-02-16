@@ -132,9 +132,9 @@ const restartCommand = async (
         copyEnvironmentFiles(project.path, worktreePath);
 
         // Configure sparse checkout to exclude files matching exclude patterns
-        const projectConfig = ProjectConfigManager.load(project.path);
+        const projectConfig = ProjectConfigManager.maybeLoad(project.path);
         if (
-          projectConfig.excludePatterns &&
+          projectConfig?.excludePatterns &&
           projectConfig.excludePatterns.length > 0
         ) {
           git.setupSparseCheckout(worktreePath, projectConfig.excludePatterns);

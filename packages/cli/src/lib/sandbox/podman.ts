@@ -58,12 +58,16 @@ export class PodmanSandbox extends Sandbox {
     }
 
     // Load project configuration
-    const projectConfig = ProjectConfigManager.load(this.options?.projectPath!);
+    const projectConfig = ProjectConfigManager.maybeLoad(
+      this.options?.projectPath!
+    );
+    const projectRoot =
+      projectConfig?.projectRoot ?? this.options?.projectPath!;
     const worktreePath = this.task.worktreePath;
 
     // Validate worktree path is within project root or data directory (security check)
     const worktreeKnownLocation =
-      isPathWithin(worktreePath, projectConfig.projectRoot) ||
+      isPathWithin(worktreePath, projectRoot) ||
       isPathWithin(worktreePath, getDataDir());
 
     if (worktreePath.length === 0 || !worktreeKnownLocation) {
@@ -98,7 +102,8 @@ export class PodmanSandbox extends Sandbox {
     const setupBuilder = new SetupBuilder(
       this.task,
       this.task.agent!,
-      projectConfig
+      projectConfig,
+      this.options?.projectPath
     );
     const entrypointScriptPath = setupBuilder.generateEntrypoint(
       true,
@@ -139,7 +144,7 @@ export class PodmanSandbox extends Sandbox {
 
     // Add NET_ADMIN capability if network filtering is configured
     const effectiveNetworkConfig = mergeNetworkConfig(
-      projectConfig.network,
+      projectConfig?.network,
       this.task.networkConfig
     );
     if (effectiveNetworkConfig && effectiveNetworkConfig.mode !== 'allowall') {
@@ -264,7 +269,9 @@ export class PodmanSandbox extends Sandbox {
    * whether to run a two-phase init before calling create().
    */
   private checkCacheState(): void {
-    const projectConfig = ProjectConfigManager.load(this.options?.projectPath!);
+    const projectConfig = ProjectConfigManager.maybeLoad(
+      this.options?.projectPath!
+    );
     const agentImage = resolveAgentImage(projectConfig, this.task.agentImage);
 
     const { hasCachedImage, cacheTag } = checkImageCache(
@@ -353,12 +360,16 @@ export class PodmanSandbox extends Sandbox {
     }
 
     // Load project configuration
-    const projectConfig = ProjectConfigManager.load(this.options?.projectPath!);
+    const projectConfig = ProjectConfigManager.maybeLoad(
+      this.options?.projectPath!
+    );
+    const projectRoot =
+      projectConfig?.projectRoot ?? this.options?.projectPath!;
     const worktreePath = this.task.worktreePath;
 
     // Validate worktree path is within project root or data directory (security check)
     const worktreeKnownLocation =
-      isPathWithin(worktreePath, projectConfig.projectRoot) ||
+      isPathWithin(worktreePath, projectRoot) ||
       isPathWithin(worktreePath, getDataDir());
 
     if (worktreePath.length === 0 || !worktreeKnownLocation) {
@@ -390,7 +401,8 @@ export class PodmanSandbox extends Sandbox {
     const setupBuilder = new SetupBuilder(
       this.task,
       this.task.agent!,
-      projectConfig
+      projectConfig,
+      this.options?.projectPath
     );
     const entrypointScriptPath = setupBuilder.generateEntrypoint(
       false,
@@ -421,7 +433,7 @@ export class PodmanSandbox extends Sandbox {
 
     // Add NET_ADMIN capability if network filtering is configured
     const effectiveNetworkConfigInteractive = mergeNetworkConfig(
-      projectConfig.network,
+      projectConfig?.network,
       this.task.networkConfig
     );
     if (
@@ -552,7 +564,9 @@ export class PodmanSandbox extends Sandbox {
     const containerName = `rover-shell-${this.task.id}-${generateRandomId()}`;
 
     // Get extra args from CLI options and project config, merge them
-    const projectConfig = ProjectConfigManager.load(this.options?.projectPath!);
+    const projectConfig = ProjectConfigManager.maybeLoad(
+      this.options?.projectPath!
+    );
     const configExtraArgs = normalizeExtraArgs(projectConfig?.sandboxExtraArgs);
     const cliExtraArgs = normalizeExtraArgs(this.options?.extraArgs);
     const extraArgs = [...configExtraArgs, ...cliExtraArgs];

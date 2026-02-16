@@ -57,16 +57,19 @@ export class SetupBuilder {
   private taskBasePath: string;
   private iterationPath: string;
   private isDockerRootless: boolean;
-  private projectConfig: ProjectConfigManager;
+  private projectConfig: ProjectConfigManager | undefined;
+  private projectPath: string | undefined;
 
   constructor(
     taskDescription: TaskDescriptionManager,
     agent: string,
-    projectConfig: ProjectConfigManager
+    projectConfig: ProjectConfigManager | undefined,
+    projectPath?: string
   ) {
     this.agent = agent;
     this.task = taskDescription;
     this.projectConfig = projectConfig;
+    this.projectPath = projectConfig?.projectRoot ?? projectPath;
 
     let isDockerRootless = false;
 
@@ -94,7 +97,7 @@ export class SetupBuilder {
   private getLanguagePackages(): SandboxPackage[] {
     const packages: SandboxPackage[] = [];
 
-    for (const language of this.projectConfig.languages) {
+    for (const language of this.projectConfig?.languages ?? []) {
       switch (language) {
         case 'javascript':
           packages.push(new JavaScriptSandboxPackage());
@@ -129,7 +132,7 @@ export class SetupBuilder {
   private getPackageManagerPackages(): SandboxPackage[] {
     const packages: SandboxPackage[] = [];
 
-    for (const packageManager of this.projectConfig.packageManagers) {
+    for (const packageManager of this.projectConfig?.packageManagers ?? []) {
       switch (packageManager) {
         case 'npm':
           packages.push(new NpmSandboxPackage());
@@ -173,7 +176,7 @@ export class SetupBuilder {
   private getTaskManagerPackages(): SandboxPackage[] {
     const packages: SandboxPackage[] = [];
 
-    for (const taskManager of this.projectConfig.taskManagers) {
+    for (const taskManager of this.projectConfig?.taskManagers ?? []) {
       switch (taskManager) {
         case 'just':
           packages.push(new JustSandboxPackage());
@@ -316,7 +319,7 @@ echo -e "\\n📦 Done installing agent"`;
     let mcpConfigSection = '';
     if (!useCachedImage) {
       // Generate MCP configuration commands from rover.json
-      const mcps = this.projectConfig.mcps;
+      const mcps = this.projectConfig?.mcps;
       let configureAllMCPCommands: string[] = [];
 
       if (mcps && mcps.length > 0) {
@@ -380,7 +383,7 @@ echo -e "\\n📦 Done installing MCP servers"`;
 
     // --- initScript execution ---
     let initScriptExecution = '';
-    if (!useCachedImage && this.projectConfig.initScript) {
+    if (!useCachedImage && this.projectConfig?.initScript) {
       initScriptExecution = `
 echo -e "\\n======================================="
 echo "🔧 Running initialization script"
@@ -408,7 +411,7 @@ sudo rm /etc/sudoers.d/1-agent-setup`;
 
     // Generate network filtering configuration (always runs — iptables are runtime state)
     const effectiveNetworkConfig = mergeNetworkConfig(
-      this.projectConfig.network,
+      this.projectConfig?.network,
       this.task.networkConfig
     );
     const networkConfigSection = generateNetworkScript(effectiveNetworkConfig);
@@ -519,7 +522,7 @@ echo "======================================="
   saveWorkflow(workflowName: string): string {
     // Write workflow file to task base path (workflow cannot change between iterations)
     const workflowTaskPath = join(this.taskBasePath, 'workflow.yml');
-    const workflowStore = initWorkflowStore(this.projectConfig.projectRoot);
+    const workflowStore = initWorkflowStore(this.projectPath!);
     const workflow = workflowStore.getWorkflow(workflowName);
 
     if (!workflow) {
@@ -681,8 +684,13 @@ echo "======================================="
     agent: string,
     projectPath: string
   ): string {
-    const projectConfig = ProjectConfigManager.load(projectPath);
-    const builder = new SetupBuilder(taskDescription, agent, projectConfig);
+    const projectConfig = ProjectConfigManager.maybeLoad(projectPath);
+    const builder = new SetupBuilder(
+      taskDescription,
+      agent,
+      projectConfig,
+      projectPath
+    );
     return builder.generateEntrypoint();
   }
 }
