@@ -8,6 +8,8 @@ import {
   AI_AGENT,
   Git,
   ProjectConfigManager,
+  showTitle,
+  showProperties,
   type ProjectManager,
 } from 'rover-core';
 import { TaskNotFoundError } from 'rover-schemas';
@@ -193,21 +195,19 @@ const restartCommand = async (
     }
 
     if (!isJsonMode()) {
-      console.log(colors.bold('Restarting Task'));
-      console.log(colors.gray('├── ID: ') + colors.cyan(task.id.toString()));
-      console.log(colors.gray('├── Title: ') + task.title);
-      console.log(colors.gray('├── Status: ') + colors.red(task.status));
-      console.log(colors.gray('├── Workspace: ') + colors.cyan(worktreePath));
-      console.log(colors.gray('├── Branch: ') + colors.cyan(branchName));
+      showTitle('Restarting Task');
+      const props: Record<string, string> = {
+        ID: colors.cyan(task.id.toString()),
+        Title: task.title,
+        Status: colors.red(task.status),
+        Workspace: colors.cyan(worktreePath),
+        Branch: colors.cyan(branchName),
+      };
       if (process.env.ROVER_AGENT_IMAGE) {
-        console.log(
-          colors.gray('├── Agent Image: ') +
-            colors.cyan(process.env.ROVER_AGENT_IMAGE)
-        );
-        console.log(colors.gray('└── Reset to: ') + colors.yellow('NEW'));
-      } else {
-        console.log(colors.gray('└── Reset to: ') + colors.yellow('NEW'));
+        props['Agent Image'] = colors.cyan(process.env.ROVER_AGENT_IMAGE);
       }
+      props['Reset to'] = colors.yellow('NEW');
+      showProperties(props);
       console.log(colors.green('\n✓ Task reset successfully'));
       console.log('');
     }

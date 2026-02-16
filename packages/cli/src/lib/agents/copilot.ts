@@ -3,6 +3,7 @@ import {
   AIAgentTool,
   InvokeAIAgentError,
   MissingAIAgentError,
+  type InvokeOptions,
 } from './index.js';
 import { PromptBuilder, IPromptTask } from '../prompts/index.js';
 import { parseJsonResponse } from '../../utils/json-parser.js';
@@ -26,11 +27,9 @@ class CopilotAI implements AIAgentTool {
     }
   }
 
-  async invoke(
-    prompt: string,
-    json: boolean = false,
-    cwd?: string
-  ): Promise<string> {
+  async invoke(prompt: string, options: InvokeOptions = {}): Promise<string> {
+    const { json = false, cwd, model } = options;
+
     if (json) {
       prompt = `${prompt}
 
@@ -39,6 +38,10 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
 
     // Use -s (silent) to get clean output without stats
     const copilotArgs = ['-s', '-p', prompt];
+
+    if (model) {
+      copilotArgs.push('--model', model);
+    }
 
     try {
       const { stdout } = await launch(this.AGENT_BIN, copilotArgs, {
@@ -60,7 +63,10 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
     const prompt = this.promptBuilder.expandTaskPrompt(briefDescription);
 
     try {
-      const response = await this.invoke(prompt, true, projectPath);
+      const response = await this.invoke(prompt, {
+        json: true,
+        cwd: projectPath,
+      });
       return parseJsonResponse<IPromptTask>(response);
     } catch (error) {
       console.error('Failed to expand task with Copilot:', error);
@@ -80,7 +86,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
     );
 
     try {
-      const response = await this.invoke(prompt, true);
+      const response = await this.invoke(prompt, { json: true });
       return parseJsonResponse<IPromptTask>(response);
     } catch (error) {
       console.error(
@@ -104,7 +110,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
         recentCommits,
         summaries
       );
-      const response = await this.invoke(prompt, false);
+      const response = await this.invoke(prompt);
 
       if (!response) {
         return null;
@@ -130,7 +136,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
         diffContext,
         conflictedContent
       );
-      const response = await this.invoke(prompt, false);
+      const response = await this.invoke(prompt);
 
       return response;
     } catch (err) {
@@ -148,7 +154,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
     );
 
     try {
-      const response = await this.invoke(prompt, true);
+      const response = await this.invoke(prompt, { json: true });
       return parseJsonResponse<Record<string, any>>(response);
     } catch (error) {
       console.error('Failed to extract GitHub inputs with Copilot:', error);

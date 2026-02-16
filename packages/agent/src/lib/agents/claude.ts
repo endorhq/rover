@@ -17,6 +17,7 @@ import {
   requiredBedrockCredentials,
   requiredVertexAiCredentials,
   VERBOSE,
+  showList,
 } from 'rover-core';
 
 export class ClaudeAgent extends BaseAgent {
@@ -75,11 +76,11 @@ export class ClaudeAgent extends BaseAgent {
     console.log(colors.bold(`\nCopying ${this.name} credentials`));
 
     const targetClaudeDir = join(targetDir, '.claude');
-    console.log(colors.gray(`├── Target directory: ${targetClaudeDir}`));
     // Ensure .claude directory exists
     this.ensureDirectory(targetClaudeDir);
 
     const credentials = this.getRequiredCredentials();
+    const copiedItems: string[] = [];
 
     for (const cred of credentials) {
       if (existsSync(cred.path)) {
@@ -87,8 +88,6 @@ export class ClaudeAgent extends BaseAgent {
 
         // For .claude.json, we need to edit the projects section
         if (cred.path.includes('.claude.json')) {
-          console.log(colors.gray('├── Processing .claude.json'));
-
           // Read the config and clear the projects object
           const config = JSON.parse(readFileSync(cred.path, 'utf-8'));
           config.projects = {};
@@ -99,28 +98,27 @@ export class ClaudeAgent extends BaseAgent {
             join(targetDir, filename),
             JSON.stringify(config, null, 2)
           );
-          console.log(
-            colors.gray('├── Copied: ') +
-              colors.cyan('.claude.json (projects cleared)')
-          );
+          copiedItems.push(colors.cyan('.claude.json (projects cleared)'));
         } else if (cred.path.includes('gcloud')) {
           // Copy the entire folder
           cpSync(cred.path, join(targetDir, '.config', 'gcloud'), {
             recursive: true,
           });
-          console.log(colors.gray('├── Copied: ') + colors.cyan(cred.path));
+          copiedItems.push(colors.cyan(cred.path));
         } else if (cred.path.includes('.settings.json')) {
           // Copy settings.json to .claude directory
           copyFileSync(cred.path, join(targetClaudeDir, 'settings.json'));
-          console.log(
-            colors.gray('├── Copied: ') + colors.cyan('settings.json')
-          );
+          copiedItems.push(colors.cyan('settings.json'));
         } else {
           // Copy file right away
           copyFileSync(cred.path, join(targetClaudeDir, filename));
-          console.log(colors.gray('├── Copied: ') + colors.cyan(cred.path));
+          copiedItems.push(colors.cyan(cred.path));
         }
       }
+    }
+
+    if (copiedItems.length > 0) {
+      showList(copiedItems);
     }
 
     console.log(colors.green(`✓ ${this.name} credentials copied successfully`));

@@ -8,7 +8,7 @@ import {
   AgentRecoveryResult,
 } from './types.js';
 import { BaseAgent } from './base.js';
-import { launch, VERBOSE } from 'rover-core';
+import { launch, VERBOSE, showList } from 'rover-core';
 import { containsGeminiYoloWarning } from '../utils/gemini.js';
 
 export class GeminiAgent extends BaseAgent {
@@ -52,12 +52,17 @@ export class GeminiAgent extends BaseAgent {
     this.ensureDirectory(targetGeminiDir);
 
     const credentials = this.getRequiredCredentials();
+    const copiedItems: string[] = [];
     for (const cred of credentials) {
       if (existsSync(cred.path)) {
         const filename = cred.path.split('/').pop()!;
         copyFileSync(cred.path, join(targetGeminiDir, filename));
-        console.log(colors.gray('├── Copied: ') + colors.cyan(cred.path));
+        copiedItems.push(colors.cyan(cred.path));
       }
+    }
+
+    if (copiedItems.length > 0) {
+      showList(copiedItems);
     }
 
     console.log(colors.green(`✓ ${this.name} credentials copied successfully`));

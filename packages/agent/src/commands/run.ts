@@ -53,7 +53,6 @@ function displayStepResults(
       // Truncate long values for display
       let displayValue =
         value.length > 100 ? value.substring(0, 100) + '...' : value;
-
       if (displayValue.includes('\n')) {
         displayValue = displayValue.split('\n')[0] + '...';
       }

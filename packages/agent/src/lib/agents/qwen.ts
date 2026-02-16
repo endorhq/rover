@@ -4,7 +4,7 @@ import { homedir } from 'node:os';
 import colors from 'ansi-colors';
 import { AgentCredentialFile } from './types.js';
 import { BaseAgent } from './base.js';
-import { launch, VERBOSE } from 'rover-core';
+import { launch, VERBOSE, showList } from 'rover-core';
 
 export class QwenAgent extends BaseAgent {
   name = 'Qwen';
@@ -47,12 +47,17 @@ export class QwenAgent extends BaseAgent {
     this.ensureDirectory(targetQwenDir);
 
     const credentials = this.getRequiredCredentials();
+    const copiedItems: string[] = [];
     for (const cred of credentials) {
       if (existsSync(cred.path)) {
         const filename = cred.path.split('/').pop()!;
         copyFileSync(cred.path, join(targetQwenDir, filename));
-        console.log(colors.gray('├── Copied: ') + colors.cyan(cred.path));
+        copiedItems.push(colors.cyan(cred.path));
       }
+    }
+
+    if (copiedItems.length > 0) {
+      showList(copiedItems);
     }
 
     console.log(colors.green(`✓ ${this.name} credentials copied successfully`));

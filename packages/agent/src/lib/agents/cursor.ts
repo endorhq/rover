@@ -4,7 +4,7 @@ import { homedir, platform } from 'node:os';
 import colors from 'ansi-colors';
 import { AgentCredentialFile } from './types.js';
 import { BaseAgent } from './base.js';
-import { launch, launchSync } from 'rover-core';
+import { launch, launchSync, VERBOSE, showList } from 'rover-core';
 import { mcpJsonSchema } from '../mcp/schema.js';
 
 export class CursorAgent extends BaseAgent {
@@ -42,11 +42,16 @@ export class CursorAgent extends BaseAgent {
 
     // Copy existing credential files
     const credentials = this.getRequiredCredentials();
+    const copiedItems: string[] = [];
     for (const cred of credentials) {
       if (existsSync(cred.path)) {
         copyFileSync(cred.path, join(targetDir, cred.path));
-        console.log(colors.gray('├── Copied: ') + colors.cyan(cred.path));
+        copiedItems.push(colors.cyan(cred.path));
       }
+    }
+
+    if (copiedItems.length > 0) {
+      showList(copiedItems);
     }
 
     console.log(colors.green(`✓ ${this.name} credentials copied successfully`));

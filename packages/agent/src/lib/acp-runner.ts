@@ -26,6 +26,7 @@ import {
   IterationStatusManager,
   VERBOSE,
   JsonlLogger,
+  showList,
 } from 'rover-core';
 import { ACPClient } from './acp-client.js';
 import { copyFileSync, rmSync } from 'node:fs';
@@ -597,11 +598,10 @@ export class ACPRunner {
 
     // Display warnings if any
     if (warnings.length > 0) {
-      console.log(colors.yellow.bold('\nPrompt Template Warnings:'));
-      warnings.forEach((warning, idx) => {
-        const prefix = idx === warnings.length - 1 ? '└──' : '├──';
-        console.log(colors.yellow(`${prefix} ${warning}`));
-      });
+      showList(
+        warnings.map(warning => colors.yellow(warning)),
+        { title: colors.yellow.bold('\nPrompt Template Warnings:') }
+      );
     }
 
     return prompt;

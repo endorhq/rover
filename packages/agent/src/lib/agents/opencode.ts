@@ -1,5 +1,5 @@
 import { existsSync, copyFileSync, readFileSync, writeFileSync } from 'node:fs';
-import { VERBOSE } from 'rover-core';
+import { VERBOSE, showList } from 'rover-core';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import colors from 'ansi-colors';
@@ -59,6 +59,7 @@ export class OpenCodeAgent extends BaseAgent {
     this.ensureDirectory(targetOpenCodeDataDir);
 
     const credentials = this.getRequiredCredentials();
+    const copiedItems: string[] = [];
     for (const cred of credentials) {
       if (existsSync(cred.path)) {
         const filename = cred.path.split('/').pop()!;
@@ -67,8 +68,12 @@ export class OpenCodeAgent extends BaseAgent {
           ? targetOpenCodeDataDir
           : targetOpenCodeConfigDir;
         copyFileSync(cred.path, join(targetSubDir, filename));
-        console.log(colors.gray('├── Copied: ') + colors.cyan(cred.path));
+        copiedItems.push(colors.cyan(cred.path));
       }
+    }
+
+    if (copiedItems.length > 0) {
+      showList(copiedItems);
     }
 
     console.log(colors.green(`✓ ${this.name} credentials copied successfully`));

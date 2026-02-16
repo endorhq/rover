@@ -1,7 +1,13 @@
 import colors from 'ansi-colors';
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { launch, launchSync, type TaskDescriptionManager } from 'rover-core';
+import {
+  launch,
+  launchSync,
+  showTitle,
+  showProperties,
+  type TaskDescriptionManager,
+} from 'rover-core';
 import { TaskNotFoundError } from 'rover-schemas';
 import { getTelemetry } from '../lib/telemetry.js';
 import { showTips } from '../utils/display.js';
@@ -141,11 +147,11 @@ const logsCommand = async (
 
     // Display header
     if (!isJsonMode()) {
-      console.log(colors.bold(`Task ${numericTaskId} Logs`));
-      console.log(colors.gray('├── Title: ') + task.title);
-      console.log(
-        colors.gray('└── Iteration: ') + colors.cyan(`#${actualIteration}`)
-      );
+      showTitle(`Task ${numericTaskId} Logs`);
+      showProperties({
+        Title: task.title,
+        Iteration: colors.cyan(`#${actualIteration}`),
+      });
     }
 
     telemetry?.eventLogs();
