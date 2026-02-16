@@ -40,7 +40,7 @@ export function getDefaultAgentImage(): string {
 
 /**
  * Resolves the agent image to use, with precedence:
- * 1. AGENT_IMAGE environment variable
+ * 1. ROVER_AGENT_IMAGE environment variable
  * 2. storedImage from task (if provided)
  * 3. agentImage from ProjectConfig
  * 4. Default image based on CLI version
@@ -50,7 +50,7 @@ export function resolveAgentImage(
   storedImage?: string
 ): string {
   // Check environment variable first
-  const envImage = process.env.AGENT_IMAGE;
+  const envImage = process.env.ROVER_AGENT_IMAGE;
   if (envImage) {
     return envImage;
   }
@@ -73,7 +73,7 @@ export function resolveAgentImage(
  * Checks if a custom agent image is being used and prints a warning if so
  */
 export function warnIfCustomImage(projectConfig?: ProjectConfigManager): void {
-  const envImage = process.env.AGENT_IMAGE;
+  const envImage = process.env.ROVER_AGENT_IMAGE;
   const configImage = projectConfig?.agentImage;
 
   // Only warn if a custom image is configured (not using the default)

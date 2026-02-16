@@ -451,7 +451,7 @@ The agent will typically:
 Or via environment variable (takes precedence over config):
 
 ```bash
-AGENT_IMAGE=my-custom-image:latest rover task "do something"
+ROVER_AGENT_IMAGE=my-custom-image:latest rover task "do something"
 ```
 
 Rover will display a warning when using a custom image to alert you of potential compatibility issues.
