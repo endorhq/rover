@@ -3,6 +3,7 @@ import {
   AIAgentTool,
   InvokeAIAgentError,
   MissingAIAgentError,
+  type InvokeOptions,
 } from './index.js';
 import { PromptBuilder, IPromptTask } from '../prompts/index.js';
 import { parseJsonResponse } from '../../utils/json-parser.js';
@@ -66,11 +67,8 @@ class OpenCodeAI implements AIAgentTool {
     }
   }
 
-  async invoke(
-    prompt: string,
-    json: boolean = false,
-    cwd?: string
-  ): Promise<string> {
+  async invoke(prompt: string, options: InvokeOptions = {}): Promise<string> {
+    const { json = false, cwd, model } = options;
     // OpenCode uses: echo "prompt" | opencode run
     // See: https://opencode.ai/docs/cli/
     // Note: We don't use --format json because it outputs streaming JSON events,
@@ -83,6 +81,10 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
 
     // Build arguments: run
     const opencodeArgs = ['run'];
+
+    if (model) {
+      opencodeArgs.push('--model', model);
+    }
 
     try {
       const { stdout } = await launch(this.AGENT_BIN, opencodeArgs, {
@@ -111,7 +113,10 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
     );
 
     try {
-      const response = await this.invoke(prompt, true, projectPath);
+      const response = await this.invoke(prompt, {
+        json: true,
+        cwd: projectPath,
+      });
       return parseJsonResponse<IPromptTask>(response);
     } catch (error) {
       console.error('Failed to expand task with OpenCode:', error);
@@ -133,7 +138,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
     );
 
     try {
-      const response = await this.invoke(prompt, true);
+      const response = await this.invoke(prompt, { json: true });
       return parseJsonResponse<IPromptTask>(response);
     } catch (error) {
       console.error(
@@ -157,7 +162,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
         recentCommits,
         summaries
       );
-      const response = await this.invoke(prompt, false);
+      const response = await this.invoke(prompt);
 
       if (!response) {
         return null;
@@ -184,7 +189,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
         diffContext,
         conflictedContent
       );
-      const response = await this.invoke(prompt, false);
+      const response = await this.invoke(prompt);
 
       return response;
     } catch (err) {
@@ -202,7 +207,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
     );
 
     try {
-      const response = await this.invoke(prompt, true);
+      const response = await this.invoke(prompt, { json: true });
       return parseJsonResponse<Record<string, any>>(response);
     } catch (error) {
       console.error('Failed to extract GitHub inputs with OpenCode:', error);
