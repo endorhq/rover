@@ -147,6 +147,7 @@ exit 0
     createMockTool('cursor-agent', 127, 'command not found: cursor-agent');
     createMockTool('gemini', 127, 'command not found: gemini');
     createMockTool('qwen', 127, 'command not found: qwen');
+    createMockTool('opencode', 127, 'command not found: opencode');
 
     // Enable Docker and Claude for the initialization and task phases
     createMockTool('docker', 0, 'Docker version 24.0.0');

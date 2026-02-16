@@ -90,6 +90,7 @@ describe('rover init (e2e)', () => {
     createMockTool('cursor-agent', 127, 'command not found: cursor-agent');
     createMockTool('gemini', 127, 'command not found: gemini');
     createMockTool('qwen', 127, 'command not found: qwen');
+    createMockTool('opencode', 127, 'command not found: opencode');
 
     // Initialize a real git repository
     await execa('git', ['init']);
