@@ -3,6 +3,7 @@ import colors from 'ansi-colors';
 import {
   WorkflowManager,
   IterationStatusManager,
+  showTitle,
   showProperties,
   showList,
 } from 'rover-core';
@@ -19,7 +20,7 @@ function displayStepResults(
   result: RunnerStepResult | ACPRunnerStepResult,
   _totalDuration: number
 ): void {
-  console.log(colors.bold(`\n📊 Step Results: ${stepName}`));
+  showTitle(`📊 Step Results: ${stepName}`);
 
   const props: Record<string, string> = {
     ID: colors.cyan(result.id),
@@ -30,6 +31,8 @@ function displayStepResults(
   if (result.error) {
     props['Error'] = colors.red(result.error);
   }
+
+  showProperties(props);
 
   // Display outputs
   const outputEntries = Array.from(result.outputs.entries()).filter(
@@ -42,20 +45,21 @@ function displayStepResults(
   );
 
   if (outputEntries.length > 0) {
-    const outputLines = outputEntries.map(([key, value]) => {
+    const outputItems = outputEntries.map(([key, value]) => {
+      // Truncate long values for display
       let displayValue =
         value.length > 100 ? value.substring(0, 100) + '...' : value;
       if (displayValue.includes('\n')) {
         displayValue = displayValue.split('\n')[0] + '...';
       }
+
       return `${key}: ${colors.cyan(displayValue)}`;
     });
-    props['Outputs'] = outputLines.join('\n');
-  } else {
-    props['Outputs'] = 'No outputs extracted';
-  }
 
-  showProperties(props);
+    showList(outputItems, { title: colors.gray('Outputs:') });
+  } else {
+    console.log(colors.gray('No outputs extracted'));
+  }
 }
 
 interface RunCommandOptions {
@@ -233,21 +237,21 @@ export const runCommand = async (
       }
     }
 
-    console.log(colors.bold('Agent Workflow'));
+    showTitle('Agent Workflow');
     showProperties({
       Name: colors.cyan(workflowManager.name),
       Description: workflowManager.description,
     });
 
-    const inputEntries = Array.from(inputs.entries());
-    showList(
-      inputEntries.map(([key, value]) => {
-        const isDefault = defaultInputs.includes(key);
-        const suffix = isDefault ? colors.gray(' (default)') : '';
-        return `${key}=` + colors.cyan(`${value}`) + suffix;
-      }),
-      { title: colors.bold('\nUser inputs') }
-    );
+    const inputItems = Array.from(inputs.entries()).map(([key, value]) => {
+      const isDefault = defaultInputs.includes(key);
+      const suffix = isDefault ? colors.gray(' (default)') : '';
+      return `${key}=${colors.cyan(String(value))}${suffix}`;
+    });
+    showList(inputItems, {
+      title: colors.bold('User inputs'),
+      addLineBreak: true,
+    });
 
     // Validate inputs against workflow requirements
     const validation = workflowManager.validateInputs(inputs);
@@ -255,8 +259,8 @@ export const runCommand = async (
     // Display warnings if any
     if (validation.warnings.length > 0) {
       showList(
-        validation.warnings.map(warning => colors.yellow(warning)),
-        { title: colors.yellow.bold('\nWarnings') }
+        validation.warnings.map((w: string) => colors.yellow(w)),
+        { title: colors.yellow.bold('Warnings'), addLineBreak: true }
       );
     }
 
@@ -274,7 +278,7 @@ export const runCommand = async (
       // Print Steps
       showList(
         workflowManager.steps.map((step, idx) => `${idx}. ${step.name}`),
-        { title: colors.bold('\nSteps') }
+        { title: colors.bold('Steps'), addLineBreak: true }
       );
 
       let runSteps = 0;
@@ -440,13 +444,13 @@ export const runCommand = async (
           colors.yellow('(Some steps were skipped)');
       }
 
-      console.log(colors.bold('\n🎉 Workflow Execution Summary'));
+      showTitle('🎉 Workflow Execution Summary');
       showProperties({
         Duration: colors.cyan(totalDuration.toFixed(2) + 's'),
         'Total Steps': colors.cyan(workflowManager.steps.length.toString()),
         'Successful Steps': colors.green(successfulSteps.toString()),
         'Failed Steps': colors.red(failedSteps.toString()),
-        'Skipped Steps': colors.yellow(failedSteps.toString()),
+        'Skipped Steps': colors.yellow(skippedSteps.toString()),
         Status: status,
       });
 
