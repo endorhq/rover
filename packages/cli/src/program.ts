@@ -41,6 +41,7 @@ import {
 import { showRoverHeader } from 'rover-core/src/display/header.js';
 import { getUserAIAgent } from './lib/agents/index.js';
 import type { CommandDefinition } from './types.js';
+import { parseTaskIdFromBranch } from './utils/branch-name.js';
 
 // Registry of all commands for metadata lookup
 const commands: CommandDefinition[] = [
@@ -140,21 +141,37 @@ export function createProgram(
           if (git.isWorktree()) {
             const mainRoot = git.getMainRepositoryRoot();
             if (!isJsonMode() && commandName !== 'mcp') {
-              console.log(
-                colors.yellow(
-                  'Note: You are inside a git worktree. Rover is using the main project root.'
-                )
-              );
-              if (mainRoot) {
+              const currentBranch = git.getCurrentBranch();
+              const taskId = parseTaskIdFromBranch(currentBranch);
+
+              if (taskId !== null) {
                 console.log(
-                  colors.gray('  Main project: ') + colors.cyan(mainRoot)
+                  colors.yellow(
+                    `Note: You are inside the worktree for task ${taskId}. Rover is using the main project root.`
+                  )
+                );
+                if (mainRoot) {
+                  console.log(
+                    colors.gray('  Main project: ') + colors.cyan(mainRoot)
+                  );
+                }
+              } else {
+                console.log(
+                  colors.yellow(
+                    'Note: You are inside a git worktree. Rover is using the main project root.'
+                  )
+                );
+                if (mainRoot) {
+                  console.log(
+                    colors.gray('  Main project: ') + colors.cyan(mainRoot)
+                  );
+                }
+                console.log(
+                  colors.gray('  Tip: Use ') +
+                    colors.cyan('--project') +
+                    colors.gray(' to target a specific project.')
                 );
               }
-              console.log(
-                colors.gray('  Tip: Use ') +
-                  colors.cyan('--project') +
-                  colors.gray(' to target a specific project.')
-              );
               console.log();
             }
           }
