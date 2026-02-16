@@ -26,6 +26,7 @@ import colors from 'ansi-colors';
 import pushCmd from './commands/push.js';
 import stopCmd from './commands/stop.js';
 import mcpCmd from './commands/mcp.js';
+import autopilotCmd from './commands/autopilot.js';
 import { addWorkflowCommands } from './commands/workflows/index.js';
 import workflowAddCmd from './commands/workflows/add.js';
 import workflowListCmd from './commands/workflows/list.js';
@@ -64,6 +65,7 @@ const commands: CommandDefinition[] = [
   workflowAddCmd,
   workflowListCmd,
   workflowInspectCmd,
+  autopilotCmd,
 ];
 
 /**
@@ -486,6 +488,14 @@ export function createProgram(
 
   // Add all subcommands
   addWorkflowCommands(program);
+
+  program.commandsGroup(colors.cyan('Autopilot:'));
+
+  program
+    .command('autopilot')
+    .description('Launch an interactive dashboard to monitor task progress')
+    .option('-r, --refresh <seconds>', 'Refresh interval in seconds', '3')
+    .action(autopilotCmd.action);
 
   program.commandsGroup(colors.cyan('Model Context Protocol:'));
 

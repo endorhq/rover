@@ -1,0 +1,301 @@
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { join } from 'node:path';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import { launch, getDataDir } from 'rover-core';
+import type { FetchStatus, GitHubEvent, Trace, Action } from './types.js';
+import { AutopilotStore } from './store.js';
+import { getRepoInfo } from './helpers.js';
+
+const POLL_INTERVAL_MS = 60_000; // 1 minute
+
+async function fetchEvents(
+  owner: string,
+  repo: string
+): Promise<GitHubEvent[]> {
+  const result = await launch('gh', [
+    'api',
+    `repos/${owner}/${repo}/events?per_page=25`,
+    '--jq',
+    '.[] | {id, type, actor: {login: .actor.login}, created_at, payload}',
+  ]);
+
+  if (result.failed || !result.stdout) {
+    throw new Error('gh api call failed');
+  }
+
+  // gh --jq outputs one JSON object per line (not an array)
+  const lines = result.stdout
+    .toString()
+    .trim()
+    .split('\n')
+    .filter(l => l.length > 0);
+
+  return lines.map(line => JSON.parse(line) as GitHubEvent);
+}
+
+interface RelevantEvent {
+  summary: string;
+  meta: Record<string, any>;
+}
+
+function extractRelevantEvent(event: GitHubEvent): RelevantEvent | null {
+  const { type, payload } = event;
+
+  switch (type) {
+    case 'IssuesEvent':
+      if (payload.action !== 'opened') return null;
+      return {
+        summary: `new issue #${payload.issue?.number}`,
+        meta: {
+          type,
+          issueNumber: payload.issue?.number,
+          title: payload.issue?.title,
+          author: payload.issue?.user?.login,
+          url: payload.issue?.html_url,
+        },
+      };
+
+    case 'PullRequestEvent':
+      if (payload.action !== 'opened') return null;
+      return {
+        summary: `new PR #${payload.pull_request?.number}`,
+        meta: {
+          type,
+          prNumber: payload.pull_request?.number,
+          title: payload.pull_request?.title,
+          author: payload.pull_request?.user?.login,
+          branch: payload.pull_request?.head?.ref,
+          url: payload.pull_request?.html_url,
+        },
+      };
+
+    case 'IssueCommentEvent':
+      if (payload.action !== 'created') return null;
+      return {
+        summary: `new comment on #${payload.issue?.number}`,
+        meta: {
+          type,
+          issueNumber: payload.issue?.number,
+          issueTitle: payload.issue?.title,
+          author: payload.comment?.user?.login,
+          commentId: payload.comment?.id,
+          body: (payload.comment?.body ?? '').slice(0, 200),
+        },
+      };
+
+    case 'PullRequestReviewEvent':
+      if (payload.action !== 'submitted') return null;
+      return {
+        summary: `new review on PR #${payload.pull_request?.number}`,
+        meta: {
+          type,
+          prNumber: payload.pull_request?.number,
+          prTitle: payload.pull_request?.title,
+          reviewer: payload.review?.user?.login,
+          state: payload.review?.state,
+          body: payload.review?.body ?? '',
+        },
+      };
+
+    case 'PullRequestReviewCommentEvent':
+      if (payload.action !== 'created') return null;
+      return {
+        summary: `new review comment on PR #${payload.pull_request?.number}`,
+        meta: {
+          type,
+          prNumber: payload.pull_request?.number,
+          prTitle: payload.pull_request?.title,
+          author: payload.comment?.user?.login,
+          commentId: payload.comment?.id,
+          path: payload.comment?.path,
+          body: (payload.comment?.body ?? '').slice(0, 200),
+        },
+      };
+
+    case 'PushEvent':
+      return {
+        summary: `new push to ${payload.ref}`,
+        meta: {
+          type,
+          ref: payload.ref,
+          pusher: event.actor.login,
+          commitCount: payload.size ?? payload.commits?.length ?? 0,
+          headSha: payload.head,
+          commits: (payload.commits ?? []).map(
+            (c: { sha: string; message: string }) => ({
+              sha: c.sha,
+              message: c.message,
+            })
+          ),
+        },
+      };
+
+    default:
+      return null;
+  }
+}
+
+export function filterRelevantEvents(
+  events: GitHubEvent[]
+): Array<GitHubEvent & RelevantEvent> {
+  const results: Array<GitHubEvent & RelevantEvent> = [];
+  for (const event of events) {
+    const relevant = extractRelevantEvent(event);
+    if (relevant) {
+      results.push({ ...event, ...relevant });
+    }
+  }
+  return results;
+}
+
+export function writeTraceAndAction(
+  projectId: string,
+  event: GitHubEvent & RelevantEvent
+): { traceId: string; actionId: string; chainId: string } {
+  const basePath = join(getDataDir(), 'projects', projectId);
+  const tracesDir = join(basePath, 'traces');
+  const actionsDir = join(basePath, 'actions');
+
+  mkdirSync(tracesDir, { recursive: true });
+  mkdirSync(actionsDir, { recursive: true });
+
+  const traceId = randomUUID();
+  const actionId = randomUUID();
+  const chainId = randomUUID();
+  const timestamp = new Date().toISOString();
+
+  const trace: Trace = {
+    id: traceId,
+    version: '1.0',
+    timestamp,
+    summary: event.summary,
+    step: 'event',
+    parent: null,
+    meta: event.meta,
+  };
+
+  const action: Action = {
+    id: actionId,
+    version: '1.0',
+    action: 'coordinate',
+    timestamp,
+    traceId,
+    meta: event.meta,
+    reasoning: 'Needs to take a decision about what to do with this event',
+  };
+
+  writeFileSync(
+    join(tracesDir, `${traceId}.json`),
+    JSON.stringify(trace, null, 2)
+  );
+  writeFileSync(
+    join(actionsDir, `${actionId}.json`),
+    JSON.stringify(action, null, 2)
+  );
+
+  return { traceId, actionId, chainId };
+}
+
+export function useGitHubEvents(
+  projectPath: string,
+  projectId: string
+): {
+  status: FetchStatus;
+  countdown: number;
+  lastFetchCount: number;
+  lastRelevantCount: number;
+  lastNewCount: number;
+} {
+  const [status, setStatus] = useState<FetchStatus>('idle');
+  const [countdown, setCountdown] = useState(POLL_INTERVAL_MS / 1000);
+  const [lastFetchCount, setLastFetchCount] = useState(0);
+  const [lastRelevantCount, setLastRelevantCount] = useState(0);
+  const [lastNewCount, setLastNewCount] = useState(0);
+  const repoRef = useRef(getRepoInfo(projectPath));
+  const storeRef = useRef<AutopilotStore | null>(null);
+
+  // Initialize store once
+  if (!storeRef.current) {
+    const store = new AutopilotStore(projectId);
+    store.ensureDir();
+    storeRef.current = store;
+  }
+
+  const doFetch = useCallback(async () => {
+    const repo = repoRef.current;
+    const store = storeRef.current;
+    if (!repo || !store) {
+      setStatus('error');
+      return;
+    }
+
+    setStatus('fetching');
+    try {
+      const events = await fetchEvents(repo.owner, repo.repo);
+      const relevant = filterRelevantEvents(events);
+
+      // Deduplicate against cursor
+      const newEvents = relevant.filter(e => !store.isEventProcessed(e.id));
+
+      for (const event of newEvents) {
+        const { traceId, actionId, chainId } = writeTraceAndAction(
+          projectId,
+          event
+        );
+
+        store.addPending({
+          chainId,
+          actionId,
+          traceId,
+          action: 'coordinate',
+          summary: event.summary,
+          createdAt: new Date().toISOString(),
+          meta: event.meta,
+        });
+
+        store.appendLog({
+          ts: new Date().toISOString(),
+          chainId,
+          traceId,
+          actionId,
+          step: 'event',
+          action: 'coordinate',
+          summary: event.summary,
+        });
+      }
+
+      // Mark all new event IDs as processed
+      if (newEvents.length > 0) {
+        store.markEventsProcessed(newEvents.map(e => e.id));
+      }
+
+      setLastFetchCount(events.length);
+      setLastRelevantCount(relevant.length);
+      setLastNewCount(newEvents.length);
+      setStatus('done');
+    } catch {
+      setStatus('error');
+    }
+
+    // Reset countdown after fetch completes
+    setCountdown(POLL_INTERVAL_MS / 1000);
+  }, [projectId]);
+
+  // Initial fetch + interval
+  useEffect(() => {
+    doFetch();
+    const timer = setInterval(doFetch, POLL_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [doFetch]);
+
+  // Countdown ticker (every second)
+  useEffect(() => {
+    const tick = setInterval(() => {
+      setCountdown(prev => Math.max(0, prev - 1));
+    }, 1000);
+    return () => clearInterval(tick);
+  }, []);
+
+  return { status, countdown, lastFetchCount, lastRelevantCount, lastNewCount };
+}
