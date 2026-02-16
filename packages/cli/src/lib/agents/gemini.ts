@@ -3,6 +3,7 @@ import {
   AIAgentTool,
   InvokeAIAgentError,
   MissingAIAgentError,
+  type InvokeOptions,
 } from './index.js';
 import { PromptBuilder, IPromptTask } from '../prompts/index.js';
 import { parseJsonResponse } from '../../utils/json-parser.js';
@@ -41,13 +42,14 @@ class GeminiAI implements AIAgentTool {
     }
   }
 
-  async invoke(
-    prompt: string,
-    json: boolean = false,
-    cwd?: string
-  ): Promise<string> {
+  async invoke(prompt: string, options: InvokeOptions = {}): Promise<string> {
+    const { json = false, cwd, model } = options;
     // Do not add -p, it's deprecated
     const geminiArgs: string[] = [];
+
+    if (model) {
+      geminiArgs.push('--model', model);
+    }
 
     if (json) {
       // Gemini does not have any way to force the JSON output at CLI level.
@@ -79,7 +81,10 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
     );
 
     try {
-      const response = await this.invoke(prompt, true, projectPath);
+      const response = await this.invoke(prompt, {
+        json: true,
+        cwd: projectPath,
+      });
       return parseJsonResponse<IPromptTask>(response);
     } catch (error) {
       console.error('Failed to expand task with Gemini:', error);
@@ -101,7 +106,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
     );
 
     try {
-      const response = await this.invoke(prompt, true);
+      const response = await this.invoke(prompt, { json: true });
       return parseJsonResponse<IPromptTask>(response);
     } catch (error) {
       console.error(
@@ -125,7 +130,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
         recentCommits,
         summaries
       );
-      const response = await this.invoke(prompt, false);
+      const response = await this.invoke(prompt);
 
       if (!response) {
         return null;
@@ -152,7 +157,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
         diffContext,
         conflictedContent
       );
-      const response = await this.invoke(prompt, false);
+      const response = await this.invoke(prompt);
 
       return response;
     } catch (err) {
@@ -170,7 +175,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
     );
 
     try {
-      const response = await this.invoke(prompt, true);
+      const response = await this.invoke(prompt, { json: true });
       return parseJsonResponse<Record<string, any>>(response);
     } catch (error) {
       console.error('Failed to extract GitHub inputs with Gemini:', error);
