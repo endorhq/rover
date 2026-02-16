@@ -116,9 +116,10 @@ sandboxed container where the AI agent performs the requested work.
 
 ### Preconditions
 
-Rover must be initialized in the project (`rover init` has been run
-successfully). The configured AI agent must be available on the system.
-Docker must be running and accessible.
+The current directory must be a git repository with at least one
+commit. The configured AI agent must be available on the system.
+Docker must be running and accessible. Rover does **not** need to be
+initialized with `rover init` before running `rover task`.
 
 ### Feature: Basic task creation
 
@@ -168,11 +169,12 @@ launched, the task must be reset to `NEW` status. The error must be
 reported clearly to the user. A suggestion to use `rover restart` must
 be provided.
 
-### Feature: Uninitialized project detection
+### Feature: Task creation without prior initialization
 
 Running `rover task` in a project that has not been initialized with
-`rover init` must fail with a clear error indicating that initialization
-is required.
+`rover init` must succeed. Rover configuration is optional and the
+task command must work in any git repository without requiring prior
+initialization.
 
 ### Postconditions
 

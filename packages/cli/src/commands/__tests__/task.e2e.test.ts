@@ -398,20 +398,31 @@ exit 0
       expect(output).toMatch(/agent|claude|not found|error/);
     });
 
-    it('should require rover to be initialized before running tasks', async () => {
+    it('should create a task even without prior rover init', async () => {
       // Setup: Remove rover configuration to simulate uninitialized project
       rmSync(join(testDir, 'rover.json'), { force: true });
       rmSync(join(testDir, '.rover'), { recursive: true, force: true });
 
-      // Execute: Run rover task
+      // Execute: Run rover task without initialization
       const result = await runRoverTask(
-        'Create a hello world bash script named hello.sh that prints the current date and time. It should explicitly print "Hello World" (without quotes and with the exact provided case)'
+        'Create a hello world bash script named hello.sh',
+        ['--json']
       );
 
-      // Verify: Command failed
-      expect(result.exitCode).not.toBe(0);
-      const output = (result.stdout || result.stderr).toLowerCase();
-      expect(output).toMatch(/not initialized|rover init|configuration/);
+      // Debug output if test fails
+      if (result.exitCode !== 0) {
+        console.log('STDOUT:', result.stdout);
+        console.log('STDERR:', result.stderr);
+      }
+
+      // Verify: Command succeeded - rover init is not required for task creation
+      expect(result.exitCode).toBe(0);
+
+      // Verify: JSON output confirms task creation
+      const jsonOutput = JSON.parse(result.stdout);
+      expect(jsonOutput.success).toBe(true);
+      expect(jsonOutput.taskId).toBe(1);
+      expect(jsonOutput.title).toBeTruthy();
     });
 
     it('should reset task to NEW status when Docker container creation fails', async () => {
