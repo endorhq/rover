@@ -23,6 +23,7 @@ import {
 import { useGitHubEvents } from './events.js';
 import { useCoordinator } from './coordinator.js';
 import { usePlanner } from './planner.js';
+import { useWorkflowRunner } from './workflow-runner.js';
 import { getUserAIAgent } from '../agents/index.js';
 import { AutopilotStore } from './store.js';
 
@@ -169,6 +170,17 @@ export function AutopilotApp({
   const { status: plannerStatus, processedCount: plannerProcessedCount } =
     usePlanner(project.path, project.id, chainsRef, onChainsUpdated);
 
+  const {
+    status: workflowRunnerStatus,
+    processedCount: workflowRunnerProcessedCount,
+  } = useWorkflowRunner(
+    project,
+    project.path,
+    project.id,
+    chainsRef,
+    onChainsUpdated
+  );
+
   const chains = Array.from(chainsRef.current.values());
 
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -286,6 +298,29 @@ export function AutopilotApp({
     }
   }, [plannerStatus, plannerProcessedCount]);
 
+  // Log workflow runner status changes
+  useEffect(() => {
+    if (workflowRunnerStatus === 'processing') {
+      const ts = new Date().toLocaleTimeString();
+      setLogs(prev => [
+        ...prev.slice(-50),
+        { timestamp: ts, message: 'Workflow runner: processing...' },
+      ]);
+    } else if (
+      workflowRunnerProcessedCount > 0 &&
+      workflowRunnerStatus === 'idle'
+    ) {
+      const ts = new Date().toLocaleTimeString();
+      setLogs(prev => [
+        ...prev.slice(-50),
+        {
+          timestamp: ts,
+          message: `Workflow runner: ${workflowRunnerProcessedCount} tasks created`,
+        },
+      ]);
+    }
+  }, [workflowRunnerStatus, workflowRunnerProcessedCount]);
+
   useInput((input, key) => {
     if (input === 'q' || (key.ctrl && input === 'c')) {
       exit();
@@ -331,6 +366,8 @@ export function AutopilotApp({
             processedCount={processedCount}
             plannerStatus={plannerStatus}
             plannerProcessedCount={plannerProcessedCount}
+            workflowRunnerStatus={workflowRunnerStatus}
+            workflowRunnerProcessedCount={workflowRunnerProcessedCount}
           />
         </Box>
         {/* Right column: 70% — space scene + work boxes */}
