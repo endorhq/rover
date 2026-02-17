@@ -16,6 +16,7 @@ import type {
   AutopilotState,
   AutopilotLogEntry,
   Trace,
+  TaskMapping,
 } from './types.js';
 
 const CURSOR_MAX_IDS = 200;
@@ -126,6 +127,18 @@ export class AutopilotStore {
 
   getPending(): PendingAction[] {
     return this.loadState().pending;
+  }
+
+  setTaskMapping(actionId: string, mapping: TaskMapping): void {
+    const state = this.loadState();
+    if (!state.taskMappings) state.taskMappings = {};
+    state.taskMappings[actionId] = mapping;
+    this.saveState(state);
+  }
+
+  getTaskMapping(actionId: string): TaskMapping | undefined {
+    const state = this.loadState();
+    return state.taskMappings?.[actionId];
   }
 
   // --- Log methods ---

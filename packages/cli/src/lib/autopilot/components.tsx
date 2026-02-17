@@ -6,6 +6,7 @@ import type {
   WorkSlot,
   CoordinatorStatus,
   PlannerStatus,
+  WorkflowRunnerStatus,
   ActionChain,
   ActionStepStatus,
 } from './types.js';
@@ -133,6 +134,44 @@ function PlannerIndicator({
   );
 }
 
+// ── Workflow Runner Status Indicator ─────────────────────────────────────────
+
+const WORKFLOW_RUNNER_ICONS: Record<WorkflowRunnerStatus, string> = {
+  idle: '\u25CB', // ○
+  processing: '\u21BB', // ↻
+  error: '\u2717', // ✗
+};
+
+const WORKFLOW_RUNNER_COLORS: Record<WorkflowRunnerStatus, string> = {
+  idle: 'gray',
+  processing: 'blue',
+  error: 'red',
+};
+
+function WorkflowRunnerIndicator({
+  status,
+  processedCount,
+}: {
+  status: WorkflowRunnerStatus;
+  processedCount: number;
+}) {
+  const icon = WORKFLOW_RUNNER_ICONS[status];
+  const color = WORKFLOW_RUNNER_COLORS[status];
+  const label =
+    status === 'processing'
+      ? 'launching...'
+      : status === 'error'
+        ? 'runner error'
+        : `${processedCount} launched`;
+
+  return (
+    <Text>
+      <Text color={color}>{icon} </Text>
+      <Text dimColor>{label}</Text>
+    </Text>
+  );
+}
+
 // ── Key Legend ────────────────────────────────────────────────────────────────
 
 function KeyLegend() {
@@ -165,6 +204,8 @@ export function InfoPanel({
   processedCount,
   plannerStatus,
   plannerProcessedCount,
+  workflowRunnerStatus,
+  workflowRunnerProcessedCount,
 }: {
   projectName: string;
   agent: string;
@@ -176,6 +217,8 @@ export function InfoPanel({
   processedCount: number;
   plannerStatus: PlannerStatus;
   plannerProcessedCount: number;
+  workflowRunnerStatus: WorkflowRunnerStatus;
+  workflowRunnerProcessedCount: number;
 }) {
   return (
     <Box
@@ -213,6 +256,10 @@ export function InfoPanel({
       <PlannerIndicator
         status={plannerStatus}
         processedCount={plannerProcessedCount}
+      />
+      <WorkflowRunnerIndicator
+        status={workflowRunnerStatus}
+        processedCount={workflowRunnerProcessedCount}
       />
       <Box flexGrow={1} />
       <KeyLegend />

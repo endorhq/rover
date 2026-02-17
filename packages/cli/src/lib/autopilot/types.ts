@@ -94,7 +94,13 @@ export interface ActionChain {
 
 export type CoordinatorStatus = 'idle' | 'processing' | 'error';
 export type PlannerStatus = 'idle' | 'processing' | 'error';
+export type WorkflowRunnerStatus = 'idle' | 'processing' | 'error';
 export type ViewMode = 'main' | 'actions';
+
+export interface TaskMapping {
+  taskId: number;
+  branchName: string;
+}
 
 export interface PlanTask {
   title: string;
@@ -118,6 +124,7 @@ export interface PlanResult {
 export interface AutopilotState {
   version: string;
   pending: PendingAction[];
+  taskMappings?: Record<string, TaskMapping>;
   updatedAt: string;
 }
 
