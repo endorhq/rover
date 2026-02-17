@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Box, useInput, useApp, useStdout } from 'ink';
 import type {
   ProjectManager,
@@ -6,7 +6,13 @@ import type {
   IterationStatusManager,
 } from 'rover-core';
 import { getVersion } from 'rover-core';
-import type { TaskInfo, LogEntry, WorkSlot, ViewMode } from './types.js';
+import type {
+  TaskInfo,
+  LogEntry,
+  WorkSlot,
+  ViewMode,
+  ActionChain,
+} from './types.js';
 import { formatDuration } from './helpers.js';
 import {
   InfoPanel,
@@ -16,6 +22,7 @@ import {
 } from './components.js';
 import { useGitHubEvents } from './events.js';
 import { useCoordinator } from './coordinator.js';
+import { usePlanner } from './planner.js';
 import { getUserAIAgent } from '../agents/index.js';
 import { AutopilotStore } from './store.js';
 
@@ -147,11 +154,22 @@ export function AutopilotApp({
     lastNewCount,
   } = useGitHubEvents(project.path, project.id);
 
-  const {
-    status: coordinatorStatus,
-    chains,
-    processedCount,
-  } = useCoordinator(project.path, project.id);
+  // Shared chains state: lifted from coordinator so planner can also update it
+  const chainsRef = useRef<Map<string, ActionChain>>(new Map());
+  const [chainsVersion, setChainsVersion] = useState(0);
+  const onChainsUpdated = useCallback(() => setChainsVersion(v => v + 1), []);
+
+  const { status: coordinatorStatus, processedCount } = useCoordinator(
+    project.path,
+    project.id,
+    chainsRef,
+    onChainsUpdated
+  );
+
+  const { status: plannerStatus, processedCount: plannerProcessedCount } =
+    usePlanner(project.path, project.id, chainsRef, onChainsUpdated);
+
+  const chains = Array.from(chainsRef.current.values());
 
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('main');
@@ -248,6 +266,26 @@ export function AutopilotApp({
     }
   }, [coordinatorStatus, processedCount]);
 
+  // Log planner status changes
+  useEffect(() => {
+    if (plannerStatus === 'processing') {
+      const ts = new Date().toLocaleTimeString();
+      setLogs(prev => [
+        ...prev.slice(-50),
+        { timestamp: ts, message: 'Planner: processing...' },
+      ]);
+    } else if (plannerProcessedCount > 0 && plannerStatus === 'idle') {
+      const ts = new Date().toLocaleTimeString();
+      setLogs(prev => [
+        ...prev.slice(-50),
+        {
+          timestamp: ts,
+          message: `Planner: ${plannerProcessedCount} processed`,
+        },
+      ]);
+    }
+  }, [plannerStatus, plannerProcessedCount]);
+
   useInput((input, key) => {
     if (input === 'q' || (key.ctrl && input === 'c')) {
       exit();
@@ -291,6 +329,8 @@ export function AutopilotApp({
             fetchCountdown={fetchCountdown}
             coordinatorStatus={coordinatorStatus}
             processedCount={processedCount}
+            plannerStatus={plannerStatus}
+            plannerProcessedCount={plannerProcessedCount}
           />
         </Box>
         {/* Right column: 70% — space scene + work boxes */}

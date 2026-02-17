@@ -86,11 +86,30 @@ class ClaudeAI implements AIAgentTool {
   }
 
   async invoke(prompt: string, options: InvokeOptions = {}): Promise<string> {
-    const { json = false, cwd, model } = options;
+    const {
+      json = false,
+      cwd,
+      model,
+      systemPrompt,
+      tools,
+      maxBudget,
+    } = options;
     const claudeArgs = ['-p'];
 
     if (model) {
       claudeArgs.push('--model', model);
+    }
+
+    if (systemPrompt) {
+      claudeArgs.push('--system-prompt', systemPrompt);
+    }
+
+    if (tools && tools.length > 0) {
+      claudeArgs.push('--tools', tools.join(','));
+    }
+
+    if (maxBudget !== undefined) {
+      claudeArgs.push('--max-budget-usd', String(maxBudget));
     }
 
     if (json) {

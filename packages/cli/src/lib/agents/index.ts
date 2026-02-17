@@ -23,6 +23,9 @@ export interface InvokeOptions {
   json?: boolean;
   cwd?: string;
   model?: string;
+  systemPrompt?: string;
+  tools?: string[];
+  maxBudget?: number;
 }
 
 export interface AIAgentTool {

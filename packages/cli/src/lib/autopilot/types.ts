@@ -93,7 +93,27 @@ export interface ActionChain {
 }
 
 export type CoordinatorStatus = 'idle' | 'processing' | 'error';
+export type PlannerStatus = 'idle' | 'processing' | 'error';
 export type ViewMode = 'main' | 'actions';
+
+export interface PlanTask {
+  title: string;
+  workflow: 'swe' | 'code-review' | 'bug-finder' | 'security-analyst';
+  description: string;
+  acceptance_criteria: string[];
+  context: {
+    files: string[];
+    references: string[];
+    depends_on: string | null;
+  };
+}
+
+export interface PlanResult {
+  analysis: string;
+  tasks: PlanTask[];
+  execution_order: 'parallel' | 'sequential' | 'mixed';
+  reasoning: string;
+}
 
 export interface AutopilotState {
   version: string;

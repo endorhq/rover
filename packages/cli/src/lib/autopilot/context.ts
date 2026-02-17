@@ -38,9 +38,15 @@ export async function fetchContextForAction(
         'view',
         String(num),
         '--json',
-        'title,body,labels,state',
+        'title,body,labels,state,assignees,milestone,comments,author,closedAt,createdAt',
       ]);
-      return data ? { type, data } : null;
+      if (!data) return null;
+      // Summarize to reduce token usage: only keep comment count
+      if (Array.isArray(data.comments)) {
+        data.commentCount = data.comments.length;
+        delete data.comments;
+      }
+      return { type, data };
     }
 
     case 'PullRequestEvent': {
@@ -51,22 +57,61 @@ export async function fetchContextForAction(
         'view',
         String(num),
         '--json',
-        'title,body,headRefName,isDraft,labels',
+        'title,body,state,headRefName,baseRefName,isDraft,labels,mergedAt,mergedBy,mergeStateStatus,mergeable,reviewDecision,reviewRequests,assignees,additions,deletions,changedFiles,statusCheckRollup,closedAt,createdAt,number',
       ]);
-      return data ? { type, data } : null;
+      if (!data) return null;
+      // Summarize statusCheckRollup to reduce token usage
+      if (Array.isArray(data.statusCheckRollup)) {
+        data.statusChecks = data.statusCheckRollup.map(
+          (c: Record<string, any>) => ({
+            name: c.name,
+            status: c.status,
+            conclusion: c.conclusion,
+            context: c.context,
+          })
+        );
+        delete data.statusCheckRollup;
+      }
+      return { type, data };
     }
 
     case 'IssueCommentEvent': {
       const num = meta.issueNumber;
       if (!num) return null;
+      // IssueCommentEvent fires for both issues and PRs; fetch accordingly
+      const isPR = meta.isPullRequest === true;
+      if (isPR) {
+        const data = await ghJson(owner, repo, [
+          'pr',
+          'view',
+          String(num),
+          '--json',
+          'title,body,state,mergedAt,reviewDecision,comments,closedAt',
+        ]);
+        if (!data) return null;
+        // Keep only recent comments to reduce token usage
+        if (Array.isArray(data.comments)) {
+          data.commentCount = data.comments.length;
+          data.recentComments = data.comments.slice(-5);
+          delete data.comments;
+        }
+        return { type, data };
+      }
       const data = await ghJson(owner, repo, [
         'issue',
         'view',
         String(num),
         '--json',
-        'title,body,comments',
+        'title,body,state,labels,comments,closedAt',
       ]);
-      return data ? { type, data } : null;
+      if (!data) return null;
+      // Keep only recent comments to reduce token usage
+      if (Array.isArray(data.comments)) {
+        data.commentCount = data.comments.length;
+        data.recentComments = data.comments.slice(-5);
+        delete data.comments;
+      }
+      return { type, data };
     }
 
     case 'PullRequestReviewEvent':
@@ -78,9 +123,22 @@ export async function fetchContextForAction(
         'view',
         String(num),
         '--json',
-        'title,body,reviews',
+        'title,body,state,mergedAt,mergedBy,reviewDecision,reviewRequests,reviews,statusCheckRollup,mergeable,closedAt',
       ]);
-      return data ? { type, data } : null;
+      if (!data) return null;
+      // Summarize statusCheckRollup
+      if (Array.isArray(data.statusCheckRollup)) {
+        data.statusChecks = data.statusCheckRollup.map(
+          (c: Record<string, any>) => ({
+            name: c.name,
+            status: c.status,
+            conclusion: c.conclusion,
+            context: c.context,
+          })
+        );
+        delete data.statusCheckRollup;
+      }
+      return { type, data };
     }
 
     case 'PushEvent':
