@@ -14,12 +14,8 @@ import type {
   ActionChain,
 } from './types.js';
 import { formatDuration } from './helpers.js';
-import {
-  InfoPanel,
-  SpaceScene,
-  LogBook,
-  ActionsDetailView,
-} from './components.js';
+import { InfoPanel, SpaceScene, LogBook } from './components.js';
+import { InspectorView } from './inspector.js';
 import { useGitHubEvents } from './events.js';
 import { useCoordinator } from './coordinator.js';
 import { usePlanner } from './planner.js';
@@ -325,8 +321,8 @@ export function AutopilotApp({
     if (input === 'q' || (key.ctrl && input === 'c')) {
       exit();
     }
-    if (key.ctrl && input === 'a') {
-      setViewMode(prev => (prev === 'main' ? 'actions' : 'main'));
+    if (input === 'i' && !key.ctrl && !key.meta && viewMode !== 'inspector') {
+      setViewMode('inspector');
     }
   });
 
@@ -341,10 +337,18 @@ export function AutopilotApp({
   const version = getVersion();
   const slots = buildWorkSlots(tasks);
 
-  if (viewMode === 'actions') {
+  if (viewMode === 'inspector') {
     return (
       <Box flexDirection="column" height={rows} width={columns}>
-        <ActionsDetailView chains={chains} width={columns} height={rows} />
+        <InspectorView
+          chains={chains}
+          chainsRef={chainsRef}
+          store={storeRef.current!}
+          tasks={tasks}
+          width={columns}
+          height={rows}
+          onClose={() => setViewMode('main')}
+        />
       </Box>
     );
   }

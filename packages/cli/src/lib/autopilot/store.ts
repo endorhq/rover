@@ -16,6 +16,7 @@ import type {
   AutopilotState,
   AutopilotLogEntry,
   Trace,
+  Action,
   TaskMapping,
 } from './types.js';
 
@@ -206,5 +207,69 @@ export class AutopilotStore {
     }
 
     return chain;
+  }
+
+  // --- Inspector read methods ---
+
+  readLogs(maxEntries = 500): AutopilotLogEntry[] {
+    const entries: AutopilotLogEntry[] = [];
+
+    // Read rotated files first (oldest to newest: log.3, log.2, log.1)
+    for (let i = LOG_MAX_ROTATED; i >= 1; i--) {
+      const rotatedPath = join(this.basePath, `log.${i}.jsonl`);
+      try {
+        const raw = readFileSync(rotatedPath, 'utf8');
+        for (const line of raw.split('\n')) {
+          if (line.trim()) {
+            try {
+              entries.push(JSON.parse(line) as AutopilotLogEntry);
+            } catch {
+              // skip malformed lines
+            }
+          }
+        }
+      } catch {
+        // file doesn't exist, skip
+      }
+    }
+
+    // Read current log file (newest)
+    try {
+      const raw = readFileSync(this.logPath, 'utf8');
+      for (const line of raw.split('\n')) {
+        if (line.trim()) {
+          try {
+            entries.push(JSON.parse(line) as AutopilotLogEntry);
+          } catch {
+            // skip malformed lines
+          }
+        }
+      }
+    } catch {
+      // file doesn't exist
+    }
+
+    // Return the most recent maxEntries in chronological order
+    return entries.slice(-maxEntries);
+  }
+
+  readAction(actionId: string): Action | null {
+    const actionPath = join(
+      getDataDir(),
+      'projects',
+      this.projectId,
+      'actions',
+      `${actionId}.json`
+    );
+    try {
+      const raw = readFileSync(actionPath, 'utf8');
+      return JSON.parse(raw) as Action;
+    } catch {
+      return null;
+    }
+  }
+
+  getAllTaskMappings(): Record<string, TaskMapping> {
+    return this.loadState().taskMappings ?? {};
   }
 }
