@@ -150,6 +150,61 @@ function writeReviewAction(
   return { reviewActionId, reviewTraceId };
 }
 
+function writeErrorTrace(
+  projectId: string,
+  summary: string,
+  parentTraceId: string,
+  error: unknown
+): { traceId: string; actionId: string } {
+  const basePath = join(getDataDir(), 'projects', projectId);
+  const tracesDir = join(basePath, 'traces');
+  const actionsDir = join(basePath, 'actions');
+
+  mkdirSync(tracesDir, { recursive: true });
+  mkdirSync(actionsDir, { recursive: true });
+
+  const traceId = randomUUID();
+  const actionId = randomUUID();
+  const timestamp = new Date().toISOString();
+
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  const errorStack = error instanceof Error ? (error.stack ?? '') : '';
+
+  const trace: Trace = {
+    id: traceId,
+    version: '1.0',
+    timestamp,
+    summary: `error: ${summary}`,
+    step: 'workflow',
+    parent: parentTraceId,
+    meta: {
+      error: errorMessage,
+      stack: errorStack,
+    },
+  };
+
+  const action: Action = {
+    id: actionId,
+    version: '1.0',
+    action: 'noop',
+    timestamp,
+    traceId,
+    meta: {},
+    reasoning: `Error during workflow: ${errorMessage}`,
+  };
+
+  writeFileSync(
+    join(tracesDir, `${traceId}.json`),
+    JSON.stringify(trace, null, 2)
+  );
+  writeFileSync(
+    join(actionsDir, `${actionId}.json`),
+    JSON.stringify(action, null, 2)
+  );
+
+  return { traceId, actionId };
+}
+
 async function processWorkflowAction(
   pending: PendingAction,
   project: ProjectManager,
@@ -184,7 +239,7 @@ async function processWorkflowAction(
   const task = project.createTask({
     title: meta.title ?? pending.summary,
     description: meta.description ?? pending.summary,
-    inputs: new Map(),
+    inputs: new Map([['description', meta.description ?? pending.summary]]),
     workflowName: meta.workflow ?? 'swe',
     agent: selectedAgent,
     sourceBranch: baseBranch,
@@ -235,6 +290,7 @@ async function processWorkflowAction(
   task.setAgentImage(agentImage);
 
   let containerId = '';
+  let sandboxError: string | undefined;
   try {
     const sandbox = await createSandbox(task, undefined, { projectPath });
     containerId = await sandbox.createAndStart();
@@ -244,8 +300,8 @@ async function processWorkflowAction(
       : undefined;
 
     task.setContainerInfo(containerId, 'running', sandboxMetadata);
-  } catch {
-    // On sandbox failure: reset task but still proceed with trace/review
+  } catch (err) {
+    sandboxError = err instanceof Error ? err.message : String(err);
     task.resetToNew();
   }
 
@@ -262,6 +318,7 @@ async function processWorkflowAction(
       workflow: meta.workflow,
       title: meta.title,
       baseBranch,
+      ...(sandboxError ? { sandboxError } : {}),
     }
   );
 
@@ -464,13 +521,34 @@ export function useWorkflowRunner(
           chainsRef.current.set(action.chainId, chain);
           onChainsUpdated();
           setProcessedCount(c => c + 1);
-        } catch {
+        } catch (err) {
+          // Write error trace + noop action
+          const { traceId: errorTraceId, actionId: errorActionId } =
+            writeErrorTrace(
+              projectId,
+              action.meta?.title ?? action.summary,
+              action.traceId,
+              err
+            );
+
+          // Write error log entry
+          store.appendLog({
+            ts: new Date().toISOString(),
+            chainId: action.chainId,
+            traceId: errorTraceId,
+            actionId: errorActionId,
+            step: 'workflow',
+            action: 'error',
+            summary: `error: ${err instanceof Error ? err.message : String(err)}`,
+          });
+
           // Mark step as failed in the chain
           const chain = chainsRef.current.get(action.chainId);
           if (chain) {
             const step = chain.steps.find(s => s.actionId === action.actionId);
             if (step) {
               step.status = 'failed';
+              step.reasoning = err instanceof Error ? err.message : String(err);
             }
             chainsRef.current.set(action.chainId, chain);
             onChainsUpdated();
