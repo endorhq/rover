@@ -15,6 +15,7 @@ import type {
   PendingAction,
   AutopilotState,
   AutopilotLogEntry,
+  Trace,
 } from './types.js';
 
 const CURSOR_MAX_IDS = 200;
@@ -38,12 +39,14 @@ function defaultState(): AutopilotState {
 }
 
 export class AutopilotStore {
+  private projectId: string;
   private basePath: string;
   private cursorPath: string;
   private statePath: string;
   private logPath: string;
 
   constructor(projectId: string) {
+    this.projectId = projectId;
     this.basePath = join(getDataDir(), 'projects', projectId, 'autopilot');
     this.cursorPath = join(this.basePath, 'cursor.json');
     this.statePath = join(this.basePath, 'state.json');
@@ -158,5 +161,37 @@ export class AutopilotStore {
 
     // Rename current log to log.1.jsonl
     renameSync(this.logPath, join(this.basePath, 'log.1.jsonl'));
+  }
+
+  // --- Trace methods ---
+
+  readTrace(traceId: string): Trace | null {
+    const tracePath = join(
+      getDataDir(),
+      'projects',
+      this.projectId,
+      'traces',
+      `${traceId}.json`
+    );
+    try {
+      const raw = readFileSync(tracePath, 'utf8');
+      return JSON.parse(raw) as Trace;
+    } catch {
+      return null;
+    }
+  }
+
+  getTraceChain(traceId: string): Trace[] {
+    const chain: Trace[] = [];
+    let currentId: string | null = traceId;
+
+    while (currentId) {
+      const trace = this.readTrace(currentId);
+      if (!trace) break;
+      chain.unshift(trace);
+      currentId = trace.parent;
+    }
+
+    return chain;
   }
 }

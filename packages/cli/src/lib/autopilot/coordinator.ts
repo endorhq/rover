@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { join } from 'node:path';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
@@ -79,7 +79,7 @@ function writeCoordinatorTrace(
     action: decision.action,
     timestamp,
     traceId,
-    meta: decision.meta,
+    meta: decision.action === 'noop' ? {} : decision.meta,
     reasoning: decision.reasoning,
   };
 
@@ -115,7 +115,10 @@ async function processAction(
   const prompt = buildPilotPrompt(pending.meta ?? {}, context);
   const agent = getUserAIAgent();
   const agentTool = getAIAgentTool(agent);
-  const response = await agentTool.invoke(prompt, true);
+  const response = await agentTool.invoke(prompt, {
+    json: true,
+    model: 'haiku',
+  });
   const decision = parseJsonResponse<PilotDecision>(response);
 
   // Safety: prevent recursive coordinate
@@ -165,16 +168,15 @@ async function processAction(
 
 export function useCoordinator(
   projectPath: string,
-  projectId: string
+  projectId: string,
+  chainsRef: React.MutableRefObject<Map<string, ActionChain>>,
+  onChainsUpdated: () => void
 ): {
   status: CoordinatorStatus;
-  chains: ActionChain[];
   processedCount: number;
 } {
   const [status, setStatus] = useState<CoordinatorStatus>('idle');
-  const [chainsVersion, setChainsVersion] = useState(0);
   const [processedCount, setProcessedCount] = useState(0);
-  const chainsRef = useRef<Map<string, ActionChain>>(new Map());
   const inProgressRef = useRef<Set<string>>(new Set());
   const repoRef = useRef(getRepoInfo(projectPath));
   const storeRef = useRef<AutopilotStore | null>(null);
@@ -232,7 +234,7 @@ export function useCoordinator(
           };
           chain.steps.push(runningStep);
           chainsRef.current.set(action.chainId, chain);
-          setChainsVersion(v => v + 1);
+          onChainsUpdated();
 
           const { decision, newActionId } = await processAction(
             action,
@@ -258,7 +260,7 @@ export function useCoordinator(
           }
 
           chainsRef.current.set(action.chainId, chain);
-          setChainsVersion(v => v + 1);
+          onChainsUpdated();
           setProcessedCount(c => c + 1);
         } catch {
           // Mark step as failed in the chain
@@ -269,7 +271,7 @@ export function useCoordinator(
               step.status = 'failed';
             }
             chainsRef.current.set(action.chainId, chain);
-            setChainsVersion(v => v + 1);
+            onChainsUpdated();
           }
 
           // Remove from pending on failure too
@@ -283,7 +285,7 @@ export function useCoordinator(
     // Check if any failed
     const hasError = results.some(r => r.status === 'rejected');
     setStatus(hasError ? 'error' : 'idle');
-  }, [projectId]);
+  }, [projectId, onChainsUpdated]);
 
   // Initial delay then periodic processing
   useEffect(() => {
@@ -300,7 +302,5 @@ export function useCoordinator(
     };
   }, [doProcess]);
 
-  const chains = Array.from(chainsRef.current.values());
-
-  return { status, chains, processedCount };
+  return { status, processedCount };
 }

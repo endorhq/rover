@@ -5,6 +5,7 @@ import type {
   LogEntry,
   WorkSlot,
   CoordinatorStatus,
+  PlannerStatus,
   ActionChain,
   ActionStepStatus,
 } from './types.js';
@@ -94,6 +95,44 @@ function CoordinatorIndicator({
   );
 }
 
+// ── Planner Status Indicator ─────────────────────────────────────────────────
+
+const PLANNER_ICONS: Record<PlannerStatus, string> = {
+  idle: '\u25CB', // ○
+  processing: '\u21BB', // ↻
+  error: '\u2717', // ✗
+};
+
+const PLANNER_COLORS: Record<PlannerStatus, string> = {
+  idle: 'gray',
+  processing: 'magenta',
+  error: 'red',
+};
+
+function PlannerIndicator({
+  status,
+  processedCount,
+}: {
+  status: PlannerStatus;
+  processedCount: number;
+}) {
+  const icon = PLANNER_ICONS[status];
+  const color = PLANNER_COLORS[status];
+  const label =
+    status === 'processing'
+      ? 'planning...'
+      : status === 'error'
+        ? 'planner error'
+        : `${processedCount} planned`;
+
+  return (
+    <Text>
+      <Text color={color}>{icon} </Text>
+      <Text dimColor>{label}</Text>
+    </Text>
+  );
+}
+
 // ── Key Legend ────────────────────────────────────────────────────────────────
 
 function KeyLegend() {
@@ -124,6 +163,8 @@ export function InfoPanel({
   fetchCountdown,
   coordinatorStatus,
   processedCount,
+  plannerStatus,
+  plannerProcessedCount,
 }: {
   projectName: string;
   agent: string;
@@ -133,6 +174,8 @@ export function InfoPanel({
   fetchCountdown: number;
   coordinatorStatus: CoordinatorStatus;
   processedCount: number;
+  plannerStatus: PlannerStatus;
+  plannerProcessedCount: number;
 }) {
   return (
     <Box
@@ -166,6 +209,10 @@ export function InfoPanel({
       <CoordinatorIndicator
         status={coordinatorStatus}
         processedCount={processedCount}
+      />
+      <PlannerIndicator
+        status={plannerStatus}
+        processedCount={plannerProcessedCount}
       />
       <Box flexGrow={1} />
       <KeyLegend />

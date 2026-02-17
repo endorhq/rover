@@ -43,32 +43,70 @@ function extractRelevantEvent(event: GitHubEvent): RelevantEvent | null {
   const { type, payload } = event;
 
   switch (type) {
-    case 'IssuesEvent':
-      if (payload.action !== 'opened') return null;
+    case 'IssuesEvent': {
+      const issueAction = payload.action;
+      if (!['opened', 'closed', 'reopened'].includes(issueAction)) return null;
       return {
-        summary: `new issue #${payload.issue?.number}`,
+        summary: `issue ${issueAction} #${payload.issue?.number}`,
         meta: {
           type,
+          action: issueAction,
           issueNumber: payload.issue?.number,
           title: payload.issue?.title,
+          state: payload.issue?.state,
           author: payload.issue?.user?.login,
+          labels: (payload.issue?.labels ?? []).map(
+            (l: { name: string }) => l.name
+          ),
+          assignees: (payload.issue?.assignees ?? []).map(
+            (a: { login: string }) => a.login
+          ),
           url: payload.issue?.html_url,
         },
       };
+    }
 
-    case 'PullRequestEvent':
-      if (payload.action !== 'opened') return null;
+    case 'PullRequestEvent': {
+      const prAction = payload.action;
+      if (
+        ![
+          'opened',
+          'closed',
+          'reopened',
+          'ready_for_review',
+          'review_requested',
+        ].includes(prAction)
+      )
+        return null;
       return {
-        summary: `new PR #${payload.pull_request?.number}`,
+        summary: `PR ${prAction} #${payload.pull_request?.number}`,
         meta: {
           type,
+          action: prAction,
           prNumber: payload.pull_request?.number,
           title: payload.pull_request?.title,
+          state: payload.pull_request?.state,
+          draft: payload.pull_request?.draft ?? false,
+          merged: payload.pull_request?.merged ?? false,
           author: payload.pull_request?.user?.login,
           branch: payload.pull_request?.head?.ref,
+          baseBranch: payload.pull_request?.base?.ref,
+          labels: (payload.pull_request?.labels ?? []).map(
+            (l: { name: string }) => l.name
+          ),
+          assignees: (payload.pull_request?.assignees ?? []).map(
+            (a: { login: string }) => a.login
+          ),
+          requestedReviewers: (
+            payload.pull_request?.requested_reviewers ?? []
+          ).map((r: { login: string }) => r.login),
+          additions: payload.pull_request?.additions,
+          deletions: payload.pull_request?.deletions,
+          changedFiles: payload.pull_request?.changed_files,
           url: payload.pull_request?.html_url,
         },
       };
+    }
 
     case 'IssueCommentEvent':
       if (payload.action !== 'created') return null;
@@ -78,6 +116,8 @@ function extractRelevantEvent(event: GitHubEvent): RelevantEvent | null {
           type,
           issueNumber: payload.issue?.number,
           issueTitle: payload.issue?.title,
+          issueState: payload.issue?.state,
+          isPullRequest: !!payload.issue?.pull_request,
           author: payload.comment?.user?.login,
           commentId: payload.comment?.id,
           body: (payload.comment?.body ?? '').slice(0, 200),
@@ -92,6 +132,8 @@ function extractRelevantEvent(event: GitHubEvent): RelevantEvent | null {
           type,
           prNumber: payload.pull_request?.number,
           prTitle: payload.pull_request?.title,
+          prState: payload.pull_request?.state,
+          prMerged: payload.pull_request?.merged ?? false,
           reviewer: payload.review?.user?.login,
           state: payload.review?.state,
           body: payload.review?.body ?? '',
@@ -106,6 +148,8 @@ function extractRelevantEvent(event: GitHubEvent): RelevantEvent | null {
           type,
           prNumber: payload.pull_request?.number,
           prTitle: payload.pull_request?.title,
+          prState: payload.pull_request?.state,
+          prMerged: payload.pull_request?.merged ?? false,
           author: payload.comment?.user?.login,
           commentId: payload.comment?.id,
           path: payload.comment?.path,
