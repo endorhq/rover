@@ -180,8 +180,8 @@ function KeyLegend() {
       <Text dimColor>{'\u2500'.repeat(14)}</Text>
       <Text dimColor>keys:</Text>
       <Text>
-        <Text color="gray">ctrl+a </Text>
-        <Text dimColor>actions</Text>
+        <Text color="gray">i </Text>
+        <Text dimColor>inspector</Text>
       </Text>
       <Text>
         <Text color="gray">q </Text>
@@ -357,52 +357,6 @@ export function ActionChainList({
       {visible.map(chain => (
         <ActionChainRow key={chain.chainId} chain={chain} />
       ))}
-    </Box>
-  );
-}
-
-// ── Actions Detail View (full-screen, CTRL+A) ───────────────────────────────
-
-export function ActionsDetailView({
-  chains,
-  width,
-  height,
-}: {
-  chains: ActionChain[];
-  width: number;
-  height: number;
-}) {
-  return (
-    <Box
-      flexDirection="column"
-      borderStyle="round"
-      borderColor="cyan"
-      paddingX={1}
-      width={width}
-      height={height}
-    >
-      <Text bold color="cyan">
-        ACTION CHAINS
-      </Text>
-      <Text dimColor>{'\u2500'.repeat(Math.min(14, width - 4))}</Text>
-      {chains.length === 0 ? (
-        <Text dimColor>No action chains yet...</Text>
-      ) : (
-        chains.map(chain => (
-          <Box key={chain.chainId} flexDirection="column" marginBottom={1}>
-            <ActionChainRow chain={chain} />
-            {chain.steps.map(step => (
-              <Text key={step.actionId} wrap="truncate">
-                <Text> </Text>
-                <Text color={STEP_COLORS[step.status]}>{step.action}</Text>
-                <Text dimColor>: {step.reasoning ?? 'pending'}</Text>
-              </Text>
-            ))}
-          </Box>
-        ))
-      )}
-      <Box flexGrow={1} />
-      <Text dimColor>press ctrl+a to return</Text>
     </Box>
   );
 }

@@ -95,7 +95,7 @@ export interface ActionChain {
 export type CoordinatorStatus = 'idle' | 'processing' | 'error';
 export type PlannerStatus = 'idle' | 'processing' | 'error';
 export type WorkflowRunnerStatus = 'idle' | 'processing' | 'error';
-export type ViewMode = 'main' | 'actions';
+export type ViewMode = 'main' | 'inspector';
 
 export interface TaskMapping {
   taskId: number;
