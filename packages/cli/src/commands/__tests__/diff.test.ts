@@ -820,6 +820,34 @@ describe('diff command', () => {
     });
   });
 
+  describe('Worktree context', () => {
+    it('should resolve correct project when running from inside a worktree directory', async () => {
+      const { task, worktreePath } = createTestTask(
+        27,
+        'Worktree Context Task'
+      );
+
+      // Make changes in the worktree
+      appendFileSync(join(worktreePath, 'README.md'), 'Change from worktree\n');
+
+      // Simulate running from inside the worktree directory
+      process.chdir(worktreePath);
+
+      await diffCommand('27');
+
+      const logCalls = consoleSpy.log.mock.calls.map(call => call.join(' '));
+      const output = logCalls.join('\n');
+
+      // The diff command should succeed (not throw TaskNotFoundError)
+      expect(output).toContain('Task 27 Changes');
+      expect(output).toContain('Worktree Context Task');
+      expect(output).toContain('+Change from worktree');
+
+      // Restore cwd
+      process.chdir(testDir);
+    });
+  });
+
   describe('Telemetry', () => {
     it('should track diff event', async () => {
       const { getTelemetry } = await import('../../lib/telemetry.js');

@@ -134,6 +134,32 @@ export function createProgram(
         // It must be defined.
         const commandDef = getCommandDefinition(actionCommand)!;
 
+        // Detect worktree context and inform the user
+        if (ctx.inGitRepo && !ctx.projectOption) {
+          const git = new Git();
+          if (git.isWorktree()) {
+            const mainRoot = git.getMainRepositoryRoot();
+            if (!isJsonMode() && commandName !== 'mcp') {
+              console.log(
+                colors.yellow(
+                  'Note: You are inside a git worktree. Rover is using the main project root.'
+                )
+              );
+              if (mainRoot) {
+                console.log(
+                  colors.gray('  Main project: ') + colors.cyan(mainRoot)
+                );
+              }
+              console.log(
+                colors.gray('  Tip: Use ') +
+                  colors.cyan('--project') +
+                  colors.gray(' to target a specific project.')
+              );
+              console.log();
+            }
+          }
+        }
+
         try {
           let project;
 
