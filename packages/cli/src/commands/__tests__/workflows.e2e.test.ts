@@ -147,6 +147,7 @@ steps:
     createMockTool('cursor-agent', 127, 'command not found: cursor-agent');
     createMockTool('gemini', 127, 'command not found: gemini');
     createMockTool('qwen', 127, 'command not found: qwen');
+    createMockTool('opencode', 127, 'command not found: opencode');
 
     createMockTool('docker', 0, 'Docker version 24.0.0');
     createMockClaude();
@@ -176,6 +177,124 @@ steps:
     process.chdir(originalCwd);
     process.env.PATH = originalPath;
     rmSync(testDir, { recursive: true, force: true });
+  });
+
+  describe('add workflow from URL', () => {
+    it('should add a workflow from an HTTP URL', async () => {
+      // Start a simple HTTP server to serve the workflow YAML
+      const { createServer } = await import('node:http');
+      const server = createServer((_req, res) => {
+        res.writeHead(200, { 'Content-Type': 'text/yaml' });
+        res.end(sampleWorkflowYaml);
+      });
+
+      await new Promise<void>(resolve => {
+        server.listen(0, '127.0.0.1', () => resolve());
+      });
+
+      const address = server.address();
+      const port =
+        typeof address === 'object' && address !== null ? address.port : 0;
+
+      try {
+        const result = await runRover([
+          'workflows',
+          'add',
+          `http://127.0.0.1:${port}/test-workflow.yml`,
+          '--name',
+          'url-workflow',
+          '--json',
+        ]);
+
+        expect(result.exitCode).toBe(0);
+
+        const output = JSON.parse(result.stdout);
+        expect(output.success).toBe(true);
+        expect(output.workflow).toBeDefined();
+        expect(output.workflow.name).toBe('url-workflow');
+      } finally {
+        server.close();
+      }
+    });
+
+    it('should allow setting a custom name with --name flag when adding from URL', async () => {
+      const { createServer } = await import('node:http');
+      const server = createServer((_req, res) => {
+        res.writeHead(200, { 'Content-Type': 'text/yaml' });
+        res.end(sampleWorkflowYaml);
+      });
+
+      await new Promise<void>(resolve => {
+        server.listen(0, '127.0.0.1', () => resolve());
+      });
+
+      const address = server.address();
+      const port =
+        typeof address === 'object' && address !== null ? address.port : 0;
+
+      try {
+        const result = await runRover([
+          'workflows',
+          'add',
+          `http://127.0.0.1:${port}/workflow.yml`,
+          '--name',
+          'custom-url-workflow',
+          '--json',
+        ]);
+
+        expect(result.exitCode).toBe(0);
+
+        const output = JSON.parse(result.stdout);
+        expect(output.success).toBe(true);
+        expect(output.workflow.name).toBe('custom-url-workflow');
+      } finally {
+        server.close();
+      }
+    });
+
+    it('should save URL workflow to global store with --global flag', async () => {
+      const { createServer } = await import('node:http');
+      const server = createServer((_req, res) => {
+        res.writeHead(200, { 'Content-Type': 'text/yaml' });
+        res.end(sampleWorkflowYaml);
+      });
+
+      await new Promise<void>(resolve => {
+        server.listen(0, '127.0.0.1', () => resolve());
+      });
+
+      const address = server.address();
+      const port =
+        typeof address === 'object' && address !== null ? address.port : 0;
+
+      const globalName = `e2e-global-url-${Date.now()}`;
+
+      try {
+        const result = await runRover([
+          'workflows',
+          'add',
+          `http://127.0.0.1:${port}/workflow.yml`,
+          '--global',
+          '--name',
+          globalName,
+          '--json',
+        ]);
+
+        expect(result.exitCode).toBe(0);
+
+        const output = JSON.parse(result.stdout);
+        expect(output.success).toBe(true);
+        expect(output.workflow.store).toBe('global');
+
+        // Clean up global workflow
+        const globalPath = output.workflow.path;
+        if (globalPath && existsSync(globalPath)) {
+          rmSync(globalPath);
+        }
+      } finally {
+        server.close();
+      }
+    });
   });
 
   describe('add workflow from file', () => {

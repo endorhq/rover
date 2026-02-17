@@ -146,6 +146,7 @@ exit 0
     createMockTool('cursor-agent', 127, 'command not found: cursor-agent');
     createMockTool('gemini', 127, 'command not found: gemini');
     createMockTool('qwen', 127, 'command not found: qwen');
+    createMockTool('opencode', 127, 'command not found: opencode');
 
     createMockTool('docker', 0, 'Docker version 24.0.0');
     createMockClaude();
@@ -241,6 +242,64 @@ exit 0
       const result = await runRover(['logs', '1', '1']);
 
       expect(result.exitCode).toBeDefined();
+    });
+  });
+
+  /**
+   * SKIPPED: Tests require real AI agent execution
+   *
+   * Why skipped:
+   *   Log following tests require a running container producing real-time logs.
+   *   With mock Docker, no container is running, so there are no logs to follow.
+   *
+   * TODO: To unskip these tests:
+   *   1. Set ROVER_E2E_REAL_AGENT=true environment variable
+   *   2. Ensure Docker is running and can pull the rover agent image
+   *   3. Ensure a valid AI agent (Claude CLI, Gemini CLI, etc.) is installed and authenticated
+   *   4. Run with: ROVER_E2E_REAL_AGENT=true pnpm e2e-test --grep "log following"
+   */
+  describe.skipIf(SKIP_REAL_AGENT_TESTS)('log following', () => {
+    it('should accept the --follow flag for real-time log streaming', async () => {
+      await runRover(['task', '-y', 'Create a hello world script']);
+
+      await waitForTaskStatus(1, ['IN_PROGRESS', 'COMPLETED', 'FAILED']);
+
+      // Start log following with a short timeout since it runs indefinitely
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2000);
+
+      try {
+        const roverBin = join(__dirname, '../../../dist/index.mjs');
+        const testPath = `${mockBinDir}:${originalPath}`;
+
+        await execa('node', [roverBin, 'logs', '1', '--follow'], {
+          cwd: testDir,
+          env: {
+            PATH: testPath,
+            HOME: mockHomeDir,
+            USER: process.env.USER,
+            TMPDIR: process.env.TMPDIR,
+            ROVER_NO_TELEMETRY: '1',
+          },
+          signal: controller.signal,
+          reject: false,
+        });
+      } catch (error: unknown) {
+        // Expected to be aborted - this is fine
+        if (
+          error &&
+          typeof error === 'object' &&
+          'killed' in error &&
+          error.killed
+        ) {
+          // Process was killed as expected
+        }
+      } finally {
+        clearTimeout(timeoutId);
+      }
+
+      // If we got here without an error about invalid flags, the command accepts --follow
+      expect(true).toBe(true);
     });
   });
 

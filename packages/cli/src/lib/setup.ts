@@ -94,7 +94,7 @@ export class SetupBuilder {
   private getLanguagePackages(): SandboxPackage[] {
     const packages: SandboxPackage[] = [];
 
-    for (const language of this.projectConfig.languages) {
+    for (const language of this.projectConfig.languages ?? []) {
       switch (language) {
         case 'javascript':
           packages.push(new JavaScriptSandboxPackage());
@@ -129,7 +129,7 @@ export class SetupBuilder {
   private getPackageManagerPackages(): SandboxPackage[] {
     const packages: SandboxPackage[] = [];
 
-    for (const packageManager of this.projectConfig.packageManagers) {
+    for (const packageManager of this.projectConfig.packageManagers ?? []) {
       switch (packageManager) {
         case 'npm':
           packages.push(new NpmSandboxPackage());
@@ -173,7 +173,7 @@ export class SetupBuilder {
   private getTaskManagerPackages(): SandboxPackage[] {
     const packages: SandboxPackage[] = [];
 
-    for (const taskManager of this.projectConfig.taskManagers) {
+    for (const taskManager of this.projectConfig.taskManagers ?? []) {
       switch (taskManager) {
         case 'just':
           packages.push(new JustSandboxPackage());

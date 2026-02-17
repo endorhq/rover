@@ -109,13 +109,7 @@ const pushCommand = async (taskId: string, options: PushOptions) => {
   let projectConfig;
 
   // Load config
-  try {
-    projectConfig = ProjectConfigManager.load(project.path);
-  } catch (err) {
-    if (!isJsonMode()) {
-      console.log(colors.yellow('⚠ Could not load project settings'));
-    }
-  }
+  projectConfig = ProjectConfigManager.load(project.path);
 
   try {
     // Load task using ProjectManager

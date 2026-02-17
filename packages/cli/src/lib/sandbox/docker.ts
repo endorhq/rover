@@ -204,7 +204,7 @@ export class DockerSandbox extends Sandbox {
     }
 
     // Mount initScript if provided in project config
-    if (projectConfig?.initScript) {
+    if (projectConfig.initScript) {
       const initScriptAbsPath = join(
         projectConfig.projectRoot,
         projectConfig.initScript
@@ -221,7 +221,7 @@ export class DockerSandbox extends Sandbox {
     }
 
     // Get extra args from CLI options and project config, merge them
-    const configExtraArgs = normalizeExtraArgs(projectConfig?.sandboxExtraArgs);
+    const configExtraArgs = normalizeExtraArgs(projectConfig.sandboxExtraArgs);
     const cliExtraArgs = normalizeExtraArgs(this.options?.extraArgs);
     const extraArgs = [...configExtraArgs, ...cliExtraArgs];
 
@@ -497,7 +497,7 @@ export class DockerSandbox extends Sandbox {
     }
 
     // Get extra args from CLI options and project config, merge them
-    const configExtraArgs = normalizeExtraArgs(projectConfig?.sandboxExtraArgs);
+    const configExtraArgs = normalizeExtraArgs(projectConfig.sandboxExtraArgs);
     const cliExtraArgs = normalizeExtraArgs(this.options?.extraArgs);
     const extraArgs = [...configExtraArgs, ...cliExtraArgs];
 
@@ -626,7 +626,7 @@ export class DockerSandbox extends Sandbox {
 
     // Get extra args from CLI options and project config, merge them
     const projectConfig = ProjectConfigManager.load(this.options?.projectPath!);
-    const configExtraArgs = normalizeExtraArgs(projectConfig?.sandboxExtraArgs);
+    const configExtraArgs = normalizeExtraArgs(projectConfig.sandboxExtraArgs);
     const cliExtraArgs = normalizeExtraArgs(this.options?.extraArgs);
     const extraArgs = [...configExtraArgs, ...cliExtraArgs];
 
