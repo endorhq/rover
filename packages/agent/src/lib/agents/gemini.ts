@@ -121,7 +121,7 @@ export class GeminiAgent extends BaseAgent {
   }
 
   toolArguments(): string[] {
-    const args = ['--yolo', '--output-format', 'json'];
+    const args = ['--yolo', '--output-format', 'json', '--include-directories', '/'];
     if (this.model) {
       args.push('--model', this.model);
     }

@@ -53,19 +53,32 @@ export interface ACPRunnerConfig {
 /**
  * Get ACP spawn command for a given agent tool
  */
-function getACPSpawnCommand(tool: string): { command: string; args: string[] } {
+function getACPSpawnCommand(
+  tool: string,
+  model?: string
+): { command: string; args: string[] } {
   switch (tool.toLowerCase()) {
     case 'claude':
       return {
         command: 'npx',
         args: ['-y', '@zed-industries/claude-code-acp'],
       };
-    case 'gemini':
+    case 'gemini': {
       // Gemini implements ACP natively via --experimental-acp flag
+      const args = [
+        '--experimental-acp',
+        '--yolo',
+        '--include-directories',
+        '/',
+      ];
+      if (model) {
+        args.push('--model', model);
+      }
       return {
         command: 'gemini',
-        args: ['--experimental-acp'],
+        args,
       };
+    }
     case 'copilot':
       return {
         command: 'copilot',
