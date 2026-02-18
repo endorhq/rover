@@ -66,10 +66,7 @@ function getACPSpawnCommand(
     case 'gemini': {
       // Gemini implements ACP natively via --experimental-acp flag
       const args = [
-        '--experimental-acp',
-        '--yolo',
-        '--include-directories',
-        '/',
+        '--experimental-acp'
       ];
       if (model) {
         args.push('--model', model);
