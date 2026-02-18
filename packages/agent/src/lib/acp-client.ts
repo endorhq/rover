@@ -233,6 +233,15 @@ export class ACPClient implements Client {
     }
   }
 
+  /**
+   * Called when readTextFile encounters a file that does not exist.
+   * Subclasses can override this to customize behavior per agent.
+   * By default, throws a resourceNotFound error.
+   */
+  protected onFileNotFound(path: string): Promise<ReadTextFileResponse> {
+    throw RequestError.resourceNotFound(path);
+  }
+
   readTextFile?(params: ReadTextFileRequest): Promise<ReadTextFileResponse> {
     // Always log ACP commands for debugging (can be seen in docker logs)
     console.log(

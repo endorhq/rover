@@ -29,6 +29,7 @@ import {
   showList,
 } from 'rover-core';
 import { ACPClient } from './acp-client.js';
+import { GeminiACPClient } from './gemini-acp-client.js';
 import { copyFileSync, rmSync } from 'node:fs';
 
 export interface ACPRunnerStepResult {
@@ -126,6 +127,18 @@ export class ACPRunner {
   }
 
   /**
+   * Create the appropriate ACPClient subclass for the current tool.
+   */
+  private createACPClient(): ACPClient {
+    switch (this.tool.toLowerCase()) {
+      case 'gemini':
+        return new GeminiACPClient();
+      default:
+        return new ACPClient();
+    }
+  }
+
+  /**
    * Initialize the ACP connection (protocol handshake)
    * Maps to the ACP initialize method
    */
@@ -134,7 +147,7 @@ export class ACPRunner {
       return;
     }
 
-    const spawnConfig = getACPSpawnCommand(this.tool);
+    const spawnConfig = getACPSpawnCommand(this.tool, this.defaultModel);
     console.log(
       colors.blue(
         `\n🚀 Starting ACP agent: ${spawnConfig.command} ${spawnConfig.args.join(' ')}`
@@ -165,8 +178,8 @@ export class ACPRunner {
       this.agentProcess.stdout
     ) as ReadableStream<Uint8Array>;
 
-    // Create the client connection
-    this.client = new ACPClient();
+    // Create the client connection (agent-specific subclass when needed)
+    this.client = this.createACPClient();
     const stream = ndJsonStream(input, output);
     this.connection = new ClientSideConnection(_agent => this.client!, stream);
 
