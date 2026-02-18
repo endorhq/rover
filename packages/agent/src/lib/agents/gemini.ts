@@ -1,5 +1,6 @@
 import { existsSync, copyFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { homedir } from 'node:os';
 import colors from 'ansi-colors';
 import {
   AgentCredentialFile,
@@ -7,7 +8,7 @@ import {
   AgentRecoveryResult,
 } from './types.js';
 import { BaseAgent } from './base.js';
-import { launch, VERBOSE } from 'rover-core';
+import { launch, VERBOSE, showList } from 'rover-core';
 import { containsGeminiYoloWarning } from '../utils/gemini.js';
 
 export class GeminiAgent extends BaseAgent {
@@ -51,12 +52,17 @@ export class GeminiAgent extends BaseAgent {
     this.ensureDirectory(targetGeminiDir);
 
     const credentials = this.getRequiredCredentials();
+    const copiedItems: string[] = [];
     for (const cred of credentials) {
       if (existsSync(cred.path)) {
         const filename = cred.path.split('/').pop()!;
         copyFileSync(cred.path, join(targetGeminiDir, filename));
-        console.log(colors.gray('├── Copied: ') + colors.cyan(cred.path));
+        copiedItems.push(colors.cyan(cred.path));
       }
+    }
+
+    if (copiedItems.length > 0) {
+      showList(copiedItems);
     }
 
     console.log(colors.green(`✓ ${this.name} credentials copied successfully`));
@@ -125,7 +131,7 @@ export class GeminiAgent extends BaseAgent {
       args.push('--model', this.model);
     }
     if (VERBOSE) {
-      args.push('--verbose');
+      args.push('--debug');
     }
     return args;
   }
@@ -178,5 +184,12 @@ export class GeminiAgent extends BaseAgent {
     }
 
     return '';
+  }
+
+  override getLogSources(): string[] {
+    // Gemini CLI writes conversation JSONL logs under
+    // ~/.gemini/projects/{mangled-cwd}/. The working directory inside
+    // the container is /workspace, so the mangled path is "-workspace".
+    return [join(homedir(), '.gemini', 'projects', '-workspace')];
   }
 }

@@ -1,9 +1,10 @@
 import { existsSync, copyFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { homedir } from 'node:os';
 import colors from 'ansi-colors';
 import { AgentCredentialFile } from './types.js';
 import { BaseAgent } from './base.js';
-import { launch, VERBOSE } from 'rover-core';
+import { launch, VERBOSE, showList } from 'rover-core';
 
 export class QwenAgent extends BaseAgent {
   name = 'Qwen';
@@ -46,12 +47,17 @@ export class QwenAgent extends BaseAgent {
     this.ensureDirectory(targetQwenDir);
 
     const credentials = this.getRequiredCredentials();
+    const copiedItems: string[] = [];
     for (const cred of credentials) {
       if (existsSync(cred.path)) {
         const filename = cred.path.split('/').pop()!;
         copyFileSync(cred.path, join(targetQwenDir, filename));
-        console.log(colors.gray('├── Copied: ') + colors.cyan(cred.path));
+        copiedItems.push(colors.cyan(cred.path));
       }
+    }
+
+    if (copiedItems.length > 0) {
+      showList(copiedItems);
     }
 
     console.log(colors.green(`✓ ${this.name} credentials copied successfully`));
@@ -120,7 +126,7 @@ export class QwenAgent extends BaseAgent {
       args.push('--model', this.model);
     }
     if (VERBOSE) {
-      args.push('--verbose');
+      args.push('--debug');
     }
     args.push('-p');
     return args;
@@ -137,5 +143,12 @@ export class QwenAgent extends BaseAgent {
     }
 
     return ['-i', prompt];
+  }
+
+  override getLogSources(): string[] {
+    // Qwen Code writes conversation JSONL logs under
+    // ~/.qwen/projects/{mangled-cwd}/. The working directory inside
+    // the container is /workspace, so the mangled path is "-workspace".
+    return [join(homedir(), '.qwen', 'projects', '-workspace')];
   }
 }

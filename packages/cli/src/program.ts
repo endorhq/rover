@@ -8,6 +8,7 @@ import {
 } from 'rover-core';
 import { NETWORK_MODE_VALUES } from 'rover-schemas';
 import initCmd from './commands/init.js';
+import cleanupCmd from './commands/cleanup.js';
 import infoCmd from './commands/info.js';
 import listCmd from './commands/list.js';
 import { exitWithError } from './utils/exit.js';
@@ -44,6 +45,7 @@ import type { CommandDefinition } from './types.js';
 // Registry of all commands for metadata lookup
 const commands: CommandDefinition[] = [
   initCmd,
+  cleanupCmd,
   infoCmd,
   listCmd,
   taskCmd,
@@ -131,6 +133,32 @@ export function createProgram(
         // Get command definition and check if it requires project
         // It must be defined.
         const commandDef = getCommandDefinition(actionCommand)!;
+
+        // Detect worktree context and inform the user
+        if (ctx.inGitRepo && !ctx.projectOption) {
+          const git = new Git();
+          if (git.isWorktree()) {
+            const mainRoot = git.getMainRepositoryRoot();
+            if (!isJsonMode() && commandName !== 'mcp') {
+              console.log(
+                colors.yellow(
+                  'Note: You are inside a git worktree. Rover is using the main project root.'
+                )
+              );
+              if (mainRoot) {
+                console.log(
+                  colors.gray('  Main project: ') + colors.cyan(mainRoot)
+                );
+              }
+              console.log(
+                colors.gray('  Tip: Use ') +
+                  colors.cyan('--project') +
+                  colors.gray(' to target a specific project.')
+              );
+              console.log();
+            }
+          }
+        }
 
         try {
           let project;
@@ -472,6 +500,14 @@ export function createProgram(
     .description('Show information about the Rover global store')
     .option('--json', 'Output in JSON format')
     .action(infoCmd.action);
+
+  program
+    .command('cleanup')
+    .description('Remove stale container cache images')
+    .option('--json', 'Output in JSON format')
+    .option('--dry-run', 'Preview what would be removed without deleting')
+    .option('-a, --all', 'Remove all cache images, including current ones')
+    .action(cleanupCmd.action);
 
   return program;
 }

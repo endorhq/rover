@@ -228,6 +228,25 @@ export interface InfoCommandOutput extends CLIJsonOutput {
 }
 
 // ---------------------------------------------------------------------------
+// cleanup command
+// ---------------------------------------------------------------------------
+
+export interface CleanupOutputImage {
+  tag: string;
+  imageId: string;
+  projectPath: string | null;
+  agent: string | null;
+  createdAt: string;
+  kept: boolean;
+}
+
+export interface CleanupCommandOutput extends CLIJsonOutput {
+  removedCount: number;
+  keptCount: number;
+  images: CleanupOutputImage[];
+}
+
+// ---------------------------------------------------------------------------
 // diff command
 // ---------------------------------------------------------------------------
 

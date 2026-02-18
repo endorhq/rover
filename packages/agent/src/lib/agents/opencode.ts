@@ -1,6 +1,7 @@
 import { existsSync, copyFileSync, readFileSync, writeFileSync } from 'node:fs';
-import { VERBOSE } from 'rover-core';
+import { VERBOSE, showList } from 'rover-core';
 import { join } from 'node:path';
+import { homedir } from 'node:os';
 import colors from 'ansi-colors';
 import { AgentCredentialFile, AgentUsageStats } from './types.js';
 import { BaseAgent } from './base.js';
@@ -58,6 +59,7 @@ export class OpenCodeAgent extends BaseAgent {
     this.ensureDirectory(targetOpenCodeDataDir);
 
     const credentials = this.getRequiredCredentials();
+    const copiedItems: string[] = [];
     for (const cred of credentials) {
       if (existsSync(cred.path)) {
         const filename = cred.path.split('/').pop()!;
@@ -66,8 +68,12 @@ export class OpenCodeAgent extends BaseAgent {
           ? targetOpenCodeDataDir
           : targetOpenCodeConfigDir;
         copyFileSync(cred.path, join(targetSubDir, filename));
-        console.log(colors.gray('├── Copied: ') + colors.cyan(cred.path));
+        copiedItems.push(colors.cyan(cred.path));
       }
+    }
+
+    if (copiedItems.length > 0) {
+      showList(copiedItems);
     }
 
     console.log(colors.green(`✓ ${this.name} credentials copied successfully`));
@@ -223,5 +229,14 @@ export class OpenCodeAgent extends BaseAgent {
     _parsedResponse: unknown
   ): AgentUsageStats | undefined {
     return undefined;
+  }
+
+  override getLogSources(): string[] {
+    // OpenCode writes debug logs under ~/.local/share/opencode/log/
+    // and session/message data under ~/.local/share/opencode/storage/
+    return [
+      join(homedir(), '.local', 'share', 'opencode', 'log'),
+      join(homedir(), '.local', 'share', 'opencode', 'storage'),
+    ];
   }
 }

@@ -68,8 +68,10 @@ export async function findOrRegisterProject(
     );
   }
 
-  // Get project root path
-  const projectRoot = git.getRepositoryRoot();
+  // Get project root path — use main repo root when inside a worktree
+  const projectRoot = git.isWorktree()
+    ? git.getMainRepositoryRoot()
+    : git.getRepositoryRoot();
   if (!projectRoot) {
     throw new ProjectLoaderNotGitRepoError(
       'Could not determine git repository root.'

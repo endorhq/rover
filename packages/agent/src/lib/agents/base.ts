@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync } from 'node:fs';
 import colors from 'ansi-colors';
-import { launch, launchSync } from 'rover-core';
+import { launch, launchSync, showTitle, showProperties } from 'rover-core';
 import {
   Agent,
   AgentCredentialFile,
@@ -65,9 +65,11 @@ export abstract class BaseAgent implements Agent {
   async install(): Promise<void> {
     const command = this.getInstallCommand();
 
-    console.log(colors.bold(`\nInstalling ${this.name} CLI`));
-    console.log(colors.gray('├── Version: ') + colors.cyan(this.version));
-    console.log(colors.gray('└── Command: ') + colors.cyan(command));
+    showTitle(`Installing ${this.name} CLI`);
+    showProperties({
+      Version: colors.cyan(this.version),
+      Command: colors.cyan(command),
+    });
 
     try {
       // Run the command in a shell so that pipes and other shell features work
@@ -116,5 +118,9 @@ export abstract class BaseAgent implements Agent {
    */
   extractUsageStats(_parsedResponse: unknown): AgentUsageStats | undefined {
     return undefined;
+  }
+
+  getLogSources(): string[] {
+    return [];
   }
 }

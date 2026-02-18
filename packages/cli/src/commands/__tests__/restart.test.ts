@@ -29,6 +29,16 @@ vi.mock('../../lib/context.js', () => ({
       },
       getWorkspacePath: (taskId: number) =>
         join(testDir, '.rover', 'tasks', taskId.toString(), 'workspace'),
+      getTaskIterationLogsPath: (taskId: number, iteration: number) =>
+        join(
+          testDir,
+          '.rover',
+          'tasks',
+          taskId.toString(),
+          'iterations',
+          iteration.toString(),
+          'logs'
+        ),
     });
   }),
   isJsonMode: vi.fn().mockReturnValue(false),
@@ -177,33 +187,81 @@ describe('restart command', async () => {
     });
 
     it('should reuse stored agent image on restart', async () => {
-      // Create a task with a specific agent image
-      const taskId = 555;
-      const taskDir = join(testDir, '.rover', 'tasks', taskId.toString());
+      const savedEnv = process.env.ROVER_AGENT_IMAGE;
+      delete process.env.ROVER_AGENT_IMAGE;
 
-      const task = TaskDescriptionManager.create(taskDir, {
-        id: taskId,
-        title: 'Test Task',
-        description: 'A test task',
-        inputs: new Map(),
-        workflowName: 'swe',
-      });
+      try {
+        // Create a task with a specific agent image
+        const taskId = 555;
+        const taskDir = join(testDir, '.rover', 'tasks', taskId.toString());
 
-      // Set a custom agent image
-      const customImage = 'ghcr.io/endorhq/rover/agent:v1.2.3';
-      task.setAgentImage(customImage);
+        const task = TaskDescriptionManager.create(taskDir, {
+          id: taskId,
+          title: 'Test Task',
+          description: 'A test task',
+          inputs: new Map(),
+          workflowName: 'swe',
+        });
 
-      // Verify it was stored
-      expect(task.agentImage).toBe(customImage);
+        // Set a custom agent image
+        const customImage = 'ghcr.io/endorhq/rover/agent:v1.2.3';
+        task.setAgentImage(customImage);
 
-      // Mark task as failed and restart it
-      task.markFailed('This task failed');
-      await restartCommand(taskId.toString(), { json: true });
+        // Verify it was stored
+        expect(task.agentImage).toBe(customImage);
 
-      // Reload and verify the agent image is still stored
-      const reloadedTask = TaskDescriptionManager.load(taskDir, taskId);
-      expect(reloadedTask.agentImage).toBe(customImage);
-      expect(reloadedTask.status).toBe('IN_PROGRESS');
+        // Mark task as failed and restart it
+        task.markFailed('This task failed');
+        await restartCommand(taskId.toString(), { json: true });
+
+        // Reload and verify the agent image is still stored
+        const reloadedTask = TaskDescriptionManager.load(taskDir, taskId);
+        expect(reloadedTask.agentImage).toBe(customImage);
+        expect(reloadedTask.status).toBe('IN_PROGRESS');
+      } finally {
+        if (savedEnv !== undefined) {
+          process.env.ROVER_AGENT_IMAGE = savedEnv;
+        }
+      }
+    });
+
+    it('should override stored agent image when ROVER_AGENT_IMAGE is set', async () => {
+      const savedEnv = process.env.ROVER_AGENT_IMAGE;
+      process.env.ROVER_AGENT_IMAGE =
+        'ghcr.io/endorhq/rover/agent:env-override';
+
+      try {
+        const taskId = 556;
+        const taskDir = join(testDir, '.rover', 'tasks', taskId.toString());
+
+        const task = TaskDescriptionManager.create(taskDir, {
+          id: taskId,
+          title: 'Test Task',
+          description: 'A test task',
+          inputs: new Map(),
+          workflowName: 'swe',
+        });
+
+        // Set a custom agent image
+        task.setAgentImage('ghcr.io/endorhq/rover/agent:v1.2.3');
+
+        // Mark task as failed and restart it
+        task.markFailed('This task failed');
+        await restartCommand(taskId.toString(), { json: true });
+
+        // Reload and verify the env var image takes priority
+        const reloadedTask = TaskDescriptionManager.load(taskDir, taskId);
+        expect(reloadedTask.agentImage).toBe(
+          'ghcr.io/endorhq/rover/agent:env-override'
+        );
+        expect(reloadedTask.status).toBe('IN_PROGRESS');
+      } finally {
+        if (savedEnv !== undefined) {
+          process.env.ROVER_AGENT_IMAGE = savedEnv;
+        } else {
+          delete process.env.ROVER_AGENT_IMAGE;
+        }
+      }
     });
   });
 
@@ -232,11 +290,87 @@ describe('restart command', async () => {
       expect(reloadedTask.restartCount).toBe(1);
     });
 
-    it('should reject restarting tasks not in NEW or FAILED status', async () => {
+    it('should allow restarting IN_PROGRESS tasks when container is dead', async () => {
+      const { createSandbox } = await import('../../lib/sandbox/index.js');
+      const mockCreateSandbox = vi.mocked(createSandbox);
+
+      // Mock sandbox to report container as exited
+      mockCreateSandbox.mockResolvedValue({
+        createAndStart: vi.fn().mockResolvedValue('new-container-id'),
+        inspect: vi.fn().mockResolvedValue({ status: 'exited', exitCode: 1 }),
+      } as any);
+
+      const taskId = 791;
+      const taskDir = join(testDir, '.rover', 'tasks', taskId.toString());
+
+      const task = TaskDescriptionManager.create(taskDir, {
+        id: taskId,
+        title: 'Test Task',
+        description: 'A test task',
+        inputs: new Map(),
+        workflowName: 'swe',
+      });
+
+      // Set to IN_PROGRESS to simulate a stuck task
+      task.markInProgress();
+      expect(task.status).toBe('IN_PROGRESS');
+
+      // Restart should succeed because container is dead
+      await restartCommand(taskId.toString(), { json: true });
+
+      const reloadedTask = TaskDescriptionManager.load(taskDir, taskId);
+      expect(reloadedTask.status).toBe('IN_PROGRESS');
+      expect(reloadedTask.restartCount).toBe(1);
+    });
+
+    it('should reject restarting IN_PROGRESS tasks when container is still running', async () => {
+      const { exitWithError } = await import('../../utils/exit.js');
+      const mockExitWithError = vi.mocked(exitWithError);
+      const { createSandbox } = await import('../../lib/sandbox/index.js');
+      const mockCreateSandbox = vi.mocked(createSandbox);
+
+      // Mock sandbox to report container as running
+      mockCreateSandbox.mockResolvedValue({
+        createAndStart: vi.fn().mockResolvedValue('mock-container-id'),
+        inspect: vi.fn().mockResolvedValue({ status: 'running', exitCode: 0 }),
+      } as any);
+
+      const taskId = 792;
+      const taskDir = join(testDir, '.rover', 'tasks', taskId.toString());
+
+      const task = TaskDescriptionManager.create(taskDir, {
+        id: taskId,
+        title: 'Test Task',
+        description: 'A test task',
+        inputs: new Map(),
+        workflowName: 'swe',
+      });
+
+      // Set to IN_PROGRESS
+      task.markInProgress();
+      expect(task.status).toBe('IN_PROGRESS');
+
+      // Try to restart — should be rejected
+      await restartCommand(taskId.toString(), { json: true });
+
+      expect(mockExitWithError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          error: expect.stringContaining('still running'),
+        }),
+        expect.objectContaining({
+          tips: expect.arrayContaining([
+            'The container for this task is still running',
+          ]),
+          telemetry: expect.anything(),
+        })
+      );
+    });
+
+    it('should reject restarting tasks in COMPLETED status', async () => {
       const { exitWithError } = await import('../../utils/exit.js');
       const mockExitWithError = vi.mocked(exitWithError);
 
-      // Create a task and set it to IN_PROGRESS status
+      // Create a task and set it to COMPLETED status
       const taskId = 790;
       const taskDir = join(testDir, '.rover', 'tasks', taskId.toString());
 
@@ -248,11 +382,11 @@ describe('restart command', async () => {
         workflowName: 'swe',
       });
 
-      // Manually set to IN_PROGRESS
-      task.markInProgress();
-      expect(task.status).toBe('IN_PROGRESS');
+      // Manually set to COMPLETED
+      task.markCompleted();
+      expect(task.status).toBe('COMPLETED');
 
-      // Try to restart an IN_PROGRESS task
+      // Try to restart a COMPLETED task
       await restartCommand(taskId.toString(), { json: true });
 
       // Verify error was called
@@ -262,7 +396,7 @@ describe('restart command', async () => {
         }),
         expect.objectContaining({
           tips: expect.arrayContaining([
-            'Only NEW and FAILED tasks can be restarted',
+            'Only NEW, FAILED, and stuck IN_PROGRESS tasks can be restarted',
           ]),
           telemetry: expect.anything(),
         })

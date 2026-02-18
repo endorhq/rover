@@ -76,6 +76,8 @@ enum EVENT_IDS {
   OPEN_WORKSPACE = 'open_workspace',
   // Show store information
   INFO = 'info',
+  // Clean up stale cache images
+  CLEANUP = 'cleanup',
 }
 
 class Telemetry {
@@ -240,6 +242,10 @@ class Telemetry {
 
   eventInfo() {
     this.capture(EVENT_IDS.INFO);
+  }
+
+  eventCleanup() {
+    this.capture(EVENT_IDS.CLEANUP);
   }
 
   // Other methods

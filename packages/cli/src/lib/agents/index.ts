@@ -19,9 +19,15 @@ export const findKeychainCredentials = (key: string): string => {
   return result.stdout?.toString() || '';
 };
 
+export interface InvokeOptions {
+  json?: boolean;
+  cwd?: string;
+  model?: string;
+}
+
 export interface AIAgentTool {
   // Invoke the CLI tool using the SDK / direct mode with the given prompt
-  invoke(prompt: string, json: boolean, cwd?: string): Promise<string>;
+  invoke(prompt: string, options?: InvokeOptions): Promise<string>;
 
   // Check if the current AI agent is available
   // It will throw an exception in other case

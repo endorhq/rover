@@ -106,6 +106,9 @@ const listWorkflowsCommand = async (options: ListWorkflowsCommandOptions) => {
           };
         });
 
+      // Add a breakline
+      console.log();
+
       // Render the table
       const table = new Table(columns);
       table.render(rows);

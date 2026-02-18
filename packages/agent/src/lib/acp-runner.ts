@@ -21,7 +21,13 @@ import type {
   WorkflowOutput,
   WorkflowStep,
 } from 'rover-schemas';
-import { WorkflowManager, IterationStatusManager, VERBOSE } from 'rover-core';
+import {
+  WorkflowManager,
+  IterationStatusManager,
+  VERBOSE,
+  JsonlLogger,
+  showList,
+} from 'rover-core';
 import { ACPClient } from './acp-client.js';
 import { copyFileSync, rmSync } from 'node:fs';
 
@@ -40,6 +46,7 @@ export interface ACPRunnerConfig {
   defaultModel?: string;
   statusManager?: IterationStatusManager;
   outputDir?: string;
+  logger?: JsonlLogger;
 }
 
 /**
@@ -74,6 +81,7 @@ export class ACPRunner {
   private defaultTool: string | undefined;
   private statusManager?: IterationStatusManager;
   private outputDir?: string;
+  private logger?: JsonlLogger;
 
   // ACP connection state
   private agentProcess: ChildProcess | null = null;
@@ -90,6 +98,7 @@ export class ACPRunner {
     this.defaultTool = config.defaultTool;
     this.statusManager = config.statusManager;
     this.outputDir = config.outputDir;
+    this.logger = config.logger;
 
     // Determine which tool to use
     // Priority: CLI flag > workflow defaults > fallback to claude
@@ -408,6 +417,15 @@ export class ACPRunner {
       // Update status before executing step
       this.statusManager?.update('running', step.name, currentProgress);
 
+      // Log step start
+      this.logger?.info('step_start', `Starting step: ${step.name}`, {
+        sessionId: this.sessionId ?? undefined,
+        stepId: step.id,
+        stepName: step.name,
+        agent: this.tool,
+        progress: currentProgress,
+      });
+
       // Build the prompt for this step (simplified for ACP - no file content injection)
       const prompt = this.buildACPPrompt(step);
 
@@ -450,10 +468,21 @@ export class ACPRunner {
       // Store outputs for next steps
       this.stepsOutput.set(stepId, outputs);
 
+      const duration = (performance.now() - start) / 1000;
+
+      // Log step completion
+      this.logger?.info('step_complete', `Step completed: ${step.name}`, {
+        sessionId: this.sessionId ?? undefined,
+        stepId: step.id,
+        stepName: step.name,
+        agent: this.tool,
+        duration,
+      });
+
       return {
         id: step.id,
         success: true,
-        duration: (performance.now() - start) / 1000,
+        duration,
         outputs,
       };
     } catch (error) {
@@ -464,11 +493,23 @@ export class ACPRunner {
 
       outputs.set('error', errorMessage);
 
+      const duration = (performance.now() - start) / 1000;
+
+      // Log step failure
+      this.logger?.error('step_fail', `Step failed: ${step.name}`, {
+        sessionId: this.sessionId ?? undefined,
+        stepId: step.id,
+        stepName: step.name,
+        agent: this.tool,
+        duration,
+        error: errorMessage,
+      });
+
       return {
         id: step.id,
         success: false,
         error: errorMessage,
-        duration: (performance.now() - start) / 1000,
+        duration,
         outputs,
       };
     }
@@ -557,11 +598,10 @@ export class ACPRunner {
 
     // Display warnings if any
     if (warnings.length > 0) {
-      console.log(colors.yellow.bold('\nPrompt Template Warnings:'));
-      warnings.forEach((warning, idx) => {
-        const prefix = idx === warnings.length - 1 ? '└──' : '├──';
-        console.log(colors.yellow(`${prefix} ${warning}`));
-      });
+      showList(
+        warnings.map(warning => colors.yellow(warning)),
+        { title: colors.yellow.bold('\nPrompt Template Warnings:') }
+      );
     }
 
     return prompt;

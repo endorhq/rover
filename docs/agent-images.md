@@ -232,10 +232,10 @@ Rover will display a warning when using a custom image:
 
 ### Environment Variable Override
 
-You can also override the image using the `AGENT_IMAGE` environment variable (takes precedence over `rover.json`):
+You can also override the image using the `ROVER_AGENT_IMAGE` environment variable (takes precedence over `rover.json`):
 
 ```bash
-AGENT_IMAGE=your-custom-image:tag rover task "Your task description"
+ROVER_AGENT_IMAGE=your-custom-image:tag rover task "Your task description"
 ```
 
 ### Building from Source

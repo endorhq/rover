@@ -362,12 +362,12 @@ const createTaskForAgent = async (
     copyEnvironmentFiles(projectPath, worktreePath);
 
     // Configure sparse checkout to exclude files matching exclude patterns
-    const projectConfig = ProjectConfigManager.load(projectPath);
+    const sparseConfig = ProjectConfigManager.load(projectPath);
     if (
-      projectConfig.excludePatterns &&
-      projectConfig.excludePatterns.length > 0
+      sparseConfig.excludePatterns &&
+      sparseConfig.excludePatterns.length > 0
     ) {
-      git.setupSparseCheckout(worktreePath, projectConfig.excludePatterns);
+      git.setupSparseCheckout(worktreePath, sparseConfig.excludePatterns);
     }
   } catch (error) {
     processManager?.failLastItem();
@@ -507,6 +507,10 @@ const createTaskForAgent = async (
     const sandbox = await createSandbox(task, processManager, {
       extraArgs: options.sandboxExtraArgs,
       projectPath,
+      iterationLogsPath: project.getTaskIterationLogsPath(
+        task.id,
+        task.iterations
+      ),
     });
     const containerId = await sandbox.createAndStart();
 

@@ -8,7 +8,7 @@ import {
 import { Sandbox, SandboxOptions } from './types.js';
 import { SetupBuilder } from '../setup.js';
 import { generateRandomId, launch, ProcessManager, VERBOSE } from 'rover-core';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import { userInfo } from 'node:os';
 import {
   ContainerBackend,
@@ -17,6 +17,10 @@ import {
   tmpUserGroupFiles,
   normalizeExtraArgs,
 } from './container-common.js';
+import {
+  checkImageCache,
+  waitForInitAndCommit,
+} from './container-image-cache.js';
 import { mergeNetworkConfig } from '../network-config.js';
 import { isJsonMode } from '../context.js';
 import { isPathWithin } from '../../utils/path-utils.js';
@@ -24,6 +28,10 @@ import colors from 'ansi-colors';
 
 export class DockerSandbox extends Sandbox {
   backend = ContainerBackend.Docker;
+
+  private cacheTag?: string;
+  private shouldCommitCache = false;
+  private initMode = false;
 
   constructor(
     task: TaskDescriptionManager,
@@ -68,13 +76,39 @@ export class DockerSandbox extends Sandbox {
       );
     }
 
+    // Resolve the agent image from env var, stored task image, config, or default
+    const agentImage = resolveAgentImage(projectConfig, this.task.agentImage);
+
+    // Check image cache
+    const { hasCachedImage, cacheTag } = checkImageCache(
+      ContainerBackend.Docker,
+      projectConfig,
+      agentImage,
+      this.task.agent!
+    );
+
+    this.cacheTag = cacheTag;
+    this.shouldCommitCache = !hasCachedImage;
+
+    const effectiveImage = hasCachedImage ? cacheTag : agentImage;
+
+    if (hasCachedImage && !isJsonMode()) {
+      console.log(
+        colors.green('Using cached setup image ') + colors.cyan(cacheTag)
+      );
+    }
+
     // Generate setup script using SetupBuilder
     const setupBuilder = new SetupBuilder(
       this.task,
       this.task.agent!,
       projectConfig
     );
-    const entrypointScriptPath = setupBuilder.generateEntrypoint();
+    const entrypointScriptPath = setupBuilder.generateEntrypoint(
+      true,
+      'entrypoint.sh',
+      hasCachedImage
+    );
     const inputsPath = setupBuilder.generateInputs();
     const workflowPath = setupBuilder.saveWorkflow(this.task.workflowName);
 
@@ -113,15 +147,12 @@ export class DockerSandbox extends Sandbox {
       userInfo_.gid = 1000;
     }
 
-    // Resolve the agent image from env var, stored task image, config, or default
-    const agentImage = resolveAgentImage(projectConfig, this.task.agentImage);
-
     // Warn if using a custom agent image
     warnIfCustomImage(projectConfig);
 
     const [etcPasswd, etcGroup] = await tmpUserGroupFiles(
       ContainerBackend.Docker,
-      agentImage,
+      effectiveImage,
       userInfo_
     );
 
@@ -144,7 +175,16 @@ export class DockerSandbox extends Sandbox {
       '-v',
       `${worktreePath}:/workspace:Z,rw`,
       '-v',
-      `${iteration.iterationPath}:/output:Z,rw`,
+      `${iteration.iterationPath}:/output:Z,rw`
+    );
+
+    // Mount project-level logs directory
+    if (this.options?.iterationLogsPath) {
+      mkdirSync(this.options.iterationLogsPath, { recursive: true });
+      dockerArgs.push('-v', `${this.options.iterationLogsPath}:/logs:Z,rw`);
+    }
+
+    dockerArgs.push(
       ...dockerMounts,
       '-v',
       `${entrypointScriptPath}:/entrypoint.sh:Z,ro`,
@@ -164,7 +204,7 @@ export class DockerSandbox extends Sandbox {
     }
 
     // Mount initScript if provided in project config
-    if (projectConfig?.initScript) {
+    if (projectConfig.initScript) {
       const initScriptAbsPath = join(
         projectConfig.projectRoot,
         projectConfig.initScript
@@ -181,7 +221,7 @@ export class DockerSandbox extends Sandbox {
     }
 
     // Get extra args from CLI options and project config, merge them
-    const configExtraArgs = normalizeExtraArgs(projectConfig?.sandboxExtraArgs);
+    const configExtraArgs = normalizeExtraArgs(projectConfig.sandboxExtraArgs);
     const cliExtraArgs = normalizeExtraArgs(this.options?.extraArgs);
     const extraArgs = [...configExtraArgs, ...cliExtraArgs];
 
@@ -191,36 +231,44 @@ export class DockerSandbox extends Sandbox {
       '/workspace',
       '--entrypoint',
       '/entrypoint.sh',
-      ...extraArgs,
-      agentImage,
-      'rover-agent',
-      'run',
-      '/workflow.yml',
-      '--agent-tool',
-      this.task.agent!,
-      '--task-id',
-      this.task.id.toString(),
-      '--status-file',
-      '/output/status.json',
-      '--output',
-      '/output',
-      '--inputs-json',
-      '/inputs.json'
+      ...extraArgs
     );
 
-    // Pass context directory argument if context was mounted
-    if (hasContext) {
-      dockerArgs.push('--context-dir', '/context');
-    }
+    if (this.initMode) {
+      // Init-only container: run setup then exit successfully
+      dockerArgs.push(effectiveImage, 'true');
+    } else {
+      dockerArgs.push(
+        effectiveImage,
+        'rover-agent',
+        'run',
+        '/workflow.yml',
+        '--agent-tool',
+        this.task.agent!,
+        '--task-id',
+        this.task.id.toString(),
+        '--status-file',
+        '/output/status.json',
+        '--output',
+        '/output',
+        '--inputs-json',
+        '/inputs.json'
+      );
 
-    // Pass model if specified
-    if (this.task.agentModel) {
-      dockerArgs.push('--agent-model', this.task.agentModel);
-    }
+      // Pass context directory argument if context was mounted
+      if (hasContext) {
+        dockerArgs.push('--context-dir', '/context');
+      }
 
-    // Forward verbose flag to rover-agent if enabled
-    if (VERBOSE) {
-      dockerArgs.push('-v');
+      // Pass model if specified
+      if (this.task.agentModel) {
+        dockerArgs.push('--agent-model', this.task.agentModel);
+      }
+
+      // Forward verbose flag to rover-agent if enabled
+      if (VERBOSE) {
+        dockerArgs.push('-v');
+      }
     }
 
     return (
@@ -235,6 +283,89 @@ export class DockerSandbox extends Sandbox {
         ?.toString()
         .trim() || this.sandboxName
     );
+  }
+
+  /**
+   * Pre-compute image cache state so createAndStart() can decide
+   * whether to run a two-phase init before calling create().
+   */
+  private checkCacheState(): void {
+    const projectConfig = ProjectConfigManager.load(this.options?.projectPath!);
+    const agentImage = resolveAgentImage(projectConfig, this.task.agentImage);
+
+    const { hasCachedImage, cacheTag } = checkImageCache(
+      ContainerBackend.Docker,
+      projectConfig,
+      agentImage,
+      this.task.agent!
+    );
+
+    this.cacheTag = cacheTag;
+    this.shouldCommitCache = !hasCachedImage;
+  }
+
+  async createAndStart(): Promise<string> {
+    this.checkCacheState();
+
+    if (this.shouldCommitCache && this.cacheTag) {
+      // Phase 1: init-only container to build the cached image
+      this.initMode = true;
+      this.processManager?.addItem(
+        `Initialize sandbox (${this.backend}) | Name: ${this.sandboxName}`
+      );
+      try {
+        await this.create();
+        this.processManager?.completeLastItem();
+        this.processManager?.addItem(
+          `Run initialization (${this.backend}) | Name: ${this.sandboxName}`
+        );
+        await this.start();
+        const committed = await waitForInitAndCommit(
+          ContainerBackend.Docker,
+          this.sandboxName,
+          this.cacheTag,
+          this.options?.projectPath!,
+          this.task.agent,
+          this.options?.sandboxMetadata
+        );
+        this.processManager?.completeLastItem();
+
+        if (!committed) {
+          this.processManager?.finish();
+          throw new Error('Init container did not exit successfully');
+        }
+      } catch (err) {
+        this.processManager?.failLastItem();
+        this.processManager?.finish();
+        throw err;
+      }
+
+      // Phase 2: create + start the real container from cached image
+      this.initMode = false;
+      this.shouldCommitCache = false;
+      this.cacheTag = undefined;
+    }
+
+    // Cache-hit path (or phase 2 after init)
+    let sandboxId = '';
+    this.processManager?.addItem(
+      `Prepare sandbox (${this.backend}) | Name: ${this.sandboxName}`
+    );
+    try {
+      sandboxId = await this.create();
+      this.processManager?.completeLastItem();
+      this.processManager?.addItem(
+        `Start sandbox (${this.backend}) | Name: ${this.sandboxName}`
+      );
+      await this.start();
+      this.processManager?.completeLastItem();
+    } catch (err) {
+      this.processManager?.failLastItem();
+      this.processManager?.finish();
+      throw err;
+    }
+    this.processManager?.finish();
+    return sandboxId;
   }
 
   async runInteractive(
@@ -262,6 +393,25 @@ export class DockerSandbox extends Sandbox {
       );
     }
 
+    // Resolve the agent image from env var, stored task image, config, or default
+    const agentImage = resolveAgentImage(projectConfig, this.task.agentImage);
+
+    // Check image cache for interactive mode
+    const { hasCachedImage, cacheTag } = checkImageCache(
+      ContainerBackend.Docker,
+      projectConfig,
+      agentImage,
+      this.task.agent!
+    );
+
+    const effectiveImage = hasCachedImage ? cacheTag : agentImage;
+
+    if (hasCachedImage && !isJsonMode()) {
+      console.log(
+        colors.green('Using cached setup image ') + colors.cyan(cacheTag)
+      );
+    }
+
     // Generate setup script using SetupBuilder
     const setupBuilder = new SetupBuilder(
       this.task,
@@ -270,7 +420,8 @@ export class DockerSandbox extends Sandbox {
     );
     const entrypointScriptPath = setupBuilder.generateEntrypoint(
       false,
-      'entrypoint-iterate.sh'
+      'entrypoint-iterate.sh',
+      hasCachedImage
     );
     // Get agent-specific Docker mounts and environment variables
     const agent = getAIAgentTool(this.task.agent!);
@@ -301,15 +452,12 @@ export class DockerSandbox extends Sandbox {
       userInfo_.gid = 1000;
     }
 
-    // Resolve the agent image from env var, stored task image, config, or default
-    const agentImage = resolveAgentImage(projectConfig, this.task.agentImage);
-
     // Warn if using a custom agent image
     warnIfCustomImage(projectConfig);
 
     const [etcPasswd, etcGroup] = await tmpUserGroupFiles(
       ContainerBackend.Docker,
-      agentImage,
+      effectiveImage,
       userInfo_
     );
 
@@ -349,7 +497,7 @@ export class DockerSandbox extends Sandbox {
     }
 
     // Get extra args from CLI options and project config, merge them
-    const configExtraArgs = normalizeExtraArgs(projectConfig?.sandboxExtraArgs);
+    const configExtraArgs = normalizeExtraArgs(projectConfig.sandboxExtraArgs);
     const cliExtraArgs = normalizeExtraArgs(this.options?.extraArgs);
     const extraArgs = [...configExtraArgs, ...cliExtraArgs];
 
@@ -360,7 +508,7 @@ export class DockerSandbox extends Sandbox {
       '--entrypoint',
       '/entrypoint.sh',
       ...extraArgs,
-      agentImage,
+      effectiveImage,
       'rover-agent',
       'session',
       this.task.agent!
@@ -402,6 +550,20 @@ export class DockerSandbox extends Sandbox {
       return { ...process.env, DOCKER_HOST: dockerHost };
     }
     return process.env;
+  }
+
+  async inspect(): Promise<{ status: string } | null> {
+    try {
+      const result = await launch(
+        'docker',
+        ['inspect', '--format', '{{.State.Status}}', this.sandboxName],
+        { env: this.getDockerEnv() }
+      );
+      const status = result.stdout?.toString().trim();
+      return status ? { status } : null;
+    } catch {
+      return null;
+    }
   }
 
   protected async remove(): Promise<string> {
@@ -464,7 +626,7 @@ export class DockerSandbox extends Sandbox {
 
     // Get extra args from CLI options and project config, merge them
     const projectConfig = ProjectConfigManager.load(this.options?.projectPath!);
-    const configExtraArgs = normalizeExtraArgs(projectConfig?.sandboxExtraArgs);
+    const configExtraArgs = normalizeExtraArgs(projectConfig.sandboxExtraArgs);
     const cliExtraArgs = normalizeExtraArgs(this.options?.extraArgs);
     const extraArgs = [...configExtraArgs, ...cliExtraArgs];
 

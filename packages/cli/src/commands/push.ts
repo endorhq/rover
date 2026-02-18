@@ -2,7 +2,12 @@ import colors from 'ansi-colors';
 import enquirer from 'enquirer';
 import yoctoSpinner from 'yocto-spinner';
 import { existsSync } from 'node:fs';
-import { ProjectConfigManager, Git } from 'rover-core';
+import {
+  ProjectConfigManager,
+  Git,
+  showTitle,
+  showProperties,
+} from 'rover-core';
 import { TaskNotFoundError } from 'rover-schemas';
 import { getTelemetry } from '../lib/telemetry.js';
 import type { TaskPushOutput } from '../output-types.js';
@@ -104,13 +109,7 @@ const pushCommand = async (taskId: string, options: PushOptions) => {
   let projectConfig;
 
   // Load config
-  try {
-    projectConfig = ProjectConfigManager.load(project.path);
-  } catch (err) {
-    if (!isJsonMode()) {
-      console.log(colors.yellow('⚠ Could not load project settings'));
-    }
-  }
+  projectConfig = ProjectConfigManager.load(project.path);
 
   try {
     // Load task using ProjectManager
@@ -133,11 +132,13 @@ const pushCommand = async (taskId: string, options: PushOptions) => {
 
       const colorFunc = statusColor(task.status);
 
-      console.log(colors.bold('Push task changes'));
-      console.log(colors.gray('├── ID: ') + colors.cyan(task.id.toString()));
-      console.log(colors.gray('├── Title: ') + task.title);
-      console.log(colors.gray('├── Branch: ') + task.branchName);
-      console.log(colors.gray('└── Status: ') + colorFunc(task.status) + '\n');
+      showTitle('Push task changes');
+      showProperties({
+        ID: colors.cyan(task.id.toString()),
+        Title: task.title,
+        Branch: task.branchName,
+        Status: colorFunc(task.status),
+      });
     }
 
     // Check for changes

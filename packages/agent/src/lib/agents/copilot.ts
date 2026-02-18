@@ -8,8 +8,10 @@ import {
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import colors from 'ansi-colors';
+import { showList } from 'rover-core';
 import { AgentCredentialFile } from './types.js';
 import { BaseAgent } from './base.js';
+import { VERBOSE } from 'rover-core';
 
 export class CopilotAgent extends BaseAgent {
   name = 'Copilot';
@@ -42,12 +44,17 @@ export class CopilotAgent extends BaseAgent {
     this.ensureDirectory(targetCopilotDir);
 
     const credentials = this.getRequiredCredentials();
+    const copiedItems: string[] = [];
     for (const cred of credentials) {
       if (existsSync(cred.path)) {
         // Copy the entire .copilot directory
         cpSync(cred.path, targetCopilotDir, { recursive: true });
-        console.log(colors.gray('├── Copied: ') + colors.cyan(cred.path));
+        copiedItems.push(colors.cyan(cred.path));
       }
+    }
+
+    if (copiedItems.length > 0) {
+      showList(copiedItems);
     }
 
     console.log(colors.green(`✓ ${this.name} credentials copied successfully`));
@@ -158,6 +165,9 @@ export class CopilotAgent extends BaseAgent {
     if (this.model) {
       args.push('--model', this.model);
     }
+    if (VERBOSE) {
+      args.push('--log-level', 'all');
+    }
     args.push('-p');
     return args;
   }
@@ -173,5 +183,11 @@ export class CopilotAgent extends BaseAgent {
     }
 
     return ['-p', prompt];
+  }
+
+  override getLogSources(): string[] {
+    // Copilot CLI writes session event logs under
+    // ~/.copilot/session-state/<session-id>/events.jsonl
+    return [join(homedir(), '.copilot', 'session-state')];
   }
 }
