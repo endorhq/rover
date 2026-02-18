@@ -11,11 +11,12 @@ import {
 } from 'node:fs';
 import { getDataDir } from 'rover-core';
 import type {
+  ActionTrace,
   EventCursor,
   PendingAction,
   AutopilotState,
   AutopilotLogEntry,
-  Trace,
+  Span,
   Action,
   TaskMapping,
 } from './types.js';
@@ -46,6 +47,7 @@ export class AutopilotStore {
   private cursorPath: string;
   private statePath: string;
   private logPath: string;
+  private tracesPath: string;
 
   constructor(projectId: string) {
     this.projectId = projectId;
@@ -53,6 +55,7 @@ export class AutopilotStore {
     this.cursorPath = join(this.basePath, 'cursor.json');
     this.statePath = join(this.basePath, 'state.json');
     this.logPath = join(this.basePath, 'log.jsonl');
+    this.tracesPath = join(this.basePath, 'traces.json');
   }
 
   ensureDir(): void {
@@ -177,36 +180,36 @@ export class AutopilotStore {
     renameSync(this.logPath, join(this.basePath, 'log.1.jsonl'));
   }
 
-  // --- Trace methods ---
+  // --- Span methods ---
 
-  readTrace(traceId: string): Trace | null {
-    const tracePath = join(
+  readSpan(spanId: string): Span | null {
+    const spanPath = join(
       getDataDir(),
       'projects',
       this.projectId,
-      'traces',
-      `${traceId}.json`
+      'spans',
+      `${spanId}.json`
     );
     try {
-      const raw = readFileSync(tracePath, 'utf8');
-      return JSON.parse(raw) as Trace;
+      const raw = readFileSync(spanPath, 'utf8');
+      return JSON.parse(raw) as Span;
     } catch {
       return null;
     }
   }
 
-  getTraceChain(traceId: string): Trace[] {
-    const chain: Trace[] = [];
-    let currentId: string | null = traceId;
+  getSpanTrace(spanId: string): Span[] {
+    const trace: Span[] = [];
+    let currentId: string | null = spanId;
 
     while (currentId) {
-      const trace = this.readTrace(currentId);
-      if (!trace) break;
-      chain.unshift(trace);
-      currentId = trace.parent;
+      const span = this.readSpan(currentId);
+      if (!span) break;
+      trace.unshift(span);
+      currentId = span.parent;
     }
 
-    return chain;
+    return trace;
   }
 
   // --- Inspector read methods ---
@@ -271,5 +274,22 @@ export class AutopilotStore {
 
   getAllTaskMappings(): Record<string, TaskMapping> {
     return this.loadState().taskMappings ?? {};
+  }
+
+  // --- Traces persistence ---
+
+  saveTraces(traces: Map<string, ActionTrace>): void {
+    const data = Object.fromEntries(traces);
+    writeFileSync(this.tracesPath, JSON.stringify(data), 'utf8');
+  }
+
+  loadTraces(): Map<string, ActionTrace> {
+    try {
+      const raw = readFileSync(this.tracesPath, 'utf8');
+      const data = JSON.parse(raw) as Record<string, ActionTrace>;
+      return new Map(Object.entries(data));
+    } catch {
+      return new Map();
+    }
   }
 }

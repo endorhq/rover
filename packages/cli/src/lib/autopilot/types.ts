@@ -32,7 +32,7 @@ export interface GitHubEvent {
   payload: Record<string, any>;
 }
 
-export interface Trace {
+export interface Span {
   id: string;
   version: string;
   timestamp: string;
@@ -47,7 +47,7 @@ export interface Action {
   version: string;
   action: string;
   timestamp: string;
-  traceId: string;
+  spanId: string;
   meta: Record<string, any>;
   reasoning: string;
 }
@@ -59,9 +59,9 @@ export interface EventCursor {
 }
 
 export interface PendingAction {
-  chainId: string;
-  actionId: string;
   traceId: string;
+  actionId: string;
+  spanId: string;
   action: string;
   summary: string;
   createdAt: string;
@@ -83,23 +83,38 @@ export interface ActionStep {
   status: ActionStepStatus;
   timestamp: string;
   reasoning?: string;
+  /** For span-only steps (e.g. noop) that have no follow-up action. */
+  spanId?: string;
 }
 
-export interface ActionChain {
-  chainId: string;
+export interface ActionTrace {
+  traceId: string;
   summary: string;
   steps: ActionStep[];
   createdAt: string;
+  retryCount?: number;
 }
 
 export type CoordinatorStatus = 'idle' | 'processing' | 'error';
 export type PlannerStatus = 'idle' | 'processing' | 'error';
 export type WorkflowRunnerStatus = 'idle' | 'processing' | 'error';
+export type CommitterStatus = 'idle' | 'processing' | 'error';
+export type ResolverStatus = 'idle' | 'processing' | 'error';
+export type ResolverDecision = 'wait' | 'push' | 'iterate' | 'fail';
+
+export interface ResolverAIResult {
+  decision: 'iterate' | 'fail';
+  reasoning: string;
+  iterate_instructions?: string;
+  fail_reason?: string;
+}
 export type ViewMode = 'main' | 'inspector';
 
 export interface TaskMapping {
   taskId: number;
   branchName: string;
+  traceId?: string;
+  workflowSpanId?: string;
 }
 
 export interface PlanTask {
@@ -130,8 +145,8 @@ export interface AutopilotState {
 
 export interface AutopilotLogEntry {
   ts: string;
-  chainId: string;
   traceId: string;
+  spanId: string;
   actionId: string;
   step: string;
   action: string;
