@@ -19,6 +19,8 @@ export interface SandboxOptions {
   sandboxMetadata?: Record<string, unknown>;
   /** Path to mount as /logs inside the container for this iteration */
   iterationLogsPath?: string;
+  /** Force verbose mode on the agent inside the container */
+  verbose?: boolean;
 }
 
 export abstract class SandboxPackage {

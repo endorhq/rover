@@ -11,11 +11,11 @@ import { getRepoInfo } from './helpers.js';
 import pilotPromptTemplate from './pilot-prompt.md';
 import type {
   CoordinatorStatus,
-  ActionChain,
+  ActionTrace,
   ActionStep,
   PendingAction,
   PilotDecision,
-  Trace,
+  Span,
   Action,
 } from './types.js';
 
@@ -46,53 +46,60 @@ function buildPilotPrompt(
   return prompt;
 }
 
-function writeCoordinatorTrace(
+function writeCoordinatorSpan(
   projectId: string,
   summary: string,
-  parentTraceId: string,
+  parentSpanId: string,
   decision: PilotDecision
-): { traceId: string; actionId: string } {
+): { spanId: string; actionId: string | null } {
   const basePath = join(getDataDir(), 'projects', projectId);
-  const tracesDir = join(basePath, 'traces');
+  const spansDir = join(basePath, 'spans');
   const actionsDir = join(basePath, 'actions');
 
-  mkdirSync(tracesDir, { recursive: true });
+  mkdirSync(spansDir, { recursive: true });
   mkdirSync(actionsDir, { recursive: true });
 
-  const traceId = randomUUID();
-  const actionId = randomUUID();
+  const spanId = randomUUID();
   const timestamp = new Date().toISOString();
 
-  const trace: Trace = {
-    id: traceId,
+  const span: Span = {
+    id: spanId,
     version: '1.0',
     timestamp,
     summary: `coordinate: ${decision.action} — ${summary}`,
     step: 'coordinate',
-    parent: parentTraceId,
+    parent: parentSpanId,
     meta: decision.meta,
   };
+
+  writeFileSync(
+    join(spansDir, `${spanId}.json`),
+    JSON.stringify(span, null, 2)
+  );
+
+  // Noop is terminal — write span only, no action.
+  if (decision.action === 'noop') {
+    return { spanId, actionId: null };
+  }
+
+  const actionId = randomUUID();
 
   const action: Action = {
     id: actionId,
     version: '1.0',
     action: decision.action,
     timestamp,
-    traceId,
-    meta: decision.action === 'noop' ? {} : decision.meta,
+    spanId,
+    meta: decision.meta,
     reasoning: decision.reasoning,
   };
 
-  writeFileSync(
-    join(tracesDir, `${traceId}.json`),
-    JSON.stringify(trace, null, 2)
-  );
   writeFileSync(
     join(actionsDir, `${actionId}.json`),
     JSON.stringify(action, null, 2)
   );
 
-  return { traceId, actionId };
+  return { spanId, actionId };
 }
 
 async function processAction(
@@ -103,8 +110,8 @@ async function processAction(
   store: AutopilotStore
 ): Promise<{
   decision: PilotDecision;
-  newActionId: string;
-  newTraceId: string;
+  newActionId: string | null;
+  newSpanId: string;
 }> {
   // Fetch additional context
   const context = pending.meta
@@ -128,20 +135,20 @@ async function processAction(
       'Forced to noop: coordinate is not available as a sub-action.';
   }
 
-  // Write trace and action
-  const { traceId: newTraceId, actionId: newActionId } = writeCoordinatorTrace(
+  // Write span and action
+  const { spanId: newSpanId, actionId: newActionId } = writeCoordinatorSpan(
     projectId,
     pending.summary,
-    pending.traceId,
+    pending.spanId,
     decision
   );
 
   // If not noop, add follow-up pending action
-  if (decision.action !== 'noop') {
+  if (decision.action !== 'noop' && newActionId) {
     store.addPending({
-      chainId: pending.chainId,
+      traceId: pending.traceId,
       actionId: newActionId,
-      traceId: newTraceId,
+      spanId: newSpanId,
       action: decision.action,
       summary: `${decision.action}: ${pending.summary}`,
       createdAt: new Date().toISOString(),
@@ -155,22 +162,22 @@ async function processAction(
   // Write log entry
   store.appendLog({
     ts: new Date().toISOString(),
-    chainId: pending.chainId,
-    traceId: newTraceId,
-    actionId: newActionId,
+    traceId: pending.traceId,
+    spanId: newSpanId,
+    actionId: newActionId ?? '',
     step: 'coordinate',
     action: decision.action,
     summary: `${decision.action} (${decision.confidence}): ${pending.summary}`,
   });
 
-  return { decision, newActionId, newTraceId };
+  return { decision, newActionId, newSpanId };
 }
 
 export function useCoordinator(
   projectPath: string,
   projectId: string,
-  chainsRef: React.MutableRefObject<Map<string, ActionChain>>,
-  onChainsUpdated: () => void
+  tracesRef: React.MutableRefObject<Map<string, ActionTrace>>,
+  onTracesUpdated: () => void
 ): {
   status: CoordinatorStatus;
   processedCount: number;
@@ -217,26 +224,33 @@ export function useCoordinator(
     const results = await Promise.allSettled(
       batch.map(async action => {
         try {
-          // Add initial step to chain
-          const chain = chainsRef.current.get(action.chainId) ?? {
-            chainId: action.chainId,
+          // Get or create trace
+          const trace = tracesRef.current.get(action.traceId) ?? {
+            traceId: action.traceId,
             summary: action.summary,
             steps: [],
             createdAt: action.createdAt,
           };
 
-          // Mark coordinate step as running
-          const runningStep: ActionStep = {
-            actionId: action.actionId,
-            action: 'coordinate',
-            status: 'running',
-            timestamp: new Date().toISOString(),
-          };
-          chain.steps.push(runningStep);
-          chainsRef.current.set(action.chainId, chain);
-          onChainsUpdated();
+          // Idempotent: reuse existing step if present (e.g. after restart)
+          let runningStep = trace.steps.find(
+            s => s.actionId === action.actionId
+          );
+          if (!runningStep) {
+            runningStep = {
+              actionId: action.actionId,
+              action: 'coordinate',
+              status: 'running',
+              timestamp: new Date().toISOString(),
+            };
+            trace.steps.push(runningStep);
+          } else {
+            runningStep.status = 'running';
+          }
+          tracesRef.current.set(action.traceId, trace);
+          onTracesUpdated();
 
-          const { decision, newActionId } = await processAction(
+          const { decision, newActionId, newSpanId } = await processAction(
             action,
             repo.owner,
             repo.repo,
@@ -248,9 +262,19 @@ export function useCoordinator(
           runningStep.status = 'completed';
           runningStep.reasoning = `${decision.action} (${decision.confidence})`;
 
-          // Add next step as pending (if not noop)
-          if (decision.action !== 'noop') {
-            chain.steps.push({
+          if (decision.action === 'noop') {
+            // Noop is terminal — add a completed noop step with its span
+            trace.steps.push({
+              actionId: action.actionId, // reuse parent id (no action file)
+              action: 'noop',
+              status: 'completed',
+              timestamp: new Date().toISOString(),
+              reasoning: decision.reasoning,
+              spanId: newSpanId,
+            });
+          } else if (newActionId) {
+            // Add next step as pending
+            trace.steps.push({
               actionId: newActionId,
               action: decision.action,
               status: 'pending',
@@ -259,19 +283,19 @@ export function useCoordinator(
             });
           }
 
-          chainsRef.current.set(action.chainId, chain);
-          onChainsUpdated();
+          tracesRef.current.set(action.traceId, trace);
+          onTracesUpdated();
           setProcessedCount(c => c + 1);
         } catch {
-          // Mark step as failed in the chain
-          const chain = chainsRef.current.get(action.chainId);
-          if (chain) {
-            const step = chain.steps.find(s => s.actionId === action.actionId);
+          // Mark step as failed in the trace
+          const trace = tracesRef.current.get(action.traceId);
+          if (trace) {
+            const step = trace.steps.find(s => s.actionId === action.actionId);
             if (step) {
               step.status = 'failed';
             }
-            chainsRef.current.set(action.chainId, chain);
-            onChainsUpdated();
+            tracesRef.current.set(action.traceId, trace);
+            onTracesUpdated();
           }
 
           // Remove from pending on failure too
@@ -285,7 +309,7 @@ export function useCoordinator(
     // Check if any failed
     const hasError = results.some(r => r.status === 'rejected');
     setStatus(hasError ? 'error' : 'idle');
-  }, [projectId, onChainsUpdated]);
+  }, [projectId, onTracesUpdated]);
 
   // Initial delay then periodic processing
   useEffect(() => {

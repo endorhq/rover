@@ -11,7 +11,7 @@ import type {
   LogEntry,
   WorkSlot,
   ViewMode,
-  ActionChain,
+  ActionTrace,
 } from './types.js';
 import { formatDuration } from './helpers.js';
 import { InfoPanel, SpaceScene, LogBook } from './components.js';
@@ -20,6 +20,8 @@ import { useGitHubEvents } from './events.js';
 import { useCoordinator } from './coordinator.js';
 import { usePlanner } from './planner.js';
 import { useWorkflowRunner } from './workflow-runner.js';
+import { useCommitter } from './committer.js';
+import { useResolver } from './resolver.js';
 import { getUserAIAgent } from '../agents/index.js';
 import { AutopilotStore } from './store.js';
 
@@ -151,20 +153,34 @@ export function AutopilotApp({
     lastNewCount,
   } = useGitHubEvents(project.path, project.id);
 
-  // Shared chains state: lifted from coordinator so planner can also update it
-  const chainsRef = useRef<Map<string, ActionChain>>(new Map());
-  const [chainsVersion, setChainsVersion] = useState(0);
-  const onChainsUpdated = useCallback(() => setChainsVersion(v => v + 1), []);
+  // Store must be initialized before traces so we can load persisted traces
+  const storeRef = useRef<AutopilotStore | null>(null);
+  if (!storeRef.current) {
+    const store = new AutopilotStore(project.id);
+    store.ensureDir();
+    storeRef.current = store;
+  }
+
+  // Shared traces state: lifted from coordinator so planner can also update it
+  // Load persisted traces on first render so they survive CLI restarts
+  const tracesRef = useRef<Map<string, ActionTrace>>(
+    storeRef.current!.loadTraces()
+  );
+  const [tracesVersion, setTracesVersion] = useState(0);
+  const onTracesUpdated = useCallback(() => {
+    setTracesVersion(v => v + 1);
+    storeRef.current?.saveTraces(tracesRef.current);
+  }, []);
 
   const { status: coordinatorStatus, processedCount } = useCoordinator(
     project.path,
     project.id,
-    chainsRef,
-    onChainsUpdated
+    tracesRef,
+    onTracesUpdated
   );
 
   const { status: plannerStatus, processedCount: plannerProcessedCount } =
-    usePlanner(project.path, project.id, chainsRef, onChainsUpdated);
+    usePlanner(project.path, project.id, tracesRef, onTracesUpdated);
 
   const {
     status: workflowRunnerStatus,
@@ -173,22 +189,20 @@ export function AutopilotApp({
     project,
     project.path,
     project.id,
-    chainsRef,
-    onChainsUpdated
+    tracesRef,
+    onTracesUpdated
   );
 
-  const chains = Array.from(chainsRef.current.values());
+  const { status: committerStatus, processedCount: committerProcessedCount } =
+    useCommitter(project, project.path, project.id, tracesRef, onTracesUpdated);
+
+  const { status: resolverStatus, processedCount: resolverProcessedCount } =
+    useResolver(project, project.path, project.id, tracesRef, onTracesUpdated);
+
+  const traces = Array.from(tracesRef.current.values());
 
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('main');
-
-  // Push a startup log entry (with recovery info)
-  const storeRef = useRef<AutopilotStore | null>(null);
-  if (!storeRef.current) {
-    const store = new AutopilotStore(project.id);
-    store.ensureDir();
-    storeRef.current = store;
-  }
 
   useEffect(() => {
     const ts = new Date().toLocaleTimeString();
@@ -317,6 +331,46 @@ export function AutopilotApp({
     }
   }, [workflowRunnerStatus, workflowRunnerProcessedCount]);
 
+  // Log committer status changes
+  useEffect(() => {
+    if (committerStatus === 'processing') {
+      const ts = new Date().toLocaleTimeString();
+      setLogs(prev => [
+        ...prev.slice(-50),
+        { timestamp: ts, message: 'Committer: processing...' },
+      ]);
+    } else if (committerProcessedCount > 0 && committerStatus === 'idle') {
+      const ts = new Date().toLocaleTimeString();
+      setLogs(prev => [
+        ...prev.slice(-50),
+        {
+          timestamp: ts,
+          message: `Committer: ${committerProcessedCount} committed`,
+        },
+      ]);
+    }
+  }, [committerStatus, committerProcessedCount]);
+
+  // Log resolver status changes
+  useEffect(() => {
+    if (resolverStatus === 'processing') {
+      const ts = new Date().toLocaleTimeString();
+      setLogs(prev => [
+        ...prev.slice(-50),
+        { timestamp: ts, message: 'Resolver: processing...' },
+      ]);
+    } else if (resolverProcessedCount > 0 && resolverStatus === 'idle') {
+      const ts = new Date().toLocaleTimeString();
+      setLogs(prev => [
+        ...prev.slice(-50),
+        {
+          timestamp: ts,
+          message: `Resolver: ${resolverProcessedCount} resolved`,
+        },
+      ]);
+    }
+  }, [resolverStatus, resolverProcessedCount]);
+
   useInput((input, key) => {
     if (input === 'q' || (key.ctrl && input === 'c')) {
       exit();
@@ -341,8 +395,8 @@ export function AutopilotApp({
     return (
       <Box flexDirection="column" height={rows} width={columns}>
         <InspectorView
-          chains={chains}
-          chainsRef={chainsRef}
+          traces={traces}
+          tracesRef={tracesRef}
           store={storeRef.current!}
           tasks={tasks}
           width={columns}
@@ -372,6 +426,10 @@ export function AutopilotApp({
             plannerProcessedCount={plannerProcessedCount}
             workflowRunnerStatus={workflowRunnerStatus}
             workflowRunnerProcessedCount={workflowRunnerProcessedCount}
+            committerStatus={committerStatus}
+            committerProcessedCount={committerProcessedCount}
+            resolverStatus={resolverStatus}
+            resolverProcessedCount={resolverProcessedCount}
           />
         </Box>
         {/* Right column: 70% — space scene + work boxes */}
@@ -380,7 +438,7 @@ export function AutopilotApp({
             width={Math.max(1, rightWidth - 2)}
             height={topHeight}
             slots={slots}
-            chains={chains}
+            traces={traces}
           />
         </Box>
       </Box>

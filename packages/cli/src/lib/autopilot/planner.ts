@@ -11,10 +11,10 @@ import type {
   PlannerStatus,
   PlanResult,
   PlanTask,
-  ActionChain,
+  ActionTrace,
   ActionStep,
   PendingAction,
-  Trace,
+  Span,
   Action,
 } from './types.js';
 
@@ -31,50 +31,50 @@ const VALID_WORKFLOWS = new Set([
 
 function buildPlanUserMessage(
   meta: Record<string, any>,
-  traces: Trace[]
+  spans: Span[]
 ): string {
   let msg = '## Plan Directive\n\n```json\n';
   msg += JSON.stringify(meta, null, 2);
   msg += '\n```\n';
 
-  msg += '\n## Traces\n\n';
-  for (const trace of traces) {
-    msg += `### Trace: ${trace.step} (${trace.id})\n\n`;
-    msg += `- **timestamp**: ${trace.timestamp}\n`;
-    msg += `- **summary**: ${trace.summary}\n`;
-    msg += `- **parent**: ${trace.parent ?? 'null'}\n\n`;
+  msg += '\n## Spans\n\n';
+  for (const span of spans) {
+    msg += `### Span: ${span.step} (${span.id})\n\n`;
+    msg += `- **timestamp**: ${span.timestamp}\n`;
+    msg += `- **summary**: ${span.summary}\n`;
+    msg += `- **parent**: ${span.parent ?? 'null'}\n\n`;
     msg += '```json\n';
-    msg += JSON.stringify(trace.meta, null, 2);
+    msg += JSON.stringify(span.meta, null, 2);
     msg += '\n```\n\n';
   }
 
   return msg;
 }
 
-function writePlannerTrace(
+function writePlannerSpan(
   projectId: string,
   summary: string,
-  parentTraceId: string,
+  parentSpanId: string,
   planResult: PlanResult
-): { traceId: string; actionId: string } {
+): { spanId: string; actionId: string } {
   const basePath = join(getDataDir(), 'projects', projectId);
-  const tracesDir = join(basePath, 'traces');
+  const spansDir = join(basePath, 'spans');
   const actionsDir = join(basePath, 'actions');
 
-  mkdirSync(tracesDir, { recursive: true });
+  mkdirSync(spansDir, { recursive: true });
   mkdirSync(actionsDir, { recursive: true });
 
-  const traceId = randomUUID();
+  const spanId = randomUUID();
   const actionId = randomUUID();
   const timestamp = new Date().toISOString();
 
-  const trace: Trace = {
-    id: traceId,
+  const span: Span = {
+    id: spanId,
     version: '1.0',
     timestamp,
     summary: `plan: ${summary}`,
     step: 'plan',
-    parent: parentTraceId,
+    parent: parentSpanId,
     meta: {
       analysis: planResult.analysis,
       taskCount: planResult.tasks.length,
@@ -87,7 +87,7 @@ function writePlannerTrace(
     version: '1.0',
     action: 'plan',
     timestamp,
-    traceId,
+    spanId,
     meta: {
       taskCount: planResult.tasks.length,
       executionOrder: planResult.execution_order,
@@ -96,22 +96,22 @@ function writePlannerTrace(
   };
 
   writeFileSync(
-    join(tracesDir, `${traceId}.json`),
-    JSON.stringify(trace, null, 2)
+    join(spansDir, `${spanId}.json`),
+    JSON.stringify(span, null, 2)
   );
   writeFileSync(
     join(actionsDir, `${actionId}.json`),
     JSON.stringify(action, null, 2)
   );
 
-  return { traceId, actionId };
+  return { spanId, actionId };
 }
 
 function writeWorkflowActions(
   projectId: string,
   sourcePending: PendingAction,
   planResult: PlanResult,
-  planTraceId: string,
+  planSpanId: string,
   store: AutopilotStore
 ): Array<{ task: PlanTask; actionId: string }> {
   const basePath = join(getDataDir(), 'projects', projectId);
@@ -146,7 +146,7 @@ function writeWorkflowActions(
       version: '1.0',
       action: 'workflow',
       timestamp,
-      traceId: planTraceId,
+      spanId: planSpanId,
       meta: {
         workflow: task.workflow,
         title: task.title,
@@ -165,9 +165,9 @@ function writeWorkflowActions(
 
     // Enqueue PendingAction
     store.addPending({
-      chainId: sourcePending.chainId,
+      traceId: sourcePending.traceId,
       actionId,
-      traceId: planTraceId,
+      spanId: planSpanId,
       action: 'workflow',
       summary: `${task.workflow}: ${task.title}`,
       createdAt: timestamp,
@@ -184,8 +184,8 @@ function writeWorkflowActions(
     // Write log entry per task
     store.appendLog({
       ts: timestamp,
-      chainId: sourcePending.chainId,
-      traceId: planTraceId,
+      traceId: sourcePending.traceId,
+      spanId: planSpanId,
       actionId,
       step: 'plan',
       action: 'workflow',
@@ -203,14 +203,14 @@ async function processPlanAction(
   store: AutopilotStore
 ): Promise<{
   planResult: PlanResult;
-  planTraceId: string;
+  planSpanId: string;
   taskEntries: Array<{ task: PlanTask; actionId: string }>;
 }> {
-  // Reconstruct trace chain
-  const traces = store.getTraceChain(pending.traceId);
+  // Reconstruct span trace
+  const spans = store.getSpanTrace(pending.spanId);
 
-  // Build user message from pending.meta + traces
-  const userMessage = buildPlanUserMessage(pending.meta ?? {}, traces);
+  // Build user message from pending.meta + spans
+  const userMessage = buildPlanUserMessage(pending.meta ?? {}, spans);
 
   // Invoke agent with system prompt and read-only tools
   const agent = getUserAIAgent();
@@ -235,11 +235,11 @@ async function processPlanAction(
     }
   }
 
-  // Write plan trace
-  const { traceId: planTraceId } = writePlannerTrace(
+  // Write plan span
+  const { spanId: planSpanId } = writePlannerSpan(
     projectId,
     pending.summary,
-    pending.traceId,
+    pending.spanId,
     planResult
   );
 
@@ -248,21 +248,21 @@ async function processPlanAction(
     projectId,
     pending,
     planResult,
-    planTraceId,
+    planSpanId,
     store
   );
 
   // Remove processed plan action from pending
   store.removePending(pending.actionId);
 
-  return { planResult, planTraceId, taskEntries };
+  return { planResult, planSpanId, taskEntries };
 }
 
 export function usePlanner(
   projectPath: string,
   projectId: string,
-  chainsRef: React.MutableRefObject<Map<string, ActionChain>>,
-  onChainsUpdated: () => void
+  tracesRef: React.MutableRefObject<Map<string, ActionTrace>>,
+  onTracesUpdated: () => void
 ): {
   status: PlannerStatus;
   processedCount: number;
@@ -307,24 +307,31 @@ export function usePlanner(
     const results = await Promise.allSettled(
       batch.map(async action => {
         try {
-          // Find/create the chain
-          const chain = chainsRef.current.get(action.chainId) ?? {
-            chainId: action.chainId,
+          // Find/create the trace
+          const trace = tracesRef.current.get(action.traceId) ?? {
+            traceId: action.traceId,
             summary: action.summary,
             steps: [],
             createdAt: action.createdAt,
           };
 
-          // Mark plan step as running
-          const runningStep: ActionStep = {
-            actionId: action.actionId,
-            action: 'plan',
-            status: 'running',
-            timestamp: new Date().toISOString(),
-          };
-          chain.steps.push(runningStep);
-          chainsRef.current.set(action.chainId, chain);
-          onChainsUpdated();
+          // Mark plan step as running (find existing pending step or add new)
+          let runningStep = trace.steps.find(
+            s => s.actionId === action.actionId
+          );
+          if (runningStep) {
+            runningStep.status = 'running';
+          } else {
+            runningStep = {
+              actionId: action.actionId,
+              action: 'plan',
+              status: 'running',
+              timestamp: new Date().toISOString(),
+            };
+            trace.steps.push(runningStep);
+          }
+          tracesRef.current.set(action.traceId, trace);
+          onTracesUpdated();
 
           const { planResult, taskEntries } = await processPlanAction(
             action,
@@ -339,7 +346,7 @@ export function usePlanner(
 
           // Add one pending step per workflow task using real actionIds
           for (const { task, actionId } of taskEntries) {
-            chain.steps.push({
+            trace.steps.push({
               actionId,
               action: task.workflow,
               status: 'pending',
@@ -348,19 +355,19 @@ export function usePlanner(
             });
           }
 
-          chainsRef.current.set(action.chainId, chain);
-          onChainsUpdated();
+          tracesRef.current.set(action.traceId, trace);
+          onTracesUpdated();
           setProcessedCount(c => c + 1);
         } catch {
-          // Mark step as failed in the chain
-          const chain = chainsRef.current.get(action.chainId);
-          if (chain) {
-            const step = chain.steps.find(s => s.actionId === action.actionId);
+          // Mark step as failed in the trace
+          const trace = tracesRef.current.get(action.traceId);
+          if (trace) {
+            const step = trace.steps.find(s => s.actionId === action.actionId);
             if (step) {
               step.status = 'failed';
             }
-            chainsRef.current.set(action.chainId, chain);
-            onChainsUpdated();
+            tracesRef.current.set(action.traceId, trace);
+            onTracesUpdated();
           }
 
           // Remove from pending on failure too
@@ -374,7 +381,7 @@ export function usePlanner(
     // Check if any failed
     const hasError = results.some(r => r.status === 'rejected');
     setStatus(hasError ? 'error' : 'idle');
-  }, [projectPath, projectId, chainsRef, onChainsUpdated]);
+  }, [projectPath, projectId, tracesRef, onTracesUpdated]);
 
   // Initial delay then periodic processing
   useEffect(() => {

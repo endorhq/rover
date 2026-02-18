@@ -16,6 +16,17 @@ import {
 import colors from 'ansi-colors';
 import { existsSync, readFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
+
+function formatError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
+}
+
 import type {
   WorkflowAgentStep,
   WorkflowOutput,
@@ -174,7 +185,7 @@ export class ACPRunner {
     } catch (error) {
       this.close();
       throw new Error(
-        `Failed to initialize ACP connection: ${error instanceof Error ? error.message : String(error)}`
+        `Failed to initialize ACP connection: ${formatError(error)}`
       );
     }
   }
@@ -213,9 +224,7 @@ export class ACPRunner {
 
       return sessionResult.sessionId;
     } catch (error) {
-      throw new Error(
-        `Failed to create session: ${error instanceof Error ? error.message : String(error)}`
-      );
+      throw new Error(`Failed to create session: ${formatError(error)}`);
     }
   }
 
@@ -318,9 +327,7 @@ export class ACPRunner {
     } catch (error) {
       // Stop capturing on error too
       this.client.stopCapturing();
-      throw new Error(
-        `Failed to send prompt: ${error instanceof Error ? error.message : String(error)}`
-      );
+      throw new Error(`Failed to send prompt: ${formatError(error)}`);
     }
   }
 
@@ -349,9 +356,7 @@ export class ACPRunner {
 
       console.log(colors.gray(`🔄 Model changed to: ${modelId}`));
     } catch (error) {
-      throw new Error(
-        `Failed to set model: ${error instanceof Error ? error.message : String(error)}`
-      );
+      throw new Error(`Failed to set model: ${formatError(error)}`);
     }
   }
 
@@ -381,9 +386,7 @@ export class ACPRunner {
         colors.yellow(`⚠️  Prompt cancelled for session: ${this.sessionId}`)
       );
     } catch (error) {
-      throw new Error(
-        `Failed to cancel prompt: ${error instanceof Error ? error.message : String(error)}`
-      );
+      throw new Error(`Failed to cancel prompt: ${formatError(error)}`);
     }
   }
 
@@ -486,8 +489,7 @@ export class ACPRunner {
         outputs,
       };
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = formatError(error);
 
       console.log(colors.red(`✗ Step '${step.name}' failed: ${errorMessage}`));
 
@@ -701,7 +703,7 @@ export class ACPRunner {
     } catch (error) {
       return {
         success: false,
-        error: `Failed to parse outputs: ${error instanceof Error ? error.message : String(error)}`,
+        error: `Failed to parse outputs: ${formatError(error)}`,
       };
     }
   }
@@ -908,7 +910,7 @@ export class ACPRunner {
       } catch (error) {
         console.log(
           colors.yellow(
-            `⚠️  Could not read file '${output.filename}': ${error instanceof Error ? error.message : String(error)}`
+            `⚠️  Could not read file '${output.filename}': ${formatError(error)}`
           )
         );
         outputs.set(output.name, '[Could not read file]');

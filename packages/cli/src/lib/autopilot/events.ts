@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { launch, getDataDir } from 'rover-core';
-import type { FetchStatus, GitHubEvent, Trace, Action } from './types.js';
+import type { FetchStatus, GitHubEvent, Span, Action } from './types.js';
 import { AutopilotStore } from './store.js';
 import { getRepoInfo } from './helpers.js';
 
@@ -193,24 +193,24 @@ export function filterRelevantEvents(
   return results;
 }
 
-export function writeTraceAndAction(
+export function writeSpanAndAction(
   projectId: string,
   event: GitHubEvent & RelevantEvent
-): { traceId: string; actionId: string; chainId: string } {
+): { spanId: string; actionId: string; traceId: string } {
   const basePath = join(getDataDir(), 'projects', projectId);
-  const tracesDir = join(basePath, 'traces');
+  const spansDir = join(basePath, 'spans');
   const actionsDir = join(basePath, 'actions');
 
-  mkdirSync(tracesDir, { recursive: true });
+  mkdirSync(spansDir, { recursive: true });
   mkdirSync(actionsDir, { recursive: true });
 
-  const traceId = randomUUID();
+  const spanId = randomUUID();
   const actionId = randomUUID();
-  const chainId = randomUUID();
+  const traceId = randomUUID();
   const timestamp = new Date().toISOString();
 
-  const trace: Trace = {
-    id: traceId,
+  const span: Span = {
+    id: spanId,
     version: '1.0',
     timestamp,
     summary: event.summary,
@@ -224,21 +224,21 @@ export function writeTraceAndAction(
     version: '1.0',
     action: 'coordinate',
     timestamp,
-    traceId,
+    spanId,
     meta: event.meta,
     reasoning: 'Needs to take a decision about what to do with this event',
   };
 
   writeFileSync(
-    join(tracesDir, `${traceId}.json`),
-    JSON.stringify(trace, null, 2)
+    join(spansDir, `${spanId}.json`),
+    JSON.stringify(span, null, 2)
   );
   writeFileSync(
     join(actionsDir, `${actionId}.json`),
     JSON.stringify(action, null, 2)
   );
 
-  return { traceId, actionId, chainId };
+  return { spanId, actionId, traceId };
 }
 
 export function useGitHubEvents(
@@ -283,15 +283,15 @@ export function useGitHubEvents(
       const newEvents = relevant.filter(e => !store.isEventProcessed(e.id));
 
       for (const event of newEvents) {
-        const { traceId, actionId, chainId } = writeTraceAndAction(
+        const { spanId, actionId, traceId } = writeSpanAndAction(
           projectId,
           event
         );
 
         store.addPending({
-          chainId,
-          actionId,
           traceId,
+          actionId,
+          spanId,
           action: 'coordinate',
           summary: event.summary,
           createdAt: new Date().toISOString(),
@@ -300,8 +300,8 @@ export function useGitHubEvents(
 
         store.appendLog({
           ts: new Date().toISOString(),
-          chainId,
           traceId,
+          spanId,
           actionId,
           step: 'event',
           action: 'coordinate',

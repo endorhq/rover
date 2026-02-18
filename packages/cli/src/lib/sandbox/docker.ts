@@ -266,7 +266,7 @@ export class DockerSandbox extends Sandbox {
       }
 
       // Forward verbose flag to rover-agent if enabled
-      if (VERBOSE) {
+      if (VERBOSE || this.options?.verbose) {
         dockerArgs.push('-v');
       }
     }

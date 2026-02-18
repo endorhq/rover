@@ -7,7 +7,9 @@ import type {
   CoordinatorStatus,
   PlannerStatus,
   WorkflowRunnerStatus,
-  ActionChain,
+  CommitterStatus,
+  ResolverStatus,
+  ActionTrace,
   ActionStepStatus,
 } from './types.js';
 import {
@@ -172,6 +174,82 @@ function WorkflowRunnerIndicator({
   );
 }
 
+// ── Committer Status Indicator ────────────────────────────────────────────────
+
+const COMMITTER_ICONS: Record<CommitterStatus, string> = {
+  idle: '\u25CB', // ○
+  processing: '\u21BB', // ↻
+  error: '\u2717', // ✗
+};
+
+const COMMITTER_COLORS: Record<CommitterStatus, string> = {
+  idle: 'gray',
+  processing: 'green',
+  error: 'red',
+};
+
+function CommitterIndicator({
+  status,
+  processedCount,
+}: {
+  status: CommitterStatus;
+  processedCount: number;
+}) {
+  const icon = COMMITTER_ICONS[status];
+  const color = COMMITTER_COLORS[status];
+  const label =
+    status === 'processing'
+      ? 'committing...'
+      : status === 'error'
+        ? 'committer error'
+        : `${processedCount} committed`;
+
+  return (
+    <Text>
+      <Text color={color}>{icon} </Text>
+      <Text dimColor>{label}</Text>
+    </Text>
+  );
+}
+
+// ── Resolver Status Indicator ────────────────────────────────────────────────
+
+const RESOLVER_ICONS: Record<ResolverStatus, string> = {
+  idle: '\u25CB', // ○
+  processing: '\u21BB', // ↻
+  error: '\u2717', // ✗
+};
+
+const RESOLVER_COLORS: Record<ResolverStatus, string> = {
+  idle: 'gray',
+  processing: 'yellow',
+  error: 'red',
+};
+
+function ResolverIndicator({
+  status,
+  processedCount,
+}: {
+  status: ResolverStatus;
+  processedCount: number;
+}) {
+  const icon = RESOLVER_ICONS[status];
+  const color = RESOLVER_COLORS[status];
+  const label =
+    status === 'processing'
+      ? 'resolving...'
+      : status === 'error'
+        ? 'resolver error'
+        : `${processedCount} resolved`;
+
+  return (
+    <Text>
+      <Text color={color}>{icon} </Text>
+      <Text dimColor>{label}</Text>
+    </Text>
+  );
+}
+
 // ── Key Legend ────────────────────────────────────────────────────────────────
 
 function KeyLegend() {
@@ -206,6 +284,10 @@ export function InfoPanel({
   plannerProcessedCount,
   workflowRunnerStatus,
   workflowRunnerProcessedCount,
+  committerStatus,
+  committerProcessedCount,
+  resolverStatus,
+  resolverProcessedCount,
 }: {
   projectName: string;
   agent: string;
@@ -219,6 +301,10 @@ export function InfoPanel({
   plannerProcessedCount: number;
   workflowRunnerStatus: WorkflowRunnerStatus;
   workflowRunnerProcessedCount: number;
+  committerStatus: CommitterStatus;
+  committerProcessedCount: number;
+  resolverStatus: ResolverStatus;
+  resolverProcessedCount: number;
 }) {
   return (
     <Box
@@ -261,6 +347,14 @@ export function InfoPanel({
         status={workflowRunnerStatus}
         processedCount={workflowRunnerProcessedCount}
       />
+      <CommitterIndicator
+        status={committerStatus}
+        processedCount={committerProcessedCount}
+      />
+      <ResolverIndicator
+        status={resolverStatus}
+        processedCount={resolverProcessedCount}
+      />
       <Box flexGrow={1} />
       <KeyLegend />
     </Box>
@@ -302,7 +396,7 @@ export function WorkBoxes({ slots }: { slots: WorkSlot[] }) {
   );
 }
 
-// ── Action Chain Row ─────────────────────────────────────────────────────────
+// ── Action Trace Row ─────────────────────────────────────────────────────────
 
 const STEP_COLORS: Record<ActionStepStatus, string> = {
   completed: 'green',
@@ -318,44 +412,44 @@ const STEP_FILLED: Record<ActionStepStatus, string> = {
   failed: '\u25A0', // ■
 };
 
-function ActionChainRow({ chain }: { chain: ActionChain }) {
+function ActionTraceRow({ trace }: { trace: ActionTrace }) {
   return (
     <Box>
       <Box>
-        {chain.steps.map((step, i) => (
+        {trace.steps.map((step, i) => (
           <Text key={step.actionId}>
             <Text color={STEP_COLORS[step.status]}>
               {STEP_FILLED[step.status]}
             </Text>
-            {i < chain.steps.length - 1 ? (
+            {i < trace.steps.length - 1 ? (
               <Text dimColor>{'\u2500'}</Text>
             ) : null}
           </Text>
         ))}
       </Box>
       <Text> </Text>
-      <Text dimColor>{chain.summary}</Text>
+      <Text dimColor>{trace.summary}</Text>
     </Box>
   );
 }
 
-// ── Action Chain List (for main view) ────────────────────────────────────────
+// ── Action Trace List (for main view) ────────────────────────────────────────
 
-export function ActionChainList({
-  chains,
+export function ActionTraceList({
+  traces,
   maxVisible,
 }: {
-  chains: ActionChain[];
+  traces: ActionTrace[];
   maxVisible: number;
 }) {
-  if (chains.length === 0) return null;
+  if (traces.length === 0) return null;
 
-  const visible = chains.slice(-maxVisible);
+  const visible = traces.slice(-maxVisible);
 
   return (
     <Box flexDirection="column" paddingX={1}>
-      {visible.map(chain => (
-        <ActionChainRow key={chain.chainId} chain={chain} />
+      {visible.map(trace => (
+        <ActionTraceRow key={trace.traceId} trace={trace} />
       ))}
     </Box>
   );
@@ -367,12 +461,12 @@ export function SpaceScene({
   width,
   height,
   slots,
-  chains,
+  traces,
 }: {
   width: number;
   height: number;
   slots: WorkSlot[];
-  chains: ActionChain[];
+  traces: ActionTrace[];
 }) {
   const starsRef = useRef(createStarField(width, height));
   const [lines, setLines] = useState<string[]>([]);
@@ -409,10 +503,10 @@ export function SpaceScene({
     return () => clearInterval(timer);
   }, [width, height]);
 
-  // Reserve rows: 3 for compact boxes + chains
+  // Reserve rows: 3 for compact boxes + traces
   const boxRows = 3;
-  const chainRows = Math.min(chains.length, 4);
-  const reservedRows = boxRows + chainRows;
+  const traceRows = Math.min(traces.length, 4);
+  const reservedRows = boxRows + traceRows;
   const starLines = lines.slice(reservedRows);
 
   return (
@@ -420,9 +514,9 @@ export function SpaceScene({
       <Box height={boxRows} paddingX={1} paddingTop={1}>
         <WorkBoxes slots={slots} />
       </Box>
-      {chains.length > 0 && (
-        <Box height={chainRows}>
-          <ActionChainList chains={chains} maxVisible={chainRows} />
+      {traces.length > 0 && (
+        <Box height={traceRows}>
+          <ActionTraceList traces={traces} maxVisible={traceRows} />
         </Box>
       )}
       <Box flexDirection="column" flexGrow={1}>
