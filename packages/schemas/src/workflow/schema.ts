@@ -64,6 +64,7 @@ export const WorkflowAgentToolSchema = z.enum([
   'claude',
   'gemini',
   'codex',
+  'opencode',
   'qwen',
 ]);
 
@@ -140,6 +141,7 @@ export const WorkflowCommandStepSchema = WorkflowBaseStepSchema.extend({
  * Conditional step schema (recursive)
  * Allows branching logic based on conditions
  */
+// biome-ignore lint/suspicious/noExplicitAny: Required for recursive Zod schema type inference
 export const WorkflowConditionalStepSchema: z.ZodType<any> =
   WorkflowBaseStepSchema.extend({
     /** Step type - 'conditional' */
@@ -147,6 +149,7 @@ export const WorkflowConditionalStepSchema: z.ZodType<any> =
     /** Condition expression to evaluate */
     condition: z.string(),
     /** Steps to execute if condition is true */
+    // biome-ignore lint/suspicious/noThenProperty: 'then' is a valid workflow concept for if-then-else branching
     then: z.lazy(() => z.array(WorkflowStepSchema)).optional(),
     /** Steps to execute if condition is false */
     else: z.lazy(() => z.array(WorkflowStepSchema)).optional(),
@@ -156,6 +159,7 @@ export const WorkflowConditionalStepSchema: z.ZodType<any> =
  * Parallel step schema (recursive)
  * Executes multiple steps concurrently
  */
+// biome-ignore lint/suspicious/noExplicitAny: Required for recursive Zod schema type inference
 export const WorkflowParallelStepSchema: z.ZodType<any> =
   WorkflowBaseStepSchema.extend({
     /** Step type - 'parallel' */
@@ -168,6 +172,7 @@ export const WorkflowParallelStepSchema: z.ZodType<any> =
  * Sequential step schema (recursive)
  * Executes multiple steps in order
  */
+// biome-ignore lint/suspicious/noExplicitAny: Required for recursive Zod schema type inference
 export const WorkflowSequentialStepSchema: z.ZodType<any> =
   WorkflowBaseStepSchema.extend({
     /** Step type - 'sequential' */
@@ -180,6 +185,7 @@ export const WorkflowSequentialStepSchema: z.ZodType<any> =
  * Union of all step types (discriminated by 'type' field)
  * Forward declared for recursive types
  */
+// biome-ignore lint/suspicious/noExplicitAny: Required for recursive Zod schema type inference
 export const WorkflowStepSchema: z.ZodType<any> = WorkflowAgentStepSchema;
 // export const WorkflowStepSchema: z.ZodType<any> = z.union([
 //   WorkflowAgentStepSchema,

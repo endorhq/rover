@@ -1,7 +1,9 @@
 import ClaudeAI from './claude.js';
 import CodexAI from './codex.js';
+import CopilotAI from './copilot.js';
 import CursorAI from './cursor.js';
 import GeminiAI from './gemini.js';
+import OpenCodeAI from './opencode.js';
 import QwenAI from './qwen.js';
 import type { IPromptTask } from '../prompts/index.js';
 import { UserSettingsManager, AI_AGENT, launchSync } from 'rover-core';
@@ -17,9 +19,15 @@ export const findKeychainCredentials = (key: string): string => {
   return result.stdout?.toString() || '';
 };
 
+export interface InvokeOptions {
+  json?: boolean;
+  cwd?: string;
+  model?: string;
+}
+
 export interface AIAgentTool {
   // Invoke the CLI tool using the SDK / direct mode with the given prompt
-  invoke(prompt: string, json: boolean, cwd?: string): Promise<string>;
+  invoke(prompt: string, options?: InvokeOptions): Promise<string>;
 
   // Check if the current AI agent is available
   // It will throw an exception in other case
@@ -28,14 +36,16 @@ export interface AIAgentTool {
   // Expand a brief task description into a full task with title and description
   expandTask(
     briefDescription: string,
-    projectPath: string
+    projectPath: string,
+    contextContent?: string
   ): Promise<IPromptTask | null>;
 
   // Expand iteration instructions based on previous work
   expandIterationInstructions(
     instructions: string,
     previousPlan?: string,
-    previousChanges?: string
+    previousChanges?: string,
+    contextContent?: string
   ): Promise<IPromptTask | null>;
 
   // Generate a git commit message based on the task and recent commits
@@ -98,10 +108,14 @@ export const getAIAgentTool = (agent: string): AIAgentTool => {
       return new ClaudeAI();
     case 'codex':
       return new CodexAI();
+    case 'copilot':
+      return new CopilotAI();
     case 'cursor':
       return new CursorAI();
     case 'gemini':
       return new GeminiAI();
+    case 'opencode':
+      return new OpenCodeAI();
     case 'qwen':
       return new QwenAI();
     default:
@@ -125,5 +139,22 @@ export const getUserAIAgent = (): AI_AGENT => {
     }
   } catch (error) {
     throw new AIAgentConfigError();
+  }
+};
+
+/**
+ * Get the user's default model for a specific agent.
+ * Returns undefined if no default is set.
+ */
+export const getUserDefaultModel = (agent: AI_AGENT): string | undefined => {
+  try {
+    const projectPath = getProjectPath();
+    if (projectPath && UserSettingsManager.exists(projectPath)) {
+      const userSettings = UserSettingsManager.load(projectPath);
+      return userSettings.getDefaultModel(agent);
+    }
+    return undefined;
+  } catch (error) {
+    return undefined;
   }
 };

@@ -135,7 +135,7 @@ steps:
 
       ## Relevant Existing Documentation
 
-      - path/to/existing/docs: only point to documentation files that matches the target audience and are relevant for this documentation
+      - path/to/existing/docs: only point to documentation files that match the target audience and are relevant for this documentation
       </template>
     outputs:
       - name: context_file
@@ -184,7 +184,7 @@ steps:
 
       1. Follows a logical progression
       2. Adapts the depth and style to the target audience. By default, be concise
-      3. Avoid over explaning
+      3. Avoid over explaining
       4. Ensures each section has a clear purpose and scope
       5. Uses appropriate headings hierarchy. Use the "Heading Level" property in the template
       6. When the target audience are not internal developers, skip any internal logic documentation
@@ -421,7 +421,7 @@ steps:
       2. Polish the content when required
          - Improve clarity, conciseness, and consistency
          - Fix grammar and spelling
-      4. Ensure the document has a valid {{inputs.format}} format
+      3. Ensure the document has a valid {{inputs.format}} format
 
       ### Phase 3: Create final documentation
 

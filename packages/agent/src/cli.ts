@@ -71,10 +71,8 @@ program
     'Directory to move the output files and values from the workflow. If none, it will save them in the current folder.'
   )
   .option(
-    '--pre-context-file <path>',
-    'Path to JSON file containing pre-context data to inject into the workflow (can be specified multiple times)',
-    collect,
-    []
+    '--context-dir <path>',
+    'Path to the context directory containing index.md and context source files'
   )
   .action(runCommand);
 
@@ -91,10 +89,8 @@ program
   })
   .argument('[initialPrompt]', 'Initial prompt to start the session with')
   .option(
-    '--pre-context-file <path>',
-    'Path to JSON file containing pre-context data to inject into the workflow (can be specified multiple times)',
-    collect,
-    []
+    '--context-dir <path>',
+    'Path to the context directory containing index.md and context source files'
   )
   .action(sessionCommand);
 

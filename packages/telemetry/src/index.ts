@@ -76,6 +76,8 @@ enum EVENT_IDS {
   OPEN_WORKSPACE = 'open_workspace',
   // Show store information
   INFO = 'info',
+  // Clean up stale cache images
+  CLEANUP = 'cleanup',
 }
 
 class Telemetry {
@@ -89,6 +91,14 @@ class Telemetry {
     this.client = new PostHog(config.apiKey, {
       host: config.host,
       disabled: disableTelemetry,
+      // Improve timeouts
+      requestTimeout: 3000,
+      fetchRetryCount: 1,
+      fetchRetryDelay: 1000,
+      // Try to flush sonner than later as
+      // this is a CLI process.
+      flushAt: 1,
+      flushInterval: 100,
     });
   }
 
@@ -234,10 +244,33 @@ class Telemetry {
     this.capture(EVENT_IDS.INFO);
   }
 
+  eventCleanup() {
+    this.capture(EVENT_IDS.CLEANUP);
+  }
+
   // Other methods
 
   async shutdown() {
-    await this.client.shutdown();
+    // Suppress PostHog's unconditional console.error in logFlushError
+    const origError = console.error;
+    console.error = () => {};
+
+    // Store the timeout
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+    try {
+      await Promise.race([
+        this.client.shutdown().catch(() => {}),
+        new Promise(resolve => {
+          timeoutId = setTimeout(resolve, 2000);
+        }),
+      ]);
+    } finally {
+      console.error = origError;
+      if (timeoutId !== undefined) {
+        clearTimeout(timeoutId);
+      }
+    }
   }
 
   getUserId(): string {

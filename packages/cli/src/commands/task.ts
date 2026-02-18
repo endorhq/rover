@@ -1,9 +1,13 @@
 import enquirer from 'enquirer';
 import colors from 'ansi-colors';
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
-import { getAIAgentTool, getUserAIAgent } from '../lib/agents/index.js';
+import {
+  getAIAgentTool,
+  getUserAIAgent,
+  getUserDefaultModel,
+} from '../lib/agents/index.js';
 import {
   ProjectConfigManager,
   IterationManager,
@@ -13,7 +17,11 @@ import {
   showProperties,
   Git,
   type ProjectManager,
-  VERBOSE,
+  ContextManager,
+  generateContextIndex,
+  ContextFetchError,
+  registerBuiltInProviders,
+  type ContextIndexOptions,
 } from 'rover-core';
 import type { NetworkConfig, NetworkMode } from 'rover-schemas';
 import {
@@ -27,17 +35,17 @@ import { generateBranchName } from '../utils/branch-name.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { NewTaskProvider } from 'rover-telemetry';
 import { readFromStdin, stdinIsAvailable } from '../utils/stdin.js';
-import type { CLIJsonOutput } from '../types.js';
+import type { TaskTaskOutput } from '../output-types.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
 import { GitHub, GitHubError } from '../lib/github.js';
 import { copyEnvironmentFiles } from '../utils/env-files.js';
 import { initWorkflowStore } from '../lib/workflow.js';
 import {
   setJsonMode,
-  isJsonMode,
   requireProjectContext,
   isVerbose,
 } from '../lib/context.js';
+import type { CommandDefinition } from '../types.js';
 
 const { prompt } = enquirer;
 
@@ -156,7 +164,11 @@ const updateTaskMetadata = (
 
       // Handle Docker execution metadata
       if (updates.containerId && updates.executionStatus) {
-        task.setContainerInfo(updates.containerId, updates.executionStatus);
+        task.setContainerInfo(
+          updates.containerId,
+          updates.executionStatus,
+          updates.sandboxMetadata
+        );
       } else if (updates.executionStatus) {
         task.updateExecutionStatus(updates.executionStatus, {
           exitCode: updates.exitCode,
@@ -173,38 +185,12 @@ const updateTaskMetadata = (
 };
 
 /**
- * Interface for the JSON output
- */
-interface TaskTaskOutput extends CLIJsonOutput {
-  taskId?: number;
-  title?: string;
-  description?: string;
-  status?: string;
-  createdAt?: string;
-  startedAt?: string;
-  workspace?: string;
-  branch?: string;
-  savedTo?: string;
-  tasks?: Array<{
-    taskId: number;
-    agent: string;
-    title: string;
-    description: string;
-    status: string;
-    createdAt: string;
-    startedAt: string;
-    workspace: string;
-    branch: string;
-    savedTo: string;
-  }>;
-}
-
-/**
  * Command options
  */
 interface TaskOptions {
   workflow?: string;
   fromGithub?: string;
+  includeComments?: boolean;
   yes?: boolean;
   sourceBranch?: string;
   targetBranch?: string;
@@ -214,7 +200,42 @@ interface TaskOptions {
   networkMode?: NetworkMode;
   networkAllow?: string[];
   networkBlock?: string[];
+  context?: string[];
+  contextTrustAuthors?: string;
+  contextTrustAllAuthors?: boolean;
 }
+
+/**
+ * Format a date string to a more readable format (YYYY-MM-DD)
+ */
+const formatCommentDate = (dateString: string): string => {
+  if (!dateString) return '';
+  try {
+    const date = new Date(dateString);
+    return date.toISOString().split('T')[0];
+  } catch {
+    return dateString;
+  }
+};
+
+/**
+ * Format GitHub comments as markdown to append to the issue body
+ */
+const formatCommentsAsMarkdown = (
+  comments: Array<{ author: string; body: string; createdAt: string }>
+): string => {
+  if (!comments || comments.length === 0) return '';
+
+  const formattedComments = comments
+    .map(comment => {
+      const date = formatCommentDate(comment.createdAt);
+      const dateStr = date ? ` (${date})` : '';
+      return `**@${comment.author}**${dateStr}:\n${comment.body}`;
+    })
+    .join('\n\n');
+
+  return `\n\n---\n## Comments\n\n${formattedComments}`;
+};
 
 /**
  * Build NetworkConfig from CLI options
@@ -270,7 +291,19 @@ const createTaskForAgent = async (
   baseBranch: string,
   git: Git,
   jsonMode: boolean,
-  networkConfig?: NetworkConfig
+  networkConfig?: NetworkConfig,
+  source?: {
+    type: 'github' | 'manual';
+    id?: string;
+    url?: string;
+    title?: string;
+    ref?: Record<string, unknown>;
+  },
+  contextOptions?: {
+    context?: string[];
+    contextTrustAuthors?: string;
+    contextTrustAllAuthors?: boolean;
+  }
 ): Promise<{
   taskId: number;
   title: string;
@@ -281,6 +314,7 @@ const createTaskForAgent = async (
   workspace: string;
   branch: string;
   savedTo: string;
+  context?: Array<{ name: string; uri: string; description: string }>;
 } | null> => {
   const { sourceBranch, targetBranch, fromGithub } = options;
 
@@ -289,36 +323,24 @@ const createTaskForAgent = async (
     : new ProcessManager({ title: `Create new task for ${selectedAiAgent}` });
   processManager?.start();
 
-  processManager?.addItem(`Expand task information using ${selectedAiAgent}`);
-
-  // Extract the title and description based on current data.
+  // Check agent availability early
   const agentTool = getAIAgentTool(selectedAiAgent);
   await agentTool.checkAgent();
-  const expandedTask = await agentTool.expandTask(description, projectPath);
-
-  if (!expandedTask) {
-    processManager?.failLastItem();
-    console.error(
-      colors.red(`Failed to expand task description using ${selectedAiAgent}`)
-    );
-    return null;
-  } else {
-    processManager?.completeLastItem();
-  }
 
   processManager?.addItem('Create the task workspace');
 
-  // Create task using ProjectManager (stores in central ~/.rover/data/projects/<id>/tasks/)
-  // Task ID is auto-generated by ProjectManager.createTask()
+  // Create task using ProjectManager with raw description (will be updated after expansion)
   const task = project.createTask({
-    title: expandedTask!.title,
-    description: expandedTask!.description,
+    // Temporary title. We will change it after the expansion.
+    title: description,
+    description: description,
     inputs: inputsData,
     workflowName: workflowName,
     agent: selectedAiAgent,
     agentModel: selectedModel,
     sourceBranch: sourceBranch,
     networkConfig: networkConfig,
+    source: source,
   });
 
   const taskId = task.id;
@@ -330,11 +352,28 @@ const createTaskForAgent = async (
   try {
     git.createWorktree(worktreePath, branchName, baseBranch);
 
+    // Capture the base commit hash (the commit when the worktree was created)
+    const baseCommit = git.getCommitHash('HEAD', { worktreePath });
+    if (baseCommit) {
+      task.setBaseCommit(baseCommit);
+    }
+
     // Copy user .env development files
     copyEnvironmentFiles(projectPath, worktreePath);
+
+    // Configure sparse checkout to exclude files matching exclude patterns
+    const sparseConfig = ProjectConfigManager.load(projectPath);
+    if (
+      sparseConfig.excludePatterns &&
+      sparseConfig.excludePatterns.length > 0
+    ) {
+      git.setupSparseCheckout(worktreePath, sparseConfig.excludePatterns);
+    }
   } catch (error) {
     processManager?.failLastItem();
-    console.error(colors.red('Error creating git workspace: ' + error));
+    if (!jsonMode) {
+      console.error(colors.red('Error creating git workspace: ' + error));
+    }
     return null;
   }
 
@@ -348,12 +387,13 @@ const createTaskForAgent = async (
   const iterationPath = join(task.iterationsPath(), task.iterations.toString());
   mkdirSync(iterationPath, { recursive: true });
 
-  // Create initial iteration.json for the first iteration
-  IterationManager.createInitial(
+  // Create initial iteration.json with raw description
+  const iteration = IterationManager.createInitial(
     iterationPath,
     task.id,
-    task.title,
-    task.description
+    // Temporary title, we will change after the expansion
+    description,
+    description
   );
 
   // Update task with workspace information
@@ -361,6 +401,101 @@ const createTaskForAgent = async (
   task.markInProgress();
 
   processManager?.completeLastItem();
+
+  // Fetch context and generate index.md
+  let contextEntries: Array<{
+    name: string;
+    uri: string;
+    description: string;
+  }> = [];
+  let contextContent: string | undefined;
+
+  processManager?.addItem('Fetching context sources');
+
+  try {
+    // Register built-in providers
+    registerBuiltInProviders();
+
+    const trustedAuthors = contextOptions?.contextTrustAuthors
+      ? contextOptions.contextTrustAuthors.split(',').map(s => s.trim())
+      : undefined;
+
+    const contextManager = new ContextManager(
+      contextOptions?.context ?? [],
+      task,
+      {
+        trustAllAuthors: contextOptions?.contextTrustAllAuthors,
+        trustedAuthors,
+        cwd: projectPath,
+      }
+    );
+
+    const entries = await contextManager.fetchAndStore();
+
+    // Store in iteration.json
+    iteration.setContext(entries);
+
+    // Generate index.md (no previous artifacts for first iteration)
+    const indexContent = generateContextIndex(entries, task.iterations);
+    writeFileSync(
+      join(contextManager.getContextDir(), 'index.md'),
+      indexContent
+    );
+
+    // Read context content for AI expansion
+    // Skip PRs to avoid huge context.
+    const expansionEntries = entries.filter(entry => {
+      !(entry.metadata?.type || '').includes('pr');
+    });
+    const storedContent = contextManager.readStoredContent(expansionEntries);
+    if (storedContent) {
+      contextContent = storedContent;
+    }
+
+    processManager?.updateLastItem(
+      `Fetching context sources | ${entries.length} source(s) loaded`
+    );
+    processManager?.completeLastItem();
+
+    // Store entries for return value and display
+    contextEntries = entries.map(entry => ({
+      name: entry.name,
+      uri: entry.uri,
+      description: entry.description,
+    }));
+  } catch (error) {
+    processManager?.failLastItem();
+    if (error instanceof ContextFetchError) {
+      if (!jsonMode) {
+        console.error(colors.red(`Error fetching context: ${error.message}`));
+      }
+    }
+    throw error;
+  }
+
+  // AI expansion with context content
+  processManager?.addItem(`Expand task information using ${selectedAiAgent}`);
+
+  const expandedTask = await agentTool.expandTask(
+    description,
+    projectPath,
+    contextContent
+  );
+
+  if (expandedTask) {
+    task.updateTitle(expandedTask.title);
+    task.updateDescription(expandedTask.description);
+    iteration.updateTitle(expandedTask.title);
+    iteration.updateDescription(expandedTask.description);
+    processManager?.completeLastItem();
+  } else {
+    processManager?.failLastItem();
+    if (!jsonMode) {
+      console.error(
+        colors.red(`Failed to expand task description using ${selectedAiAgent}`)
+      );
+    }
+  }
 
   // Resolve and store the agent image that will be used for this task
   const projectConfig = ProjectConfigManager.load(projectPath);
@@ -372,6 +507,10 @@ const createTaskForAgent = async (
     const sandbox = await createSandbox(task, processManager, {
       extraArgs: options.sandboxExtraArgs,
       projectPath,
+      iterationLogsPath: project.getTaskIterationLogsPath(
+        task.id,
+        task.iterations
+      ),
     });
     const containerId = await sandbox.createAndStart();
 
@@ -382,6 +521,9 @@ const createTaskForAgent = async (
         containerId,
         executionStatus: 'running',
         runningAt: new Date().toISOString(),
+        sandboxMetadata: process.env.DOCKER_HOST
+          ? { dockerHost: process.env.DOCKER_HOST }
+          : undefined,
       },
       jsonMode
     );
@@ -400,16 +542,18 @@ const createTaskForAgent = async (
     processManager?.failLastItem();
     processManager?.finish();
 
-    console.warn(
-      colors.yellow(
-        `Task ${taskId} was created, but reset to 'New' due to an error running the container`
-      )
-    );
-    console.log(
-      colors.gray(
-        'Use ' + colors.cyan(`rover restart ${taskId}`) + ' to retry it'
-      )
-    );
+    if (!jsonMode) {
+      console.warn(
+        colors.yellow(
+          `Task ${taskId} was created, but reset to 'New' due to an error running the container`
+        )
+      );
+      console.log(
+        colors.gray(
+          'Use ' + colors.cyan(`rover restart ${taskId}`) + ' to retry it'
+        )
+      );
+    }
   }
 
   return {
@@ -422,19 +566,48 @@ const createTaskForAgent = async (
     workspace: task.worktreePath,
     branch: task.branchName,
     savedTo: task.getBasePath(),
+    context: contextEntries.length > 0 ? contextEntries : undefined,
   };
 };
 
 /**
- * Task commands
+ * Create and assign a new task to an AI agent for execution.
+ *
+ * This is the primary command for creating work items in Rover. It expands
+ * the task description using AI, sets up an isolated git worktree, creates
+ * iteration tracking, and launches a sandboxed container running the specified
+ * AI agent. Supports multiple agents working on the same task in parallel,
+ * GitHub issue integration, custom workflows, and network filtering.
+ *
+ * @param initPrompt - Initial task description (prompts if not provided)
+ * @param options - Command options
+ * @param options.workflow - Workflow name to use (defaults to 'swe')
+ * @param options.fromGithub - GitHub issue number to fetch description from
+ * @param options.yes - Skip interactive prompts
+ * @param options.sourceBranch - Base branch for git worktree creation
+ * @param options.targetBranch - Custom name for the task branch
+ * @param options.agent - AI agent(s) to use with optional model (e.g., 'claude:opus')
+ * @param options.json - Output results in JSON format
+ * @param options.sandboxExtraArgs - Extra arguments to pass to the container
+ * @param options.networkMode - Network filtering mode for the container
+ * @param options.networkAllow - Hosts to allow network access to
+ * @param options.networkBlock - Hosts to block network access to
  */
-export const taskCommand = async (
-  initPrompt?: string,
-  options: TaskOptions = {}
-) => {
+const taskCommand = async (initPrompt?: string, options: TaskOptions = {}) => {
   const telemetry = getTelemetry();
   // Extract options
-  const { yes, json, fromGithub, sourceBranch, targetBranch, agent } = options;
+  let {
+    yes,
+    json,
+    fromGithub,
+    includeComments,
+    sourceBranch,
+    targetBranch,
+    agent,
+    context,
+    contextTrustAuthors,
+    contextTrustAllAuthors,
+  } = options;
 
   // Set global JSON mode for tests and backwards compatibility
   if (json !== undefined) {
@@ -446,6 +619,56 @@ export const taskCommand = async (
   const jsonOutput: TaskTaskOutput = {
     success: false,
   };
+
+  // Deprecation: translate --from-github to --context
+  if (fromGithub) {
+    if (!json) {
+      console.warn(
+        colors.yellow(
+          'Warning: --from-github is deprecated. Use --context github:issue/<number> instead.'
+        )
+      );
+    }
+
+    // Translate to context URI
+    context = context ?? [];
+    context.push(`github:issue/${fromGithub}`);
+
+    // Translate --include-comments to --context-trust-all-authors
+    if (includeComments) {
+      if (!json) {
+        console.warn(
+          colors.yellow(
+            'Warning: --include-comments is deprecated. Use --context-trust-all-authors instead.'
+          )
+        );
+      }
+      contextTrustAllAuthors = contextTrustAllAuthors || includeComments;
+    }
+  }
+
+  // Validate --include-comments requires --from-github
+  if (includeComments && !fromGithub) {
+    jsonOutput.error =
+      '--include-comments requires --from-github to be specified';
+    await exitWithError(jsonOutput, {
+      tips: [
+        'Use ' +
+          colors.cyan('rover task --from-github <issue> --include-comments') +
+          ' to include issue comments',
+      ],
+      telemetry: getTelemetry(),
+    });
+    return;
+  }
+
+  // Validate mutual exclusivity of --context-trust-authors and --context-trust-all-authors
+  if (contextTrustAuthors && contextTrustAllAuthors) {
+    jsonOutput.error =
+      '--context-trust-authors and --context-trust-all-authors are mutually exclusive';
+    await exitWithError(jsonOutput, { telemetry: getTelemetry() });
+    return;
+  }
 
   // Get project context
   let project;
@@ -496,6 +719,12 @@ export const taskCommand = async (
       selectedAgents = [{ agent: AI_AGENT.Claude, model: undefined }];
     }
   }
+
+  // Fill in default models for agents without a specified model
+  selectedAgents = selectedAgents.map(({ agent: agentName, model }) => ({
+    agent: agentName,
+    model: model ?? getUserDefaultModel(agentName),
+  }));
 
   // Validate all agents before proceeding
   for (const { agent: selectedAiAgent } of selectedAgents) {
@@ -550,6 +779,17 @@ export const taskCommand = async (
     requiredInputs.length === 1 && requiredInputs[0] === 'description';
   const inputsData: Map<string, string> = new Map();
 
+  // Task source (populated when --from-github is used)
+  let taskSource:
+    | {
+        type: 'github' | 'manual';
+        id?: string;
+        url?: string;
+        title?: string;
+        ref?: Record<string, unknown>;
+      }
+    | undefined;
+
   // Validate branch option and check for uncommitted changes
   const git = new Git({ cwd: project.path });
   let baseBranch = sourceBranch;
@@ -603,50 +843,44 @@ export const taskCommand = async (
   // We need to process the workflow inputs. We will ask users to provide this
   // information or load it as a JSON from the stdin.
   if (inputs && inputs.length > 0) {
-    if (stdinIsAvailable()) {
-      const stdinInput = await readFromStdin();
-      if (stdinInput) {
-        try {
-          const parsed = JSON.parse(stdinInput);
-
-          for (const key in parsed) {
-            inputsData.set(key, parsed[key]);
-
-            if (key == 'description') {
-              description = parsed[key];
-            }
-          }
-
-          if (!json) {
-            console.log(colors.gray('✓ Read task description from stdin'));
-          }
-        } catch (err) {
-          // Assume the text is just the description
-          description = stdinInput;
-          inputsData.set('description', description);
-          if (!json) {
-            showProperties(
-              {
-                Description: description,
-              },
-              { addLineBreak: false }
-            );
-          }
-        }
-      } else if (description != null && description.length > 0) {
-        // There are cases like running the CLI from the extension that might
-        // configure an empty stdin, while passing the `description` as argument.
-        // In that case, we also load the description
-        inputsData.set('description', description);
-      }
-    } else if (fromGithub != null) {
+    if (fromGithub != null) {
       // Load the inputs from GitHub
       const github = new GitHub({ cwd: project.path });
+      const remoteUrl = git.remoteUrl();
+
+      // Extract repo info for storing with the task
+      const repoInfo = github.getGitHubRepoInfo(remoteUrl);
+      if (repoInfo) {
+        const issueNumber = parseInt(fromGithub, 10);
+        taskSource = {
+          type: 'github',
+          id: fromGithub,
+          url: `https://github.com/${repoInfo.owner}/${repoInfo.repo}/issues/${issueNumber}`,
+          ref: {
+            owner: repoInfo.owner,
+            repo: repoInfo.repo,
+            number: issueNumber,
+          },
+        };
+      }
 
       try {
-        const issueData = await github.fetchIssue(fromGithub, git.remoteUrl());
+        const issueData = await github.fetchIssue(fromGithub, remoteUrl, {
+          includeComments,
+        });
         if (issueData) {
+          // Start with the issue body
           description = issueData.body;
+
+          // Append comments if they were included
+          if (
+            includeComments &&
+            issueData.comments &&
+            issueData.comments.length > 0
+          ) {
+            description += formatCommentsAsMarkdown(issueData.comments);
+          }
+
           inputsData.set('description', description);
 
           if (!issueData.body || issueData.body.length == 0) {
@@ -717,13 +951,49 @@ export const taskCommand = async (
         }
       } catch (err) {
         if (err instanceof GitHubError) {
-          jsonOutput.error = `Failed to fetch issue from GitHub: ${err.cause}`;
+          jsonOutput.error = `Failed to fetch issue from GitHub: ${err.message}`;
         } else {
           jsonOutput.error = `Failed to fetch issue from GitHub: ${err}`;
         }
 
         await exitWithError(jsonOutput, { telemetry });
         return;
+      }
+    } else if (stdinIsAvailable()) {
+      const stdinInput = await readFromStdin();
+      if (stdinInput) {
+        try {
+          const parsed = JSON.parse(stdinInput);
+
+          for (const key in parsed) {
+            inputsData.set(key, parsed[key]);
+
+            if (key == 'description') {
+              description = parsed[key];
+            }
+          }
+
+          if (!json) {
+            console.log(colors.gray('✓ Read task description from stdin'));
+          }
+        } catch (err) {
+          // Assume the text is just the description
+          description = stdinInput;
+          inputsData.set('description', description);
+          if (!json) {
+            showProperties(
+              {
+                Description: description,
+              },
+              { addLineBreak: false }
+            );
+          }
+        }
+      } else if (description != null && description.length > 0) {
+        // There are cases like running the CLI from the extension that might
+        // configure an empty stdin, while passing the `description` as argument.
+        // In that case, we also load the description
+        inputsData.set('description', description);
       }
     } else {
       const questions = [];
@@ -824,6 +1094,7 @@ export const taskCommand = async (
       workspace: string;
       branch: string;
       savedTo: string;
+      context?: Array<{ name: string; uri: string; description: string }>;
     }> = [];
     const failedAgents: string[] = [];
 
@@ -856,7 +1127,13 @@ export const taskCommand = async (
         baseBranch!,
         git,
         json || false,
-        networkConfig
+        networkConfig,
+        taskSource,
+        {
+          context,
+          contextTrustAuthors,
+          contextTrustAllAuthors,
+        }
       );
 
       if (taskResult) {
@@ -897,6 +1174,7 @@ export const taskCommand = async (
     jsonOutput.workspace = firstTask.workspace;
     jsonOutput.branch = firstTask.branch;
     jsonOutput.savedTo = firstTask.savedTo;
+    jsonOutput.context = firstTask.context;
     jsonOutput.success = true;
 
     // For multiple agents, include all task information in an array
@@ -973,3 +1251,10 @@ export const taskCommand = async (
 
   await telemetry?.shutdown();
 };
+
+export default {
+  name: 'task',
+  description: 'Create and assign task to an AI Agent to complete it',
+  requireProject: true,
+  action: taskCommand,
+} satisfies CommandDefinition;

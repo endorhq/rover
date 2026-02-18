@@ -15,49 +15,52 @@ vi.mock('../../../lib/telemetry.js', () => ({
 // Mock workflow store
 vi.mock('../../../lib/workflow.js', () => ({
   initWorkflowStore: vi.fn().mockReturnValue({
-    getWorkflow: vi.fn((name: string) => {
+    getWorkflowEntry: vi.fn((name: string) => {
       if (name === 'swe') {
         return {
-          name: 'swe',
-          description: 'Software engineering workflow',
-          version: '1.0.0',
-          inputs: [
-            {
-              name: 'task',
-              description: 'Task to complete',
-              required: true,
-            },
-          ],
-          outputs: [
-            {
-              name: 'result',
-              description: 'Task result',
-            },
-          ],
-          steps: [
-            {
-              name: 'analyze',
-              outputs: [{ name: 'analysis' }],
-            },
-            {
-              name: 'implement',
-              outputs: [{ name: 'code' }],
-            },
-          ],
-          defaults: {
-            tool: 'claude',
-            model: 'claude-3-sonnet',
-          },
-          config: {
-            timeout: 300,
-            continueOnError: false,
-          },
-          filePath: '/builtin/swe.yml',
-          toObject: vi.fn().mockReturnValue({
+          workflow: {
             name: 'swe',
             description: 'Software engineering workflow',
             version: '1.0.0',
-          }),
+            inputs: [
+              {
+                name: 'task',
+                description: 'Task to complete',
+                required: true,
+              },
+            ],
+            outputs: [
+              {
+                name: 'result',
+                description: 'Task result',
+              },
+            ],
+            steps: [
+              {
+                name: 'analyze',
+                outputs: [{ name: 'analysis' }],
+              },
+              {
+                name: 'implement',
+                outputs: [{ name: 'code' }],
+              },
+            ],
+            defaults: {
+              tool: 'claude',
+              model: 'claude-3-sonnet',
+            },
+            config: {
+              timeout: 300,
+              continueOnError: false,
+            },
+            filePath: '/builtin/swe.yml',
+            toObject: vi.fn().mockReturnValue({
+              name: 'swe',
+              description: 'Software engineering workflow',
+              version: '1.0.0',
+            }),
+          },
+          source: 'built-in',
         };
       }
       return undefined;

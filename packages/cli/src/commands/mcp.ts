@@ -3,27 +3,32 @@ import {
   ResourceTemplate,
 } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { listCommand } from '../commands/list.js';
-import { taskCommand } from '../commands/task.js';
-import { initCommand } from '../commands/init.js';
-import { diffCommand } from '../commands/diff.js';
-import { logsCommand } from '../commands/logs.js';
-import { pushCommand } from '../commands/push.js';
-import { mergeCommand } from '../commands/merge.js';
-import { deleteCommand } from '../commands/delete.js';
-import { inspectCommand } from '../commands/inspect.js';
-import { iterateCommand } from '../commands/iterate.js';
-import { restartCommand } from '../commands/restart.js';
-import { resetCommand } from '../commands/reset.js';
-import { stopCommand } from '../commands/stop.js';
+import listCmd from '../commands/list.js';
+import taskCmd from '../commands/task.js';
+import initCmd from '../commands/init.js';
+import diffCmd from '../commands/diff.js';
+import logsCmd from '../commands/logs.js';
+import pushCmd from '../commands/push.js';
+import mergeCmd from '../commands/merge.js';
+import deleteCmd from '../commands/delete.js';
+import inspectCmd from '../commands/inspect.js';
+import iterateCmd from '../commands/iterate.js';
+import restartCmd from '../commands/restart.js';
+import resetCmd from '../commands/reset.js';
+import stopCmd from '../commands/stop.js';
 import { AI_AGENT } from 'rover-core';
 import { z } from 'zod';
+import type { CommandDefinition } from '../types.js';
 
 /**
- * Start an MCP server
- * MCP adapts to project mode or global mode based on the CLI context
+ * Start Rover as a Model Context Protocol (MCP) server.
+ *
+ * Exposes Rover's functionality through the MCP protocol, allowing AI assistants
+ * and other MCP clients to interact with Rover programmatically. Supports all
+ * core commands (task creation, inspection, logs, diff, merge, push, etc.) as
+ * MCP tools. Adapts to project mode or global mode based on the CLI context.
  */
-export const mcpCommand = async () => {
+const mcpCommand = async () => {
   const server = new McpServer({
     name: 'rover',
     version: '1.0.0',
@@ -87,7 +92,7 @@ export const mcpCommand = async () => {
       inputSchema: {},
     },
     async () => {
-      return runCommand(listCommand);
+      return runCommand(listCmd.action);
     }
   );
 
@@ -95,9 +100,14 @@ export const mcpCommand = async () => {
   const taskSchema = z.object({
     initPrompt: z.string(),
     fromGithub: z.string().optional(),
+    includeComments: z.boolean().optional(),
     sourceBranch: z.string().optional(),
     targetBranch: z.string().optional(),
     agent: z.nativeEnum(AI_AGENT).optional(),
+    // New context fields
+    context: z.array(z.string()).optional(),
+    contextTrustAuthors: z.string().optional(),
+    contextTrustAllAuthors: z.boolean().optional(),
   });
 
   server.registerTool(
@@ -109,12 +119,16 @@ export const mcpCommand = async () => {
     },
     async args => {
       const parsed = taskSchema.parse(args);
-      return runCommand(taskCommand, [parsed.initPrompt], {
+      return runCommand(taskCmd.action, [parsed.initPrompt], {
         fromGithub: parsed.fromGithub,
+        includeComments: parsed.includeComments,
         yes: true,
         sourceBranch: parsed.sourceBranch,
         targetBranch: parsed.targetBranch,
         agent: parsed.agent,
+        context: parsed.context,
+        contextTrustAuthors: parsed.contextTrustAuthors,
+        contextTrustAllAuthors: parsed.contextTrustAllAuthors,
         debug: false,
       });
     }
@@ -129,7 +143,7 @@ export const mcpCommand = async () => {
       inputSchema: {},
     },
     async args => {
-      return runCommand(initCommand, ['.'], {
+      return runCommand(initCmd.action, ['.'], {
         yes: true,
       });
     }
@@ -152,7 +166,7 @@ export const mcpCommand = async () => {
     },
     async args => {
       const parsed = diffSchema.parse(args);
-      return runCommand(diffCommand, [parsed.taskId, parsed.filePath], {
+      return runCommand(diffCmd.action, [parsed.taskId, parsed.filePath], {
         onlyFiles: parsed.onlyFiles,
         branch: parsed.branch,
       });
@@ -174,7 +188,10 @@ export const mcpCommand = async () => {
     },
     async args => {
       const parsed = logsSchema.parse(args);
-      return runCommand(logsCommand, [parsed.taskId, parsed.iterationNumber]);
+      return runCommand(logsCmd.action, [
+        parsed.taskId,
+        parsed.iterationNumber,
+      ]);
     }
   );
 
@@ -194,7 +211,7 @@ export const mcpCommand = async () => {
     },
     async args => {
       const parsed = pushSchema.parse(args);
-      return runCommand(pushCommand, [parsed.taskId], {
+      return runCommand(pushCmd.action, [parsed.taskId], {
         message: parsed.message,
         pr: parsed.pr,
       });
@@ -215,7 +232,7 @@ export const mcpCommand = async () => {
     },
     async args => {
       const parsed = mergeSchema.parse(args);
-      return runCommand(mergeCommand, [parsed.taskId]);
+      return runCommand(mergeCmd.action, [parsed.taskId]);
     }
   );
 
@@ -233,7 +250,7 @@ export const mcpCommand = async () => {
     },
     async args => {
       const parsed = deleteSchema.parse(args);
-      return runCommand(deleteCommand, [parsed.taskIds], {
+      return runCommand(deleteCmd.action, [parsed.taskIds], {
         yes: true,
       });
     }
@@ -256,7 +273,7 @@ export const mcpCommand = async () => {
     async args => {
       const parsed = inspectSchema.parse(args);
       return runCommand(
-        inspectCommand,
+        inspectCmd.action,
         [parsed.taskId, parsed.iterationNumber],
         {
           file: parsed.files,
@@ -269,6 +286,10 @@ export const mcpCommand = async () => {
   const iterateSchema = z.object({
     taskId: z.string(),
     instructions: z.string().optional(),
+    // New context fields
+    context: z.array(z.string()).optional(),
+    contextTrustAuthors: z.string().optional(),
+    contextTrustAllAuthors: z.boolean().optional(),
   });
 
   server.registerTool(
@@ -281,7 +302,15 @@ export const mcpCommand = async () => {
     },
     async args => {
       const parsed = iterateSchema.parse(args);
-      return runCommand(iterateCommand, [parsed.taskId, parsed.instructions]);
+      return runCommand(
+        iterateCmd.action,
+        [parsed.taskId, parsed.instructions],
+        {
+          context: parsed.context,
+          contextTrustAuthors: parsed.contextTrustAuthors,
+          contextTrustAllAuthors: parsed.contextTrustAllAuthors,
+        }
+      );
     }
   );
 
@@ -299,7 +328,7 @@ export const mcpCommand = async () => {
     },
     async args => {
       const parsed = restartSchema.parse(args);
-      return runCommand(restartCommand, [parsed.taskId]);
+      return runCommand(restartCmd.action, [parsed.taskId]);
     }
   );
 
@@ -318,7 +347,7 @@ export const mcpCommand = async () => {
     },
     async args => {
       const parsed = resetSchema.parse(args);
-      return runCommand(resetCommand, [parsed.taskId], {
+      return runCommand(resetCmd.action, [parsed.taskId], {
         force: parsed.force,
       });
     }
@@ -341,7 +370,7 @@ export const mcpCommand = async () => {
     },
     async args => {
       const parsed = stopSchema.parse(args);
-      return runCommand(stopCommand, [parsed.taskId], {
+      return runCommand(stopCmd.action, [parsed.taskId], {
         removeAll: parsed.removeAll,
         removeContainer: parsed.removeContainer,
         removeGitWorktreeAndBranch: parsed.removeGitWorktreeAndBranch,
@@ -352,3 +381,10 @@ export const mcpCommand = async () => {
   const transport = new StdioServerTransport();
   await server.connect(transport);
 };
+
+export default {
+  name: 'mcp',
+  description: 'Start Rover as an MCP server',
+  requireProject: false,
+  action: mcpCommand,
+} satisfies CommandDefinition;

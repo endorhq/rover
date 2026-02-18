@@ -3,12 +3,18 @@ import colors from 'ansi-colors';
 import {
   WorkflowManager,
   IterationStatusManager,
-  PreContextDataManager,
+  JsonlLogger,
+  showTitle,
+  showProperties,
+  showList,
 } from 'rover-core';
+import { ROVER_LOG_FILENAME, AGENT_LOGS_DIR } from 'rover-schemas';
 import { parseCollectOptions } from '../lib/options.js';
 import { Runner, RunnerStepResult } from '../lib/runner.js';
 import { ACPRunner, ACPRunnerStepResult } from '../lib/acp-runner.js';
-import { existsSync, readFileSync } from 'node:fs';
+import { createAgent } from '../lib/agents/index.js';
+import { cpSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 /**
  * Helper function to display step results consistently for both ACP and standard runners
@@ -18,20 +24,19 @@ function displayStepResults(
   result: RunnerStepResult | ACPRunnerStepResult,
   _totalDuration: number
 ): void {
-  console.log(colors.bold(`\n📊 Step Results: ${stepName}`));
-  console.log(colors.gray('├── ID: ') + colors.cyan(result.id));
-  console.log(
-    colors.gray('├── Status: ') +
-      (result.success ? colors.green('✓ Success') : colors.red('✗ Failed'))
-  );
-  console.log(
-    colors.gray('├── Duration: ') +
-      colors.yellow(`${result.duration.toFixed(2)}s`)
-  );
+  showTitle(`📊 Step Results: ${stepName}`);
+
+  const props: Record<string, string> = {
+    ID: colors.cyan(result.id),
+    Status: result.success ? colors.green('✓ Success') : colors.red('✗ Failed'),
+    Duration: colors.yellow(`${result.duration.toFixed(2)}s`),
+  };
 
   if (result.error) {
-    console.log(colors.gray('├── Error: ') + colors.red(result.error));
+    props['Error'] = colors.red(result.error);
   }
+
+  showProperties(props);
 
   // Display outputs
   const outputEntries = Array.from(result.outputs.entries()).filter(
@@ -44,23 +49,48 @@ function displayStepResults(
   );
 
   if (outputEntries.length > 0) {
-    console.log(colors.gray('└── Outputs:'));
-    outputEntries.forEach(([key, value], idx) => {
-      const prefix = idx === outputEntries.length - 1 ? '    └──' : '    ├──';
+    const outputItems = outputEntries.map(([key, value]) => {
       // Truncate long values for display
       let displayValue =
         value.length > 100 ? value.substring(0, 100) + '...' : value;
-
       if (displayValue.includes('\n')) {
         displayValue = displayValue.split('\n')[0] + '...';
       }
 
-      console.log(
-        colors.gray(`${prefix} ${key}: `) + colors.cyan(displayValue)
-      );
+      return `${key}: ${colors.cyan(displayValue)}`;
     });
+
+    showList(outputItems, { title: colors.gray('Outputs:') });
   } else {
-    console.log(colors.gray('└── No outputs extracted'));
+    console.log(colors.gray('No outputs extracted'));
+  }
+}
+
+/**
+ * Copy agent-produced logs from their source locations into the logs
+ * directory so they are persisted on the host alongside rover.jsonl.
+ */
+function collectAgentLogs(logsDir: string, agentTool?: string): void {
+  if (!agentTool) return;
+
+  let sources: string[];
+  try {
+    sources = createAgent(agentTool).getLogSources();
+  } catch {
+    return;
+  }
+  if (sources.length === 0) return;
+
+  const targetDir = join(logsDir, AGENT_LOGS_DIR);
+
+  for (const src of sources) {
+    if (!existsSync(src)) continue;
+    try {
+      mkdirSync(targetDir, { recursive: true });
+      cpSync(src, targetDir, { recursive: true });
+    } catch {
+      // Best-effort: don't fail the workflow for log collection errors
+    }
   }
 }
 
@@ -79,107 +109,60 @@ interface RunCommandOptions {
   statusFile?: string;
   // Optional output directory
   output?: string;
-  // Paths to pre-context JSON files
-  preContextFile: string[];
+  // Path to the context directory
+  contextDir?: string;
 }
 
 interface RunCommandOutput extends CommandOutput {}
 
 /**
- * Handles pre-context file loading, validation, and injection into workflow steps.
- * Skips injection on the first iteration.
+ * Build context injection message from the context directory.
+ * The context directory contains an index.md file and individual context source files.
  *
- * @param options - Run command options containing pre-context file paths
- * @param workflowManager - Workflow manager to inject pre-context into
- * @returns Array of validated pre-context file paths
+ * @param contextDir - Path to the context directory
+ * @returns Context message to prepend to prompts, or null if no context
  */
-const handlePreContextInjection = (
+function buildContextMessage(contextDir: string): string | null {
+  const indexPath = `${contextDir}/index.md`;
+  if (!existsSync(indexPath)) return null;
+
+  const lines = [
+    '\n\n**Context Sources:**',
+    `The context directory at \`${contextDir}/\` contains reference materials for this task.`,
+    `Read the index file at \`${contextDir}/index.md\` for a complete overview of all available context sources and their descriptions.`,
+    '',
+    '**Important:** Read the context index before proceeding with the task.',
+    '',
+  ];
+
+  return lines.join('\n');
+}
+
+/**
+ * Inject context sources into workflow step prompts.
+ * Reads from the context directory mounted at the path specified by --context-dir.
+ *
+ * @param options - Run command options
+ * @param workflowManager - Workflow manager to inject context into
+ */
+const handleContextInjection = (
   options: RunCommandOptions,
   workflowManager: WorkflowManager
-): string[] => {
-  const preContextFilePaths: string[] = [];
+): void => {
+  const contextDir = options.contextDir;
+  if (!contextDir || !existsSync(contextDir)) return;
 
-  // Load and validate pre-context files
-  if (options.preContextFile && options.preContextFile.length > 0) {
-    for (const preContextFilePath of options.preContextFile) {
-      if (!existsSync(preContextFilePath)) {
-        console.log(
-          colors.yellow(
-            `\n⚠ Pre-context file not found at ${preContextFilePath}. Skipping this file.`
-          )
-        );
-      } else {
-        try {
-          // Load and validate pre-context data using PreContextDataManager
-          const rawData = readFileSync(preContextFilePath, 'utf-8');
-          const parsedData = JSON.parse(rawData);
-          // Validate by creating a PreContextDataManager instance
-          new PreContextDataManager(parsedData, preContextFilePath);
+  const contextMessage = buildContextMessage(contextDir);
 
-          // Track the file path for later use
-          preContextFilePaths.push(preContextFilePath);
-        } catch (err) {
-          console.log(
-            colors.yellow(
-              `\n⚠ Failed to load pre-context file ${preContextFilePath}: ${err instanceof Error ? err.message : String(err)}. Skipping this file.`
-            )
-          );
-        }
-      }
+  if (contextMessage && workflowManager.steps.length > 0) {
+    console.log(
+      colors.gray('✓ Context sources injected into workflow steps\n')
+    );
+
+    for (const step of workflowManager.steps) {
+      step.prompt = contextMessage + step.prompt;
     }
   }
-
-  // Add pre-context file location information to all workflow steps
-  // Only inject if this is not the first iteration
-  if (preContextFilePaths.length > 0 && workflowManager.steps.length > 0) {
-    let shouldInjectPreContext = true;
-
-    // Check if this is the first iteration
-    const iterationFilePath = options.output
-      ? `${options.output}/iteration.json`
-      : '/output/iteration.json';
-
-    if (existsSync(iterationFilePath)) {
-      try {
-        const iterationData = JSON.parse(
-          readFileSync(iterationFilePath, 'utf-8')
-        );
-        if (iterationData.iteration === 1) {
-          shouldInjectPreContext = false;
-          console.log(
-            colors.gray(
-              '⚠ Skipping pre-context injection for first iteration\n'
-            )
-          );
-        }
-      } catch (err) {
-        console.log(
-          colors.yellow(
-            `\n⚠ Failed to read iteration file ${iterationFilePath}: ${err instanceof Error ? err.message : String(err)}. Proceeding with pre-context injection.`
-          )
-        );
-      }
-    }
-
-    if (shouldInjectPreContext) {
-      // Build the pre-context file paths message
-      const preContextMessage =
-        preContextFilePaths.length === 1
-          ? `\n\n**Note:** Pre-context information is available at: \`${preContextFilePaths[0]}\``
-          : `\n\n**Note:** Pre-context information is available at the following locations:\n${preContextFilePaths.map(path => `- \`${path}\``).join('\n')}`;
-
-      // Prepend pre-context file location to each step's prompt
-      for (const step of workflowManager.steps) {
-        console.log(
-          colors.gray(`✓ Pre-context file location added to step ${step.id}\n`)
-        );
-
-        step.prompt = preContextMessage + '\n\n---\n' + step.prompt;
-      }
-    }
-  }
-
-  return preContextFilePaths;
 };
 
 /**
@@ -188,7 +171,7 @@ const handlePreContextInjection = (
  */
 export const runCommand = async (
   workflowPath: string,
-  options: RunCommandOptions = { input: [], preContextFile: [] }
+  options: RunCommandOptions = { input: [] }
 ) => {
   const output: RunCommandOutput = {
     success: false,
@@ -197,6 +180,24 @@ export const runCommand = async (
   // Declare status manager outside try block so it's accessible in catch
   let statusManager: IterationStatusManager | undefined;
   let totalDuration = 0;
+
+  // Determine the logs directory. Prefer /logs (bind-mounted by the sandbox
+  // to the project-level logs directory), fall back to the output directory.
+  const logsDir = existsSync('/logs') ? '/logs' : options.output;
+
+  // Create JSONL logger for rover-specific structured logs.
+  let logger: JsonlLogger | undefined;
+  if (logsDir) {
+    try {
+      logger = new JsonlLogger(join(logsDir, ROVER_LOG_FILENAME));
+    } catch (error) {
+      console.log(
+        colors.yellow(
+          `Warning: Failed to initialize JSONL logger: ${error instanceof Error ? error.message : String(error)}`
+        )
+      );
+    }
+  }
 
   try {
     // Validate status tracking options
@@ -239,8 +240,8 @@ export const runCommand = async (
     // Load the agent workflow
     const workflowManager = WorkflowManager.load(workflowPath);
 
-    // Handle pre-context injection
-    handlePreContextInjection(options, workflowManager);
+    // Handle context sources injection
+    handleContextInjection(options, workflowManager);
 
     let providedInputs = new Map();
 
@@ -286,17 +287,20 @@ export const runCommand = async (
       }
     }
 
-    console.log(colors.bold('Agent Workflow'));
-    console.log(colors.gray('├── Name: ') + colors.cyan(workflowManager.name));
-    console.log(colors.gray('└── Description: ') + workflowManager.description);
+    showTitle('Agent Workflow');
+    showProperties({
+      Name: colors.cyan(workflowManager.name),
+      Description: workflowManager.description,
+    });
 
-    console.log(colors.bold('\nUser inputs'));
-    const inputEntries = Array.from(inputs.entries());
-    inputEntries.forEach(([key, value], idx) => {
-      const prefix = idx == inputEntries.length - 1 ? '└──' : '├──';
+    const inputItems = Array.from(inputs.entries()).map(([key, value]) => {
       const isDefault = defaultInputs.includes(key);
       const suffix = isDefault ? colors.gray(' (default)') : '';
-      console.log(`${prefix} ${key}=` + colors.cyan(`${value}`) + suffix);
+      return `${key}=${colors.cyan(String(value))}${suffix}`;
+    });
+    showList(inputItems, {
+      title: colors.bold('User inputs'),
+      addLineBreak: true,
     });
 
     // Validate inputs against workflow requirements
@@ -304,11 +308,10 @@ export const runCommand = async (
 
     // Display warnings if any
     if (validation.warnings.length > 0) {
-      console.log(colors.yellow.bold('\nWarnings'));
-      validation.warnings.forEach((warning, idx) => {
-        const prefix = idx == validation.warnings.length - 1 ? '└──' : '├──';
-        console.log(colors.yellow(`${prefix} ${warning}`));
-      });
+      showList(
+        validation.warnings.map((w: string) => colors.yellow(w)),
+        { title: colors.yellow.bold('Warnings'), addLineBreak: true }
+      );
     }
 
     // Check for validation errors
@@ -323,15 +326,27 @@ export const runCommand = async (
       const stepsOutput: Map<string, Map<string, string>> = new Map();
 
       // Print Steps
-      console.log(colors.bold('\nSteps'));
-      workflowManager.steps.forEach((step, idx) => {
-        const prefix = idx == workflowManager.steps.length - 1 ? '└──' : '├──';
-        console.log(`${prefix} ${idx}. ` + `${step.name}`);
-      });
+      showList(
+        workflowManager.steps.map((step, idx) => `${idx}. ${step.name}`),
+        { title: colors.bold('Steps'), addLineBreak: true }
+      );
 
       let runSteps = 0;
       const totalSteps = workflowManager.steps.length;
       const stepResults: RunnerStepResult[] = [];
+
+      // Log workflow start
+      logger?.info(
+        'workflow_start',
+        `Starting workflow: ${workflowManager.name}`,
+        {
+          taskId: options.taskId,
+          metadata: {
+            workflowName: workflowManager.name,
+            totalSteps,
+          },
+        }
+      );
 
       // Determine which tool to use
       // Priority: workflow defaults > CLI flag > fallback to claude
@@ -340,7 +355,8 @@ export const runCommand = async (
         options.agentTool || workflowManager.defaults?.tool || 'claude';
 
       // ACP usage decision: use ACP mode for agents that support it
-      const useACPMode = ['claude', 'gemini'].includes(tool.toLowerCase());
+      const acpEnabledTools = ['claude', 'gemini', 'copilot', 'opencode'];
+      const useACPMode = acpEnabledTools.includes(tool.toLowerCase());
 
       if (useACPMode) {
         console.log(colors.cyan('\n🔗 ACP Mode enabled'));
@@ -353,6 +369,7 @@ export const runCommand = async (
           defaultModel: options.agentModel,
           statusManager,
           outputDir: options.output,
+          logger,
         });
 
         try {
@@ -435,7 +452,8 @@ export const runCommand = async (
             options.agentModel,
             statusManager,
             totalSteps,
-            stepIndex
+            stepIndex,
+            logger
           );
 
           runSteps++;
@@ -477,35 +495,11 @@ export const runCommand = async (
       }
 
       // Display workflow completion summary
-      console.log(colors.bold('\n🎉 Workflow Execution Summary'));
-      console.log(
-        colors.gray('├── Duration: ') +
-          colors.cyan(totalDuration.toFixed(2) + 's')
-      );
-      console.log(
-        colors.gray('├── Total Steps: ') +
-          colors.cyan(workflowManager.steps.length.toString())
-      );
-
       const successfulSteps = Array.from(stepsOutput.keys()).length;
-      console.log(
-        colors.gray('├── Successful Steps: ') +
-          colors.green(successfulSteps.toString())
-      );
-
       const failedSteps = runSteps - successfulSteps;
-      console.log(
-        colors.gray('├── Failed Steps: ') + colors.red(failedSteps.toString())
-      );
-
       const skippedSteps = workflowManager.steps.length - runSteps;
-      console.log(
-        colors.gray('├── Skipped Steps: ') +
-          colors.yellow(failedSteps.toString())
-      );
 
       let status = colors.green('✓ Workflow Completed Successfully');
-
       if (failedSteps > 0) {
         status = colors.red('✗ Workflow Completed with Errors');
       } else if (skippedSteps > 0) {
@@ -514,14 +508,40 @@ export const runCommand = async (
           colors.yellow('(Some steps were skipped)');
       }
 
-      console.log(colors.gray('└── Status: ') + status);
+      showTitle('🎉 Workflow Execution Summary');
+      showProperties({
+        Duration: colors.cyan(totalDuration.toFixed(2) + 's'),
+        'Total Steps': colors.cyan(workflowManager.steps.length.toString()),
+        'Successful Steps': colors.green(successfulSteps.toString()),
+        'Failed Steps': colors.red(failedSteps.toString()),
+        'Skipped Steps': colors.yellow(skippedSteps.toString()),
+        Status: status,
+      });
 
       // Mark workflow as completed in status file
       if (failedSteps > 0) {
         output.success = false;
+        logger?.error('workflow_fail', 'Workflow completed with errors', {
+          taskId: options.taskId,
+          duration: totalDuration,
+          metadata: {
+            successfulSteps,
+            failedSteps,
+            skippedSteps,
+          },
+        });
       } else {
         output.success = true;
         statusManager?.complete('Workflow completed successfully');
+        logger?.info('workflow_complete', 'Workflow completed successfully', {
+          taskId: options.taskId,
+          duration: totalDuration,
+          metadata: {
+            successfulSteps,
+            failedSteps: 0,
+            skippedSteps,
+          },
+        });
       }
     }
   } catch (err) {
@@ -531,7 +551,19 @@ export const runCommand = async (
 
   if (!output.success) {
     statusManager?.fail('Workflow execution', output.error || 'Unknown error');
+    logger?.error('workflow_fail', output.error || 'Unknown error', {
+      taskId: options.taskId,
+      error: output.error,
+      duration: totalDuration,
+    });
 
     console.log(colors.red(`\n✗ ${output.error}`));
   }
+
+  // Collect agent-specific logs into the logs directory
+  if (logsDir) {
+    collectAgentLogs(logsDir, options.agentTool);
+  }
+
+  process.exit(output.success ? 0 : 1);
 };

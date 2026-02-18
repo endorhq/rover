@@ -1,6 +1,6 @@
 import colors from 'ansi-colors';
 import { existsSync } from 'node:fs';
-import { launch, launchSync } from 'rover-core';
+import { launch, launchSync, showTitle, showProperties } from 'rover-core';
 import yoctoSpinner from 'yocto-spinner';
 import { statusColor } from '../utils/task-status.js';
 import { TaskNotFoundError } from 'rover-schemas';
@@ -12,11 +12,21 @@ import {
   createSandbox,
   getAvailableSandboxBackend,
 } from '../lib/sandbox/index.js';
+import type { CommandDefinition } from '../types.js';
 
 /**
- * Start an interactive shell for testing task changes
+ * Open an interactive shell in a task's workspace for manual testing.
+ *
+ * Provides direct shell access to a task's git worktree, allowing users to
+ * manually test changes, run commands, or debug issues. Can run either as
+ * a local shell in the worktree directory or inside a sandboxed container
+ * matching the task's execution environment.
+ *
+ * @param taskId - The numeric task ID to open shell for
+ * @param options - Command options
+ * @param options.container - Run shell inside a sandboxed container instead of locally
  */
-export const shellCommand = async (
+const shellCommand = async (
   taskId: string,
   options: { container?: boolean }
 ) => {
@@ -55,10 +65,12 @@ export const shellCommand = async (
 
     const colorFunc = statusColor(task.status);
 
-    console.log(colors.bold('Task details'));
-    console.log(colors.gray('├── ID: ') + colors.cyan(task.id.toString()));
-    console.log(colors.gray('├── Title: ') + task.title);
-    console.log(colors.gray('└── Status: ') + colorFunc(task.status) + '\n');
+    showTitle('Task details');
+    showProperties({
+      ID: colors.cyan(task.id.toString()),
+      Title: task.title,
+      Status: colorFunc(task.status),
+    });
 
     // Check if worktree exists
     if (!task.worktreePath || !existsSync(task.worktreePath)) {
@@ -169,10 +181,14 @@ export const shellCommand = async (
       }
 
       try {
+        // Use detached: false for interactive shells to ensure proper TTY
+        // signal handling and job control. Without this, the terminal can
+        // get into a corrupted state when using job control (Ctrl+Z, fg, etc.)
         const shellInit = launch(shell, shellArgs, {
           stdio: 'inherit',
           cwd: task.worktreePath,
           reject: false,
+          detached: false,
         });
 
         spinner.success(`Shell started using ${shell}`);
@@ -213,3 +229,10 @@ export const shellCommand = async (
     await telemetry?.shutdown();
   }
 };
+
+export default {
+  name: 'shell',
+  description: 'Open interactive shell for testing task changes',
+  requireProject: true,
+  action: shellCommand,
+} satisfies CommandDefinition;

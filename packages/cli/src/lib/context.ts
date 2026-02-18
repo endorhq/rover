@@ -3,8 +3,14 @@
  * This module provides a cohesive context object for CLI state management.
  */
 
+import colors from 'ansi-colors';
 import path from 'node:path';
-import { type ProjectManager, ProjectStore } from 'rover-core';
+import {
+  findOrRegisterProject,
+  type ProjectManager,
+  ProjectStore,
+} from 'rover-core';
+import { isInteractiveTerminal } from '../utils/stdin.js';
 
 /**
  * CLI execution context
@@ -192,6 +198,16 @@ export async function resolveProjectContext(
 }
 
 /**
+ * Options for requireProjectContext
+ */
+export interface RequireProjectOptions {
+  /** If true, disable showing the interactive project selector */
+  disableProjectSelection?: boolean;
+  /** Missing project message */
+  missingProjectMessage?: string;
+}
+
+/**
  * Require a project context for a command.
  *
  * Use this for commands that cannot operate in global mode and require
@@ -199,18 +215,54 @@ export async function resolveProjectContext(
  * `--project` flag.
  *
  * @param projectOverride - Optional project identifier to override context
+ * @param options - Configuration options
  * @returns ProjectManager
  * @throws If no project context available
  */
 export async function requireProjectContext(
-  projectOverride?: string
+  projectOverride?: string,
+  options: RequireProjectOptions = {}
 ): Promise<ProjectManager> {
   const project = await resolveProjectContext(projectOverride);
   if (project) {
     return project;
   }
 
-  throw new Error(
-    'Not in a project. Run from a git repository or use --project option.'
-  );
+  // Check if we can show the interactive selector
+  const showSelector =
+    !options.disableProjectSelection &&
+    isInteractiveTerminal() &&
+    !isJsonMode();
+
+  if (showSelector) {
+    if (options.missingProjectMessage) {
+      console.log(`\n${options.missingProjectMessage}`);
+    }
+
+    // Break line.
+    console.log();
+
+    // Dynamic import to avoid loading enquirer during test setup
+    const { promptProjectSelection } = await import(
+      '../utils/project-selector.js'
+    );
+    const selectedProject = await promptProjectSelection();
+    if (selectedProject) {
+      // Update context with the selected project
+      setProject(selectedProject);
+      return selectedProject;
+    }
+    // User cancelled the selection
+    throw new Error('Project selection cancelled.');
+  }
+
+  if (projectOverride) {
+    throw new Error(
+      `Could not find project '${projectOverride}'. Please check the identifier and try again.`
+    );
+  } else {
+    throw new Error(
+      'This Rover command requires a project to run. You can:\n\n- Run it on a git repository folder (Rover will autoregister the project)\n- Use the --project option.\n- Set the ROVER_PROJECT environment variable.'
+    );
+  }
 }

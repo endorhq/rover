@@ -333,35 +333,6 @@ describe('list command', () => {
       // Project without tasks should not appear as a group header
       expect(output).not.toContain('empty-project');
     });
-
-    it('should warn that watch mode is not supported in global mode', async () => {
-      const task1 = createTestTask(1, 'Test Task');
-
-      const projectA: GlobalProject = {
-        id: 'project-a',
-        repositoryName: 'my-app',
-        path: '/path/to/my-app',
-        languages: [],
-        packageManagers: [],
-        taskManagers: [],
-        nextTaskId: 2,
-      };
-
-      mockProjects.push(projectA);
-      mockProjectManagers.set('project-a', {
-        id: 'project-a',
-        name: 'my-app',
-        path: '/path/to/my-app',
-        listTasks: () => [task1],
-      });
-
-      await listCommand({ watch: true });
-
-      const output = capturedOutput.join('\n');
-      expect(output).toContain(
-        'Watch mode is only supported when inside a project directory'
-      );
-    });
   });
 
   describe('JSON output', () => {

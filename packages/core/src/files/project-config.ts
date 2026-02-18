@@ -20,6 +20,7 @@ import {
   type HooksConfig,
   type NetworkConfig,
 } from 'rover-schemas';
+import { GlobalConfigManager } from './global-config.js';
 
 /**
  * Manager class for project configuration (rover.json)
@@ -32,11 +33,30 @@ export class ProjectConfigManager {
   ) {}
 
   /**
-   * Load an existing configuration from disk
-   * @param projectPath - The project root path where rover.json is located
+   * Load project configuration.
+   *
+   * When `rover.json` exists on disk, it is loaded and validated (current behaviour).
+   * When it does not exist, the project's `GlobalProject` entry is looked up and its
+   * `languages`, `packageManagers`, and `taskManagers` are used as defaults so that
+   * callers always receive a valid `ProjectConfigManager`.
+   *
+   * @param projectPath - The project root path where rover.json may be located
    */
   static load(projectPath: string): ProjectConfigManager {
     const projectRoot = projectPath;
+
+    if (ProjectConfigManager.exists(projectRoot)) {
+      return ProjectConfigManager.loadFromDisk(projectRoot);
+    }
+
+    // Infer defaults from the GlobalProject entry
+    return ProjectConfigManager.inferFromGlobalProject(projectRoot);
+  }
+
+  /**
+   * Load an existing configuration from disk.
+   */
+  private static loadFromDisk(projectRoot: string): ProjectConfigManager {
     const filePath = join(projectRoot, PROJECT_CONFIG_FILENAME);
 
     try {
@@ -74,6 +94,42 @@ export class ProjectConfigManager {
         );
       }
     }
+  }
+
+  /**
+   * Infer project configuration from the GlobalProject entry.
+   * Uses the project's languages, packageManagers, and taskManagers as defaults.
+   * Falls back to empty arrays if no GlobalProject entry is found.
+   */
+  private static inferFromGlobalProject(
+    projectRoot: string
+  ): ProjectConfigManager {
+    let languages: Language[] = [];
+    let packageManagers: PackageManager[] = [];
+    let taskManagers: TaskManager[] = [];
+
+    try {
+      const globalConfig = GlobalConfigManager.load();
+      const globalProject = globalConfig.getProjectByPath(projectRoot);
+      if (globalProject) {
+        languages = globalProject.languages as Language[];
+        packageManagers = globalProject.packageManagers as PackageManager[];
+        taskManagers = globalProject.taskManagers as TaskManager[];
+      }
+    } catch {
+      // If global config can't be loaded, fall back to empty defaults
+    }
+
+    const schema: ProjectConfig = {
+      version: CURRENT_PROJECT_SCHEMA_VERSION,
+      languages,
+      mcps: [],
+      packageManagers,
+      taskManagers,
+      attribution: true,
+    };
+
+    return new ProjectConfigManager(schema, projectRoot);
   }
 
   /**
@@ -144,6 +200,9 @@ export class ProjectConfigManager {
       ...(data.envsFile !== undefined ? { envsFile: data.envsFile } : {}),
       ...(sandbox !== undefined ? { sandbox } : {}),
       ...(data.hooks !== undefined ? { hooks: data.hooks } : {}),
+      ...(data.excludePatterns !== undefined
+        ? { excludePatterns: data.excludePatterns }
+        : {}),
     };
 
     return migrated;
@@ -169,7 +228,7 @@ export class ProjectConfigManager {
    * Reload configuration from disk
    */
   reload(): void {
-    const reloaded = ProjectConfigManager.load(this.projectRoot);
+    const reloaded = ProjectConfigManager.loadFromDisk(this.projectRoot);
     this.data = reloaded.data;
   }
 
@@ -212,6 +271,9 @@ export class ProjectConfigManager {
   }
   get network(): NetworkConfig | undefined {
     return this.data.sandbox?.network;
+  }
+  get excludePatterns(): string[] | undefined {
+    return this.data.excludePatterns;
   }
 
   // Data Modification (Setters)

@@ -2,6 +2,7 @@ import colors from 'ansi-colors';
 import enquirer from 'enquirer';
 import {
   Git,
+  showList,
   type TaskDescriptionManager,
   type ProjectManager,
 } from 'rover-core';
@@ -13,21 +14,29 @@ import {
   exitWithSuccess,
   exitWithWarn,
 } from '../utils/exit.js';
-import type { CLIJsonOutputWithErrors } from '../types.js';
+import type { TaskDeleteOutput } from '../output-types.js';
 import {
   isJsonMode,
   setJsonMode,
   requireProjectContext,
 } from '../lib/context.js';
+import type { CommandDefinition } from '../types.js';
 
 const { prompt } = enquirer;
 
 /**
- * Interface for JSON output
+ * Delete one or more tasks from a Rover project.
+ *
+ * This command permanently removes task metadata and associated git worktrees.
+ * It validates task IDs, shows a summary of tasks to be deleted, and prompts
+ * for confirmation before proceeding (unless --yes flag is used).
+ *
+ * @param taskIds - Array of task ID strings to delete
+ * @param options - Command options
+ * @param options.json - Output results in JSON format
+ * @param options.yes - Skip confirmation prompt
  */
-interface TaskDeleteOutput extends CLIJsonOutputWithErrors {}
-
-export const deleteCommand = async (
+const deleteCommand = async (
   taskIds: string[],
   options: { json?: boolean; yes?: boolean } = {}
 ) => {
@@ -114,20 +123,19 @@ export const deleteCommand = async (
       colors.bold(`Task${tasksToDelete.length > 1 ? 's' : ''} to delete`)
     );
 
-    tasksToDelete.forEach((task, index) => {
-      const colorFunc = statusColor(task.status);
-      const isLast = index === tasksToDelete.length - 1;
-      const prefix = isLast ? '└──' : '├──';
-
-      console.log(
-        colors.gray(`${prefix} ID: `) +
+    showList(
+      tasksToDelete.map(task => {
+        const colorFunc = statusColor(task.status);
+        return (
+          colors.gray('ID: ') +
           colors.cyan(task.id.toString()) +
           colors.gray(' | Title: ') +
           task.title +
           colors.gray(' | Status: ') +
           colorFunc(task.status)
-      );
-    });
+        );
+      })
+    );
 
     console.log(
       '\n' +
@@ -218,3 +226,13 @@ export const deleteCommand = async (
     await telemetry?.shutdown();
   }
 };
+
+// Named export for backwards compatibility (used by tests)
+export { deleteCommand };
+
+export default {
+  name: 'delete',
+  description: 'Delete a task',
+  requireProject: true,
+  action: deleteCommand,
+} satisfies CommandDefinition;

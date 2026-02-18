@@ -1,24 +1,24 @@
 import colors from 'ansi-colors';
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { launch, launchSync, type TaskDescriptionManager } from 'rover-core';
+import {
+  launch,
+  launchSync,
+  showTitle,
+  showProperties,
+  type TaskDescriptionManager,
+} from 'rover-core';
 import { TaskNotFoundError } from 'rover-schemas';
 import { getTelemetry } from '../lib/telemetry.js';
 import { showTips } from '../utils/display.js';
-import type { CLIJsonOutput } from '../types.js';
+import type { TaskLogsOutput } from '../output-types.js';
 import { exitWithError, exitWithWarn } from '../utils/exit.js';
 import {
   isJsonMode,
   setJsonMode,
   requireProjectContext,
 } from '../lib/context.js';
-
-/**
- * Interface for JSON output
- */
-interface TaskLogsOutput extends CLIJsonOutput {
-  logs: string;
-}
+import type { CommandDefinition } from '../types.js';
 
 /**
  * Get available iterations for a task
@@ -42,7 +42,20 @@ const getAvailableIterations = (task: TaskDescriptionManager): number[] => {
   }
 };
 
-export const logsCommand = async (
+/**
+ * Display execution logs for a Rover task iteration.
+ *
+ * Retrieves and displays the Docker container logs for a task's execution.
+ * Shows the AI agent's real-time activity including commands run, files modified,
+ * and progress updates. Supports following logs in real-time for running tasks.
+ *
+ * @param taskId - The numeric task ID to show logs for
+ * @param iterationNumber - Optional specific iteration number (defaults to latest)
+ * @param options - Command options
+ * @param options.follow - Follow log output in real-time (like tail -f)
+ * @param options.json - Output logs in JSON format
+ */
+const logsCommand = async (
   taskId: string,
   iterationNumber?: string,
   options: { follow?: boolean; json?: boolean } = {}
@@ -134,11 +147,11 @@ export const logsCommand = async (
 
     // Display header
     if (!isJsonMode()) {
-      console.log(colors.bold(`Task ${numericTaskId} Logs`));
-      console.log(colors.gray('├── Title: ') + task.title);
-      console.log(
-        colors.gray('└── Iteration: ') + colors.cyan(`#${actualIteration}`)
-      );
+      showTitle(`Task ${numericTaskId} Logs`);
+      showProperties({
+        Title: task.title,
+        Iteration: colors.cyan(`#${actualIteration}`),
+      });
     }
 
     telemetry?.eventLogs();
@@ -153,9 +166,23 @@ export const logsCommand = async (
       console.log(colors.gray('Following logs... (Press Ctrl+C to exit)'));
       console.log('');
 
+      const controller = new AbortController();
+      const cancelSignal = controller.signal;
+
+      // Register SIGINT handler before launching so Ctrl+C
+      // aborts the detached docker process
+      const sigintHandler = () => {
+        controller.abort();
+      };
+      process.on('SIGINT', sigintHandler);
+
       try {
-        const controller = new AbortController();
-        const cancelSignal = controller.signal;
+        // Build environment with stored DOCKER_HOST if available
+        const dockerHost = task.sandboxMetadata?.dockerHost;
+        const dockerEnv =
+          typeof dockerHost === 'string'
+            ? { ...process.env, DOCKER_HOST: dockerHost }
+            : process.env;
 
         const logsProcess = await launch(
           'docker',
@@ -164,6 +191,7 @@ export const logsCommand = async (
             stdout: ['inherit'],
             stderr: ['inherit'],
             cancelSignal,
+            env: dockerEnv,
           }
         );
 
@@ -177,15 +205,11 @@ export const logsCommand = async (
             )
           );
         }
-
-        // Handle process interruption (Ctrl+C)
-        process.on('SIGINT', () => {
-          console.log(colors.yellow('\n\n⚠ Stopping log following...'));
-          controller.abort();
-          process.exit(0);
-        });
       } catch (error: any) {
-        if (error.message.includes('No such container')) {
+        if (error.isCanceled) {
+          // Clean exit on Ctrl+C
+          console.log(colors.yellow('\n\n⚠ Stopping log following...'));
+        } else if (error.message?.includes('No such container')) {
           console.log(colors.yellow('⚠ Container no longer exists'));
           console.log(
             colors.gray('Cannot follow logs for a non-existent container')
@@ -194,12 +218,23 @@ export const logsCommand = async (
           console.log(colors.red('Error following Docker logs:'));
           console.log(colors.red(error.message));
         }
+      } finally {
+        process.removeListener('SIGINT', sigintHandler);
       }
     } else {
       // Get logs using docker logs command (one-time)
       try {
+        // Build environment with stored DOCKER_HOST if available
+        const dockerHostSync = task.sandboxMetadata?.dockerHost;
+        const dockerEnvSync =
+          typeof dockerHostSync === 'string'
+            ? { ...process.env, DOCKER_HOST: dockerHostSync }
+            : process.env;
+
         const logs =
-          launchSync('docker', ['logs', containerId])?.stdout?.toString() || '';
+          launchSync('docker', ['logs', containerId], {
+            env: dockerEnvSync,
+          })?.stdout?.toString() || '';
 
         if (logs.trim() === '') {
           await exitWithWarn(
@@ -285,3 +320,13 @@ export const logsCommand = async (
     await telemetry?.shutdown();
   }
 };
+
+// Named export for backwards compatibility (used by tests)
+export { logsCommand };
+
+export default {
+  name: 'logs',
+  description: 'Show execution logs for a task iteration',
+  requireProject: true,
+  action: logsCommand,
+} satisfies CommandDefinition;

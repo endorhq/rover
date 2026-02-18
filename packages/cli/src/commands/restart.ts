@@ -7,12 +7,15 @@ import {
   IterationManager,
   AI_AGENT,
   Git,
+  ProjectConfigManager,
+  showTitle,
+  showProperties,
   type ProjectManager,
 } from 'rover-core';
 import { TaskNotFoundError } from 'rover-schemas';
 import { exitWithError, exitWithSuccess } from '../utils/exit.js';
 import { createSandbox } from '../lib/sandbox/index.js';
-import type { CLIJsonOutput } from '../types.js';
+import type { TaskRestartOutput } from '../output-types.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import {
   isJsonMode,
@@ -21,22 +24,21 @@ import {
 } from '../lib/context.js';
 import yoctoSpinner from 'yocto-spinner';
 import { copyEnvironmentFiles } from '../utils/env-files.js';
+import type { CommandDefinition } from '../types.js';
 
 /**
- * Interface for JSON output
+ * Restart a task that is in NEW or FAILED status.
+ *
+ * Re-executes a task that either never started (NEW) or previously failed.
+ * Resets the task state, ensures the git worktree exists, and spawns a new
+ * sandboxed container to run the AI agent. Useful for retrying tasks after
+ * fixing configuration issues or transient failures.
+ *
+ * @param taskId - The numeric task ID to restart
+ * @param options - Command options
+ * @param options.json - Output results in JSON format
  */
-interface TaskRestartOutput extends CLIJsonOutput {
-  taskId?: number;
-  title?: string;
-  description?: string;
-  status?: string;
-  restartedAt?: string;
-}
-
-/**
- * Restart a task that is in NEW or FAILED status
- */
-export const restartCommand = async (
+const restartCommand = async (
   taskId: string,
   options: { json?: boolean } = {}
 ) => {
@@ -76,19 +78,46 @@ export const restartCommand = async (
       throw new TaskNotFoundError(numericTaskId);
     }
 
-    // Check if task is in NEW or FAILED status
+    // Check if task is in a restartable status
     if (!task.isNew() && !task.isFailed()) {
-      jsonOutput.error = `Task ${taskId} is not in NEW or FAILED status (current: ${task.status})`;
-      await exitWithError(jsonOutput, {
-        tips: [
-          'Only NEW and FAILED tasks can be restarted',
-          'Use ' +
-            colors.cyan(`rover inspect ${taskId}`) +
-            colors.gray(' to find out the current task status'),
-        ],
-        telemetry,
-      });
-      return;
+      if (task.isInProgress()) {
+        // Allow restarting IN_PROGRESS tasks if the container is dead
+        try {
+          const sandbox = await createSandbox(task, undefined, {
+            projectPath: project.path,
+          });
+          const state = await sandbox.inspect();
+          // Container is still running — reject the restart
+          if (state && state.status === 'running') {
+            jsonOutput.error = `Task ${taskId} is IN_PROGRESS and its container is still running`;
+            await exitWithError(jsonOutput, {
+              tips: [
+                'The container for this task is still running',
+                'Use ' +
+                  colors.cyan(`rover logs -f ${taskId}`) +
+                  colors.gray(' to watch the task logs'),
+              ],
+              telemetry,
+            });
+            return;
+          }
+          // Container is dead (exited or not found) — allow restart to proceed
+        } catch {
+          // If we can't inspect (e.g. no backend available), allow restart
+        }
+      } else {
+        jsonOutput.error = `Task ${taskId} is not in NEW or FAILED status (current: ${task.status})`;
+        await exitWithError(jsonOutput, {
+          tips: [
+            'Only NEW, FAILED, and stuck IN_PROGRESS tasks can be restarted',
+            'Use ' +
+              colors.cyan(`rover inspect ${taskId}`) +
+              colors.gray(' to find out the current task status'),
+          ],
+          telemetry,
+        });
+        return;
+      }
     }
 
     // Restart the task (resets to NEW status and tracks restart attempt)
@@ -131,6 +160,15 @@ export const restartCommand = async (
         // Copy user .env development files
         copyEnvironmentFiles(project.path, worktreePath);
 
+        // Configure sparse checkout to exclude files matching exclude patterns
+        const projectConfig = ProjectConfigManager.load(project.path);
+        if (
+          projectConfig.excludePatterns &&
+          projectConfig.excludePatterns.length > 0
+        ) {
+          git.setupSparseCheckout(worktreePath, projectConfig.excludePatterns);
+        }
+
         // Update task with workspace information
         task.setWorkspace(worktreePath, branchName);
 
@@ -157,21 +195,19 @@ export const restartCommand = async (
     }
 
     if (!isJsonMode()) {
-      console.log(colors.bold('Restarting Task'));
-      console.log(colors.gray('├── ID: ') + colors.cyan(task.id.toString()));
-      console.log(colors.gray('├── Title: ') + task.title);
-      console.log(colors.gray('├── Status: ') + colors.red(task.status));
-      console.log(colors.gray('├── Workspace: ') + colors.cyan(worktreePath));
-      console.log(colors.gray('├── Branch: ') + colors.cyan(branchName));
+      showTitle('Restarting Task');
+      const props: Record<string, string> = {
+        ID: colors.cyan(task.id.toString()),
+        Title: task.title,
+        Status: colors.red(task.status),
+        Workspace: colors.cyan(worktreePath),
+        Branch: colors.cyan(branchName),
+      };
       if (process.env.ROVER_AGENT_IMAGE) {
-        console.log(
-          colors.gray('├── Agent Image: ') +
-            colors.cyan(process.env.ROVER_AGENT_IMAGE)
-        );
-        console.log(colors.gray('└── Reset to: ') + colors.yellow('NEW'));
-      } else {
-        console.log(colors.gray('└── Reset to: ') + colors.yellow('NEW'));
+        props['Agent Image'] = colors.cyan(process.env.ROVER_AGENT_IMAGE);
       }
+      props['Reset to'] = colors.yellow('NEW');
+      showProperties(props);
       console.log(colors.green('\n✓ Task reset successfully'));
       console.log('');
     }
@@ -182,7 +218,7 @@ export const restartCommand = async (
     // Track restart event
     telemetry?.eventRestartTask();
 
-    // Check if user provided a custom agent image via environment variable
+    // Override agent image from environment variable if set
     if (process.env.ROVER_AGENT_IMAGE) {
       task.setAgentImage(process.env.ROVER_AGENT_IMAGE);
     }
@@ -191,11 +227,21 @@ export const restartCommand = async (
     try {
       const sandbox = await createSandbox(task, undefined, {
         projectPath: project.path,
+        iterationLogsPath: project.getTaskIterationLogsPath(
+          task.id,
+          task.iterations
+        ),
       });
       const containerId = await sandbox.createAndStart();
 
       // Update task metadata with new container ID
-      task.setContainerInfo(containerId, 'running');
+      task.setContainerInfo(
+        containerId,
+        'running',
+        process.env.DOCKER_HOST
+          ? { dockerHost: process.env.DOCKER_HOST }
+          : undefined
+      );
     } catch (error) {
       // If sandbox execution fails, reset task back to NEW status
       task.resetToNew();
@@ -241,3 +287,13 @@ export const restartCommand = async (
     await telemetry?.shutdown();
   }
 };
+
+// Named export for backwards compatibility (used by tests)
+export { restartCommand };
+
+export default {
+  name: 'restart',
+  description: 'Restart a new, failed, or stuck in-progress task',
+  requireProject: true,
+  action: restartCommand,
+} satisfies CommandDefinition;

@@ -2,10 +2,15 @@ import colors from 'ansi-colors';
 import enquirer from 'enquirer';
 import yoctoSpinner from 'yocto-spinner';
 import { existsSync } from 'node:fs';
-import { ProjectConfigManager, Git } from 'rover-core';
+import {
+  ProjectConfigManager,
+  Git,
+  showTitle,
+  showProperties,
+} from 'rover-core';
 import { TaskNotFoundError } from 'rover-schemas';
 import { getTelemetry } from '../lib/telemetry.js';
-import type { CLIJsonOutput } from '../types.js';
+import type { TaskPushOutput } from '../output-types.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
 import {
   isJsonMode,
@@ -15,6 +20,7 @@ import {
 import { showRoverChat, TIP_TITLES } from '../utils/display.js';
 import { statusColor } from '../utils/task-status.js';
 import { executeHooks } from '../lib/hooks.js';
+import type { CommandDefinition } from '../types.js';
 
 const { prompt } = enquirer;
 
@@ -32,8 +38,7 @@ const getGitHubRepoInfo = (
 ): { owner: string; repo: string } | null => {
   // Handle various GitHub URL formats
   const patterns = [
-    /github\.com[:/]([^/]+)\/([^/.]+)(\.git)?$/,
-    /^git@github\.com:([^/]+)\/([^/.]+)(\.git)?$/,
+    /github[^:/]*[:/]([^/]+)\/([^/.]+)(\.git)?$/,
     /^https?:\/\/github\.com\/([^/]+)\/([^/.]+)(\.git)?$/,
   ];
 
@@ -47,27 +52,28 @@ const getGitHubRepoInfo = (
   return null;
 };
 
-interface PushResult extends CLIJsonOutput {
-  taskId: number;
-  taskTitle: string;
-  branchName: string;
-  hasChanges: boolean;
-  committed: boolean;
-  commitMessage?: string;
-  pushed: boolean;
-}
-
 /**
- * Push command implementation
+ * Commit and push a task's changes to the remote repository.
+ *
+ * Stages all changes in the task worktree, commits them with a provided or
+ * prompted message (including Rover co-author attribution if enabled), and
+ * pushes the task branch to the remote. Sets up upstream tracking if needed.
+ * Triggers onPush hooks after successful pushes.
+ *
+ * @param taskId - The numeric task ID to push
+ * @param options - Command options
+ * @param options.message - Commit message (prompts if not provided)
+ * @param options.pr - Reserved for future GitHub PR creation support
+ * @param options.json - Output results in JSON format
  */
-export const pushCommand = async (taskId: string, options: PushOptions) => {
+const pushCommand = async (taskId: string, options: PushOptions) => {
   if (options.json !== undefined) {
     setJsonMode(options.json);
   }
 
   const telemetry = getTelemetry();
   const json = options.json === true;
-  const result: PushResult = {
+  const result: TaskPushOutput = {
     success: false,
     taskId: 0,
     taskTitle: '',
@@ -103,13 +109,7 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
   let projectConfig;
 
   // Load config
-  try {
-    projectConfig = ProjectConfigManager.load(project.path);
-  } catch (err) {
-    if (!isJsonMode()) {
-      console.log(colors.yellow('⚠ Could not load project settings'));
-    }
-  }
+  projectConfig = ProjectConfigManager.load(project.path);
 
   try {
     // Load task using ProjectManager
@@ -132,11 +132,13 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
 
       const colorFunc = statusColor(task.status);
 
-      console.log(colors.bold('Push task changes'));
-      console.log(colors.gray('├── ID: ') + colors.cyan(task.id.toString()));
-      console.log(colors.gray('├── Title: ') + task.title);
-      console.log(colors.gray('├── Branch: ') + task.branchName);
-      console.log(colors.gray('└── Status: ') + colorFunc(task.status) + '\n');
+      showTitle('Push task changes');
+      showProperties({
+        ID: colors.cyan(task.id.toString()),
+        Title: task.title,
+        Branch: task.branchName,
+        Status: colorFunc(task.status),
+      });
     }
 
     // Check for changes
@@ -401,3 +403,10 @@ export const pushCommand = async (taskId: string, options: PushOptions) => {
     await telemetry?.shutdown();
   }
 };
+
+export default {
+  name: 'push',
+  description: 'Commit and push task changes to remote, with GitHub PR support',
+  requireProject: true,
+  action: pushCommand,
+} satisfies CommandDefinition;

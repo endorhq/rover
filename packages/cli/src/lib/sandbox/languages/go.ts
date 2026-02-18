@@ -6,7 +6,7 @@ export class GoSandboxPackage extends SandboxPackage {
 
   installScript(): string {
     // Install go
-    return `sudo apk add --no-cache go`;
+    return `sudo apt-get install -y --no-install-recommends golang-go`;
   }
 
   initScript(): string {

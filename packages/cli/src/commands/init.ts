@@ -3,13 +3,19 @@ import { join, resolve } from 'node:path';
 import colors from 'ansi-colors';
 import ora from 'ora';
 import enquirer from 'enquirer';
-import { detectEnvironment, Git, type EnvironmentResult } from 'rover-core';
+import {
+  detectEnvironment,
+  Git,
+  showList,
+  type EnvironmentResult,
+} from 'rover-core';
 import {
   checkClaude,
   checkCodex,
   checkCursor,
   checkDocker,
   checkGemini,
+  checkOpenCode,
   checkQwen,
   checkGit,
 } from '../utils/system.js';
@@ -19,8 +25,10 @@ import {
   AI_AGENT,
 } from 'rover-core';
 import { showRoverChat, showTips, TIP_TITLES } from '../utils/display.js';
+import { selectPromptActions } from '../utils/prompt-actions.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { exitWithError, exitWithWarn, exitWithSuccess } from '../utils/exit.js';
+import type { CommandDefinition } from '../types.js';
 
 // Get the default prompt
 const { prompt } = enquirer;
@@ -84,12 +92,18 @@ const ensureGitignore = async (projectPath: string): Promise<void> => {
 };
 
 /**
- * Init the project
+ * Initialize Rover in a git repository.
+ *
+ * Sets up the project configuration (rover.json) and user settings (.rover/settings.json)
+ * required to use Rover. The command performs system checks to verify Git, Docker, and
+ * AI agent availability (Claude, Codex, Cursor, Gemini, Qwen), detects the project's
+ * programming languages and package managers, and configures the default AI agent.
+ *
+ * @param path - Path to the project root (defaults to current directory)
+ * @param options - Command options
+ * @param options.yes - Skip interactive prompts and use defaults
  */
-export const initCommand = async (
-  path: string = '.',
-  options: { yes?: boolean }
-) => {
+const initCommand = async (path: string = '.', options: { yes?: boolean }) => {
   const telemetry = getTelemetry();
   const resolvedPath = resolve(path);
   const git = new Git({ cwd: resolvedPath });
@@ -149,10 +163,18 @@ export const initCommand = async (
 
   const qwenInstalled = await checkQwen();
 
+  reqSpinner.text = 'Checking OpenCode';
+
+  const opencodeInstalled = await checkOpenCode();
+
   const completeInstallation =
     gitInstalled &&
     dockerInstalled &&
-    (claudeInstalled || codexInstalled || geminiInstalled || qwenInstalled);
+    (claudeInstalled ||
+      codexInstalled ||
+      geminiInstalled ||
+      opencodeInstalled ||
+      qwenInstalled);
 
   if (completeInstallation) {
     reqSpinner.succeed('Your system is ready!');
@@ -160,29 +182,27 @@ export const initCommand = async (
     reqSpinner.fail('Your system misses some required tools');
   }
 
-  console.log(colors.bold('\nRequired Tools'));
-  console.log(
-    `├── Git: ${gitInstalled ? colors.green('✓ Installed') : colors.red('✗ Missing')}`
-  );
-  console.log(
-    `└── Docker: ${dockerInstalled ? colors.green('✓ Installed') : colors.red('✗ Missing')}`
+  const statusLabel = (installed: boolean) =>
+    installed ? colors.green('✓ Installed') : colors.red('✗ Missing');
+
+  showList(
+    [
+      `Git: ${statusLabel(gitInstalled)}`,
+      `Docker: ${statusLabel(dockerInstalled)}`,
+    ],
+    { title: colors.bold('Required Tools'), addLineBreak: true }
   );
 
-  console.log(colors.bold('\nAI Agents (at least one)'));
-  console.log(
-    `├── Claude: ${claudeInstalled ? colors.green('✓ Installed') : colors.red('✗ Missing')}`
-  );
-  console.log(
-    `├── Codex: ${codexInstalled ? colors.green('✓ Installed') : colors.red('✗ Missing')}`
-  );
-  console.log(
-    `├── Cursor: ${cursorInstalled ? colors.green('✓ Installed') : colors.red('✗ Missing')}`
-  );
-  console.log(
-    `├── Gemini: ${geminiInstalled ? colors.green('✓ Installed') : colors.red('✗ Missing')}`
-  );
-  console.log(
-    `└── Qwen: ${qwenInstalled ? colors.green('✓ Installed') : colors.red('✗ Missing')}`
+  showList(
+    [
+      `Claude: ${statusLabel(claudeInstalled)}`,
+      `Codex: ${statusLabel(codexInstalled)}`,
+      `Cursor: ${statusLabel(cursorInstalled)}`,
+      `Gemini: ${statusLabel(geminiInstalled)}`,
+      `OpenCode: ${statusLabel(opencodeInstalled)}`,
+      `Qwen: ${statusLabel(qwenInstalled)}`,
+    ],
+    { title: colors.bold('AI Agents (at least one)'), addLineBreak: true }
   );
 
   if (!completeInstallation) {
@@ -219,11 +239,10 @@ export const initCommand = async (
   try {
     await ensureGitignore(projectRoot);
   } catch (error) {
-    console.log(colors.bold('\n.gitignore'));
-    console.log(
-      `└── ${colors.yellow('⚠ Could not update .gitignore:')}`,
-      error
-    );
+    showList([`${colors.yellow('⚠ Could not update .gitignore:')} ${error}`], {
+      title: colors.bold('.gitignore'),
+      addLineBreak: true,
+    });
   }
 
   // Detect environment
@@ -254,6 +273,10 @@ export const initCommand = async (
       availableAgents.push(AI_AGENT.Qwen);
     }
 
+    if (opencodeInstalled) {
+      availableAgents.push(AI_AGENT.OpenCode);
+    }
+
     // If multiple AI agents are available, ask user to select one
     if (availableAgents.length > 1 && !options.yes) {
       try {
@@ -265,7 +288,8 @@ export const initCommand = async (
             name: agent.charAt(0).toUpperCase() + agent.slice(1),
             value: agent,
           })),
-        })) as { aiAgent: string };
+          actions: selectPromptActions,
+        } as Parameters<typeof prompt>[0])) as { aiAgent: string };
 
         defaultAIAgent = result?.aiAgent.toLocaleLowerCase() as AI_AGENT;
       } catch (error) {
@@ -286,18 +310,17 @@ export const initCommand = async (
     let attribution = true;
 
     if (!options.yes) {
-      console.log(colors.bold('\nAttribution'));
       // Confirm attribution
-      console.log(
-        colors.gray(
-          '├── Rover can add itself as a co-author on commits it helps create'
-        )
+      showList(
+        [
+          colors.gray(
+            'Rover can add itself as a co-author on commits it helps create'
+          ),
+          colors.gray('This helps track AI-assisted work in your repository'),
+        ],
+        { title: colors.bold('Attribution'), addLineBreak: true }
       );
-      console.log(
-        colors.gray(
-          '└── This helps track AI-assisted work in your repository\n'
-        )
-      );
+      console.log('');
       try {
         const { confirm } = await prompt<{ confirm: boolean }>({
           type: 'confirm',
@@ -371,10 +394,10 @@ export const initCommand = async (
       }
 
       console.log(colors.green('✓ Rover initialization complete!'));
-      console.log(`├── ${colors.gray('Project config:')} rover.json`);
-      console.log(
-        `└── ${colors.gray('User settings:')} .rover/settings.json (.rover/settings.local.json added to .gitignore)`
-      );
+      showList([
+        `${colors.gray('Project config:')} rover.json`,
+        `${colors.gray('User settings:')} .rover/settings.json (.rover/settings.local.json added to .gitignore)`,
+      ]);
 
       showTips(
         [
@@ -415,3 +438,13 @@ export const initCommand = async (
     return;
   }
 };
+
+// Named export for backwards compatibility (used by tests)
+export { initCommand };
+
+export default {
+  name: 'init',
+  description: 'Create a shared configuration for this project',
+  requireProject: false,
+  action: initCommand,
+} satisfies CommandDefinition;

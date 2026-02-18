@@ -21,7 +21,7 @@ import {
   WriteTextFileResponse,
 } from '@agentclientprotocol/sdk';
 import colors from 'ansi-colors';
-import { execa, parseCommandString, type ResultPromise } from 'execa';
+import { execa, type ResultPromise } from 'execa';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { generateRandomId, VERBOSE } from 'rover-core';
@@ -306,20 +306,15 @@ export class ACPClient implements Client {
 
     // Split command into executable and arguments if args not provided
     let command: string;
-    let args: string[];
 
     if (params.args && params.args.length > 0) {
       // Args explicitly provided, use command as-is
-      command = params.command;
-      args = params.args;
+      command = `${params.command} ${params.args}`;
     } else {
-      // No args provided, split the command string using execa's parser
-      const [parsedCommand, ...parsedArgs] = parseCommandString(params.command);
-      command = parsedCommand;
-      args = parsedArgs;
+      command = params.command;
     }
 
-    const childProcess = execa(command, args, {
+    const childProcess = execa('bash', ['-c', command], {
       cwd: params.cwd ?? undefined,
       env: envObj,
       reject: false,
@@ -429,6 +424,12 @@ export class ACPClient implements Client {
     );
 
     const state = terminals.get(params.terminalId);
+
+    if (VERBOSE) {
+      console.log('Terminal output:');
+      console.log(colors.gray(state?.output || 'No output'));
+    }
+
     if (!state) {
       console.log(
         colors.red(

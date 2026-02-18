@@ -58,6 +58,7 @@ export {
   getConfigDir,
   getDataDir,
   getCacheDir,
+  getProjectLogsDir,
   ensureDirectories,
 } from './paths.js';
 
@@ -87,7 +88,47 @@ export {
   WorkflowStoreError,
   WorkflowSource,
   WorkflowManager,
+  JsonlLogger,
   type WorkflowMetadata,
   type AddWorkflowResult,
   type WorkflowEntry,
 } from './files/index.js';
+
+// Context providers
+export {
+  // Types
+  type ContextEntry,
+  type ContextProvider,
+  type ContextProviderClass,
+  type ProviderOptions,
+  type BaseContextMetadata,
+  type IssueMetadata,
+  type PRMetadata,
+  type PRDiffMetadata,
+  type FileMetadata,
+  type HTTPSResourceMetadata,
+  type ContextMetadata,
+  type ContextManagerOptions,
+  type ContextIndexOptions,
+  // Errors
+  ContextError,
+  ContextSchemeNotSupportedError,
+  ContextUriParseError,
+  ContextTypeNotSupportedError,
+  ContextFetchError,
+  // Registry
+  registerContextProvider,
+  createContextProvider,
+  isContextSchemeSupported,
+  getRegisteredSchemes,
+  clearContextProviders,
+  // Providers
+  registerBuiltInProviders,
+  LocalFileProvider,
+  GitHubProvider,
+  HTTPSProvider,
+  // Manager
+  ContextManager,
+  // Index Generator
+  generateContextIndex,
+} from './context/index.js';

@@ -6,8 +6,7 @@ export class RustSandboxPackage extends SandboxPackage {
 
   installScript(): string {
     // Install rust
-    return `sudo apk add --no-cache rustup
-rustup-init -y`;
+    return `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y`;
   }
 
   initScript(): string {

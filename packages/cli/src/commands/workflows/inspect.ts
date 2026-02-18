@@ -21,8 +21,9 @@ import {
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { getTelemetry } from '../../lib/telemetry.js';
-import { isJsonMode, setJsonMode } from '../../lib/context.js';
+import { getProjectPath, isJsonMode, setJsonMode } from '../../lib/context.js';
 import { readFromStdin } from '../../utils/stdin.js';
+import type { CommandDefinition } from '../../types.js';
 
 interface InspectWorkflowCommandOptions {
   // Output formats
@@ -140,7 +141,7 @@ function cleanupTempFile(filePath: string): void {
  * @param workflowSource Name, URL, or file path of the workflow to inspect
  * @param options Options to modify the output
  */
-export const inspectWorkflowCommand = async (
+const inspectWorkflowCommand = async (
   workflowSource: string,
   options: InspectWorkflowCommandOptions
 ) => {
@@ -254,10 +255,12 @@ export const inspectWorkflowCommand = async (
       }
     } else {
       // Load by workflow name
-      const workflowStore = initWorkflowStore();
-      workflow = workflowStore.getWorkflow(workflowSource);
+      const workflowStore = initWorkflowStore(
+        getProjectPath() ?? process.cwd()
+      );
+      const entry = workflowStore.getWorkflowEntry(workflowSource);
 
-      if (!workflow) {
+      if (!entry) {
         if (isJsonMode()) {
           console.log(
             JSON.stringify(
@@ -281,7 +284,8 @@ export const inspectWorkflowCommand = async (
         }
         return;
       }
-      sourceOrigin = 'built-in';
+      workflow = entry.workflow;
+      sourceOrigin = entry.source;
     }
 
     // Handle --raw flag: output workflow as YAML
@@ -431,3 +435,14 @@ export const inspectWorkflowCommand = async (
     await telemetry?.shutdown();
   }
 };
+
+// Named export for backwards compatibility (used by tests)
+export { inspectWorkflowCommand };
+
+export default {
+  name: 'inspect',
+  parent: 'workflows',
+  description: 'Display detailed information about a specific workflow',
+  requireProject: false,
+  action: inspectWorkflowCommand,
+} satisfies CommandDefinition;

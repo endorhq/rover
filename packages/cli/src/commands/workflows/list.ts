@@ -4,29 +4,15 @@
 import colors from 'ansi-colors';
 import { initWorkflowStore } from '../../lib/workflow.js';
 import { Table, TableColumn, WorkflowSource } from 'rover-core';
-import { CLIJsonOutput } from '../../types.js';
+import type { ListWorkflowsOutput } from '../../output-types.js';
 import { exitWithError, exitWithSuccess } from '../../utils/exit.js';
-import { Workflow } from 'rover-schemas';
 import { getTelemetry } from '../../lib/telemetry.js';
-import { isJsonMode, setJsonMode } from '../../lib/context.js';
+import { getProjectPath, isJsonMode, setJsonMode } from '../../lib/context.js';
+import type { CommandDefinition } from '../../types.js';
 
 interface ListWorkflowsCommandOptions {
   // Output format
   json: boolean;
-}
-
-/**
- * Interface for workflow data with source for JSON output
- */
-interface WorkflowWithSource extends Workflow {
-  source: WorkflowSource;
-}
-
-/**
- * Interface for JSON output
- */
-interface ListWorkflowsOutput extends CLIJsonOutput {
-  workflows: WorkflowWithSource[];
 }
 
 /**
@@ -45,15 +31,13 @@ interface WorkflowRow {
  *
  * @param options Options to modify the output
  */
-export const listWorkflowsCommand = async (
-  options: ListWorkflowsCommandOptions
-) => {
+const listWorkflowsCommand = async (options: ListWorkflowsCommandOptions) => {
   const telemetry = getTelemetry();
   if (options.json !== undefined) {
     setJsonMode(options.json);
   }
 
-  const workflowStore = initWorkflowStore();
+  const workflowStore = initWorkflowStore(getProjectPath() ?? process.cwd());
   const output: ListWorkflowsOutput = {
     success: false,
     workflows: [],
@@ -122,6 +106,9 @@ export const listWorkflowsCommand = async (
           };
         });
 
+      // Add a breakline
+      console.log();
+
       // Render the table
       const table = new Table(columns);
       table.render(rows);
@@ -135,3 +122,11 @@ export const listWorkflowsCommand = async (
     await telemetry?.shutdown();
   }
 };
+
+export default {
+  name: 'list',
+  parent: 'workflows',
+  description: 'List all available workflows',
+  requireProject: false,
+  action: listWorkflowsCommand,
+} satisfies CommandDefinition;

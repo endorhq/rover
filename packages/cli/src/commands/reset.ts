@@ -2,16 +2,35 @@ import colors from 'ansi-colors';
 import enquirer from 'enquirer';
 import { existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { launchSync, type ProjectManager } from 'rover-core';
+import {
+  launchSync,
+  showTitle,
+  showProperties,
+  showList,
+  type ProjectManager,
+} from 'rover-core';
 import yoctoSpinner from 'yocto-spinner';
 import { TaskNotFoundError } from 'rover-schemas';
 import { getTelemetry } from '../lib/telemetry.js';
 import { exitWithError, exitWithWarn, exitWithSuccess } from '../utils/exit.js';
 import { requireProjectContext } from '../lib/context.js';
+import type { CommandDefinition } from '../types.js';
 
 const { prompt } = enquirer;
 
-export const resetCommand = async (
+/**
+ * Reset a task to its initial state, removing all progress.
+ *
+ * Completely resets a task by removing its git worktree, branch, and any
+ * iteration data. This is a destructive operation that cannot be undone.
+ * Useful for starting fresh when a task has gone off track or when the
+ * workspace needs to be recreated.
+ *
+ * @param taskId - The numeric task ID to reset
+ * @param options - Command options
+ * @param options.force - Skip confirmation prompt
+ */
+const resetCommand = async (
   taskId: string,
   options: { force?: boolean } = {}
 ) => {
@@ -52,25 +71,31 @@ export const resetCommand = async (
     }
     const taskPath = project.getTaskPath(numericTaskId);
 
-    console.log(colors.bold('\n🔄 Reset Task\n'));
-    console.log(colors.gray('ID: ') + colors.cyan(taskId));
-    console.log(colors.gray('Title: ') + task.title);
-    console.log(colors.gray('Status: ') + colors.yellow(task.status));
+    showTitle('🔄 Reset Task');
 
+    const props: Record<string, string> = {
+      ID: colors.cyan(taskId),
+      Title: task.title,
+      Status: colors.yellow(task.status),
+    };
     if (existsSync(task.worktreePath)) {
-      console.log(colors.gray('Workspace: ') + colors.cyan(task.worktreePath));
+      props['Workspace'] = colors.cyan(task.worktreePath);
     }
     if (task.branchName) {
-      console.log(colors.gray('Branch: ') + colors.cyan(task.branchName));
+      props['Branch'] = colors.cyan(task.branchName);
     }
+    showProperties(props);
 
-    console.log(colors.red('\nThis will:'));
-    console.log(colors.red('  • Reset task status to NEW'));
-    console.log(colors.red('  • Remove the git workspace'));
-    console.log(colors.red('  • Remove the iterations metadata'));
-    console.log(colors.red('  • Delete the git branch'));
-    console.log(colors.red('  • Clear all execution metadata'));
-    console.log('');
+    showList(
+      [
+        colors.red('Reset task status to NEW'),
+        colors.red('Remove the git workspace'),
+        colors.red('Remove the iterations metadata'),
+        colors.red('Delete the git branch'),
+        colors.red('Clear all execution metadata'),
+      ],
+      { title: colors.red('This will:'), addLineBreak: true }
+    );
 
     // Confirm reset unless force flag is used
     if (!options.force) {
@@ -179,3 +204,10 @@ export const resetCommand = async (
     }
   }
 };
+
+export default {
+  name: 'reset',
+  description: 'Reset a task to original state and remove any worktree/branch',
+  requireProject: true,
+  action: resetCommand,
+} satisfies CommandDefinition;

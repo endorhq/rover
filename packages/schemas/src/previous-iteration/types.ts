@@ -3,8 +3,8 @@
  * All types are inferred from Zod schemas to ensure consistency
  */
 
-import { z } from 'zod';
-import { PreviousIterationSchema } from './schema.js';
+import type { z } from 'zod';
+import type { PreviousIterationSchema } from './schema.js';
 
 /**
  * Type representing information about a previous iteration

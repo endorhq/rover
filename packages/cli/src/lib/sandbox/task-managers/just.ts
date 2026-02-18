@@ -5,8 +5,7 @@ export class JustSandboxPackage extends SandboxPackage {
   name = 'just';
 
   installScript(): string {
-    // Install just command runner
-    return `sudo apk add just`;
+    return `sudo apt-get install -y --no-install-recommends just`;
   }
 
   initScript(): string {

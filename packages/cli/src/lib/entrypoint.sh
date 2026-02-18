@@ -7,7 +7,7 @@
 # @see https://github.com/sindresorhus/pupa
 
 # Define the agent user home
-if [[ -z "$\\{HOME\\}" ]]; then
+if [[ -z "$\{HOME\}" ]]; then
   export HOME=/home/$(id -u)
 fi
 
@@ -16,18 +16,8 @@ fi
 # available in the $PATH.
 export PATH=/root/local/.bin:$PATH
 
-# Initially, use sudo to ensure even users without permissions can
-# create this. Once we finish the setup, we will reduce the sudo
-# permissions to the minimal.
-sudo mkdir -p $HOME
-sudo mkdir -p $HOME/.config
-sudo mkdir -p $HOME/.local/bin
-echo 'export PATH="$HOME/.local/bin:$HOME/.local/npm/bin:$PATH"' >> $HOME/.profile
-sudo chown -R $(id -u):$(id -g) $HOME
-sudo chown -R $(id -u):$(id -g) /workspace
-sudo chown -R $(id -u):$(id -g) /output
-
-source $HOME/.profile
+{aptGetUpdate}
+{homeSetup}
 
 # Function to shred secrets before exit
 shred_secrets() {
@@ -133,59 +123,11 @@ done
 echo "✅ Package manager MCP is ready"
 {taskDataSection}
 {installAllPackages}
-
-# Agent-specific CLI installation and credential setup
-echo -e "\n📦 Installing Agent CLI and setting up credentials"
-# Pass the environment variables to ensure it loads the right credentials
-sudo -E rover-agent install $AGENT --user-dir $HOME
-# Set the right permissions after installing and moving credentials
-sudo chown -R $(id -u):$(id -g) $HOME
-
-if [ $? -eq 0 ]; then
-    echo "✅ $AGENT was installed successfully."
-else
-    echo "❌ $AGENT could not be installed"
-    safe_exit 1
-fi
-
-echo -e "\n📦 Done installing agent"
-
-echo -e "\n📦 Installing MCP servers"
-# Configure built-in MCPs
-rover-agent config mcp $AGENT package-manager --transport "http" http://127.0.0.1:8090/mcp
-
-# Configure MCPs from rover.json if mcps array exists
-#
-# TODO(ereslibre): replace with `rover-agent config mcps` that by
-# default will read /workspace/rover.json.
-configure_all_mcps() {
-  # Fail as soon as the configuration of one of the provided MCP's
-  # fail. This is because results might not be close to what the user
-  # expects without the required MCP's.
-
-  set -e
-  trap 'warn_mcp_configuration_failed; return 1' ERR
-
-  {configureAllMCPCommands}
-
-  trap - ERR
-  set +e
-}
-
-warn_mcp_configuration_failed() {
-  echo "❌ Failed to configure MCP servers"
-  safe_exit 1
-}
-
-configure_all_mcps
-
-echo -e "\n📦 Done installing MCP servers"
+{agentInstallSection}
+{mcpConfigSection}
 {exportTaskVariables}
 {networkConfigSection}
-# Remove ourselves from sudoers
-echo -e "\n👤 Removing privileges after completing the setup!"
-sudo rm /etc/sudoers.d/1-agent-setup
-
+{sudoersRemoval}
 {initScriptExecution}
 {workflowExecutionSection}
 # Capture the CMD exit and ensure we recover the result!

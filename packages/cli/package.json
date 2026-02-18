@@ -41,7 +41,9 @@
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
-    "e2e-test": "pnpm build && vitest --config vitest.e2e.config.ts --run"
+    "e2e-test": "pnpm build && vitest --config vitest.e2e.config.ts --run",
+    "e2e-test:mock": "pnpm build && vitest --config vitest.e2e.config.ts --run",
+    "e2e-test:real": "pnpm build && ROVER_E2E_REAL_AGENT=true vitest --config vitest.e2e.config.ts --run"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.23.0",

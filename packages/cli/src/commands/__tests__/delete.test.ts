@@ -21,7 +21,6 @@ let testDir: string;
 // Mock context to return a mock ProjectManager
 vi.mock('../../lib/context.js', () => ({
   requireProjectContext: vi.fn().mockImplementation(() => {
-    // Return a ProjectManager-like object directly (not wrapped in { project, projectPath })
     return Promise.resolve({
       path: testDir,
       getTask: (taskId: number) => {
@@ -32,7 +31,6 @@ vi.mock('../../lib/context.js', () => ({
         return undefined;
       },
       deleteTask: (task: TaskDescriptionManager) => {
-        // Actually delete the task directory to match real behavior
         const taskPath = task.getBasePath();
         if (existsSync(taskPath)) {
           rmSync(taskPath, { recursive: true, force: true });

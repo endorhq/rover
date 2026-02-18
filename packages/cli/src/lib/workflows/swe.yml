@@ -47,10 +47,10 @@ steps:
       Task title: {{inputs.title}}
       Task description: {{inputs.description}}
 
-      Follow these steps to complete it. Do not move to the next phase until to complete the previous one.
+      Follow these steps to complete it. Do not move to the next phase until you complete the previous one.
 
       1. Phase 1: Triage the task complexity.
-         - Identify the task complexity by analyze the affected files and the complexity of the task. Categorize it on:
+         - Identify the task complexity by analyzing the affected files and the complexity of the task. Categorize it as:
            - Simple task: affects 1-3 files. No complex changes involved. The changes are straightforward and a plan might not be required.
            - Complex task: affects multiple files. It requires to introduce new libraries or create them. To properly implement them, it is recommended to first write a plan.
       2. Phase 2: Adapt your analysis depth:
@@ -123,7 +123,7 @@ steps:
 
       Provide a clear, concise and actionable plan that another engineer can follow to complete the task.
 
-      Follow these steps to complete it. Do not move to the next phase until to complete the previous one.
+      Follow these steps to complete it. Do not move to the next phase until you complete the previous one.
 
       ### Phase 1: Evaluate task requirements
 
@@ -145,7 +145,7 @@ steps:
 
       - Do not fabricate content; if information is unavailable or irrelevant, skip it
       - Only list in-scope changes. Do not mention out-of-scope items.
-      - Only add existing test files to the scope and implementation steps. Do not add any step or scope item to create new test suites unless the task description request it explicitly. This is VERY IMPORTANT
+      - Only add existing test files to the scope and implementation steps. Do not add any step or scope item to create new test suites unless the task description requests it explicitly. This is VERY IMPORTANT
       - Break down implementation into small, clear and concise steps. Do not overengineer, focus on the changes to complete the task and clear side effects.
       - Follow the template strictly
       - Just output the template. Skip any text before and after
@@ -337,7 +337,7 @@ steps:
 
       ### [Specific security issue]
 
-      **Risk**: [Condise Risk description]
+      **Risk**: [Concise Risk description]
       **Severity**: Must Fix | Nice to have
       **Recommendation**: [Actionable action]
       </template>

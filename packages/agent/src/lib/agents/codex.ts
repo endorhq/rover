@@ -1,9 +1,10 @@
 import { existsSync, copyFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { homedir } from 'node:os';
 import colors from 'ansi-colors';
 import { AgentCredentialFile } from './types.js';
 import { BaseAgent } from './base.js';
-import { launch } from 'rover-core';
+import { launch, showList } from 'rover-core';
 
 export class CodexAgent extends BaseAgent {
   name = 'Codex';
@@ -46,12 +47,17 @@ export class CodexAgent extends BaseAgent {
     this.ensureDirectory(targetCodexDir);
 
     const credentials = this.getRequiredCredentials();
+    const copiedItems: string[] = [];
     for (const cred of credentials) {
       if (existsSync(cred.path)) {
         const filename = cred.path.split('/').pop()!;
         copyFileSync(cred.path, join(targetCodexDir, filename));
-        console.log(colors.gray('├── Copied: ') + colors.cyan(cred.path));
+        copiedItems.push(colors.cyan(cred.path));
       }
+    }
+
+    if (copiedItems.length > 0) {
+      showList(copiedItems);
     }
 
     console.log(colors.green(`✓ ${this.name} credentials copied successfully`));
@@ -148,5 +154,11 @@ export class CodexAgent extends BaseAgent {
     }
 
     return [prompt];
+  }
+
+  override getLogSources(): string[] {
+    // Codex CLI writes session JSONL logs under
+    // ~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl
+    return [join(homedir(), '.codex', 'sessions')];
   }
 }

@@ -85,6 +85,7 @@ export class TaskDescriptionManager {
       agentModel: taskData.agentModel,
       sourceBranch: taskData.sourceBranch,
       networkConfig: taskData.networkConfig,
+      source: taskData.source,
       version: CURRENT_TASK_DESCRIPTION_SCHEMA_VERSION,
     };
 
@@ -195,6 +196,14 @@ export class TaskDescriptionManager {
 
     // Preserve all execution-related fields
     migrated.containerId = data.containerId || '';
+    // Migrate old dockerHost to sandboxMetadata
+    if (data.dockerHost !== undefined) {
+      migrated.sandboxMetadata = { dockerHost: data.dockerHost };
+      // Remove the old dockerHost field after migration
+      delete migrated.dockerHost;
+    } else {
+      migrated.sandboxMetadata = data.sandboxMetadata;
+    }
     migrated.executionStatus = data.executionStatus || '';
     migrated.runningAt = data.runningAt || undefined;
     migrated.errorAt = data.errorAt || undefined;
@@ -224,6 +233,26 @@ export class TaskDescriptionManager {
 
     // Preserve networkConfig field
     migrated.networkConfig = data.networkConfig;
+
+    // Preserve baseCommit field
+    migrated.baseCommit = data.baseCommit;
+
+    // Preserve task source (and migrate from old githubIssue if present)
+    if (data.source) {
+      migrated.source = data.source;
+    } else if (data.githubIssue) {
+      // Migrate old githubIssue format to new source format
+      migrated.source = {
+        type: 'github',
+        id: String(data.githubIssue.number),
+        url: `https://github.com/${data.githubIssue.repository}/issues/${data.githubIssue.number}`,
+        ref: {
+          owner: data.githubIssue.repository.split('/')[0],
+          repo: data.githubIssue.repository.split('/')[1],
+          number: data.githubIssue.number,
+        },
+      };
+    }
 
     return migrated as TaskDescription;
   }
@@ -508,6 +537,37 @@ export class TaskDescriptionManager {
   }
 
   /**
+   * Collect artifacts (summaries and plans) from all iterations before a given number.
+   * Returns artifacts sorted by iteration number (ascending).
+   */
+  getPreviousIterationArtifacts(beforeIteration: number): {
+    summaries: Array<{ iteration: number; content: string }>;
+    plans: Array<{ iteration: number; content: string }>;
+  } {
+    const summaries: Array<{ iteration: number; content: string }> = [];
+    const plans: Array<{ iteration: number; content: string }> = [];
+
+    const allIterations = this.getIterations()
+      .filter(iter => iter.iteration < beforeIteration)
+      .sort((a, b) => a.iteration - b.iteration);
+
+    for (const iter of allIterations) {
+      const artifacts = iter.getArtifacts();
+      if (artifacts.summary) {
+        summaries.push({
+          iteration: iter.iteration,
+          content: artifacts.summary,
+        });
+      }
+      if (artifacts.plan) {
+        plans.push({ iteration: iter.iteration, content: artifacts.plan });
+      }
+    }
+
+    return { summaries, plans };
+  }
+
+  /**
    * Update the task status based on the latest iteration
    */
   updateStatusFromIteration(): void {
@@ -648,6 +708,9 @@ export class TaskDescriptionManager {
   get containerId(): string | undefined {
     return this.data.containerId;
   }
+  get sandboxMetadata(): Record<string, unknown> | undefined {
+    return this.data.sandboxMetadata;
+  }
   get executionStatus(): string | undefined {
     return this.data.executionStatus;
   }
@@ -687,6 +750,15 @@ export class TaskDescriptionManager {
   get networkConfig(): NetworkConfig | undefined {
     return this.data.networkConfig;
   }
+  get baseCommit(): string | undefined {
+    return this.data.baseCommit;
+  }
+  get source(): TaskDescription['source'] {
+    return this.data.source;
+  }
+  get onCompleteHookFiredAt(): TaskDescription['onCompleteHookFiredAt'] {
+    return this.data.onCompleteHookFiredAt;
+  }
 
   // ============================================================
   // Data Modification (Setters)
@@ -711,8 +783,31 @@ export class TaskDescriptionManager {
   /**
    * Set agent image
    */
+  setAgent(agent: string, model?: string): void {
+    this.data.agent = agent;
+    this.data.agentModel = model;
+    this.save();
+  }
+
   setAgentImage(agentImage: string): void {
     this.data.agentImage = agentImage;
+    this.save();
+  }
+
+  /**
+   * Set the base commit hash (the commit when the worktree was created)
+   */
+  setBaseCommit(commit: string): void {
+    this.data.baseCommit = commit;
+    this.save();
+  }
+
+  /**
+   * Record that the onComplete hook was fired at a specific lastStatusCheck timestamp.
+   * Used to prevent duplicate hook executions while allowing re-fires after iterate/restart.
+   */
+  setOnCompleteHookFiredAt(timestamp: string): void {
+    this.data.onCompleteHookFiredAt = timestamp;
     this.save();
   }
 
@@ -723,9 +818,14 @@ export class TaskDescriptionManager {
   /**
    * Set container execution information
    */
-  setContainerInfo(containerId: string, executionStatus: string): void {
+  setContainerInfo(
+    containerId: string,
+    executionStatus: string,
+    sandboxMetadata?: Record<string, unknown>
+  ): void {
     this.data.containerId = containerId;
     this.data.executionStatus = executionStatus;
+    this.data.sandboxMetadata = sandboxMetadata;
     if (executionStatus === 'running') {
       this.data.runningAt = new Date().toISOString();
     }

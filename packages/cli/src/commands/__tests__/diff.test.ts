@@ -735,6 +735,119 @@ describe('diff command', () => {
     });
   });
 
+  describe('JSON output', () => {
+    it('should output JSON for regular diff with --json flag', async () => {
+      const { isJsonMode } = await import('../../lib/context.js');
+      const { worktreePath } = createTestTask(24, 'JSON Diff Task');
+
+      // Make changes
+      appendFileSync(join(worktreePath, 'README.md'), 'JSON test change\n');
+
+      // Enable JSON mode for this test
+      vi.mocked(isJsonMode).mockReturnValue(true);
+
+      await diffCommand('24', undefined, { json: true });
+
+      // Find the JSON output in console.log calls
+      const logCalls = consoleSpy.log.mock.calls.map(call => call[0]);
+      const jsonCall = logCalls.find(
+        call => typeof call === 'string' && call.includes('"taskId"')
+      );
+      expect(jsonCall).toBeDefined();
+      const jsonOutput = JSON.parse(jsonCall as string);
+
+      expect(jsonOutput.success).toBe(true);
+      expect(jsonOutput.taskId).toBe(24);
+      expect(jsonOutput.title).toBe('JSON Diff Task');
+      expect(jsonOutput.branchName).toBeDefined();
+      expect(jsonOutput.diff).toBeDefined();
+      expect(typeof jsonOutput.diff).toBe('string');
+      expect(jsonOutput.diff).toContain('JSON test change');
+
+      // Should not contain human-readable header
+      const allOutput = logCalls.join('\n');
+      expect(allOutput).not.toContain('Task 24 Changes');
+
+      vi.mocked(isJsonMode).mockReturnValue(false);
+    });
+
+    it('should output JSON for --only-files with --json flag', async () => {
+      const { isJsonMode } = await import('../../lib/context.js');
+      const { worktreePath } = createTestTask(25, 'JSON Files Task');
+
+      // Make changes
+      appendFileSync(join(worktreePath, 'README.md'), 'Change\n');
+      writeFileSync(join(worktreePath, 'new-file.txt'), 'New content\n');
+
+      vi.mocked(isJsonMode).mockReturnValue(true);
+
+      await diffCommand('25', undefined, { onlyFiles: true, json: true });
+
+      const logCalls = consoleSpy.log.mock.calls.map(call => call[0]);
+      const jsonCall = logCalls.find(
+        call => typeof call === 'string' && call.includes('"taskId"')
+      );
+      expect(jsonCall).toBeDefined();
+      const jsonOutput = JSON.parse(jsonCall as string);
+
+      expect(jsonOutput.success).toBe(true);
+      expect(jsonOutput.taskId).toBe(25);
+      expect(jsonOutput.files).toBeDefined();
+      expect(Array.isArray(jsonOutput.files)).toBe(true);
+
+      // Each file should have path, insertions, deletions
+      for (const file of jsonOutput.files) {
+        expect(file).toHaveProperty('path');
+        expect(file).toHaveProperty('insertions');
+        expect(file).toHaveProperty('deletions');
+      }
+
+      vi.mocked(isJsonMode).mockReturnValue(false);
+    });
+
+    it('should not show tips in JSON mode', async () => {
+      const { isJsonMode } = await import('../../lib/context.js');
+      const { showTips } = await import('../../utils/display.js');
+      createTestTask(26, 'JSON No Tips Task');
+
+      vi.mocked(isJsonMode).mockReturnValue(true);
+
+      await diffCommand('26', undefined, { json: true });
+
+      expect(showTips).not.toHaveBeenCalled();
+
+      vi.mocked(isJsonMode).mockReturnValue(false);
+    });
+  });
+
+  describe('Worktree context', () => {
+    it('should resolve correct project when running from inside a worktree directory', async () => {
+      const { task, worktreePath } = createTestTask(
+        27,
+        'Worktree Context Task'
+      );
+
+      // Make changes in the worktree
+      appendFileSync(join(worktreePath, 'README.md'), 'Change from worktree\n');
+
+      // Simulate running from inside the worktree directory
+      process.chdir(worktreePath);
+
+      await diffCommand('27');
+
+      const logCalls = consoleSpy.log.mock.calls.map(call => call.join(' '));
+      const output = logCalls.join('\n');
+
+      // The diff command should succeed (not throw TaskNotFoundError)
+      expect(output).toContain('Task 27 Changes');
+      expect(output).toContain('Worktree Context Task');
+      expect(output).toContain('+Change from worktree');
+
+      // Restore cwd
+      process.chdir(testDir);
+    });
+  });
+
   describe('Telemetry', () => {
     it('should track diff event', async () => {
       const { getTelemetry } = await import('../../lib/telemetry.js');

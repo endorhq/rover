@@ -23,12 +23,8 @@ import {
 import { executeHooks } from '../lib/hooks.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { formatTaskStatus, statusColor } from '../utils/task-status.js';
-
-/**
- * Track previous task statuses to detect transitions for onComplete hooks.
- * Module-level to persist across watch mode polling cycles.
- */
-const previousTaskStatuses = new Map<number, string>();
+import type { ListTasksOutput } from '../output-types.js';
+import type { CommandDefinition } from '../types.js';
 
 /**
  * Format duration from start to now or completion
@@ -153,7 +149,21 @@ const buildTaskRow = (
   };
 };
 
-export const listCommand = async (
+/**
+ * List all tasks in the current project or across all registered projects.
+ *
+ * Displays a table of tasks with their IDs, titles, agents, workflows, status,
+ * progress, and duration. In project context, shows tasks for that project.
+ * In global context (outside any project), shows tasks grouped by project.
+ * Supports watch mode for real-time status updates and triggers onComplete hooks.
+ *
+ * @param options - Command options
+ * @param options.watch - Enable watch mode with optional refresh interval in seconds
+ * @param options.verbose - Show additional details including error messages
+ * @param options.json - Output results in JSON format
+ * @param options.watching - Internal flag indicating active watch mode cycle
+ */
+const listCommand = async (
   options: {
     watch?: boolean | string;
     verbose?: boolean;
@@ -235,36 +245,31 @@ export const listCommand = async (
       }
     }
 
-    // Update task status and detect transitions for onComplete hooks
-    // (hooks only apply in single-project context)
+    // Update task status and detect completions for onComplete hooks
     for (const { task, project: projectData } of tasksWithProjects) {
       try {
-        // Get previous status before update
-        const previousStatus = previousTaskStatuses.get(task.id);
-
         // Update status from iteration
         task.updateStatusFromIteration();
         const currentStatus = task.status;
 
-        // Detect NEW transition to COMPLETED or FAILED
-        const isNewCompletion =
-          previousStatus !== currentStatus &&
-          (currentStatus === 'COMPLETED' || currentStatus === 'FAILED');
+        // Check if this is a terminal status that should trigger onComplete hooks
+        const isTerminalStatus =
+          currentStatus === 'COMPLETED' || currentStatus === 'FAILED';
+
+        // Check if hook has already been fired for this status transition
+        const hookAlreadyFired =
+          task.onCompleteHookFiredAt === task.lastStatusCheck;
 
         // Load project config for hooks per project
         let projectConfig: ProjectConfigManager | undefined;
         if (projectData) {
-          try {
-            projectConfig = ProjectConfigManager.load(projectData.path);
-          } catch {
-            // Project config is optional, continue without hooks
-          }
+          projectConfig = ProjectConfigManager.load(projectData.path);
         }
 
-        // Execute onComplete hooks if configured and this is a new completion
-        // Only execute hooks in single-project mode
+        // Execute onComplete hooks if configured and not already fired for this status
         if (
-          isNewCompletion &&
+          isTerminalStatus &&
+          !hookAlreadyFired &&
           projectConfig?.hooks?.onComplete?.length &&
           projectData?.path
         ) {
@@ -279,10 +284,10 @@ export const listCommand = async (
             },
             'onComplete'
           );
-        }
 
-        // Update tracking for next iteration
-        previousTaskStatuses.set(task.id, currentStatus);
+          // Record that hook was fired for this status transition (persists to task file)
+          task.setOnCompleteHookFiredAt(task.lastStatusCheck!);
+        }
       } catch (err) {
         if (!isJsonMode()) {
           console.log(
@@ -298,12 +303,7 @@ export const listCommand = async (
 
     // JSON output mode
     if (isJsonMode()) {
-      const jsonOutput: Array<
-        TaskDescription & {
-          iterationsData: IterationManager[];
-          projectId?: string;
-        }
-      > = [];
+      const jsonOutput: ListTasksOutput = [];
 
       for (const { task, project: projectData } of tasksWithProjects) {
         let iterationsData: IterationManager[] = [];
@@ -434,16 +434,6 @@ export const listCommand = async (
 
     // Watch mode (configurable refresh interval, default 3 seconds)
     if (options.watch) {
-      // Watch mode is only supported in scoped (single project) mode
-      if (!project) {
-        console.log(
-          colors.yellow(
-            'Watch mode is only supported when inside a project directory'
-          )
-        );
-        return;
-      }
-
       // CLI argument takes precedence, then settings, then default (3s)
       let intervalSeconds: number;
       if (typeof options.watch === 'string') {
@@ -512,3 +502,13 @@ export const listCommand = async (
     await telemetry?.shutdown();
   }
 };
+
+// Named export for backwards compatibility (used by tests)
+export { listCommand };
+
+export default {
+  name: 'list',
+  description: 'Show the tasks from current project or all projects',
+  requireProject: false,
+  action: listCommand,
+} satisfies CommandDefinition;

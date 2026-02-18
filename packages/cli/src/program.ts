@@ -7,25 +7,29 @@ import {
   findOrRegisterProject,
 } from 'rover-core';
 import { NETWORK_MODE_VALUES } from 'rover-schemas';
-import { initCommand } from './commands/init.js';
-import { infoCommand } from './commands/info.js';
-import { listCommand } from './commands/list.js';
+import initCmd from './commands/init.js';
+import cleanupCmd from './commands/cleanup.js';
+import infoCmd from './commands/info.js';
+import listCmd from './commands/list.js';
 import { exitWithError } from './utils/exit.js';
-import { taskCommand } from './commands/task.js';
-import { diffCommand } from './commands/diff.js';
-import { logsCommand } from './commands/logs.js';
-import { inspectCommand } from './commands/inspect.js';
-import { iterateCommand } from './commands/iterate.js';
-import { shellCommand } from './commands/shell.js';
-import { resetCommand } from './commands/reset.js';
-import { restartCommand } from './commands/restart.js';
-import { deleteCommand } from './commands/delete.js';
-import { mergeCommand } from './commands/merge.js';
+import taskCmd from './commands/task.js';
+import diffCmd from './commands/diff.js';
+import logsCmd from './commands/logs.js';
+import inspectCmd from './commands/inspect.js';
+import iterateCmd from './commands/iterate.js';
+import shellCmd from './commands/shell.js';
+import resetCmd from './commands/reset.js';
+import restartCmd from './commands/restart.js';
+import deleteCmd from './commands/delete.js';
+import mergeCmd from './commands/merge.js';
 import colors from 'ansi-colors';
-import { pushCommand } from './commands/push.js';
-import { stopCommand } from './commands/stop.js';
-import { mcpCommand } from './commands/mcp.js';
+import pushCmd from './commands/push.js';
+import stopCmd from './commands/stop.js';
+import mcpCmd from './commands/mcp.js';
 import { addWorkflowCommands } from './commands/workflows/index.js';
+import workflowAddCmd from './commands/workflows/add.js';
+import workflowListCmd from './commands/workflows/list.js';
+import workflowInspectCmd from './commands/workflows/inspect.js';
 import {
   getCLIContext,
   getProjectPath,
@@ -36,9 +40,45 @@ import {
 } from './lib/context.js';
 import { showRoverHeader } from 'rover-core/src/display/header.js';
 import { getUserAIAgent } from './lib/agents/index.js';
+import type { CommandDefinition } from './types.js';
 
-function isWorkflowsToplevelCommand(command: Command): boolean {
-  return command.parent?.name() === 'workflows';
+// Registry of all commands for metadata lookup
+const commands: CommandDefinition[] = [
+  initCmd,
+  cleanupCmd,
+  infoCmd,
+  listCmd,
+  taskCmd,
+  diffCmd,
+  logsCmd,
+  inspectCmd,
+  iterateCmd,
+  shellCmd,
+  resetCmd,
+  restartCmd,
+  deleteCmd,
+  mergeCmd,
+  pushCmd,
+  stopCmd,
+  mcpCmd,
+  workflowAddCmd,
+  workflowListCmd,
+  workflowInspectCmd,
+];
+
+/**
+ * Get command definition by matching the command name and optional parent.
+ * For subcommands (e.g., "workflows add"), the parent field distinguishes
+ * them from top-level commands with the same name.
+ */
+function getCommandDefinition(
+  actionCommand: Command
+): CommandDefinition | undefined {
+  const name = actionCommand.name();
+  const parent = actionCommand.parent?.parent
+    ? actionCommand.parent.name()
+    : undefined;
+  return commands.find(c => c.name === name && c.parent === parent);
 }
 
 /**
@@ -90,42 +130,70 @@ export function createProgram(
         // Retrive from previous hook
         const ctx = getCLIContext();
 
-        // Load the project option to determine the current project.
-        let project = null;
+        // Get command definition and check if it requires project
+        // It must be defined.
+        const commandDef = getCommandDefinition(actionCommand)!;
 
-        // Skip project resolution for init (it creates the project),
-        // and workflow commands
-        if (
-          !isWorkflowsToplevelCommand(actionCommand) &&
-          commandName !== 'init'
-        ) {
-          // Only auto-register cwd project if no --project flag is set
-          if (!ctx.projectOption && ctx.inGitRepo) {
-            try {
-              project = await findOrRegisterProject();
-            } catch (error) {
-              // Config/registration errors - exit
-              exitWithError({
-                error: error instanceof Error ? error.message : String(error),
-                success: false,
-              });
-            }
-          } else if (ctx.projectOption) {
-            // Try to resolve the project if the option / env var is set
-            try {
-              project = await requireProjectContext(ctx.projectOption);
-            } catch {
-              exitWithError({
-                error: `Project "${ctx.projectOption}" not found.`,
-                success: false,
-              });
+        // Detect worktree context and inform the user
+        if (ctx.inGitRepo && !ctx.projectOption) {
+          const git = new Git();
+          if (git.isWorktree()) {
+            const mainRoot = git.getMainRepositoryRoot();
+            if (!isJsonMode() && commandName !== 'mcp') {
+              console.log(
+                colors.yellow(
+                  'Note: You are inside a git worktree. Rover is using the main project root.'
+                )
+              );
+              if (mainRoot) {
+                console.log(
+                  colors.gray('  Main project: ') + colors.cyan(mainRoot)
+                );
+              }
+              console.log(
+                colors.gray('  Tip: Use ') +
+                  colors.cyan('--project') +
+                  colors.gray(' to target a specific project.')
+              );
+              console.log();
             }
           }
         }
 
-        // Update the project in the context
-        if (project) {
-          setProject(project);
+        try {
+          let project;
+
+          if (ctx.projectOption) {
+            // When users pass the project option, always try to resolve it.
+            const message = `Could not find the "${ctx.projectOption}" project. Please, select a \nvalid project from the list. You can type to filter the projects`;
+
+            project = await requireProjectContext(ctx.projectOption, {
+              missingProjectMessage: colors.yellow(message),
+            });
+          } else if (ctx.inGitRepo) {
+            // No project option but in git repo, resolve it.
+            project = await findOrRegisterProject();
+          }
+
+          if (!project && commandDef.requireProject) {
+            // If project is required, force to resolve it.
+            let message = `The "${commandName}" command requires a project context.\nPlease, select it from the list. You can type to filter the projects`;
+
+            project = await requireProjectContext(ctx.projectOption, {
+              missingProjectMessage: colors.yellow(message),
+            });
+          }
+
+          // Skip forcing to resolve
+          if (project) {
+            setProject(project);
+          }
+        } catch (error) {
+          // Config/registration errors - exit
+          exitWithError({
+            error: error instanceof Error ? error.message : String(error),
+            success: false,
+          });
         }
       })
       .hook('preAction', (_thisCommand, actionCommand) => {
@@ -178,7 +246,7 @@ export function createProgram(
     .description('Create a shared configuration for this project')
     .option('-y, --yes', 'Skip all confirmations and run non-interactively')
     .argument('[path]', 'Project path', process.cwd())
-    .action(initCommand);
+    .action(initCmd.action);
 
   program.commandsGroup(colors.cyan('Current tasks:'));
   // Add the ps command for monitoring tasks
@@ -191,7 +259,7 @@ export function createProgram(
       'Watch for changes (default 3s, or specify interval)'
     )
     .option('--json', 'Output in JSON format')
-    .action(listCommand);
+    .action(listCmd.action);
 
   program.commandsGroup(colors.cyan('Manage tasks in a project:'));
 
@@ -201,7 +269,11 @@ export function createProgram(
     .description('Create and assign task to an AI Agent to complete it')
     .option(
       '--from-github <issue>',
-      'Fetch task description from a GitHub issue number'
+      '(Deprecated. Use --context) Fetch task description from a GitHub issue number'
+    )
+    .option(
+      '--include-comments',
+      '(Deprecated. Use --context-trust-all-authors) Include issue comments in the task description (requires --from-github)'
     )
     .addOption(
       new Option(
@@ -242,6 +314,20 @@ export function createProgram(
       (value: string, previous: string[] | undefined) =>
         previous ? [...previous, value] : [value]
     )
+    .option(
+      '-c, --context <uri>',
+      'Add context from URI (github:issue/15, file:./docs.md, https://...). Can be repeated.',
+      (value: string, previous: string[] | undefined) =>
+        previous ? [...previous, value] : [value]
+    )
+    .option(
+      '--context-trust-authors <users>',
+      'Comma-separated list of trusted authors for comment inclusion'
+    )
+    .option(
+      '--context-trust-all-authors',
+      'Trust all authors for comment inclusion (use with caution)'
+    )
     .option('--json', 'Output the result in JSON format')
     .option(
       '--sandbox-extra-args <args>',
@@ -251,7 +337,7 @@ export function createProgram(
       '[description]',
       'The task description, or provide it later. Mandatory in non-interactive environments'
     )
-    .action(taskCommand);
+    .action(taskCmd.action);
 
   // Restart a task
   program
@@ -259,7 +345,7 @@ export function createProgram(
     .description('Restart a new or failed task')
     .argument('<taskId>', 'Task ID to restart')
     .option('--json', 'Output the result in JSON format')
-    .action(restartCommand);
+    .action(restartCmd.action);
 
   // Stop a running task
   program
@@ -276,7 +362,7 @@ export function createProgram(
       'Remove git worktree and branch'
     )
     .option('--json', 'Output the result in JSON format')
-    .action(stopCommand);
+    .action(stopCmd.action);
 
   program
     .command('inspect')
@@ -292,7 +378,7 @@ export function createProgram(
       'Output raw file contents without formatting (mutually exclusive with --file)'
     )
     .option('--json', 'Output in JSON format')
-    .action(inspectCommand);
+    .action(inspectCmd.action);
 
   program
     .command('logs')
@@ -304,7 +390,7 @@ export function createProgram(
     )
     .option('-f, --follow', 'Follow log output in real-time')
     .option('--json', 'Output the result in JSON format')
-    .action(logsCommand);
+    .action(logsCmd.action);
 
   // TODO: Improve the reset process by adding a way to start / stop tasks
   // 		 For now, I will skip this command.
@@ -322,7 +408,7 @@ export function createProgram(
     .argument('<taskId...>', 'Task IDs to delete')
     .option('-y, --yes', 'Skip all confirmations and run non-interactively')
     .option('--json', 'Output in JSON format')
-    .action(deleteCommand);
+    .action(deleteCmd.action);
 
   program
     .command('iterate')
@@ -338,14 +424,32 @@ export function createProgram(
       'Open an interactive command session to iterate on the task'
     )
     .option('--json', 'Output JSON and skip confirmation prompts')
-    .action(iterateCommand);
+    .option(
+      '-a, --agent <agent>',
+      'AI agent to use for this iteration (e.g., claude, claude:sonnet)'
+    )
+    .option(
+      '-c, --context <uri>',
+      'Add context from URI (github:issue/15, file:./docs.md, https://...). Can be repeated.',
+      (value: string, previous: string[] | undefined) =>
+        previous ? [...previous, value] : [value]
+    )
+    .option(
+      '--context-trust-authors <users>',
+      'Comma-separated list of trusted authors for comment inclusion'
+    )
+    .option(
+      '--context-trust-all-authors',
+      'Trust all authors for comment inclusion (use with caution)'
+    )
+    .action(iterateCmd.action);
 
   program
     .command('shell')
     .description('Open interactive shell for testing task changes')
     .argument('<taskId>', 'Task ID to open shell for')
     .option('-c, --container', 'Start the interactive shell within a container')
-    .action(shellCommand);
+    .action(shellCmd.action);
 
   program.commandsGroup(colors.cyan('Merge changes:'));
 
@@ -354,9 +458,11 @@ export function createProgram(
     .description('Show git diff between task worktree and main branch')
     .argument('<taskId>', 'Task ID to show diff for')
     .argument('[filePath]', 'Optional file path to show diff for specific file')
+    .option('--base', 'Compare against the base commit when task was created')
     .option('-b, --branch <name>', 'Compare changes with a specific branch')
     .option('--only-files', 'Show only changed filenames')
-    .action(diffCommand);
+    .option('--json', 'Output in JSON format')
+    .action(diffCmd.action);
 
   program
     .command('merge')
@@ -364,7 +470,7 @@ export function createProgram(
     .argument('<taskId>', 'Task ID to merge')
     .option('-f, --force', 'Force merge without confirmation')
     .option('--json', 'Output in JSON format')
-    .action(mergeCommand);
+    .action(mergeCmd.action);
 
   program
     .command('push')
@@ -374,7 +480,7 @@ export function createProgram(
     .argument('<taskId>', 'Task ID to push')
     .option('-m, --message <message>', 'Commit message')
     .option('--json', 'Output in JSON format')
-    .action(pushCommand);
+    .action(pushCmd.action);
 
   program.commandsGroup(colors.cyan('Workflows:'));
 
@@ -386,14 +492,22 @@ export function createProgram(
   program
     .command('mcp')
     .description('Start Rover as an MCP server')
-    .action(mcpCommand);
+    .action(mcpCmd.action);
 
   program.commandsGroup(colors.cyan('Rover store:'));
   program
     .command('info')
     .description('Show information about the Rover global store')
     .option('--json', 'Output in JSON format')
-    .action(infoCommand);
+    .action(infoCmd.action);
+
+  program
+    .command('cleanup')
+    .description('Remove stale container cache images')
+    .option('--json', 'Output in JSON format')
+    .option('--dry-run', 'Preview what would be removed without deleting')
+    .option('-a, --all', 'Remove all cache images, including current ones')
+    .action(cleanupCmd.action);
 
   return program;
 }

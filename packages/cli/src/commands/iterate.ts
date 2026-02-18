@@ -1,6 +1,6 @@
 import colors from 'ansi-colors';
 import enquirer from 'enquirer';
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   AI_AGENT,
@@ -9,33 +9,30 @@ import {
   showProperties,
   showTitle,
   type TaskDescriptionManager,
+  ContextManager,
+  generateContextIndex,
+  ContextFetchError,
+  registerBuiltInProviders,
+  type ContextIndexOptions,
 } from 'rover-core';
 import { TaskNotFoundError } from 'rover-schemas';
 import {
   getAIAgentTool,
   getUserAIAgent,
+  getUserDefaultModel,
   type AIAgentTool,
 } from '../lib/agents/index.js';
+import { parseAgentString } from '../utils/agent-parser.js';
 import { isJsonMode, requireProjectContext } from '../lib/context.js';
 import type { IPromptTask } from '../lib/prompts/index.js';
 import { createSandbox } from '../lib/sandbox/index.js';
 import { getTelemetry } from '../lib/telemetry.js';
-import type { CLIJsonOutput } from '../types.js';
+import type { IterateOutput } from '../output-types.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
 import { readFromStdin, stdinIsAvailable } from '../utils/stdin.js';
+import type { CommandDefinition } from '../types.js';
 
 const { prompt } = enquirer;
-
-interface IterateResult extends CLIJsonOutput {
-  taskId: number;
-  taskTitle: string;
-  iterationNumber: number;
-  expandedTitle?: string;
-  expandedDescription?: string;
-  instructions: string;
-  worktreePath?: string;
-  iterationPath?: string;
-}
 
 type IterationContext = {
   plan?: string;
@@ -49,6 +46,10 @@ type IterationContext = {
 interface IterateOptions {
   json?: boolean;
   interactive?: boolean;
+  agent?: string;
+  context?: string[];
+  contextTrustAuthors?: string;
+  contextTrustAllAuthors?: boolean;
 }
 
 /**
@@ -58,13 +59,15 @@ const expandIterationInstructions = async (
   instructions: string,
   previousContext: IterationContext,
   aiAgent: AIAgentTool,
-  jsonMode: boolean
+  jsonMode: boolean,
+  contextContent?: string
 ): Promise<IPromptTask | null> => {
   try {
     const expanded = await aiAgent.expandIterationInstructions(
       instructions,
       previousContext.plan,
-      previousContext.changes
+      previousContext.changes,
+      contextContent
     );
     return expanded;
   } catch (error) {
@@ -79,15 +82,26 @@ const expandIterationInstructions = async (
 };
 
 /**
- * Command to iterate over a existing task.
+ * Add a new iteration to an existing Rover task with additional instructions.
+ *
+ * Creates a new iteration for a task by providing refinement instructions that
+ * build upon the work from previous iterations. The AI agent uses context from
+ * previous plans and changes to understand the task state. Supports both batch
+ * mode (with instructions) and interactive mode for real-time collaboration.
+ *
+ * @param taskId - The numeric task ID to iterate on
+ * @param instructions - New requirements or refinement instructions to apply
+ * @param options - Command options
+ * @param options.json - Output results in JSON format
+ * @param options.interactive - Open an interactive shell session for iteration
  */
-export const iterateCommand = async (
+const iterateCommand = async (
   taskId: string,
   instructions?: string,
   options: IterateOptions = {}
 ): Promise<void> => {
   const telemetry = getTelemetry();
-  const result: IterateResult = {
+  const result: IterateOutput = {
     success: false,
     taskId: 0,
     taskTitle: '',
@@ -195,6 +209,10 @@ export const iterateCommand = async (
       // Start sandbox container for task execution
       const sandbox = await createSandbox(task, undefined, {
         projectPath: project.path,
+        iterationLogsPath: project.getTaskIterationLogsPath(
+          task.id,
+          task.iterations
+        ),
       });
       // TODO: ADD INITIAL PROMPT!
       await sandbox.runInteractive();
@@ -266,11 +284,20 @@ export const iterateCommand = async (
     result.instructions = finalInstructions;
 
     try {
-      // Load AI agent selection - prefer task's agent or fall back to user settings
-      let selectedAiAgent = task.agent || AI_AGENT.Claude; // Use task agent if available
+      // Load AI agent selection - prefer CLI flag, then task's agent, then user settings
+      let selectedAiAgent: string;
+      let selectedModel: string | undefined;
 
-      if (!task.agent) {
-        // No agent stored in task, try user settings
+      if (options.agent) {
+        const parsed = parseAgentString(options.agent);
+        selectedAiAgent = parsed.agent;
+        selectedModel = parsed.model ?? getUserDefaultModel(parsed.agent);
+        task.setAgent(selectedAiAgent, selectedModel);
+      } else if (task.agent) {
+        selectedAiAgent = task.agent;
+        selectedModel = task.agentModel;
+      } else {
+        selectedAiAgent = AI_AGENT.Claude;
         try {
           selectedAiAgent = getUserAIAgent();
         } catch (_err) {
@@ -315,39 +342,6 @@ export const iterateCommand = async (
 
       processManager?.completeLastItem();
 
-      processManager?.addItem('Expanding new instructions with AI agent');
-
-      let expandedTask: IPromptTask | null = null;
-
-      try {
-        expandedTask = await expandIterationInstructions(
-          finalInstructions,
-          previousContext,
-          aiAgent,
-          options.json === true
-        );
-
-        if (expandedTask) {
-          processManager?.completeLastItem();
-        } else {
-          processManager?.failLastItem();
-        }
-      } catch (error) {
-        processManager?.failLastItem();
-      }
-
-      if (expandedTask == null) {
-        // Fallback approach
-        expandedTask = {
-          title: `${task.title} - Iteration refinement instructinos`,
-          description: `${task.description}\n\nAdditional requirements:\n${finalInstructions}`,
-        };
-      }
-
-      // TODO(angel): Is this required?
-      result.expandedTitle = expandedTask.title;
-      result.expandedDescription = expandedTask.description;
-
       result.worktreePath = task.worktreePath;
 
       processManager?.addItem('Creating the new iteration for the task');
@@ -371,26 +365,170 @@ export const iterateCommand = async (
       task.incrementIteration();
       task.markIterating();
 
-      // Create new iteration config
-      IterationManager.createIteration(
+      // Create new iteration config with raw instructions (will be updated after expansion)
+      const iteration = IterationManager.createIteration(
         iterationPath,
         newIterationNumber,
         task.id,
-        expandedTask.title,
-        expandedTask.description,
+        finalInstructions,
+        finalInstructions,
         previousContext
       );
 
       processManager?.completeLastItem();
 
+      // Validate mutual exclusivity of --context-trust-authors and --context-trust-all-authors
+      if (options.contextTrustAuthors && options.contextTrustAllAuthors) {
+        result.error =
+          '--context-trust-authors and --context-trust-all-authors are mutually exclusive';
+        exitWithError(result, { telemetry });
+        return;
+      }
+
+      // Fetch context and collect artifacts from previous iterations
+      processManager?.addItem('Fetching context sources');
+
+      let contextContent: string | undefined;
+
+      try {
+        // Register built-in providers
+        registerBuiltInProviders();
+
+        const trustedAuthors = options.contextTrustAuthors
+          ? options.contextTrustAuthors.split(',').map(s => s.trim())
+          : undefined;
+
+        const contextManager = new ContextManager(options.context ?? [], task, {
+          trustAllAuthors: options.contextTrustAllAuthors,
+          trustedAuthors,
+          cwd: project.path,
+        });
+
+        const entries = await contextManager.fetchAndStore();
+
+        // Store in iteration.json
+        iteration.setContext(entries);
+
+        // Gather artifacts from all previous iterations
+        const { summaries, plans } =
+          task.getPreviousIterationArtifacts(newIterationNumber);
+
+        // Copy plan files into context directory and build references
+        const iterationPlans: ContextIndexOptions['iterationPlans'] = [];
+        for (const plan of plans) {
+          const planFilename = `plan-iter-${plan.iteration}.md`;
+          writeFileSync(
+            join(contextManager.getContextDir(), planFilename),
+            plan.content
+          );
+          iterationPlans.push({
+            iteration: plan.iteration,
+            file: planFilename,
+          });
+        }
+
+        // Generate index.md with artifacts
+        const indexContent = generateContextIndex(entries, task.iterations, {
+          iterationSummaries: summaries,
+          iterationPlans,
+        });
+        writeFileSync(
+          join(contextManager.getContextDir(), 'index.md'),
+          indexContent
+        );
+
+        // Read context content for AI expansion
+        // Skip PRs to avoid huge context.
+        const expansionEntries = entries.filter(entry => {
+          !(entry.metadata?.type || '').includes('pr');
+        });
+        const storedContent =
+          contextManager.readStoredContent(expansionEntries);
+        if (storedContent) {
+          contextContent = storedContent;
+        }
+
+        processManager?.updateLastItem(
+          `Fetching context sources | ${entries.length} source(s) loaded`
+        );
+        processManager?.completeLastItem();
+
+        // Display context summary
+        if (!isJsonMode() && entries.length > 0) {
+          console.log(colors.gray('\nContext sources:'));
+          for (const entry of entries) {
+            console.log(colors.gray(`  - ${entry.name}: ${entry.description}`));
+          }
+        }
+      } catch (error) {
+        processManager?.failLastItem();
+        if (error instanceof ContextFetchError) {
+          if (!isJsonMode()) {
+            console.error(
+              colors.red(`Error fetching context: ${error.message}`)
+            );
+          }
+        }
+        throw error;
+      }
+
+      // AI expansion with context content
+      processManager?.addItem('Expanding new instructions with AI agent');
+
+      let expandedTask: IPromptTask | null = null;
+
+      try {
+        expandedTask = await expandIterationInstructions(
+          finalInstructions,
+          previousContext,
+          aiAgent,
+          options.json === true,
+          contextContent
+        );
+
+        if (expandedTask) {
+          processManager?.completeLastItem();
+        } else {
+          processManager?.failLastItem();
+        }
+      } catch (error) {
+        processManager?.failLastItem();
+      }
+
+      if (expandedTask == null) {
+        // Fallback approach
+        expandedTask = {
+          title: `${task.title} - Iteration refinement instructinos`,
+          description: `${task.description}\n\nAdditional requirements:\n${finalInstructions}`,
+        };
+      }
+
+      // Update iteration with expanded values
+      iteration.updateTitle(expandedTask.title);
+      iteration.updateDescription(expandedTask.description);
+
+      // TODO(angel): Is this required?
+      result.expandedTitle = expandedTask.title;
+      result.expandedDescription = expandedTask.description;
+
       // Start sandbox container for task execution
       const sandbox = await createSandbox(task, processManager, {
         projectPath: project.path,
+        iterationLogsPath: project.getTaskIterationLogsPath(
+          task.id,
+          task.iterations
+        ),
       });
       const containerId = await sandbox.createAndStart();
 
       // Update task metadata with new container ID for this iteration
-      task.setContainerInfo(containerId, 'running');
+      task.setContainerInfo(
+        containerId,
+        'running',
+        process.env.DOCKER_HOST
+          ? { dockerHost: process.env.DOCKER_HOST }
+          : undefined
+      );
 
       result.success = true;
 
@@ -432,3 +570,10 @@ export const iterateCommand = async (
     }
   }
 };
+
+export default {
+  name: 'iterate',
+  description: 'Add instructions to a task and start new iteration',
+  requireProject: true,
+  action: iterateCommand,
+} satisfies CommandDefinition;

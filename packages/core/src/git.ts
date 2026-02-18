@@ -1,6 +1,6 @@
 import { createReadStream } from 'node:fs';
 import { launchSync } from './os.js';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 export class GitError extends Error {
   constructor(reason: string) {
@@ -88,7 +88,9 @@ export class Git {
   }
 
   /**
-   * Get the root directory of the Git repository
+   * Get the root directory of the Git repository.
+   * Note: Inside a worktree, this returns the worktree root, not the main repo root.
+   * Use getMainRepositoryRoot() to always get the main repository root.
    */
   getRepositoryRoot(): string | null {
     const result = launchSync('git', ['rev-parse', '--show-toplevel'], {
@@ -99,6 +101,87 @@ export class Git {
       return result.stdout?.toString().trim() || null;
     }
     return null;
+  }
+
+  /**
+   * Detect whether the current working directory is inside a git worktree
+   * (as opposed to the main checkout).
+   *
+   * Compares `--git-dir` (per-worktree git dir) with `--git-common-dir`
+   * (shared .git directory). In a worktree, --git-dir returns something like
+   * `<main-repo>/.git/worktrees/<name>` while --git-common-dir returns
+   * `<main-repo>/.git`. In the main checkout, they are the same.
+   */
+  isWorktree(): boolean {
+    try {
+      const effectiveCwd = this.cwd ?? process.cwd();
+
+      const gitDirResult = launchSync('git', ['rev-parse', '--git-dir'], {
+        reject: false,
+        cwd: this.cwd,
+      });
+      if (gitDirResult.exitCode !== 0) return false;
+
+      const commonDirResult = launchSync(
+        'git',
+        ['rev-parse', '--git-common-dir'],
+        { reject: false, cwd: this.cwd }
+      );
+      if (commonDirResult.exitCode !== 0) return false;
+
+      const rawGitDir = gitDirResult.stdout?.toString().trim();
+      const rawCommonDir = commonDirResult.stdout?.toString().trim();
+      if (!rawGitDir || !rawCommonDir) return false;
+
+      // Resolve relative paths (git may return relative paths like ".git")
+      const gitDir = resolve(effectiveCwd, rawGitDir);
+      const commonDir = resolve(effectiveCwd, rawCommonDir);
+
+      // In a worktree, --git-dir and --git-common-dir differ
+      return gitDir !== commonDir;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Get the root directory of the main repository, even when inside a worktree.
+   *
+   * Uses `git rev-parse --git-common-dir` to find the shared .git directory,
+   * then derives the main repo root by stripping the `/.git` suffix.
+   * Falls back to getRepositoryRoot() if detection fails.
+   */
+  getMainRepositoryRoot(): string | null {
+    try {
+      const commonDirResult = launchSync(
+        'git',
+        ['rev-parse', '--git-common-dir'],
+        { reject: false, cwd: this.cwd }
+      );
+      if (commonDirResult.exitCode !== 0) {
+        return this.getRepositoryRoot();
+      }
+
+      const rawCommonDir = commonDirResult.stdout?.toString().trim();
+      if (!rawCommonDir) {
+        return this.getRepositoryRoot();
+      }
+
+      // Resolve relative paths
+      const effectiveCwd = this.cwd ?? process.cwd();
+      const commonDir = resolve(effectiveCwd, rawCommonDir);
+
+      // --git-common-dir returns <main-repo>/.git — strip the /.git suffix
+      const gitDirMatch = commonDir.match(/^(.+)\/\.git$/);
+      if (gitDirMatch) {
+        return gitDirMatch[1];
+      }
+
+      // Fallback
+      return this.getRepositoryRoot();
+    } catch {
+      return this.getRepositoryRoot();
+    }
   }
 
   hasCommits(): boolean {
@@ -465,16 +548,15 @@ export class Git {
   ): boolean {
     const targetBranch = options.targetBranch || this.getCurrentBranch();
 
-    try {
-      const unmergedCommits =
-        launchSync('git', ['log', `${targetBranch}..${srcBranch}`, '--oneline'])
-          .stdout?.toString()
-          .trim() || '';
+    // Let errors propagate so callers can handle "remote doesn't exist" case
+    const unmergedCommits =
+      launchSync('git', ['log', `${targetBranch}..${srcBranch}`, '--oneline'], {
+        cwd: options.worktreePath ?? this.cwd,
+      })
+        .stdout?.toString()
+        .trim() || '';
 
-      return unmergedCommits.length > 0;
-    } catch (_err) {
-      return false;
-    }
+    return unmergedCommits.length > 0;
   }
 
   /**
@@ -491,6 +573,29 @@ export class Git {
       );
     } catch (error) {
       return 'unknown';
+    }
+  }
+
+  /**
+   * Get the commit hash for a given ref (branch, tag, HEAD, etc.)
+   * @param ref The ref to get the commit hash for (defaults to HEAD)
+   * @param options Optional worktree path
+   * @returns The full commit hash
+   */
+  getCommitHash(
+    ref: string = 'HEAD',
+    options: GitWorktreeOptions = {}
+  ): string {
+    try {
+      return (
+        launchSync('git', ['rev-parse', ref], {
+          cwd: options.worktreePath ?? this.cwd,
+        })
+          .stdout?.toString()
+          .trim() || ''
+      );
+    } catch (error) {
+      return '';
     }
   }
 
@@ -639,6 +744,56 @@ export class Git {
       }
 
       throw new GitError(errorMessage);
+    }
+  }
+
+  /**
+   * Setup sparse checkout to exclude files matching the given patterns.
+   * Uses --no-cone mode to support full glob pattern syntax.
+   *
+   * @param worktreePath - Path to the worktree to configure
+   * @param excludePatterns - Array of glob patterns to exclude
+   */
+  setupSparseCheckout(worktreePath: string, excludePatterns: string[]): void {
+    if (!excludePatterns || excludePatterns.length === 0) {
+      return;
+    }
+
+    // Initialize sparse checkout in no-cone mode (supports full glob patterns)
+    const initResult = launchSync(
+      'git',
+      ['sparse-checkout', 'init', '--no-cone'],
+      {
+        cwd: worktreePath,
+        reject: false,
+      }
+    );
+
+    if (initResult.exitCode !== 0) {
+      const errorMsg =
+        initResult.stderr?.toString() || 'Failed to initialize sparse checkout';
+      throw new GitError(errorMsg);
+    }
+
+    // Build sparse checkout patterns:
+    // First include everything with /*, then exclude specific patterns with !
+    const sparsePatterns = ['/*', ...excludePatterns.map(p => `!${p}`)];
+
+    // Set the patterns
+    const setResult = launchSync(
+      'git',
+      ['sparse-checkout', 'set', ...sparsePatterns],
+      {
+        cwd: worktreePath,
+        reject: false,
+      }
+    );
+
+    if (setResult.exitCode !== 0) {
+      const errorMsg =
+        setResult.stderr?.toString() ||
+        'Failed to set sparse checkout patterns';
+      throw new GitError(errorMsg);
     }
   }
 

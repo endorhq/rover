@@ -415,7 +415,7 @@ If you need network restrictions, you would need to:
 **Yes.** The AI agent can execute any commands within the container, including test runners.
 
 The container has:
-- Node.js runtime (base image is `node:24-alpine` or custom agent image)
+- Node.js runtime (base image is `node:lts` or custom agent image)
 - Full access to the workspace with your project files
 - Ability to install dependencies and run scripts
 
@@ -451,7 +451,7 @@ The agent will typically:
 Or via environment variable (takes precedence over config):
 
 ```bash
-AGENT_IMAGE=my-custom-image:latest rover task "do something"
+ROVER_AGENT_IMAGE=my-custom-image:latest rover task "do something"
 ```
 
 Rover will display a warning when using a custom image to alert you of potential compatibility issues.

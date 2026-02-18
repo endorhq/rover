@@ -4,28 +4,30 @@ import { createSandbox } from '../lib/sandbox/index.js';
 import { TaskNotFoundError } from 'rover-schemas';
 import { launch, ProcessManager } from 'rover-core';
 import { exitWithError, exitWithSuccess } from '../utils/exit.js';
-import type { CLIJsonOutput } from '../types.js';
+import type { TaskStopOutput } from '../output-types.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import {
   isJsonMode,
   setJsonMode,
   requireProjectContext,
 } from '../lib/context.js';
+import type { CommandDefinition } from '../types.js';
 
 /**
- * Interface for JSON output
+ * Stop a running task and optionally clean up its resources.
+ *
+ * Terminates an in-progress task by stopping its Docker container. Can also
+ * remove associated resources like the container, git worktree, and branch.
+ * Useful for cancelling stuck tasks or freeing up system resources.
+ *
+ * @param taskId - The numeric task ID to stop
+ * @param options - Command options
+ * @param options.json - Output results in JSON format
+ * @param options.removeAll - Remove container, git worktree, and branch
+ * @param options.removeContainer - Remove only the Docker container
+ * @param options.removeGitWorktreeAndBranch - Remove git worktree and branch
  */
-interface TaskStopOutput extends CLIJsonOutput {
-  taskId?: number;
-  title?: string;
-  status?: string;
-  stoppedAt?: string;
-}
-
-/**
- * Stop a running task and clean up its resources
- */
-export const stopCommand = async (
+const stopCommand = async (
   taskId: string,
   options: {
     json?: boolean;
@@ -82,7 +84,10 @@ export const stopCommand = async (
 
     // Stop sandbox container if it exists and is running
     if (task.containerId) {
-      const sandbox = await createSandbox(task, processManager);
+      const sandbox = await createSandbox(task, processManager, {
+        sandboxMetadata: task.sandboxMetadata,
+      });
+
       await sandbox.stopAndRemove();
     }
 
@@ -196,3 +201,13 @@ export const stopCommand = async (
     await telemetry?.shutdown();
   }
 };
+
+// Named export for backwards compatibility (used by tests)
+export { stopCommand };
+
+export default {
+  name: 'stop',
+  description: 'Stop a running task and clean up its resources',
+  requireProject: true,
+  action: stopCommand,
+} satisfies CommandDefinition;

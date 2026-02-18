@@ -3,14 +3,15 @@
  */
 import colors from 'ansi-colors';
 import { WorkflowStore, WorkflowStoreError } from 'rover-core';
-import { CLIJsonOutput } from '../../types.js';
+import type { AddWorkflowOutput } from '../../output-types.js';
 import { exitWithError, exitWithSuccess } from '../../utils/exit.js';
 import { getTelemetry } from '../../lib/telemetry.js';
-import { isJsonMode, setJsonMode } from '../../lib/context.js';
+import { getProjectPath, isJsonMode, setJsonMode } from '../../lib/context.js';
 import { readFromStdin } from '../../utils/stdin.js';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { writeFileSync, mkdtempSync, rmSync } from 'node:fs';
+import type { CommandDefinition } from '../../types.js';
 
 interface AddWorkflowCommandOptions {
   // Custom name for the workflow
@@ -22,23 +23,12 @@ interface AddWorkflowCommandOptions {
 }
 
 /**
- * Interface for JSON output
- */
-interface AddWorkflowOutput extends CLIJsonOutput {
-  workflow?: {
-    name: string;
-    path: string;
-    store: 'local' | 'global';
-  };
-}
-
-/**
  * Add a workflow from a URL or local path.
  *
  * @param source The URL, local path, or '-' for stdin
  * @param options Options to modify the behavior
  */
-export const addWorkflowCommand = async (
+const addWorkflowCommand = async (
   source: string,
   options: AddWorkflowCommandOptions
 ) => {
@@ -71,7 +61,9 @@ export const addWorkflowCommand = async (
       actualSource = tempFile;
     }
 
-    const store = new WorkflowStore();
+    const store = new WorkflowStore(
+      options.global ? undefined : (getProjectPath() ?? process.cwd())
+    );
 
     // Track add workflow event
     telemetry?.eventAddWorkflow();
@@ -102,8 +94,7 @@ export const addWorkflowCommand = async (
       const storePath = colors.gray(result.path);
 
       const message = [
-        `${colors.green('✓')} Workflow ${workflowName} added to ${storeType} store`,
-        `  ${storePath}`,
+        `Workflow ${workflowName} added to ${storeType} store ${storePath}`,
       ].join('\n');
 
       await exitWithSuccess(message, output, { telemetry });
@@ -127,3 +118,15 @@ export const addWorkflowCommand = async (
     await telemetry?.shutdown();
   }
 };
+
+// Named export for backwards compatibility (used by tests)
+export { addWorkflowCommand };
+
+export default {
+  name: 'add',
+  parent: 'workflows',
+  description:
+    'Add a workflow from a URL, local path, or stdin to the workflow store',
+  requireProject: false,
+  action: addWorkflowCommand,
+} satisfies CommandDefinition;

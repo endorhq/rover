@@ -9,18 +9,22 @@ import {
   Git,
   ProjectConfigManager,
   UserSettingsManager,
+  showTitle,
+  showProperties,
+  showList,
 } from 'rover-core';
 import { TaskNotFoundError } from 'rover-schemas';
 import { executeHooks } from '../lib/hooks.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { showRoverChat, showTips } from '../utils/display.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
-import type { CLIJsonOutput } from '../types.js';
+import type { TaskMergeOutput } from '../output-types.js';
 import {
   isJsonMode,
   setJsonMode,
   requireProjectContext,
 } from '../lib/context.js';
+import type { CommandDefinition } from '../types.js';
 
 const { prompt } = enquirer;
 
@@ -189,26 +193,19 @@ interface MergeOptions {
 }
 
 /**
- * Interface for JSON output
+ * Merge a completed task's changes into the current branch.
+ *
+ * Handles the full merge workflow: commits any uncommitted worktree changes
+ * with an AI-generated commit message, merges the task branch into the current
+ * branch, and handles merge conflicts using AI-powered resolution. Triggers
+ * onMerge hooks after successful merges.
+ *
+ * @param taskId - The numeric task ID to merge
+ * @param options - Command options
+ * @param options.force - Skip confirmation prompt
+ * @param options.json - Output results in JSON format
  */
-interface TaskMergeOutput extends CLIJsonOutput {
-  taskId?: number;
-  taskTitle?: string;
-  branchName?: string;
-  currentBranch?: string;
-  hasWorktreeChanges?: boolean;
-  hasUnmergedCommits?: boolean;
-  committed?: boolean;
-  commitMessage?: string;
-  merged?: boolean;
-  conflictsResolved?: boolean;
-  cleanedUp?: boolean;
-}
-
-export const mergeCommand = async (
-  taskId: string,
-  options: MergeOptions = {}
-) => {
+const mergeCommand = async (taskId: string, options: MergeOptions = {}) => {
   if (options.json !== undefined) {
     setJsonMode(options.json);
   }
@@ -258,13 +255,7 @@ export const mergeCommand = async (
   let projectConfig;
 
   // Load config
-  try {
-    projectConfig = ProjectConfigManager.load(project.path);
-  } catch (err) {
-    if (!isJsonMode()) {
-      console.log(colors.yellow('⚠ Could not load project settings'));
-    }
-  }
+  projectConfig = ProjectConfigManager.load(project.path);
 
   // Load user preferences
   try {
@@ -304,12 +295,14 @@ export const mergeCommand = async (
     jsonOutput.branchName = task.branchName;
 
     if (!isJsonMode()) {
-      console.log(colors.bold('Merge Task'));
-      console.log(colors.gray('├── ID: ') + colors.cyan(task.id.toString()));
-      console.log(colors.gray('├── Title: ') + task.title);
-      console.log(colors.gray('├── Worktree: ') + task.worktreePath);
-      console.log(colors.gray('├── Branch: ') + task.branchName);
-      console.log(colors.gray('└── Status: ') + task.status);
+      showTitle('Merge Task');
+      showProperties({
+        ID: colors.cyan(task.id.toString()),
+        Title: task.title,
+        Worktree: task.worktreePath,
+        Branch: task.branchName,
+        Status: task.status,
+      });
     }
 
     if (task.isPushed()) {
@@ -384,14 +377,15 @@ export const mergeCommand = async (
     if (!isJsonMode()) {
       // Show what will happen
       console.log('');
-      console.log(colors.cyan('The merge process will'));
+      const mergeSteps = [];
       if (hasWorktreeChanges) {
-        console.log(colors.cyan('├── Commit changes in the task worktree'));
+        mergeSteps.push(colors.cyan('Commit changes in the task worktree'));
       }
-      console.log(
-        colors.cyan('├── Merge the task branch into the current branch')
+      mergeSteps.push(
+        colors.cyan('Merge the task branch into the current branch')
       );
-      console.log(colors.cyan('└── Clean up the worktree and branch'));
+      mergeSteps.push(colors.cyan('Clean up the worktree and branch'));
+      showList(mergeSteps, { title: colors.cyan('The merge process will') });
     }
 
     // Confirm merge unless force flag is used (skip in JSON mode)
@@ -512,11 +506,7 @@ export const mergeCommand = async (
                 `\n⚠ Merge conflicts detected in ${mergeConflicts.length} file(s):`
               )
             );
-            mergeConflicts.forEach((file, index) => {
-              const isLast = index === mergeConflicts.length - 1;
-              const connector = isLast ? '└──' : '├──';
-              console.log(colors.gray(connector), file);
-            });
+            showList(mergeConflicts);
           }
 
           // Attempt to fix them with an AI
@@ -596,22 +586,18 @@ export const mergeCommand = async (
             jsonOutput.error = 'AI failed to resolve merge conflicts';
             if (!isJsonMode()) {
               console.log(colors.yellow('\n⚠ Merge aborted due to conflicts.'));
-              console.log(colors.gray('To resolve manually:'));
-              console.log(
-                colors.gray('├──'),
-                colors.gray('1. Fix conflicts in the listed files')
-              );
-              console.log(
-                colors.gray('├──'),
-                colors.gray('2. Run: git add <resolved-files>')
-              );
-              console.log(
-                colors.gray('└──'),
-                colors.gray('3. Run: git merge --continue')
+              showList(
+                [
+                  colors.gray('Fix conflicts in the listed files'),
+                  colors.gray('Run: git add <resolved-files>'),
+                  colors.gray('Run: git merge --continue'),
+                ],
+                { title: colors.gray('To resolve manually:') }
               );
 
-              console.log('\nIf you prefer to stop the process:');
-              console.log(colors.cyan(`└── 1. Run: git merge --abort`));
+              showList([colors.cyan('Run: git merge --abort')], {
+                title: '\nIf you prefer to stop the process:',
+              });
             }
             await exitWithError(jsonOutput, { telemetry });
             return;
@@ -670,3 +656,10 @@ export const mergeCommand = async (
     await telemetry?.shutdown();
   }
 };
+
+export default {
+  name: 'merge',
+  description: 'Merge the task changes into your current branch',
+  requireProject: true,
+  action: mergeCommand,
+} satisfies CommandDefinition;

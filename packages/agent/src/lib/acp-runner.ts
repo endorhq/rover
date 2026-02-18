@@ -11,6 +11,7 @@ import {
   ClientSideConnection,
   ndJsonStream,
   PROTOCOL_VERSION,
+  type ContentBlock,
 } from '@agentclientprotocol/sdk';
 import colors from 'ansi-colors';
 import { existsSync, readFileSync } from 'node:fs';
@@ -20,7 +21,13 @@ import type {
   WorkflowOutput,
   WorkflowStep,
 } from 'rover-schemas';
-import { WorkflowManager, IterationStatusManager, VERBOSE } from 'rover-core';
+import {
+  WorkflowManager,
+  IterationStatusManager,
+  VERBOSE,
+  JsonlLogger,
+  showList,
+} from 'rover-core';
 import { ACPClient } from './acp-client.js';
 import { copyFileSync, rmSync } from 'node:fs';
 
@@ -39,6 +46,7 @@ export interface ACPRunnerConfig {
   defaultModel?: string;
   statusManager?: IterationStatusManager;
   outputDir?: string;
+  logger?: JsonlLogger;
 }
 
 /**
@@ -57,6 +65,16 @@ function getACPSpawnCommand(tool: string): { command: string; args: string[] } {
         command: 'gemini',
         args: ['--experimental-acp'],
       };
+    case 'copilot':
+      return {
+        command: 'copilot',
+        args: ['--acp'],
+      };
+    case 'opencode':
+      return {
+        command: 'opencode',
+        args: ['acp'],
+      };
     default:
       throw new Error(`No ACP available for tool ${tool}`);
   }
@@ -69,6 +87,7 @@ export class ACPRunner {
   private defaultTool: string | undefined;
   private statusManager?: IterationStatusManager;
   private outputDir?: string;
+  private logger?: JsonlLogger;
 
   // ACP connection state
   private agentProcess: ChildProcess | null = null;
@@ -85,6 +104,7 @@ export class ACPRunner {
     this.defaultTool = config.defaultTool;
     this.statusManager = config.statusManager;
     this.outputDir = config.outputDir;
+    this.logger = config.logger;
 
     // Determine which tool to use
     // Priority: CLI flag > workflow defaults > fallback to claude
@@ -239,9 +259,26 @@ export class ACPRunner {
   /**
    * Send a prompt to the current session
    * Maps to the ACP session/prompt method
+   *
+   * Supports text, images (base64 or file:// URIs), and embedded resources.
    */
   async sendPrompt(
-    prompt: string
+    prompt: string,
+    options?: {
+      /** Image attachments (base64 data or file:// URIs) */
+      images?: Array<{
+        data: string;
+        mimeType: string;
+        uri?: string;
+      }>;
+      /** Embedded text or blob resources */
+      resources?: Array<{
+        uri: string;
+        mimeType?: string;
+        text?: string;
+        blob?: string;
+      }>;
+    }
   ): Promise<{ stopReason: string; response: string }> {
     if (!this.isConnectionInitialized || !this.connection) {
       throw new Error(
@@ -261,15 +298,50 @@ export class ACPRunner {
       // Start capturing agent messages
       this.client.startCapturing();
 
-      const promptRequest = {
-        sessionId: this.sessionId,
-        prompt: [
-          {
-            type: 'text',
-            text: prompt,
-          },
-        ],
-      };
+      // Build prompt content array
+      const promptContent: ContentBlock[] = [
+        {
+          type: 'text',
+          text: prompt,
+        },
+      ];
+
+      // Add image attachments if provided
+      if (options?.images) {
+        for (const image of options.images) {
+          promptContent.push({
+            type: 'image',
+            data: image.data,
+            mimeType: image.mimeType,
+            uri: image.uri,
+          });
+        }
+      }
+
+      // Add embedded resources if provided
+      if (options?.resources) {
+        for (const resource of options.resources) {
+          if (resource.text !== undefined) {
+            promptContent.push({
+              type: 'resource',
+              resource: {
+                uri: resource.uri,
+                mimeType: resource.mimeType,
+                text: resource.text,
+              },
+            });
+          } else if (resource.blob !== undefined) {
+            promptContent.push({
+              type: 'resource',
+              resource: {
+                uri: resource.uri,
+                mimeType: resource.mimeType,
+                blob: resource.blob,
+              },
+            });
+          }
+        }
+      }
 
       console.log(
         colors.gray(
@@ -279,7 +351,10 @@ export class ACPRunner {
         )
       );
 
-      const promptResult = await this.connection.prompt(promptRequest);
+      const promptResult = await this.connection.prompt({
+        sessionId: this.sessionId,
+        prompt: promptContent,
+      });
 
       console.log(
         colors.gray('[ACP] Prompt response:'),
@@ -299,6 +374,69 @@ export class ACPRunner {
       this.client.stopCapturing();
       throw new Error(
         `Failed to send prompt: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
+  /**
+   * Set the model for the current session
+   * Maps to the ACP session/set_model method (experimental)
+   *
+   * Allows changing the AI model used for subsequent prompts in the session.
+   */
+  async setModel(modelId: string): Promise<void> {
+    if (!this.isConnectionInitialized || !this.connection) {
+      throw new Error(
+        'Connection not initialized. Call initializeConnection() first.'
+      );
+    }
+
+    if (!this.isSessionCreated || !this.sessionId) {
+      throw new Error('No active session. Call createSession() first.');
+    }
+
+    try {
+      await this.connection.unstable_setSessionModel({
+        sessionId: this.sessionId,
+        modelId,
+      });
+
+      console.log(colors.gray(`🔄 Model changed to: ${modelId}`));
+    } catch (error) {
+      throw new Error(
+        `Failed to set model: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
+  /**
+   * Cancel an ongoing prompt operation
+   * Maps to the ACP session/cancel notification
+   *
+   * Aborts any running language model requests and tool calls.
+   */
+  async cancelPrompt(): Promise<void> {
+    if (!this.isConnectionInitialized || !this.connection) {
+      throw new Error(
+        'Connection not initialized. Call initializeConnection() first.'
+      );
+    }
+
+    if (!this.isSessionCreated || !this.sessionId) {
+      throw new Error('No active session. Call createSession() first.');
+    }
+
+    try {
+      await this.connection.cancel({
+        sessionId: this.sessionId,
+      });
+
+      console.log(
+        colors.yellow(`⚠️  Prompt cancelled for session: ${this.sessionId}`)
+      );
+    } catch (error) {
+      throw new Error(
+        `Failed to cancel prompt: ${error instanceof Error ? error.message : String(error)}`
       );
     }
   }
@@ -332,6 +470,15 @@ export class ACPRunner {
     try {
       // Update status before executing step
       this.statusManager?.update('running', step.name, currentProgress);
+
+      // Log step start
+      this.logger?.info('step_start', `Starting step: ${step.name}`, {
+        sessionId: this.sessionId ?? undefined,
+        stepId: step.id,
+        stepName: step.name,
+        agent: this.tool,
+        progress: currentProgress,
+      });
 
       // Build the prompt for this step (simplified for ACP - no file content injection)
       const prompt = this.buildACPPrompt(step);
@@ -375,10 +522,21 @@ export class ACPRunner {
       // Store outputs for next steps
       this.stepsOutput.set(stepId, outputs);
 
+      const duration = (performance.now() - start) / 1000;
+
+      // Log step completion
+      this.logger?.info('step_complete', `Step completed: ${step.name}`, {
+        sessionId: this.sessionId ?? undefined,
+        stepId: step.id,
+        stepName: step.name,
+        agent: this.tool,
+        duration,
+      });
+
       return {
         id: step.id,
         success: true,
-        duration: (performance.now() - start) / 1000,
+        duration,
         outputs,
       };
     } catch (error) {
@@ -389,11 +547,23 @@ export class ACPRunner {
 
       outputs.set('error', errorMessage);
 
+      const duration = (performance.now() - start) / 1000;
+
+      // Log step failure
+      this.logger?.error('step_fail', `Step failed: ${step.name}`, {
+        sessionId: this.sessionId ?? undefined,
+        stepId: step.id,
+        stepName: step.name,
+        agent: this.tool,
+        duration,
+        error: errorMessage,
+      });
+
       return {
         id: step.id,
         success: false,
         error: errorMessage,
-        duration: (performance.now() - start) / 1000,
+        duration,
         outputs,
       };
     }
@@ -482,11 +652,10 @@ export class ACPRunner {
 
     // Display warnings if any
     if (warnings.length > 0) {
-      console.log(colors.yellow.bold('\nPrompt Template Warnings:'));
-      warnings.forEach((warning, idx) => {
-        const prefix = idx === warnings.length - 1 ? '└──' : '├──';
-        console.log(colors.yellow(`${prefix} ${warning}`));
-      });
+      showList(
+        warnings.map(warning => colors.yellow(warning)),
+        { title: colors.yellow.bold('\nPrompt Template Warnings:') }
+      );
     }
 
     return prompt;
@@ -532,7 +701,7 @@ export class ACPRunner {
     if (fileOutputs.length > 0) {
       instructions += '### File Creation\n\n';
       instructions +=
-        'You MUST create the following files with the exact content needed and print their content in the current session:\n\n';
+        'You MUST create the following files with the exact content needed:\n\n';
 
       fileOutputs.forEach(output => {
         instructions += `- **${output.name}**: ${output.description}\n`;
@@ -547,9 +716,7 @@ export class ACPRunner {
       });
 
       instructions +=
-        'IMPORTANT: All files must be created with appropriate content. Do not create empty or placeholder files.\n';
-      instructions +=
-        'IMPORTANT: Print the content in the session so next steps have all the context.\n\n';
+        'IMPORTANT: All files must be created with appropriate content. Do not create empty or placeholder files.\n\n';
     }
 
     instructions += '**CRITICAL**: Follow these output requirements exactly. ';

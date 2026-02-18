@@ -1,3 +1,6 @@
+# Agents
+.claude/settings.local.json
+
 # Logs
 logs
 *.log
@@ -5,6 +8,9 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
+
+# Agents
+.claude/settings.local.json
 
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
@@ -137,6 +143,12 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Zed
+.zed
+
+# PNPM local store
+.pnpm-store
 
 # Rover
 .rover

@@ -1,16 +1,8 @@
+export type { CLIJsonOutput, CLIJsonOutputWithErrors } from './output-types.js';
+
 export interface ProjectInstructions {
   runDev: string;
   interaction: string;
-}
-
-export interface CLIJsonOutput {
-  success: boolean;
-  error?: string;
-}
-
-export interface CLIJsonOutputWithErrors {
-  success: boolean;
-  errors: string[];
 }
 
 export interface Task {
@@ -52,12 +44,14 @@ export interface TaskExpansion {
 export interface AIProvider {
   expandTask(
     briefDescription: string,
-    projectPath: string
+    projectPath: string,
+    contextContent?: string
   ): Promise<TaskExpansion | null>;
   expandIterationInstructions(
     instructions: string,
     previousPlan?: string,
-    previousChanges?: string
+    previousChanges?: string,
+    contextContent?: string
   ): Promise<TaskExpansion | null>;
   generateCommitMessage(
     taskTitle: string,
@@ -70,4 +64,21 @@ export interface AIProvider {
     diffContext: string,
     conflictedContent: string
   ): Promise<string | null>;
+}
+
+/**
+ * Defines the metadata for a CLI command.
+ * Each command file exports a default object that satisfies this interface.
+ */
+export interface CommandDefinition {
+  /** Command name used in CLI (e.g., 'list', 'task') */
+  name: string;
+  /** Parent command name for subcommands (e.g., 'workflows' for 'workflows add') */
+  parent?: string;
+  /** Description shown in help text */
+  description: string;
+  /** Whether this command requires an active project context */
+  requireProject: boolean;
+  /** The command action handler */
+  action: (...args: any[]) => Promise<void>;
 }

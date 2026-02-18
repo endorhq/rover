@@ -5,7 +5,7 @@ export class YarnSandboxPackage extends SandboxPackage {
   name = 'yarn';
 
   installScript(): string {
-    // yarn is typically included in node:alpine, but ensure it's installed
+    // yarn is typically included in the node base image, but ensure it's installed
     return `npm install -g yarn`;
   }
 
