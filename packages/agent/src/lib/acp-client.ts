@@ -26,6 +26,20 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { generateRandomId, VERBOSE } from 'rover-core';
 
+/**
+ * Format an error into a human-readable string.
+ * Handles Error instances, plain objects (e.g. JSON-RPC errors), and primitives.
+ */
+function formatError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (error !== null && typeof error === 'object') {
+    return JSON.stringify(error, null, 2);
+  }
+  return String(error);
+}
+
 // Custom JSON replacer to handle BigInt values
 function jsonReplacer(_key: string, value: unknown): unknown {
   if (typeof value === 'bigint') {
@@ -213,7 +227,7 @@ export class ACPClient implements Client {
     } catch (error) {
       console.log(
         colors.red(`[ACP] writeTextFile error:`),
-        colors.red(error instanceof Error ? error.message : String(error))
+        colors.red(formatError(error))
       );
       throw error;
     }
@@ -235,29 +249,19 @@ export class ACPClient implements Client {
         )
       );
     } catch (error) {
-      // Handle file not found - return empty content instead of error
-      // This allows agents like Gemini that read before write to proceed
-      // with file creation (Gemini's write tool calls read internally first)
       if (
         error instanceof Error &&
         'code' in error &&
         error.code === 'ENOENT'
       ) {
         console.log(
-          colors.yellow(
-            `[ACP] readTextFile: File not found ${params.path}, returning empty content`
-          )
+          colors.yellow(`[ACP] readTextFile: File not found ${params.path}`)
         );
-        const response = { content: '' };
-        console.log(
-          colors.gray('[ACP] readTextFile response:'),
-          colors.cyan(JSON.stringify(response, jsonReplacer, 2))
-        );
-        return Promise.resolve(response);
+        return this.onFileNotFound(params.path);
       }
       console.log(
         colors.red(`[ACP] readTextFile error:`),
-        colors.red(error instanceof Error ? error.message : String(error))
+        colors.red(formatError(error))
       );
       throw error;
     }
