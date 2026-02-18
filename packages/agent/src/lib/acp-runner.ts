@@ -113,6 +113,7 @@ export class ACPRunner {
   private inputs: Map<string, string>;
   public stepsOutput: Map<string, Map<string, string>> = new Map();
   private defaultTool: string | undefined;
+  private defaultModel: string | undefined;
   private statusManager?: IterationStatusManager;
   private outputDir?: string;
   private logger?: JsonlLogger;
@@ -130,6 +131,7 @@ export class ACPRunner {
     this.workflow = config.workflow;
     this.inputs = config.inputs;
     this.defaultTool = config.defaultTool;
+    this.defaultModel = config.defaultModel;
     this.statusManager = config.statusManager;
     this.outputDir = config.outputDir;
     this.logger = config.logger;
@@ -511,6 +513,20 @@ export class ACPRunner {
         agent: this.tool,
         progress: currentProgress,
       });
+
+      // Set the model for this step if specified (step-level > CLI flag > workflow defaults)
+      const stepModel = this.workflow.getStepModel(stepId, this.defaultModel);
+      if (stepModel) {
+        try {
+          await this.setModel(stepModel);
+        } catch (error) {
+          console.log(
+            colors.yellow(
+              `⚠️  Could not set model to ${stepModel} via ACP: ${formatError(error)}`
+            )
+          );
+        }
+      }
 
       // Build the prompt for this step (simplified for ACP - no file content injection)
       const prompt = this.buildACPPrompt(step);
