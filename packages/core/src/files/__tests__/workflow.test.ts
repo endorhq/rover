@@ -13,9 +13,11 @@ import { WorkflowManager } from '../workflow.js';
 import type {
   Workflow,
   WorkflowAgentStep,
+  WorkflowCommandStep,
   WorkflowInput,
   WorkflowOutput,
 } from 'rover-schemas';
+import { isAgentStep, isCommandStep } from 'rover-schemas';
 
 describe('WorkflowManager', () => {
   let testDir: string;
@@ -1191,6 +1193,158 @@ steps:
       workflow.save();
       const reloaded = WorkflowManager.load(workflowPath);
       expect(reloaded.name).toBe('test-workflow');
+    });
+  });
+
+  describe('command step schema validation', () => {
+    it('should load a workflow with a valid command step', () => {
+      const yamlContent = `
+version: '1.0'
+name: test-workflow
+description: Test workflow with command step
+inputs: []
+outputs: []
+steps:
+  - id: build
+    type: command
+    name: Build project
+    command: npm run build
+`;
+
+      writeFileSync(workflowPath, yamlContent, 'utf8');
+
+      const workflow = WorkflowManager.load(workflowPath);
+      expect(workflow.steps).toHaveLength(1);
+      expect(workflow.steps[0].type).toBe('command');
+      expect(workflow.steps[0].command).toBe('npm run build');
+    });
+
+    it('should load a command step with args and allow_failure', () => {
+      const yamlContent = `
+version: '1.0'
+name: test-workflow
+description: Test workflow
+inputs: []
+outputs: []
+steps:
+  - id: test
+    type: command
+    name: Run tests
+    command: npm
+    args:
+      - run
+      - test
+    allow_failure: true
+`;
+
+      writeFileSync(workflowPath, yamlContent, 'utf8');
+
+      const workflow = WorkflowManager.load(workflowPath);
+      const step = workflow.steps[0];
+      expect(step.type).toBe('command');
+      expect(step.command).toBe('npm');
+      expect(step.args).toEqual(['run', 'test']);
+      expect(step.allow_failure).toBe(true);
+    });
+
+    it('should reject a command step missing the command field', () => {
+      const yamlContent = `
+version: '1.0'
+name: test-workflow
+description: Test workflow
+inputs: []
+outputs: []
+steps:
+  - id: bad-step
+    type: command
+    name: Missing command
+`;
+
+      writeFileSync(workflowPath, yamlContent, 'utf8');
+
+      expect(() => {
+        WorkflowManager.load(workflowPath);
+      }).toThrow();
+    });
+
+    it('should load a workflow with mixed agent and command steps', () => {
+      const yamlContent = `
+version: '1.0'
+name: mixed-workflow
+description: Workflow with both agent and command steps
+inputs: []
+outputs: []
+steps:
+  - id: build
+    type: command
+    name: Build project
+    command: npm run build
+  - id: analyze
+    type: agent
+    name: Analyze build output
+    prompt: Analyze the build results
+`;
+
+      writeFileSync(workflowPath, yamlContent, 'utf8');
+
+      const workflow = WorkflowManager.load(workflowPath);
+      expect(workflow.steps).toHaveLength(2);
+      expect(workflow.steps[0].type).toBe('command');
+      expect(workflow.steps[1].type).toBe('agent');
+    });
+
+    it('should default allow_failure to undefined when not specified', () => {
+      const yamlContent = `
+version: '1.0'
+name: test-workflow
+description: Test workflow
+inputs: []
+outputs: []
+steps:
+  - id: build
+    type: command
+    name: Build
+    command: make build
+`;
+
+      writeFileSync(workflowPath, yamlContent, 'utf8');
+
+      const workflow = WorkflowManager.load(workflowPath);
+      expect(workflow.steps[0].allow_failure).toBeUndefined();
+    });
+  });
+
+  describe('type guards', () => {
+    it('isAgentStep should return true for agent steps', () => {
+      const step: WorkflowAgentStep = {
+        id: 'agent1',
+        type: 'agent',
+        name: 'Agent Step',
+        prompt: 'Do something',
+      };
+      expect(isAgentStep(step)).toBe(true);
+      expect(isCommandStep(step)).toBe(false);
+    });
+
+    it('isCommandStep should return true for command steps', () => {
+      const step: WorkflowCommandStep = {
+        id: 'cmd1',
+        type: 'command',
+        name: 'Command Step',
+        command: 'echo hello',
+      };
+      expect(isCommandStep(step)).toBe(true);
+      expect(isAgentStep(step)).toBe(false);
+    });
+
+    it('isCommandStep should return false for agent steps', () => {
+      const step: WorkflowAgentStep = {
+        id: 'agent1',
+        type: 'agent',
+        name: 'Agent Step',
+        prompt: 'Do something',
+      };
+      expect(isCommandStep(step)).toBe(false);
     });
   });
 });
