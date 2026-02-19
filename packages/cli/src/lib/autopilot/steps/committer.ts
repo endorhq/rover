@@ -2,8 +2,9 @@ import { join } from 'node:path';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { ProjectConfigManager, Git } from 'rover-core';
 import { getUserAIAgent, getAIAgentTool } from '../../agents/index.js';
+import { parseJsonResponse } from '../../../utils/json-parser.js';
 import { SpanWriter, ActionWriter, enqueueAction } from '../logging.js';
-import type { PendingAction } from '../types.js';
+import type { PendingAction, CommitterAIResult } from '../types.js';
 import type {
   Step,
   StepConfig,
@@ -11,6 +12,7 @@ import type {
   StepContext,
   StepResult,
 } from './types.js';
+import commitPromptTemplate from './prompts/commit-prompt.md';
 
 function getTaskIterationSummaries(iterationsPath: string): string[] {
   try {
@@ -48,30 +50,41 @@ function getTaskIterationSummaries(iterationsPath: string): string[] {
   }
 }
 
-async function generateCommitMessage(
+function buildCommitterUserMessage(
   taskTitle: string,
   taskDescription: string,
+  summaries: string[],
   recentCommits: string[],
-  summaries: string[]
-): Promise<string | null> {
-  try {
-    const agent = getUserAIAgent();
-    const aiAgent = getAIAgentTool(agent);
-    const commitMessage = await aiAgent.generateCommitMessage(
-      taskTitle,
-      taskDescription,
-      recentCommits,
-      summaries
-    );
+  branchName: string,
+  attribution: boolean
+): string {
+  let msg = '## Task\n\n';
+  msg += `**Title**: ${taskTitle}\n\n`;
+  msg += `**Description**: ${taskDescription}\n\n`;
+  msg += `**Branch**: ${branchName}\n\n`;
 
-    if (commitMessage == null || commitMessage.length === 0) {
-      return null;
-    }
-
-    return commitMessage;
-  } catch {
-    return null;
+  if (attribution) {
+    msg += `**Attribution**: Append the following trailer to the commit message (after a blank line):\n`;
+    msg += '`Co-Authored-By: Rover <noreply@endor.dev>`\n\n';
   }
+
+  if (summaries.length > 0) {
+    msg += '## Iteration Summaries\n\n';
+    for (const summary of summaries) {
+      msg += `- ${summary}\n`;
+    }
+    msg += '\n';
+  }
+
+  if (recentCommits.length > 0) {
+    msg += '## Recent Commits (for style reference)\n\n';
+    for (const commit of recentCommits) {
+      msg += `- ${commit}\n`;
+    }
+    msg += '\n';
+  }
+
+  return msg;
 }
 
 export const committerStep: Step = {
@@ -161,71 +174,49 @@ export const committerStep: Step = {
       };
     }
 
-    // Task completed — check for uncommitted changes
+    // Task completed — invoke the committer agent
     const git = new Git({ cwd: projectPath });
+    const summaries = getTaskIterationSummaries(task.iterationsPath());
+    const recentCommits = git.getRecentCommits();
 
-    let committed = false;
-    let commitSha: string | null = null;
-    let commitError: {
-      message: string;
-      exitCode: number | null;
-      stderr: string;
-      command: string;
-    } | null = null;
+    const projectConfig = ProjectConfigManager.load(projectPath);
+    const attribution =
+      projectConfig == null || projectConfig?.attribution === true;
 
-    try {
-      const hasChanges = git.hasUncommittedChanges({
-        worktreePath: task.worktreePath,
-      });
+    const userMessage = buildCommitterUserMessage(
+      task.title,
+      task.description,
+      summaries,
+      recentCommits,
+      branchName,
+      attribution
+    );
 
-      if (hasChanges) {
-        // Gather iteration summaries for commit message
-        const summaries = getTaskIterationSummaries(task.iterationsPath());
-        const recentCommits = git.getRecentCommits();
+    const agent = getUserAIAgent();
+    const agentTool = getAIAgentTool(agent);
+    const response = await agentTool.invoke(userMessage, {
+      json: true,
+      cwd: task.worktreePath,
+      systemPrompt: commitPromptTemplate,
+      tools: ['Bash'],
+    });
 
-        // Generate AI commit message
-        const aiCommitMessage = await generateCommitMessage(
-          task.title,
-          task.description,
-          recentCommits,
-          summaries
-        );
+    const result = parseJsonResponse<CommitterAIResult>(response);
 
-        let finalCommitMessage = aiCommitMessage || task.title;
+    // Build commit span based on result
+    const committed = result.status === 'committed';
+    const commitSha = result.commit_sha ?? null;
 
-        // Add attribution line when enabled
-        const projectConfig = ProjectConfigManager.load(projectPath);
-        if (projectConfig == null || projectConfig?.attribution === true) {
-          finalCommitMessage = `${finalCommitMessage}\n\nCo-Authored-By: Rover <noreply@endor.dev>`;
-        }
-
-        // Stage and commit
-        git.addAndCommit(finalCommitMessage, {
-          worktreePath: task.worktreePath,
-        });
-
-        committed = true;
-        commitSha = git.getCommitHash('HEAD', {
-          worktreePath: task.worktreePath,
-        });
-      }
-    } catch (err) {
-      commitError = {
-        message: err instanceof Error ? err.message : String(err),
-        exitCode: (err as any).exitCode ?? null,
-        stderr: (err as any).stderr?.toString() ?? '',
-        command: (err as any).command ?? 'git',
-      };
-    }
-
-    // Write commit span
     const commitSpanMeta: Record<string, any> = {
       roverTaskId: taskId,
       branchName,
       committed,
       commitSha,
       taskStatus: 'COMPLETED',
-      ...(commitError ? { commitError } : {}),
+      commitMessage: result.commit_message,
+      recoveryActions: result.recovery_actions_taken,
+      agentSummary: result.summary,
+      ...(result.error ? { error: result.error } : {}),
     };
 
     const commitSpan = new SpanWriter(projectId, {
@@ -234,27 +225,28 @@ export const committerStep: Step = {
       meta: commitSpanMeta,
     });
 
-    const commitSummary = commitError
-      ? `commit: task #${taskId}: commit failed`
-      : `commit: task #${taskId}: ${committed ? 'committed' : 'no changes'}`;
-
-    if (commitError) {
-      commitSpan.error(commitSummary);
+    if (result.status === 'failed') {
+      commitSpan.error(
+        `commit: task #${taskId}: commit failed: ${result.error ?? 'unknown error'}`
+      );
     } else {
-      commitSpan.complete(commitSummary);
+      const statusLabel =
+        result.status === 'committed' ? 'committed' : 'no changes';
+      commitSpan.complete(`commit: task #${taskId}: ${statusLabel}`);
     }
 
-    // Write resolve action and enqueue
+    // Always enqueue a resolve action
     const resolveMeta = {
       ...meta,
       committed,
       taskStatus: 'COMPLETED',
-      ...(commitError ? { commitError } : {}),
+      ...(result.error ? { commitError: result.error } : {}),
     };
 
-    const resolveReasoning = commitError
-      ? `Resolve task #${taskId}: ${meta.title} (commit failed: ${commitError.message})`
-      : `Resolve task #${taskId}: ${meta.title} (${committed ? 'committed' : 'no changes'})`;
+    const resolveReasoning =
+      result.status === 'failed'
+        ? `Resolve task #${taskId}: ${meta.title} (commit failed: ${result.error})`
+        : `Resolve task #${taskId}: ${meta.title} (${committed ? 'committed' : 'no changes'})`;
 
     const resolveAction = new ActionWriter(projectId, {
       action: 'resolve',
@@ -272,11 +264,12 @@ export const committerStep: Step = {
 
     store.removePending(pending.actionId);
 
-    const reasoning = commitError
-      ? `task #${taskId} commit failed: ${commitError.message}`
-      : committed
-        ? `task #${taskId} committed on ${branchName}`
-        : `task #${taskId} no changes`;
+    const reasoning =
+      result.status === 'failed'
+        ? `task #${taskId} commit failed: ${result.error}`
+        : committed
+          ? `task #${taskId} committed on ${branchName}`
+          : `task #${taskId} no changes`;
 
     return {
       spanId: commitSpan.id,

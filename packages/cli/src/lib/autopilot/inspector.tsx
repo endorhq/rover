@@ -528,7 +528,7 @@ function TracesListView({
               </Text>
               <Box>
                 {trace.steps.map((step, si) => (
-                  <Text key={step.actionId}>
+                  <Text key={`${step.actionId}-${si}`}>
                     <Text color={STEP_COLORS[step.status]}>
                       {STEP_FILLED[step.status]}
                     </Text>
@@ -1180,7 +1180,7 @@ function PendingPanel({
           const isSelected = realIndex === state.pendingSelectedIndex;
           const color = LOG_STEP_COLORS[p.action] ?? 'gray';
           return (
-            <Text key={p.actionId} wrap="truncate">
+            <Text key={`${p.actionId}-${i}`} wrap="truncate">
               <Text color={isSelected ? 'cyan' : undefined}>
                 {isSelected ? ' > ' : '   '}
               </Text>

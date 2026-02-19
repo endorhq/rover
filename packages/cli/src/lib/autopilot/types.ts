@@ -112,6 +112,15 @@ export interface ResolverAIResult {
   iterate_instructions?: string;
   fail_reason?: string;
 }
+
+export interface CommitterAIResult {
+  status: 'committed' | 'no_changes' | 'failed';
+  commit_sha: string | null;
+  commit_message: string | null;
+  error: string | null;
+  recovery_actions_taken: string[];
+  summary: string;
+}
 export type ViewMode = 'main' | 'inspector';
 
 export interface TaskMapping {

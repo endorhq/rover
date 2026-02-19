@@ -492,42 +492,6 @@ export const resolverStep: Step = {
   async process(pending: PendingAction, ctx: StepContext): Promise<StepResult> {
     const { store, projectId, project, projectPath, trace } = ctx;
 
-    // Git commit failed — noop (log and drop, trace ends here)
-    if (pending.meta?.commitError) {
-      const errorInfo = pending.meta.commitError;
-
-      const resolveSpan = new SpanWriter(projectId, {
-        step: 'resolve',
-        parentId: pending.spanId,
-        meta: {
-          decision: 'noop',
-          reason: `git commit failed: ${errorInfo.message}`,
-          commitError: errorInfo,
-        },
-      });
-      resolveSpan.fail(`resolve: commit error on trace: ${trace.summary}`);
-
-      store.removePending(pending.actionId);
-
-      store.appendLog({
-        ts: new Date().toISOString(),
-        traceId: pending.traceId,
-        spanId: resolveSpan.id,
-        actionId: pending.actionId,
-        step: 'resolve',
-        action: 'noop',
-        summary: `trace: ${trace.summary} — commit failed: ${errorInfo.message} (noop)`,
-      });
-
-      return {
-        spanId: resolveSpan.id,
-        terminal: true,
-        enqueuedActions: [],
-        reasoning: `fail: git commit failed: ${errorInfo.message}`,
-        status: 'failed',
-      };
-    }
-
     // Try deterministic paths first
     const quick = tryQuickDecision(trace);
 
