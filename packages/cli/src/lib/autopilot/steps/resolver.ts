@@ -1,28 +1,28 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
 import { join } from 'node:path';
 import { mkdirSync } from 'node:fs';
-import { IterationManager, type ProjectManager } from 'rover-core';
-import { getUserAIAgent, getAIAgentTool } from '../agents/index.js';
-import { parseJsonResponse } from '../../utils/json-parser.js';
-import { AutopilotStore } from './store.js';
-import { SpanWriter, ActionWriter, enqueueAction } from './logging.js';
-import resolvePromptTemplate from './resolve-prompt.md';
+import { IterationManager } from 'rover-core';
+import { getUserAIAgent, getAIAgentTool } from '../../agents/index.js';
+import { parseJsonResponse } from '../../../utils/json-parser.js';
+import { SpanWriter, ActionWriter, enqueueAction } from '../logging.js';
 import type {
-  ResolverStatus,
+  PendingAction,
   ResolverDecision,
   ResolverAIResult,
   ActionTrace,
-  PendingAction,
   Span,
+} from '../types.js';
+import type {
+  Step,
+  StepConfig,
+  StepDependencies,
+  StepContext,
+  StepResult,
 } from './types.js';
+import resolvePromptTemplate from './prompts/resolve-prompt.md';
 
-const PROCESS_INTERVAL_MS = 30_000; // 30 seconds
-const INITIAL_DELAY_MS = 25_000; // 25 seconds (staggered after committer's 20s)
 const MAX_RETRIES = 3;
 
 // ── Deterministic decision paths ─────────────────────────────────────────────
-// Only handles unambiguous states. Returns null when the situation needs AI
-// judgment (failures, empty worktrees, ambiguous outcomes).
 
 type QuickDecision = {
   decision: ResolverDecision;
@@ -32,7 +32,7 @@ type QuickDecision = {
 function tryQuickDecision(trace: ActionTrace): QuickDecision {
   const steps = trace.steps;
 
-  // Workflow steps still running or pending → wait (unambiguous)
+  // Workflow steps still running or pending -> wait
   const hasRunningWorkflow = steps.some(
     s =>
       s.action !== 'commit' &&
@@ -47,7 +47,7 @@ function tryQuickDecision(trace: ActionTrace): QuickDecision {
     };
   }
 
-  // Commit steps still active → wait (unambiguous)
+  // Commit steps still active -> wait
   const hasActiveCommit = steps.some(
     s =>
       s.action === 'commit' &&
@@ -57,7 +57,7 @@ function tryQuickDecision(trace: ActionTrace): QuickDecision {
     return { decision: 'wait', reason: 'commit steps still active' };
   }
 
-  // All commit steps completed, no failures → push (unambiguous)
+  // All commit steps completed, no failures -> push
   const commitSteps = steps.filter(s => s.action === 'commit');
   const failedSteps = steps.filter(
     s => s.status === 'failed' && s.action !== 'resolve' && s.action !== 'push'
@@ -69,7 +69,7 @@ function tryQuickDecision(trace: ActionTrace): QuickDecision {
     return { decision: 'push', reason: 'all commits completed' };
   }
 
-  // Max retries exceeded → fail (hard gate, no point asking AI)
+  // Max retries exceeded -> fail
   if (failedSteps.length > 0) {
     const retryCount = trace.retryCount ?? 0;
     if (retryCount >= MAX_RETRIES) {
@@ -80,7 +80,6 @@ function tryQuickDecision(trace: ActionTrace): QuickDecision {
     }
   }
 
-  // Failures present but retries remain, or other ambiguous state → needs AI
   return null;
 }
 
@@ -117,14 +116,14 @@ function buildResolverUserMessage(
 async function askAIForDecision(
   trace: ActionTrace,
   pending: PendingAction,
-  project: ProjectManager,
-  projectPath: string,
-  store: AutopilotStore
+  ctx: StepContext
 ): Promise<{
   decision: 'iterate' | 'fail';
   reason: string;
   iterateInstructions?: string;
 }> {
+  const { store, project, projectPath } = ctx;
+
   // Gather failed step details with task context
   const failedSteps = trace.steps.filter(
     s => s.status === 'failed' && s.action !== 'resolve' && s.action !== 'push'
@@ -137,9 +136,8 @@ async function askAIForDecision(
       reasoning: step.reasoning ?? 'unknown error',
     };
 
-    // Try to get task context from mapping
     const mapping = store.getTaskMapping(step.actionId);
-    if (mapping) {
+    if (mapping && project) {
       const task = project.getTask(mapping.taskId);
       if (task) {
         detail.task_title = task.title;
@@ -149,7 +147,6 @@ async function askAIForDecision(
       }
     }
 
-    // Check commit meta for additional context
     if (pending.meta?.committed !== undefined) {
       detail.committed = pending.meta.committed;
     }
@@ -160,7 +157,6 @@ async function askAIForDecision(
     failedStepDetails.push(detail);
   }
 
-  // Reconstruct span trace for full pipeline context
   const spans = store.getSpanTrace(pending.spanId);
 
   const userMessage = buildResolverUserMessage(
@@ -180,9 +176,7 @@ async function askAIForDecision(
 
   const result = parseJsonResponse<ResolverAIResult>(response);
 
-  // Validate decision
   if (result.decision !== 'iterate' && result.decision !== 'fail') {
-    // Fallback: treat unexpected decisions as iterate if retries remain
     return {
       decision: 'iterate',
       reason: `AI returned unexpected decision "${result.decision}", defaulting to iterate`,
@@ -208,111 +202,18 @@ async function askAIForDecision(
   };
 }
 
-// ── Process resolve action ───────────────────────────────────────────────────
+// ── Execute a decision ───────────────────────────────────────────────────────
 
-async function processResolveAction(
-  pending: PendingAction,
-  project: ProjectManager,
-  projectPath: string,
-  projectId: string,
-  tracesRef: React.MutableRefObject<Map<string, ActionTrace>>,
-  store: AutopilotStore,
-  onTracesUpdated: () => void
-): Promise<{ decision: ResolverDecision; reason: string }> {
-  const trace = tracesRef.current.get(pending.traceId);
-  if (!trace) {
-    throw new Error(`Trace ${pending.traceId} not found`);
-  }
-
-  // Git commit failed — noop (log and drop, trace ends here)
-  if (pending.meta?.commitError) {
-    const errorInfo = pending.meta.commitError;
-
-    const resolveSpan = new SpanWriter(projectId, {
-      step: 'resolve',
-      parentId: pending.spanId,
-      meta: {
-        decision: 'noop',
-        reason: `git commit failed: ${errorInfo.message}`,
-        commitError: errorInfo,
-      },
-    });
-    resolveSpan.fail(`resolve: commit error on trace: ${trace.summary}`);
-
-    store.removePending(pending.actionId);
-
-    store.appendLog({
-      ts: new Date().toISOString(),
-      traceId: pending.traceId,
-      spanId: resolveSpan.id,
-      actionId: pending.actionId,
-      step: 'resolve',
-      action: 'noop',
-      summary: `trace: ${trace.summary} — commit failed: ${errorInfo.message} (noop)`,
-    });
-
-    return {
-      decision: 'fail',
-      reason: `git commit failed: ${errorInfo.message}`,
-    };
-  }
-
-  // Try deterministic paths first
-  const quick = tryQuickDecision(trace);
-
-  if (quick) {
-    return executeDecision(
-      quick.decision,
-      quick.reason,
-      undefined,
-      pending,
-      trace,
-      project,
-      projectPath,
-      projectId,
-      tracesRef,
-      store,
-      onTracesUpdated
-    );
-  }
-
-  // Ambiguous state — ask the AI agent
-  const aiResult = await askAIForDecision(
-    trace,
-    pending,
-    project,
-    projectPath,
-    store
-  );
-
-  return executeDecision(
-    aiResult.decision,
-    aiResult.reason,
-    aiResult.iterateInstructions,
-    pending,
-    trace,
-    project,
-    projectPath,
-    projectId,
-    tracesRef,
-    store,
-    onTracesUpdated
-  );
-}
-
-async function executeDecision(
+function executeDecision(
   decision: ResolverDecision,
   reason: string,
   iterateInstructions: string | undefined,
   pending: PendingAction,
   trace: ActionTrace,
-  project: ProjectManager,
-  projectPath: string,
-  projectId: string,
-  tracesRef: React.MutableRefObject<Map<string, ActionTrace>>,
-  store: AutopilotStore,
-  onTracesUpdated: () => void
-): Promise<{ decision: ResolverDecision; reason: string }> {
+  ctx: StepContext
+): StepResult {
+  const { store, projectId, project } = ctx;
+
   switch (decision) {
     case 'wait': {
       store.removePending(pending.actionId);
@@ -326,11 +227,16 @@ async function executeDecision(
         action: 'wait',
         summary: `trace: ${trace.summary} — wait: ${reason}`,
       });
-      break;
+
+      return {
+        spanId: pending.spanId,
+        terminal: true,
+        enqueuedActions: [],
+        reasoning: `wait: ${reason}`,
+      };
     }
 
     case 'push': {
-      // 1. Write resolver's own span (what we decided)
       const resolveSpan = new SpanWriter(projectId, {
         step: 'resolve',
         parentId: pending.spanId,
@@ -338,7 +244,6 @@ async function executeDecision(
       });
       resolveSpan.complete(`resolve: trace ready to push: ${trace.summary}`);
 
-      // 2. Write push action and enqueue
       const pushMeta = {
         ...pending.meta,
         decision: 'push',
@@ -358,22 +263,42 @@ async function executeDecision(
         summary: `push: ${trace.summary}`,
       });
 
-      trace.steps.push({
-        actionId: pushAction.id,
-        action: 'push',
-        status: 'pending',
-        timestamp: new Date().toISOString(),
-        reasoning: 'all commits completed',
-      });
-
-      tracesRef.current.set(pending.traceId, trace);
-      onTracesUpdated();
       store.removePending(pending.actionId);
-      break;
+
+      return {
+        spanId: resolveSpan.id,
+        terminal: false,
+        enqueuedActions: [
+          {
+            actionId: pushAction.id,
+            actionType: 'push',
+            summary: 'all commits completed',
+          },
+        ],
+        reasoning: `push: ${reason}`,
+      };
     }
 
     case 'iterate': {
-      // Find the failed task to iterate on
+      if (!project) {
+        store.removePending(pending.actionId);
+        store.appendLog({
+          ts: new Date().toISOString(),
+          traceId: pending.traceId,
+          spanId: pending.spanId,
+          actionId: pending.actionId,
+          step: 'resolve',
+          action: 'fail',
+          summary: `trace: ${trace.summary} — cannot iterate, no project manager`,
+        });
+        return {
+          spanId: pending.spanId,
+          terminal: true,
+          enqueuedActions: [],
+          reasoning: 'fail: no project manager for iterate',
+        };
+      }
+
       const failedWorkflowStep = trace.steps.find(
         s =>
           s.status === 'failed' &&
@@ -382,7 +307,6 @@ async function executeDecision(
           s.action !== 'push'
       );
 
-      // Resolve the action ID — prefer workflow step, fall back to commit step
       const failedActionId =
         failedWorkflowStep?.actionId ??
         trace.steps.find(s => s.status === 'failed' && s.action === 'commit')
@@ -403,15 +327,22 @@ async function executeDecision(
           action: 'fail',
           summary: `trace: ${trace.summary} — cannot iterate, no task mapping`,
         });
-        return { decision: 'fail', reason: 'no task mapping for failed step' };
+        return {
+          spanId: pending.spanId,
+          terminal: true,
+          enqueuedActions: [],
+          reasoning: 'fail: no task mapping for failed step',
+        };
       }
 
       const task = project.getTask(mapping.taskId);
       if (!task) {
         store.removePending(pending.actionId);
         return {
-          decision: 'fail',
-          reason: `task #${mapping.taskId} not found`,
+          spanId: pending.spanId,
+          terminal: true,
+          enqueuedActions: [],
+          reasoning: `fail: task #${mapping.taskId} not found`,
         };
       }
 
@@ -447,7 +378,6 @@ async function executeDecision(
         }
       );
 
-      // 1. Write resolver's own span (what we decided)
       const resolveSpan = new SpanWriter(projectId, {
         step: 'resolve',
         parentId: pending.spanId,
@@ -463,7 +393,6 @@ async function executeDecision(
         `resolve: iterating task #${mapping.taskId}: ${reason}`
       );
 
-      // 2. Write workflow action and enqueue (same shape as planner's workflow actions)
       const workflowName = pending.meta?.workflow ?? 'swe';
       const workflowMeta = {
         workflow: workflowName,
@@ -491,22 +420,23 @@ async function executeDecision(
         summary: `${workflowName}: ${task.title}`,
       });
 
-      trace.steps.push({
-        actionId: workflowAction.id,
-        action: workflowName,
-        status: 'pending',
-        timestamp: new Date().toISOString(),
-        reasoning: `retry #${trace.retryCount}: ${task.title}`,
-      });
-
-      tracesRef.current.set(pending.traceId, trace);
-      onTracesUpdated();
       store.removePending(pending.actionId);
-      break;
+
+      return {
+        spanId: resolveSpan.id,
+        terminal: false,
+        enqueuedActions: [
+          {
+            actionId: workflowAction.id,
+            actionType: workflowName,
+            summary: `retry #${trace.retryCount}: ${task.title}`,
+          },
+        ],
+        reasoning: `iterate: ${reason}`,
+      };
     }
 
     case 'fail': {
-      // Write resolver's own span (terminal — no next action)
       const resolveSpan = new SpanWriter(projectId, {
         step: 'resolve',
         parentId: pending.spanId,
@@ -514,15 +444,15 @@ async function executeDecision(
       });
       resolveSpan.fail(`resolve: trace failed: ${trace.summary}`);
 
-      for (const step of trace.steps) {
-        if (step.status === 'pending') {
-          step.status = 'failed';
-          step.reasoning = `trace failed: ${reason}`;
-        }
-      }
+      // Mark all pending steps as failed via traceMutations
+      const stepUpdates = trace.steps
+        .filter(s => s.status === 'pending')
+        .map(s => ({
+          actionId: s.actionId,
+          status: 'failed' as const,
+          reasoning: `trace failed: ${reason}`,
+        }));
 
-      tracesRef.current.set(pending.traceId, trace);
-      onTracesUpdated();
       store.removePending(pending.actionId);
 
       store.appendLog({
@@ -534,143 +464,94 @@ async function executeDecision(
         action: 'fail',
         summary: `trace: ${trace.summary} — failed: ${reason}`,
       });
-      break;
+
+      return {
+        spanId: resolveSpan.id,
+        terminal: true,
+        enqueuedActions: [],
+        reasoning: `fail: ${reason}`,
+        traceMutations: {
+          stepUpdates,
+        },
+      };
     }
   }
-
-  return { decision, reason };
 }
 
-// ── Hook ─────────────────────────────────────────────────────────────────────
+export const resolverStep: Step = {
+  config: {
+    actionType: 'resolve',
+    maxParallel: 3,
+    dedupBy: 'traceId',
+  } satisfies StepConfig,
 
-export function useResolver(
-  project: ProjectManager,
-  projectPath: string,
-  projectId: string,
-  tracesRef: React.MutableRefObject<Map<string, ActionTrace>>,
-  onTracesUpdated: () => void
-): { status: ResolverStatus; processedCount: number } {
-  const [status, setStatus] = useState<ResolverStatus>('idle');
-  const [processedCount, setProcessedCount] = useState(0);
-  const inProgressRef = useRef<Set<string>>(new Set());
-  const storeRef = useRef<AutopilotStore | null>(null);
+  dependencies: {
+    needsProjectManager: true,
+  } satisfies StepDependencies,
 
-  if (!storeRef.current) {
-    const store = new AutopilotStore(projectId);
-    store.ensureDir();
-    storeRef.current = store;
-  }
+  async process(pending: PendingAction, ctx: StepContext): Promise<StepResult> {
+    const { store, projectId, project, projectPath, trace } = ctx;
 
-  const doProcess = useCallback(async () => {
-    const store = storeRef.current;
-    if (!store) return;
+    // Git commit failed — noop (log and drop, trace ends here)
+    if (pending.meta?.commitError) {
+      const errorInfo = pending.meta.commitError;
 
-    const pending = store.getPending();
-    const resolveActions = pending.filter(
-      p => p.action === 'resolve' && !inProgressRef.current.has(p.actionId)
+      const resolveSpan = new SpanWriter(projectId, {
+        step: 'resolve',
+        parentId: pending.spanId,
+        meta: {
+          decision: 'noop',
+          reason: `git commit failed: ${errorInfo.message}`,
+          commitError: errorInfo,
+        },
+      });
+      resolveSpan.fail(`resolve: commit error on trace: ${trace.summary}`);
+
+      store.removePending(pending.actionId);
+
+      store.appendLog({
+        ts: new Date().toISOString(),
+        traceId: pending.traceId,
+        spanId: resolveSpan.id,
+        actionId: pending.actionId,
+        step: 'resolve',
+        action: 'noop',
+        summary: `trace: ${trace.summary} — commit failed: ${errorInfo.message} (noop)`,
+      });
+
+      return {
+        spanId: resolveSpan.id,
+        terminal: true,
+        enqueuedActions: [],
+        reasoning: `fail: git commit failed: ${errorInfo.message}`,
+        status: 'failed',
+      };
+    }
+
+    // Try deterministic paths first
+    const quick = tryQuickDecision(trace);
+
+    if (quick) {
+      return executeDecision(
+        quick.decision,
+        quick.reason,
+        undefined,
+        pending,
+        trace,
+        ctx
+      );
+    }
+
+    // Ambiguous state — ask the AI agent
+    const aiResult = await askAIForDecision(trace, pending, ctx);
+
+    return executeDecision(
+      aiResult.decision,
+      aiResult.reason,
+      aiResult.iterateInstructions,
+      pending,
+      trace,
+      ctx
     );
-
-    if (resolveActions.length === 0) return;
-
-    setStatus('processing');
-
-    // De-duplicate: keep only one resolve action per traceId
-    const seenTraces = new Set<string>();
-    const deduped: PendingAction[] = [];
-    const toRemove: string[] = [];
-
-    for (const action of resolveActions) {
-      if (seenTraces.has(action.traceId)) {
-        toRemove.push(action.actionId);
-      } else {
-        seenTraces.add(action.traceId);
-        deduped.push(action);
-      }
-    }
-
-    for (const actionId of toRemove) {
-      store.removePending(actionId);
-    }
-
-    for (const action of deduped) {
-      inProgressRef.current.add(action.actionId);
-    }
-
-    const results = await Promise.allSettled(
-      deduped.map(async action => {
-        try {
-          const trace = tracesRef.current.get(action.traceId);
-          if (trace) {
-            const existingStep = trace.steps.find(
-              s => s.actionId === action.actionId
-            );
-            if (existingStep) {
-              existingStep.status = 'running';
-            }
-            tracesRef.current.set(action.traceId, trace);
-            onTracesUpdated();
-          }
-
-          const result = await processResolveAction(
-            action,
-            project,
-            projectPath,
-            projectId,
-            tracesRef,
-            store,
-            onTracesUpdated
-          );
-
-          const updatedTrace = tracesRef.current.get(action.traceId);
-          if (updatedTrace) {
-            const step = updatedTrace.steps.find(
-              s => s.actionId === action.actionId
-            );
-            if (step) {
-              step.status = 'completed';
-              step.reasoning = `${result.decision}: ${result.reason}`;
-            }
-            tracesRef.current.set(action.traceId, updatedTrace);
-            onTracesUpdated();
-          }
-
-          setProcessedCount(c => c + 1);
-        } catch (err) {
-          const trace = tracesRef.current.get(action.traceId);
-          if (trace) {
-            const step = trace.steps.find(s => s.actionId === action.actionId);
-            if (step) {
-              step.status = 'failed';
-              step.reasoning = err instanceof Error ? err.message : String(err);
-            }
-            tracesRef.current.set(action.traceId, trace);
-            onTracesUpdated();
-          }
-
-          store.removePending(action.actionId);
-        } finally {
-          inProgressRef.current.delete(action.actionId);
-        }
-      })
-    );
-
-    const hasError = results.some(r => r.status === 'rejected');
-    setStatus(hasError ? 'error' : 'idle');
-  }, [project, projectPath, projectId, tracesRef, onTracesUpdated]);
-
-  useEffect(() => {
-    let interval: ReturnType<typeof setInterval> | null = null;
-
-    const initialTimer = setTimeout(() => {
-      doProcess();
-      interval = setInterval(doProcess, PROCESS_INTERVAL_MS);
-    }, INITIAL_DELAY_MS);
-
-    return () => {
-      clearTimeout(initialTimer);
-      if (interval) clearInterval(interval);
-    };
-  }, [doProcess]);
-
-  return { status, processedCount };
-}
+  },
+};
