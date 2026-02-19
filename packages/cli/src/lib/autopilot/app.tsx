@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, useInput, useApp, useStdout } from 'ink';
 import type {
   ProjectManager,
@@ -6,24 +6,13 @@ import type {
   IterationStatusManager,
 } from 'rover-core';
 import { getVersion } from 'rover-core';
-import type {
-  TaskInfo,
-  LogEntry,
-  WorkSlot,
-  ViewMode,
-  ActionTrace,
-} from './types.js';
+import type { TaskInfo, LogEntry, WorkSlot, ViewMode } from './types.js';
 import { formatDuration } from './helpers.js';
 import { InfoPanel, SpaceScene, LogBook } from './components.js';
 import { InspectorView } from './inspector.js';
 import { useGitHubEvents } from './events.js';
-import { useCoordinator } from './coordinator.js';
-import { usePlanner } from './planner.js';
-import { useWorkflowRunner } from './workflow-runner.js';
-import { useCommitter } from './committer.js';
-import { useResolver } from './resolver.js';
+import { useStepOrchestrator } from './steps/use-orchestrator.js';
 import { getUserAIAgent } from '../agents/index.js';
-import { AutopilotStore } from './store.js';
 
 const MIN_LOG_HEIGHT = 5; // 3 visible lines + 2 for border
 
@@ -153,53 +142,11 @@ export function AutopilotApp({
     lastNewCount,
   } = useGitHubEvents(project.path, project.id);
 
-  // Store must be initialized before traces so we can load persisted traces
-  const storeRef = useRef<AutopilotStore | null>(null);
-  if (!storeRef.current) {
-    const store = new AutopilotStore(project.id);
-    store.ensureDir();
-    storeRef.current = store;
-  }
-
-  // Shared traces state: lifted from coordinator so planner can also update it
-  // Load persisted traces on first render so they survive CLI restarts
-  const tracesRef = useRef<Map<string, ActionTrace>>(
-    storeRef.current!.loadTraces()
-  );
-  const [tracesVersion, setTracesVersion] = useState(0);
-  const onTracesUpdated = useCallback(() => {
-    setTracesVersion(v => v + 1);
-    storeRef.current?.saveTraces(tracesRef.current);
-  }, []);
-
-  const { status: coordinatorStatus, processedCount } = useCoordinator(
-    project.path,
-    project.id,
-    tracesRef,
-    onTracesUpdated
-  );
-
-  const { status: plannerStatus, processedCount: plannerProcessedCount } =
-    usePlanner(project.path, project.id, tracesRef, onTracesUpdated);
-
-  const {
-    status: workflowRunnerStatus,
-    processedCount: workflowRunnerProcessedCount,
-  } = useWorkflowRunner(
+  const { statuses, traces, tracesRef, store } = useStepOrchestrator(
     project,
     project.path,
-    project.id,
-    tracesRef,
-    onTracesUpdated
+    project.id
   );
-
-  const { status: committerStatus, processedCount: committerProcessedCount } =
-    useCommitter(project, project.path, project.id, tracesRef, onTracesUpdated);
-
-  const { status: resolverStatus, processedCount: resolverProcessedCount } =
-    useResolver(project, project.path, project.id, tracesRef, onTracesUpdated);
-
-  const traces = Array.from(tracesRef.current.values());
 
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('main');
@@ -210,19 +157,16 @@ export function AutopilotApp({
       { timestamp: ts, message: 'Autopilot started' },
     ];
 
-    const store = storeRef.current;
-    if (store) {
-      const pending = store.getPending();
-      if (pending.length > 0) {
-        entries.push({
-          timestamp: ts,
-          message: `Autopilot resumed: ${pending.length} pending actions`,
-        });
-      }
+    const pending = store.getPending();
+    if (pending.length > 0) {
+      entries.push({
+        timestamp: ts,
+        message: `Autopilot resumed: ${pending.length} pending actions`,
+      });
     }
 
     setLogs(entries);
-  }, []);
+  }, [store]);
 
   // Log task status changes
   useEffect(() => {
@@ -269,6 +213,7 @@ export function AutopilotApp({
   }, [fetchStatus, lastFetchCount, lastRelevantCount, lastNewCount]);
 
   // Log coordinator status changes
+  const { status: coordinatorStatus, processedCount } = statuses.coordinator;
   useEffect(() => {
     if (coordinatorStatus === 'processing') {
       const ts = new Date().toLocaleTimeString();
@@ -289,6 +234,8 @@ export function AutopilotApp({
   }, [coordinatorStatus, processedCount]);
 
   // Log planner status changes
+  const { status: plannerStatus, processedCount: plannerProcessedCount } =
+    statuses.planner;
   useEffect(() => {
     if (plannerStatus === 'processing') {
       const ts = new Date().toLocaleTimeString();
@@ -309,6 +256,10 @@ export function AutopilotApp({
   }, [plannerStatus, plannerProcessedCount]);
 
   // Log workflow runner status changes
+  const {
+    status: workflowRunnerStatus,
+    processedCount: workflowRunnerProcessedCount,
+  } = statuses.workflow;
   useEffect(() => {
     if (workflowRunnerStatus === 'processing') {
       const ts = new Date().toLocaleTimeString();
@@ -332,6 +283,8 @@ export function AutopilotApp({
   }, [workflowRunnerStatus, workflowRunnerProcessedCount]);
 
   // Log committer status changes
+  const { status: committerStatus, processedCount: committerProcessedCount } =
+    statuses.committer;
   useEffect(() => {
     if (committerStatus === 'processing') {
       const ts = new Date().toLocaleTimeString();
@@ -352,6 +305,8 @@ export function AutopilotApp({
   }, [committerStatus, committerProcessedCount]);
 
   // Log resolver status changes
+  const { status: resolverStatus, processedCount: resolverProcessedCount } =
+    statuses.resolver;
   useEffect(() => {
     if (resolverStatus === 'processing') {
       const ts = new Date().toLocaleTimeString();
@@ -397,7 +352,7 @@ export function AutopilotApp({
         <InspectorView
           traces={traces}
           tracesRef={tracesRef}
-          store={storeRef.current!}
+          store={store}
           tasks={tasks}
           width={columns}
           height={rows}

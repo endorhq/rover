@@ -72,13 +72,12 @@ Not every event traverses all steps. The coordinator may decide no action is nee
 
 ### Processing Model
 
-Each step runs as an independent polling loop with:
+A single `StepOrchestrator` manages all steps using a hybrid event-driven + fallback interval model:
 
-- A **processing interval** — how often it checks for pending work.
-- An **initial delay** — staggered startup to avoid thundering herd on launch.
-- A **parallelism limit** — max concurrent actions being processed.
+- **Eager drain**: When new actions are enqueued (e.g. coordinator produces a `plan` action), the orchestrator immediately re-drains the pending queue. This creates natural cascading — event → coordinate → plan → workflow flows without waiting between steps. The drain loop continues as long as there are processable actions (respecting per-step `maxParallel`).
+- **Fallback interval**: A single background timer (30s) runs for `monitor()` calls (detecting workflow task completion), startup recovery (draining actions left from a previous run), and edge cases where the eager drain missed something.
 
-Steps are independent. They communicate exclusively through the store: one step writes an action and enqueues a pending entry; another step reads and processes it. There is no direct coupling between steps.
+Each step defines a `maxParallel` limit — the maximum concurrent actions being processed for that step type. Steps communicate exclusively through the store: one step writes an action and enqueues a pending entry; another step reads and processes it. There is no direct coupling between steps.
 
 ### Concurrency
 
