@@ -15,7 +15,7 @@ import {
 } from '@agentclientprotocol/sdk';
 import colors from 'ansi-colors';
 import { existsSync, readFileSync } from 'node:fs';
-import { basename, join } from 'node:path';
+import { basename, join, resolve } from 'node:path';
 import type {
   WorkflowAgentStep,
   WorkflowOutput,
@@ -65,9 +65,7 @@ function getACPSpawnCommand(
       };
     case 'gemini': {
       // Gemini implements ACP natively via --experimental-acp flag
-      const args = [
-        '--experimental-acp'
-      ];
+      const args = ['--experimental-acp'];
       if (model) {
         args.push('--model', model);
       }
@@ -749,14 +747,17 @@ export class ACPRunner {
 
       fileOutputs.forEach(output => {
         instructions += `- **${output.name}**: ${output.description}\n`;
-        instructions += `  - Create this file in the current working directory\n`;
 
         if (this.tool == 'gemini' || this.tool == 'qwen') {
-          // Gemini has difficulties calling its own tools
-          instructions += `  - When creating the file, call the write_file tool using an absolute path based on current directory. THIS IS MANDATORY\n`;
+          // Gemini refuses to write files using relative paths, so we must
+          // provide an absolute path in the prompt.
+          const absolutePath = resolve(output.filename!);
+          instructions += `  - When creating the file, call the write_file tool using the following absolute path. THIS IS MANDATORY\n`;
+          instructions += `  - Filename: \`${absolutePath}\`\n\n`;
+        } else {
+          instructions += `  - Create this file in the current working directory\n`;
+          instructions += `  - Filename: \`${output.filename}\`\n\n`;
         }
-
-        instructions += `  - Filename: \`${output.filename}\`\n\n`;
       });
 
       instructions +=

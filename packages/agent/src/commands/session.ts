@@ -2,6 +2,7 @@ import colors from 'ansi-colors';
 import { getVersion, launch, ProcessManager, VERBOSE } from 'rover-core';
 import { createAgent } from '../lib/agents/index.js';
 import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { showRoverHeader } from 'rover-core/src/display/header.js';
 
 interface SessionCommandOptions {
@@ -38,7 +39,10 @@ export const sessionCommand = async (
   let preContextInstructions = '';
 
   if (options.contextDir && existsSync(options.contextDir)) {
-    const indexPath = `${options.contextDir}/index.md`;
+    // Resolve to absolute paths so that agents like Gemini that refuse
+    // to operate on relative paths can read the files without issues.
+    const absoluteContextDir = resolve(options.contextDir);
+    const indexPath = `${absoluteContextDir}/index.md`;
 
     if (existsSync(indexPath)) {
       processManager.addItem('Load context information for this session');
@@ -46,12 +50,12 @@ export const sessionCommand = async (
       if (VERBOSE) {
         console.log(
           colors.gray(
-            `\nLoading context from directory: ${colors.cyan(options.contextDir)}`
+            `\nLoading context from directory: ${colors.cyan(absoluteContextDir)}`
           )
         );
       }
 
-      preContextInstructions = `You are helping the user iterate over the existing changes in this project. There are already changes in the project, so it's critical you get familiar with the current changes before continuing. Do not use git, as it's not available. Instead, read the context index file at \`${indexPath}\` for a complete overview of all available context sources. The context directory at \`${options.contextDir}/\` contains all the reference materials.
+      preContextInstructions = `You are helping the user iterate over the existing changes in this project. There are already changes in the project, so it's critical you get familiar with the current changes before continuing. Do not use git, as it's not available. Instead, read the context index file at \`${indexPath}\` for a complete overview of all available context sources. The context directory at \`${absoluteContextDir}/\` contains all the reference materials.
 
 After reading the context index (it's mandatory), ask the user for the new changes and follow the new instructions you get rigorously.`;
 
