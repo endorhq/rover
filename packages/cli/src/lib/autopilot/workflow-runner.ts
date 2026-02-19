@@ -1,12 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { join } from 'node:path';
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { randomUUID } from 'node:crypto';
+import { mkdirSync } from 'node:fs';
 import {
   ProjectConfigManager,
   IterationManager,
   Git,
-  getDataDir,
   type ProjectManager,
 } from 'rover-core';
 import { getUserAIAgent } from '../agents/index.js';
@@ -15,69 +13,19 @@ import { resolveAgentImage } from '../sandbox/container-common.js';
 import { generateBranchName } from '../../utils/branch-name.js';
 import { copyEnvironmentFiles } from '../../utils/env-files.js';
 import { AutopilotStore } from './store.js';
+import { SpanWriter, ActionWriter, enqueueAction } from './logging.js';
 import type {
   WorkflowRunnerStatus,
   ActionTrace,
   ActionStep,
   PendingAction,
-  Span,
-  Action,
 } from './types.js';
 
 const PROCESS_INTERVAL_MS = 30_000; // 30 seconds
 const INITIAL_DELAY_MS = 15_000; // 15 seconds (after planner's 10s)
 const MAX_RUNNING_TASKS = 3;
 
-function writeWorkflowSpan(
-  projectId: string,
-  summary: string,
-  parentSpanId: string,
-  meta: Record<string, any>
-): { spanId: string; actionId: string } {
-  const basePath = join(getDataDir(), 'projects', projectId);
-  const spansDir = join(basePath, 'spans');
-  const actionsDir = join(basePath, 'actions');
-
-  mkdirSync(spansDir, { recursive: true });
-  mkdirSync(actionsDir, { recursive: true });
-
-  const spanId = randomUUID();
-  const actionId = randomUUID();
-  const timestamp = new Date().toISOString();
-
-  const span: Span = {
-    id: spanId,
-    version: '1.0',
-    timestamp,
-    summary: `workflow: ${summary}`,
-    step: 'workflow',
-    parent: parentSpanId,
-    meta,
-  };
-
-  const action: Action = {
-    id: actionId,
-    version: '1.0',
-    action: 'workflow',
-    timestamp,
-    spanId,
-    meta,
-    reasoning: summary,
-  };
-
-  writeFileSync(
-    join(spansDir, `${spanId}.json`),
-    JSON.stringify(span, null, 2)
-  );
-  writeFileSync(
-    join(actionsDir, `${actionId}.json`),
-    JSON.stringify(action, null, 2)
-  );
-
-  return { spanId, actionId };
-}
-
-function writeCommitAction(
+function enqueueCommitAction(
   projectId: string,
   pending: PendingAction,
   roverTaskId: number,
@@ -86,17 +34,6 @@ function writeCommitAction(
   taskStatus: string,
   store: AutopilotStore
 ): { commitActionId: string; commitSpanId: string } {
-  const basePath = join(getDataDir(), 'projects', projectId);
-  const actionsDir = join(basePath, 'actions');
-  const spansDir = join(basePath, 'spans');
-
-  mkdirSync(actionsDir, { recursive: true });
-  mkdirSync(spansDir, { recursive: true });
-
-  const commitActionId = randomUUID();
-  const commitSpanId = randomUUID();
-  const timestamp = new Date().toISOString();
-
   const commitMeta = {
     roverTaskId,
     workflow: pending.meta?.workflow,
@@ -106,105 +43,30 @@ function writeCommitAction(
     taskStatus,
   };
 
-  // Write commit span
-  const span: Span = {
-    id: commitSpanId,
-    version: '1.0',
-    timestamp,
-    summary: `commit: ${pending.meta?.title}`,
+  // Commit span — created and completed immediately (it just records intent)
+  const span = new SpanWriter(projectId, {
     step: 'commit',
-    parent: workflowSpanId,
+    parentId: workflowSpanId,
     meta: commitMeta,
-  };
+  });
+  span.complete(`commit: ${pending.meta?.title}`);
 
-  writeFileSync(
-    join(spansDir, `${commitSpanId}.json`),
-    JSON.stringify(span, null, 2)
-  );
-
-  // Write commit action file
-  const action: Action = {
-    id: commitActionId,
-    version: '1.0',
+  // Commit action — tells the committer to run git operations
+  const action = new ActionWriter(projectId, {
     action: 'commit',
-    timestamp,
-    spanId: commitSpanId,
-    meta: commitMeta,
+    spanId: span.id,
     reasoning: `Commit task #${roverTaskId}: ${pending.meta?.title}`,
-  };
-
-  writeFileSync(
-    join(actionsDir, `${commitActionId}.json`),
-    JSON.stringify(action, null, 2)
-  );
-
-  // Enqueue commit pending action
-  store.addPending({
-    traceId: pending.traceId,
-    actionId: commitActionId,
-    spanId: commitSpanId,
-    action: 'commit',
-    summary: `commit: ${pending.meta?.title}`,
-    createdAt: timestamp,
     meta: commitMeta,
   });
 
-  return { commitActionId, commitSpanId };
-}
-
-function writeErrorSpan(
-  projectId: string,
-  summary: string,
-  parentSpanId: string,
-  error: unknown
-): { spanId: string; actionId: string } {
-  const basePath = join(getDataDir(), 'projects', projectId);
-  const spansDir = join(basePath, 'spans');
-  const actionsDir = join(basePath, 'actions');
-
-  mkdirSync(spansDir, { recursive: true });
-  mkdirSync(actionsDir, { recursive: true });
-
-  const spanId = randomUUID();
-  const actionId = randomUUID();
-  const timestamp = new Date().toISOString();
-
-  const errorMessage = error instanceof Error ? error.message : String(error);
-  const errorStack = error instanceof Error ? (error.stack ?? '') : '';
-
-  const span: Span = {
-    id: spanId,
-    version: '1.0',
-    timestamp,
-    summary: `error: ${summary}`,
+  enqueueAction(store, {
+    traceId: pending.traceId,
+    action,
     step: 'workflow',
-    parent: parentSpanId,
-    meta: {
-      error: errorMessage,
-      stack: errorStack,
-    },
-  };
+    summary: `commit: ${pending.meta?.title}`,
+  });
 
-  const action: Action = {
-    id: actionId,
-    version: '1.0',
-    action: 'noop',
-    timestamp,
-    spanId,
-    meta: {},
-    reasoning: `Error during workflow: ${errorMessage}`,
-  };
-
-  writeFileSync(
-    join(spansDir, `${spanId}.json`),
-    JSON.stringify(span, null, 2)
-  );
-  writeFileSync(
-    join(actionsDir, `${actionId}.json`),
-    JSON.stringify(action, null, 2)
-  );
-
-  return { spanId, actionId };
+  return { commitActionId: action.id, commitSpanId: span.id };
 }
 
 async function processWorkflowAction(
@@ -309,12 +171,11 @@ async function processWorkflowAction(
     task.resetToNew();
   }
 
-  // 6. Write workflow execution span
-  const { spanId: workflowSpanId } = writeWorkflowSpan(
-    projectId,
-    `${meta.workflow}: ${meta.title}`,
-    pending.spanId,
-    {
+  // 6. Write workflow execution span (stays running — monitor phase will complete it)
+  const workflowSpan = new SpanWriter(projectId, {
+    step: 'workflow',
+    parentId: pending.spanId,
+    meta: {
       roverTaskId: taskId,
       branchName,
       worktreePath,
@@ -323,15 +184,15 @@ async function processWorkflowAction(
       title: meta.title,
       baseBranch,
       ...(sandboxError ? { sandboxError } : {}),
-    }
-  );
+    },
+  });
 
   // 7. Store actionId → task mapping (with trace context for monitor phase)
   store.setTaskMapping(pending.actionId, {
     taskId,
     branchName,
     traceId: pending.traceId,
-    workflowSpanId,
+    workflowSpanId: workflowSpan.id,
   });
 
   // 8. Remove processed workflow action from pending
@@ -341,7 +202,7 @@ async function processWorkflowAction(
   store.appendLog({
     ts: new Date().toISOString(),
     traceId: pending.traceId,
-    spanId: workflowSpanId,
+    spanId: workflowSpan.id,
     actionId: pending.actionId,
     step: 'workflow',
     action: 'workflow',
@@ -352,7 +213,7 @@ async function processWorkflowAction(
     roverTaskId: taskId,
     branchName,
     containerId,
-    workflowSpanId,
+    workflowSpanId: workflowSpan.id,
   };
 }
 
@@ -400,22 +261,24 @@ export function useWorkflowRunner(
         const taskStatus = task.status;
 
         if (taskStatus === 'COMPLETED') {
-          // Task completed — write commit action and enqueue
-          const { commitActionId, commitSpanId } = writeCommitAction(
-            projectId,
-            {
-              traceId: mapping.traceId,
-              actionId,
-              spanId: mapping.workflowSpanId!,
-              action: 'workflow',
-              summary: step.reasoning ?? '',
-              createdAt: step.timestamp,
-              meta: {
-                workflow: step.action,
-                title: task.title,
-                description: task.description,
-              },
+          const pendingForCommit: PendingAction = {
+            traceId: mapping.traceId,
+            actionId,
+            spanId: mapping.workflowSpanId!,
+            action: 'workflow',
+            summary: step.reasoning ?? '',
+            createdAt: step.timestamp,
+            meta: {
+              workflow: step.action,
+              title: task.title,
+              description: task.description,
             },
+          };
+
+          // Task completed — enqueue commit action
+          const { commitActionId } = enqueueCommitAction(
+            projectId,
+            pendingForCommit,
             mapping.taskId,
             mapping.branchName,
             mapping.workflowSpanId!,
@@ -438,37 +301,28 @@ export function useWorkflowRunner(
 
           tracesRef.current.set(mapping.traceId, trace);
 
-          // Log completion
-          store.appendLog({
-            ts: new Date().toISOString(),
-            traceId: mapping.traceId,
-            spanId: commitSpanId,
-            actionId: commitActionId,
-            step: 'workflow',
-            action: 'commit',
-            summary: `task #${mapping.taskId}: ${task.title} — completed, commit enqueued`,
-          });
-
           updated = true;
           setProcessedCount(c => c + 1);
         } else if (taskStatus === 'FAILED') {
-          // Task failed — write commit action so committer/resolver can handle it
           const errorMessage = task.error ?? 'unknown error';
-          const { commitActionId, commitSpanId } = writeCommitAction(
-            projectId,
-            {
-              traceId: mapping.traceId,
-              actionId,
-              spanId: mapping.workflowSpanId!,
-              action: 'workflow',
-              summary: step.reasoning ?? '',
-              createdAt: step.timestamp,
-              meta: {
-                workflow: step.action,
-                title: task.title,
-                description: task.description,
-              },
+          const pendingForCommit: PendingAction = {
+            traceId: mapping.traceId,
+            actionId,
+            spanId: mapping.workflowSpanId!,
+            action: 'workflow',
+            summary: step.reasoning ?? '',
+            createdAt: step.timestamp,
+            meta: {
+              workflow: step.action,
+              title: task.title,
+              description: task.description,
             },
+          };
+
+          // Task failed — enqueue commit action so committer/resolver can handle it
+          const { commitActionId } = enqueueCommitAction(
+            projectId,
+            pendingForCommit,
             mapping.taskId,
             mapping.branchName,
             mapping.workflowSpanId!,
@@ -490,17 +344,6 @@ export function useWorkflowRunner(
           });
 
           tracesRef.current.set(mapping.traceId, trace);
-
-          // Log failure
-          store.appendLog({
-            ts: new Date().toISOString(),
-            traceId: mapping.traceId,
-            spanId: commitSpanId,
-            actionId: commitActionId,
-            step: 'workflow',
-            action: 'commit',
-            summary: `task #${mapping.taskId}: ${task.title} — failed: ${errorMessage}, commit enqueued`,
-          });
 
           updated = true;
         }
@@ -651,24 +494,26 @@ export function useWorkflowRunner(
           tracesRef.current.set(action.traceId, trace);
           onTracesUpdated();
         } catch (err) {
-          // Write error span + noop action
-          const { spanId: errorSpanId, actionId: errorActionId } =
-            writeErrorSpan(
-              projectId,
-              action.meta?.title ?? action.summary,
-              action.spanId,
-              err
-            );
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          const errorStack = err instanceof Error ? (err.stack ?? '') : '';
+
+          // Write error span — workflow step that errored out
+          const errorSpan = new SpanWriter(projectId, {
+            step: 'workflow',
+            parentId: action.spanId,
+            meta: { error: errorMessage, stack: errorStack },
+          });
+          errorSpan.error(`error: ${action.meta?.title ?? action.summary}`);
 
           // Write error log entry
           store.appendLog({
             ts: new Date().toISOString(),
             traceId: action.traceId,
-            spanId: errorSpanId,
-            actionId: errorActionId,
+            spanId: errorSpan.id,
+            actionId: action.actionId,
             step: 'workflow',
             action: 'error',
-            summary: `error: ${err instanceof Error ? err.message : String(err)}`,
+            summary: `error: ${errorMessage}`,
           });
 
           // Mark step as failed in the trace

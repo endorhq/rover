@@ -32,13 +32,17 @@ export interface GitHubEvent {
   payload: Record<string, any>;
 }
 
+export type SpanStatus = 'running' | 'completed' | 'failed' | 'error';
+
 export interface Span {
   id: string;
   version: string;
   timestamp: string;
-  summary: string;
   step: string;
   parent: string | null;
+  status?: SpanStatus;
+  completed?: string | null;
+  summary: string | null;
   meta: Record<string, any>;
 }
 

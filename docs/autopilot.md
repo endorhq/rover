@@ -60,14 +60,15 @@ When a step creates an action, it also enqueues a corresponding pending entry. T
 
 ### Step Chain
 
-The pipeline consists of nine steps, each responsible for a specific concern:
+The pipeline consists of ten steps, each responsible for a specific concern:
 
 ```plain
 Event → Coordinate → Plan → Workflow → Commit → Resolve → Push → Notify
                 ↘ Noop
+                ↘ Cleanup
 ```
 
-Not every event traverses all steps. The coordinator may decide no action is needed and produce a `noop` action, ending the trace after three spans (`event → coordinate → noop`). The resolver may loop back to retry a failed workflow. Multiple steps can branch into Notify as a terminal step — the coordinator, planner, resolver, and pusher can all produce `notify` actions.
+Not every event traverses all steps. The coordinator may decide no action is needed and produce a `noop` action, ending the trace after three spans (`event → coordinate → noop`). When a Rover-created PR is merged, the coordinator produces a `cleanup` action to tear down the workspace (`event → coordinate → cleanup`). The resolver may loop back to retry a failed workflow. Multiple steps can branch into Notify as a terminal step — the coordinator, planner, resolver, and pusher can all produce `notify` actions.
 
 ### Processing Model
 
@@ -126,6 +127,12 @@ event (issue comment, with answer) → coordinate (has context now) → plan →
 
 # Workflow fails, max retries exceeded
 → workflow/swe [failed] → commit → resolve (iterate) → workflow/swe [failed] → commit → resolve (fail)
+
+# Rover-created PR is merged, workspace cleaned up
+event (PR merged) → coordinate (Rover PR, cleanup) → cleanup (remove worktree, branch, task)
+
+# Reviewer requests changes on a Rover-created PR
+event (PR review: "changes requested") → coordinate (Rover PR, feedback) → plan (iterate with feedback) → workflow/swe (existing task/branch) → commit → resolve → push → notify
 ```
 
 ## Steps
@@ -173,8 +180,15 @@ The decision-making entry point. Receives events and decides what the autopilot 
 | `notify` | Respond to the source — answer a question, acknowledge, clarify | `notify` action |
 | `wait` | Wait for external conditions | `wait` action |
 | `flag` | Flag for human review | `flag` action |
+| `cleanup` | A Rover-created PR was merged — tear down the associated workspace | `cleanup` action |
 
 The coordinator cannot produce a `coordinate` action (no recursive self-dispatch). When the coordinator needs clarification before proceeding, it uses `notify` to post the question back to the source channel (see [Clarification Pattern](#clarification-pattern)).
+
+**Rover-created PR handling**: The coordinator has two additional responsibilities for events that target pull requests created by Rover:
+
+1. **Merged PR → cleanup.** When a `PullRequestEvent` with action `closed` (merged) arrives, the coordinator checks `taskMappings` in the state to determine if the PR belongs to a Rover task. If a match is found, it produces a `cleanup` action referencing the associated task. The cleanup step then tears down the workspace. Chain: `event → coordinate → cleanup`.
+
+2. **PR feedback → iterate via planner.** When review comments, PR comments, or review requests arrive on a Rover-created PR, the coordinator recognizes the PR as its own by checking `taskMappings`. Instead of treating the feedback as an unrelated event, it routes to `plan`. This is a separate, independent trace — there is no cross-trace linking. The planner receives the full feedback context along with the existing task reference, understands the situation, and produces a `workflow` action that iterates on the existing task and branch with updated instructions. Chain: `event → coordinate → plan → workflow (iterate existing task) → commit → resolve → push → notify`.
 
 ### Noop
 
@@ -358,6 +372,28 @@ The visibility level is determined by the event source. GitHub issues and PRs on
 
 **Extensibility**: The channel resolution is based on the source event type, not hardcoded to GitHub. When new event sources are added (chat apps, other platforms), the notify step routes to the appropriate channel based on the event metadata. The event span must always contain enough information for the notify step to resolve the delivery target and its visibility.
 
+### Cleanup
+
+Tears down the workspace associated with a completed Rover task. This is a terminal step — it removes the git worktree, branch, and Rover task resources, then ends the trace.
+
+| | |
+|---|---|
+| **Trigger** | Pending `cleanup` action |
+| **Input** | Cleanup action meta (references the task ID, branch name, worktree path from `taskMappings`) |
+| **Span** | `step: "cleanup"`, `status: "completed"`, meta contains the resources removed |
+| **Actions** | None (trace ends) |
+
+**Behavior**:
+
+1. Look up the task mapping from the action meta (task ID, branch name).
+2. Remove the git worktree for the task branch.
+3. Delete the local branch.
+4. Clean up the Rover task resources.
+5. Remove the entry from `taskMappings` in the state.
+6. Record what was cleaned up in the span meta.
+
+The cleanup step is deterministic — no AI, no tools beyond git and filesystem operations. If cleanup fails (e.g., worktree already removed, branch doesn't exist), it records the issue in span meta but still completes successfully. Cleanup is best-effort; a partial cleanup is acceptable and should not block the trace.
+
 ## Clarification Pattern
 
 Clarification is not a dedicated step — it is a pattern that emerges from the combination of Notify (to post the question) and the event loop (to pick up the response).
@@ -412,7 +448,7 @@ Spans and actions are stored as individual JSON files at the **project level**, 
   "id": "UUID",
   "version": "1.0",
   "timestamp": "ISO 8601",       // When the span was created
-  "step": "step name",           // event | coordinate | plan | workflow | commit | resolve | push | notify | noop
+  "step": "step name",           // event | coordinate | plan | workflow | commit | resolve | push | notify | noop | cleanup
   "parentId": "UUID | null",     // Parent span. Null for event spans (root)
 
   "status": "running",           // running | completed | failed | error
@@ -430,7 +466,7 @@ Spans and actions are stored as individual JSON files at the **project level**, 
   "id": "UUID",
   "version": "1.0",
   "timestamp": "ISO 8601",       // When the action was created
-  "action": "step name",         // coordinate | plan | workflow | commit | resolve | push | notify | noop
+  "action": "step name",         // coordinate | plan | workflow | commit | resolve | push | notify | noop | cleanup
   "spanId": "UUID",              // The span that created this action
   "reason": "string",            // Why this action was created
   "meta": {}                     // Data needed by the target step
@@ -478,7 +514,7 @@ Spans and actions are stored as individual JSON files at the **project level**, 
 
 1. **Steps communicate only through the store.** No direct function calls between steps. One step writes an action and enqueues a pending entry; another reads it. This keeps steps independent and testable.
 
-2. **Spans record, actions direct.** A span captures what happened. An action describes what should happen next. Not every span produces an action — `noop` and `notify` are terminal steps that create a span but no further actions. A `fail` decision terminates the trace at the resolver. Every trace must end with an explicit terminal step so the outcome is unambiguous.
+2. **Spans record, actions direct.** A span captures what happened. An action describes what should happen next. Not every span produces an action — `noop`, `notify`, and `cleanup` are terminal steps that create a span but no further actions. A `fail` decision terminates the trace at the resolver. Every trace must end with an explicit terminal step so the outcome is unambiguous.
 
 3. **Actions are immutable, spans are mutable during processing.** Once created, an action never changes. Spans are updated as the step executes (adding results, summary, completion timestamp), then become immutable.
 

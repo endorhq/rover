@@ -1,10 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { join } from 'node:path';
-import { mkdirSync, writeFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
-import { launch, getDataDir } from 'rover-core';
-import type { FetchStatus, GitHubEvent, Span, Action } from './types.js';
+import { launch } from 'rover-core';
+import type { FetchStatus, GitHubEvent } from './types.js';
 import { AutopilotStore } from './store.js';
+import { SpanWriter, ActionWriter, enqueueAction } from './logging.js';
 import { getRepoInfo } from './helpers.js';
 
 const POLL_INTERVAL_MS = 60_000; // 1 minute
@@ -195,50 +194,35 @@ export function filterRelevantEvents(
 
 export function writeSpanAndAction(
   projectId: string,
-  event: GitHubEvent & RelevantEvent
+  event: GitHubEvent & RelevantEvent,
+  store: AutopilotStore
 ): { spanId: string; actionId: string; traceId: string } {
-  const basePath = join(getDataDir(), 'projects', projectId);
-  const spansDir = join(basePath, 'spans');
-  const actionsDir = join(basePath, 'actions');
-
-  mkdirSync(spansDir, { recursive: true });
-  mkdirSync(actionsDir, { recursive: true });
-
-  const spanId = randomUUID();
-  const actionId = randomUUID();
   const traceId = randomUUID();
-  const timestamp = new Date().toISOString();
 
-  const span: Span = {
-    id: spanId,
-    version: '1.0',
-    timestamp,
-    summary: event.summary,
+  // Event span — root of the trace, completed immediately
+  const span = new SpanWriter(projectId, {
     step: 'event',
-    parent: null,
+    parentId: null,
     meta: event.meta,
-  };
+  });
+  span.complete(event.summary);
 
-  const action: Action = {
-    id: actionId,
-    version: '1.0',
+  // Coordinate action — tells the coordinator to decide what to do
+  const action = new ActionWriter(projectId, {
     action: 'coordinate',
-    timestamp,
-    spanId,
-    meta: event.meta,
+    spanId: span.id,
     reasoning: 'Needs to take a decision about what to do with this event',
-  };
+    meta: event.meta,
+  });
 
-  writeFileSync(
-    join(spansDir, `${spanId}.json`),
-    JSON.stringify(span, null, 2)
-  );
-  writeFileSync(
-    join(actionsDir, `${actionId}.json`),
-    JSON.stringify(action, null, 2)
-  );
+  enqueueAction(store, {
+    traceId,
+    action,
+    step: 'event',
+    summary: event.summary,
+  });
 
-  return { spanId, actionId, traceId };
+  return { spanId: span.id, actionId: action.id, traceId };
 }
 
 export function useGitHubEvents(
@@ -283,30 +267,7 @@ export function useGitHubEvents(
       const newEvents = relevant.filter(e => !store.isEventProcessed(e.id));
 
       for (const event of newEvents) {
-        const { spanId, actionId, traceId } = writeSpanAndAction(
-          projectId,
-          event
-        );
-
-        store.addPending({
-          traceId,
-          actionId,
-          spanId,
-          action: 'coordinate',
-          summary: event.summary,
-          createdAt: new Date().toISOString(),
-          meta: event.meta,
-        });
-
-        store.appendLog({
-          ts: new Date().toISOString(),
-          traceId,
-          spanId,
-          actionId,
-          step: 'event',
-          action: 'coordinate',
-          summary: event.summary,
-        });
+        writeSpanAndAction(projectId, event, store);
       }
 
       // Mark all new event IDs as processed
