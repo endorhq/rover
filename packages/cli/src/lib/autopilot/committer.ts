@@ -1,28 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { join } from 'node:path';
-import {
-  mkdirSync,
-  writeFileSync,
-  existsSync,
-  readdirSync,
-  readFileSync,
-} from 'node:fs';
-import { randomUUID } from 'node:crypto';
-import {
-  ProjectConfigManager,
-  Git,
-  getDataDir,
-  type ProjectManager,
-} from 'rover-core';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { ProjectConfigManager, Git, type ProjectManager } from 'rover-core';
 import { getUserAIAgent, getAIAgentTool } from '../agents/index.js';
 import { AutopilotStore } from './store.js';
-import type {
-  CommitterStatus,
-  ActionTrace,
-  PendingAction,
-  Span,
-  Action,
-} from './types.js';
+import { SpanWriter, ActionWriter, enqueueAction } from './logging.js';
+import type { CommitterStatus, ActionTrace, PendingAction } from './types.js';
 
 const PROCESS_INTERVAL_MS = 30_000; // 30 seconds
 const INITIAL_DELAY_MS = 20_000; // 20 seconds (staggered after workflow runner's 15s)
@@ -89,71 +72,6 @@ async function generateCommitMessage(
   }
 }
 
-/**
- * Write the committer's own span — records what the commit step did.
- */
-function writeCommitSpan(
-  projectId: string,
-  summary: string,
-  parentSpanId: string,
-  meta: Record<string, any>
-): { spanId: string } {
-  const basePath = join(getDataDir(), 'projects', projectId);
-  const spansDir = join(basePath, 'spans');
-  mkdirSync(spansDir, { recursive: true });
-
-  const spanId = randomUUID();
-  const timestamp = new Date().toISOString();
-
-  const span: Span = {
-    id: spanId,
-    version: '1.0',
-    timestamp,
-    summary: `commit: ${summary}`,
-    step: 'commit',
-    parent: parentSpanId,
-    meta,
-  };
-
-  writeFileSync(
-    join(spansDir, `${spanId}.json`),
-    JSON.stringify(span, null, 2)
-  );
-
-  return { spanId };
-}
-
-/**
- * Write the resolve Action file for the next step in the pipeline.
- * This creates the action on disk so the resolver can read it.
- */
-function writeResolveAction(
-  projectId: string,
-  actionId: string,
-  commitSpanId: string,
-  meta: Record<string, any>,
-  reasoning: string
-): void {
-  const basePath = join(getDataDir(), 'projects', projectId);
-  const actionsDir = join(basePath, 'actions');
-  mkdirSync(actionsDir, { recursive: true });
-
-  const action: Action = {
-    id: actionId,
-    version: '1.0',
-    action: 'resolve',
-    timestamp: new Date().toISOString(),
-    spanId: commitSpanId,
-    meta,
-    reasoning,
-  };
-
-  writeFileSync(
-    join(actionsDir, `${actionId}.json`),
-    JSON.stringify(action, null, 2)
-  );
-}
-
 async function processCommitAction(
   pending: PendingAction,
   project: ProjectManager,
@@ -191,59 +109,42 @@ async function processCommitAction(
 
   // If the task failed, skip committing — pass through to resolver
   if (taskStatus === 'FAILED' || task.status === 'FAILED') {
-    const { spanId: commitSpanId } = writeCommitSpan(
-      projectId,
-      `task #${taskId} failed, skipping commit`,
-      pending.spanId,
-      {
+    const commitSpan = new SpanWriter(projectId, {
+      step: 'commit',
+      parentId: pending.spanId,
+      meta: {
         roverTaskId: taskId,
         branchName,
         committed: false,
         commitSha: null,
         taskStatus: 'FAILED',
         error: task.error ?? 'unknown error',
-      }
-    );
+      },
+    });
+    commitSpan.fail(`commit: task #${taskId} failed, skipping commit`);
 
-    // Write resolve action file to disk and enqueue
-    const resolveActionId = randomUUID();
     const resolveMeta = {
       ...meta,
       committed: false,
       taskStatus: 'FAILED',
     };
 
-    writeResolveAction(
-      projectId,
-      resolveActionId,
-      commitSpanId,
-      resolveMeta,
-      `Resolve task #${taskId}: ${meta.title} (failed)`
-    );
-
-    store.addPending({
-      traceId: pending.traceId,
-      actionId: resolveActionId,
-      spanId: commitSpanId,
+    const resolveAction = new ActionWriter(projectId, {
       action: 'resolve',
-      summary: `resolve: ${meta.title}`,
-      createdAt: new Date().toISOString(),
+      spanId: commitSpan.id,
+      reasoning: `Resolve task #${taskId}: ${meta.title} (failed)`,
       meta: resolveMeta,
+    });
+
+    enqueueAction(store, {
+      traceId: pending.traceId,
+      action: resolveAction,
+      step: 'commit',
+      summary: `resolve: ${meta.title}`,
     });
 
     // Remove processed commit action
     store.removePending(pending.actionId);
-
-    // Log
-    store.appendLog({
-      ts: new Date().toISOString(),
-      traceId: pending.traceId,
-      spanId: commitSpanId,
-      actionId: resolveActionId,
-      step: 'commit',
-      action: 'resolve',
-      summary: `task #${taskId}: ${meta.title} — failed, skipping commit, resolve enqueued`,
-    });
 
     return { committed: false, taskId, branchName, commitError: null };
   }
@@ -306,26 +207,32 @@ async function processCommitAction(
   }
 
   // Write commit span
+  const commitSpanMeta: Record<string, any> = {
+    roverTaskId: taskId,
+    branchName,
+    committed,
+    commitSha,
+    taskStatus: 'COMPLETED',
+    ...(commitError ? { commitError } : {}),
+  };
+
+  const commitSpan = new SpanWriter(projectId, {
+    step: 'commit',
+    parentId: pending.spanId,
+    meta: commitSpanMeta,
+  });
+
   const commitSummary = commitError
-    ? `task #${taskId}: commit failed`
-    : `task #${taskId}: ${committed ? 'committed' : 'no changes'}`;
+    ? `commit: task #${taskId}: commit failed`
+    : `commit: task #${taskId}: ${committed ? 'committed' : 'no changes'}`;
 
-  const { spanId: commitSpanId } = writeCommitSpan(
-    projectId,
-    commitSummary,
-    pending.spanId,
-    {
-      roverTaskId: taskId,
-      branchName,
-      committed,
-      commitSha,
-      taskStatus: 'COMPLETED',
-      ...(commitError ? { commitError } : {}),
-    }
-  );
+  if (commitError) {
+    commitSpan.error(commitSummary);
+  } else {
+    commitSpan.complete(commitSummary);
+  }
 
-  // Write resolve action file to disk and enqueue
-  const resolveActionId = randomUUID();
+  // Write resolve action and enqueue
   const resolveMeta = {
     ...meta,
     committed,
@@ -337,39 +244,22 @@ async function processCommitAction(
     ? `Resolve task #${taskId}: ${meta.title} (commit failed: ${commitError.message})`
     : `Resolve task #${taskId}: ${meta.title} (${committed ? 'committed' : 'no changes'})`;
 
-  writeResolveAction(
-    projectId,
-    resolveActionId,
-    commitSpanId,
-    resolveMeta,
-    resolveReasoning
-  );
-
-  store.addPending({
-    traceId: pending.traceId,
-    actionId: resolveActionId,
-    spanId: commitSpanId,
+  const resolveAction = new ActionWriter(projectId, {
     action: 'resolve',
-    summary: `resolve: ${meta.title}`,
-    createdAt: new Date().toISOString(),
+    spanId: commitSpan.id,
+    reasoning: resolveReasoning,
     meta: resolveMeta,
+  });
+
+  enqueueAction(store, {
+    traceId: pending.traceId,
+    action: resolveAction,
+    step: 'commit',
+    summary: `resolve: ${meta.title}`,
   });
 
   // Remove processed commit action
   store.removePending(pending.actionId);
-
-  // Log
-  store.appendLog({
-    ts: new Date().toISOString(),
-    traceId: pending.traceId,
-    spanId: commitSpanId,
-    actionId: resolveActionId,
-    step: 'commit',
-    action: 'resolve',
-    summary: commitError
-      ? `task #${taskId}: ${meta.title} — commit failed: ${commitError.message}, resolve enqueued`
-      : `task #${taskId}: ${meta.title} — ${committed ? 'committed' : 'no changes'}, resolve enqueued`,
-  });
 
   return { committed, taskId, branchName, commitError };
 }

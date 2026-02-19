@@ -1,11 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { join } from 'node:path';
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { randomUUID } from 'node:crypto';
-import { getDataDir } from 'rover-core';
 import { getUserAIAgent, getAIAgentTool } from '../agents/index.js';
 import { parseJsonResponse } from '../../utils/json-parser.js';
 import { AutopilotStore } from './store.js';
+import { SpanWriter, ActionWriter, enqueueAction } from './logging.js';
 import planPromptTemplate from './plan-prompt.md';
 import type {
   PlannerStatus,
@@ -15,7 +12,6 @@ import type {
   ActionStep,
   PendingAction,
   Span,
-  Action,
 } from './types.js';
 
 const PROCESS_INTERVAL_MS = 30_000; // 30 seconds
@@ -51,62 +47,6 @@ function buildPlanUserMessage(
   return msg;
 }
 
-function writePlannerSpan(
-  projectId: string,
-  summary: string,
-  parentSpanId: string,
-  planResult: PlanResult
-): { spanId: string; actionId: string } {
-  const basePath = join(getDataDir(), 'projects', projectId);
-  const spansDir = join(basePath, 'spans');
-  const actionsDir = join(basePath, 'actions');
-
-  mkdirSync(spansDir, { recursive: true });
-  mkdirSync(actionsDir, { recursive: true });
-
-  const spanId = randomUUID();
-  const actionId = randomUUID();
-  const timestamp = new Date().toISOString();
-
-  const span: Span = {
-    id: spanId,
-    version: '1.0',
-    timestamp,
-    summary: `plan: ${summary}`,
-    step: 'plan',
-    parent: parentSpanId,
-    meta: {
-      analysis: planResult.analysis,
-      taskCount: planResult.tasks.length,
-      executionOrder: planResult.execution_order,
-    },
-  };
-
-  const action: Action = {
-    id: actionId,
-    version: '1.0',
-    action: 'plan',
-    timestamp,
-    spanId,
-    meta: {
-      taskCount: planResult.tasks.length,
-      executionOrder: planResult.execution_order,
-    },
-    reasoning: planResult.reasoning,
-  };
-
-  writeFileSync(
-    join(spansDir, `${spanId}.json`),
-    JSON.stringify(span, null, 2)
-  );
-  writeFileSync(
-    join(actionsDir, `${actionId}.json`),
-    JSON.stringify(action, null, 2)
-  );
-
-  return { spanId, actionId };
-}
-
 function writeWorkflowActions(
   projectId: string,
   sourcePending: PendingAction,
@@ -114,63 +54,26 @@ function writeWorkflowActions(
   planSpanId: string,
   store: AutopilotStore
 ): Array<{ task: PlanTask; actionId: string }> {
-  const basePath = join(getDataDir(), 'projects', projectId);
-  const actionsDir = join(basePath, 'actions');
-  mkdirSync(actionsDir, { recursive: true });
-
-  // First pass: generate actionIds and build title → actionId map
-  const taskEntries: Array<{ task: PlanTask; actionId: string }> = [];
+  // First pass: create ActionWriters and build title → actionId map
   const titleToActionId = new Map<string, string>();
+  const taskActions: Array<{ task: PlanTask; action: ActionWriter }> = [];
 
+  // We need action IDs before we can resolve depends_on, so do two passes.
+  // Pre-generate the map by creating writers eagerly (they write to disk).
   for (const task of planResult.tasks) {
-    const actionId = randomUUID();
-    taskEntries.push({ task, actionId });
-    titleToActionId.set(task.title, actionId);
-  }
-
-  // Second pass: write Action file, enqueue PendingAction, and log per task
-  for (const { task, actionId } of taskEntries) {
     const dependsOnActionId = task.context.depends_on
       ? (titleToActionId.get(task.context.depends_on) ?? null)
       : null;
 
-    const timestamp = new Date().toISOString();
     const description =
       task.description.length > 200
         ? task.description.slice(0, 200) + '…'
         : task.description;
 
-    // Write Action JSON file
-    const action: Action = {
-      id: actionId,
-      version: '1.0',
+    const action = new ActionWriter(projectId, {
       action: 'workflow',
-      timestamp,
       spanId: planSpanId,
-      meta: {
-        workflow: task.workflow,
-        title: task.title,
-        description: task.description,
-        acceptance_criteria: task.acceptance_criteria,
-        context: task.context,
-        depends_on_action_id: dependsOnActionId,
-      },
       reasoning: `${task.title}: ${description}`,
-    };
-
-    writeFileSync(
-      join(actionsDir, `${actionId}.json`),
-      JSON.stringify(action, null, 2)
-    );
-
-    // Enqueue PendingAction
-    store.addPending({
-      traceId: sourcePending.traceId,
-      actionId,
-      spanId: planSpanId,
-      action: 'workflow',
-      summary: `${task.workflow}: ${task.title}`,
-      createdAt: timestamp,
       meta: {
         workflow: task.workflow,
         title: task.title,
@@ -181,19 +84,24 @@ function writeWorkflowActions(
       },
     });
 
-    // Write log entry per task
-    store.appendLog({
-      ts: timestamp,
+    titleToActionId.set(task.title, action.id);
+    taskActions.push({ task, action });
+  }
+
+  // Second pass: enqueue each action
+  for (const { task, action } of taskActions) {
+    enqueueAction(store, {
       traceId: sourcePending.traceId,
-      spanId: planSpanId,
-      actionId,
+      action,
       step: 'plan',
-      action: 'workflow',
       summary: `${task.workflow}: ${task.title}`,
     });
   }
 
-  return taskEntries;
+  return taskActions.map(({ task, action }) => ({
+    task,
+    actionId: action.id,
+  }));
 }
 
 async function processPlanAction(
@@ -206,6 +114,12 @@ async function processPlanAction(
   planSpanId: string;
   taskEntries: Array<{ task: PlanTask; actionId: string }>;
 }> {
+  // Open the plan span
+  const span = new SpanWriter(projectId, {
+    step: 'plan',
+    parentId: pending.spanId,
+  });
+
   // Reconstruct span trace
   const spans = store.getSpanTrace(pending.spanId);
 
@@ -235,27 +149,26 @@ async function processPlanAction(
     }
   }
 
-  // Write plan span
-  const { spanId: planSpanId } = writePlannerSpan(
-    projectId,
-    pending.summary,
-    pending.spanId,
-    planResult
-  );
+  // Finalize the plan span
+  span.complete(`plan: ${pending.summary}`, {
+    analysis: planResult.analysis,
+    taskCount: planResult.tasks.length,
+    executionOrder: planResult.execution_order,
+  });
 
   // Write workflow action files, enqueue pending actions, and log per task
   const taskEntries = writeWorkflowActions(
     projectId,
     pending,
     planResult,
-    planSpanId,
+    span.id,
     store
   );
 
   // Remove processed plan action from pending
   store.removePending(pending.actionId);
 
-  return { planResult, planSpanId, taskEntries };
+  return { planResult, planSpanId: span.id, taskEntries };
 }
 
 export function usePlanner(

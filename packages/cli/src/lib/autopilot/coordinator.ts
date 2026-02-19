@@ -1,11 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { join } from 'node:path';
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { randomUUID } from 'node:crypto';
-import { getDataDir } from 'rover-core';
 import { getUserAIAgent, getAIAgentTool } from '../agents/index.js';
 import { parseJsonResponse } from '../../utils/json-parser.js';
 import { AutopilotStore } from './store.js';
+import { SpanWriter, ActionWriter, enqueueAction } from './logging.js';
 import { fetchContextForAction } from './context.js';
 import { getRepoInfo } from './helpers.js';
 import pilotPromptTemplate from './pilot-prompt.md';
@@ -15,8 +12,6 @@ import type {
   ActionStep,
   PendingAction,
   PilotDecision,
-  Span,
-  Action,
 } from './types.js';
 
 const PROCESS_INTERVAL_MS = 30_000; // 30 seconds
@@ -46,62 +41,6 @@ function buildPilotPrompt(
   return prompt;
 }
 
-function writeCoordinatorSpan(
-  projectId: string,
-  summary: string,
-  parentSpanId: string,
-  decision: PilotDecision
-): { spanId: string; actionId: string | null } {
-  const basePath = join(getDataDir(), 'projects', projectId);
-  const spansDir = join(basePath, 'spans');
-  const actionsDir = join(basePath, 'actions');
-
-  mkdirSync(spansDir, { recursive: true });
-  mkdirSync(actionsDir, { recursive: true });
-
-  const spanId = randomUUID();
-  const timestamp = new Date().toISOString();
-
-  const span: Span = {
-    id: spanId,
-    version: '1.0',
-    timestamp,
-    summary: `coordinate: ${decision.action} — ${summary}`,
-    step: 'coordinate',
-    parent: parentSpanId,
-    meta: decision.meta,
-  };
-
-  writeFileSync(
-    join(spansDir, `${spanId}.json`),
-    JSON.stringify(span, null, 2)
-  );
-
-  // Noop is terminal — write span only, no action.
-  if (decision.action === 'noop') {
-    return { spanId, actionId: null };
-  }
-
-  const actionId = randomUUID();
-
-  const action: Action = {
-    id: actionId,
-    version: '1.0',
-    action: decision.action,
-    timestamp,
-    spanId,
-    meta: decision.meta,
-    reasoning: decision.reasoning,
-  };
-
-  writeFileSync(
-    join(actionsDir, `${actionId}.json`),
-    JSON.stringify(action, null, 2)
-  );
-
-  return { spanId, actionId };
-}
-
 async function processAction(
   pending: PendingAction,
   owner: string,
@@ -113,6 +52,13 @@ async function processAction(
   newActionId: string | null;
   newSpanId: string;
 }> {
+  // Open the coordinator span
+  const span = new SpanWriter(projectId, {
+    step: 'coordinate',
+    parentId: pending.spanId,
+    meta: pending.meta ?? {},
+  });
+
   // Fetch additional context
   const context = pending.meta
     ? await fetchContextForAction(owner, repo, pending.meta)
@@ -135,42 +81,54 @@ async function processAction(
       'Forced to noop: coordinate is not available as a sub-action.';
   }
 
-  // Write span and action
-  const { spanId: newSpanId, actionId: newActionId } = writeCoordinatorSpan(
-    projectId,
-    pending.summary,
-    pending.spanId,
-    decision
-  );
+  let newActionId: string | null = null;
 
-  // If not noop, add follow-up pending action
-  if (decision.action !== 'noop' && newActionId) {
-    store.addPending({
-      traceId: pending.traceId,
-      actionId: newActionId,
-      spanId: newSpanId,
+  if (decision.action === 'noop') {
+    // Noop is terminal — finalize span, no follow-up action
+    span.complete(
+      `coordinate: ${decision.action} — ${pending.summary}`,
+      decision.meta
+    );
+  } else {
+    // Write follow-up action and enqueue it
+    const action = new ActionWriter(projectId, {
       action: decision.action,
-      summary: `${decision.action}: ${pending.summary}`,
-      createdAt: new Date().toISOString(),
+      spanId: span.id,
+      reasoning: decision.reasoning,
       meta: decision.meta,
     });
+    newActionId = action.id;
+
+    enqueueAction(store, {
+      traceId: pending.traceId,
+      action,
+      step: 'coordinate',
+      summary: `${decision.action}: ${pending.summary}`,
+    });
+
+    span.complete(
+      `coordinate: ${decision.action} — ${pending.summary}`,
+      decision.meta
+    );
   }
 
   // Remove the processed coordinate action
   store.removePending(pending.actionId);
 
-  // Write log entry
-  store.appendLog({
-    ts: new Date().toISOString(),
-    traceId: pending.traceId,
-    spanId: newSpanId,
-    actionId: newActionId ?? '',
-    step: 'coordinate',
-    action: decision.action,
-    summary: `${decision.action} (${decision.confidence}): ${pending.summary}`,
-  });
+  // Write log for noop (enqueueAction already logged for non-noop)
+  if (decision.action === 'noop') {
+    store.appendLog({
+      ts: new Date().toISOString(),
+      traceId: pending.traceId,
+      spanId: span.id,
+      actionId: '',
+      step: 'coordinate',
+      action: 'noop',
+      summary: `noop (${decision.confidence}): ${pending.summary}`,
+    });
+  }
 
-  return { decision, newActionId, newSpanId };
+  return { decision, newActionId, newSpanId: span.id };
 }
 
 export function useCoordinator(

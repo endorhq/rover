@@ -1,4 +1,6 @@
-import { Git } from 'rover-core';
+import { join } from 'node:path';
+import { mkdirSync } from 'node:fs';
+import { Git, getDataDir } from 'rover-core';
 
 export function getRepoInfo(projectPath: string): {
   owner: string;
@@ -21,6 +23,17 @@ export function getRepoInfo(projectPath: string): {
   }
 
   return null;
+}
+
+/**
+ * Ensures the spans/ and actions/ directories exist for a project.
+ * Call once at autopilot startup — individual SpanWriter / ActionWriter
+ * instances assume the directories are already present.
+ */
+export function ensureTraceDirs(projectId: string): void {
+  const base = join(getDataDir(), 'projects', projectId);
+  mkdirSync(join(base, 'spans'), { recursive: true });
+  mkdirSync(join(base, 'actions'), { recursive: true });
 }
 
 export function formatDuration(startTime?: string, endTime?: string): string {

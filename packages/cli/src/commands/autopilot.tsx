@@ -4,6 +4,7 @@ import colors from 'ansi-colors';
 import { requireProjectContext } from '../lib/context.js';
 import { exitWithError } from '../utils/exit.js';
 import { AutopilotApp } from '../lib/autopilot/app.js';
+import { ensureTraceDirs } from '../lib/autopilot/helpers.js';
 import type { CommandDefinition } from '../types.js';
 
 // Alternate screen buffer escape sequences
@@ -43,6 +44,9 @@ const autopilotCommand = async (options: { refresh?: string } = {}) => {
   const refreshInterval = options.refresh
     ? Number.parseInt(options.refresh, 10)
     : 3;
+
+  // Ensure spans/ and actions/ directories exist before any step runs
+  ensureTraceDirs(project.id);
 
   // Enter alternate screen so quitting restores the original shell
   process.stdout.write(ENTER_ALT_SCREEN + HIDE_CURSOR);

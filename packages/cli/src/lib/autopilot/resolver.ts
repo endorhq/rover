@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { join } from 'node:path';
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { randomUUID } from 'node:crypto';
-import { IterationManager, getDataDir, type ProjectManager } from 'rover-core';
+import { mkdirSync } from 'node:fs';
+import { IterationManager, type ProjectManager } from 'rover-core';
 import { getUserAIAgent, getAIAgentTool } from '../agents/index.js';
 import { parseJsonResponse } from '../../utils/json-parser.js';
 import { AutopilotStore } from './store.js';
+import { SpanWriter, ActionWriter, enqueueAction } from './logging.js';
 import resolvePromptTemplate from './resolve-prompt.md';
 import type {
   ResolverStatus,
@@ -14,78 +14,11 @@ import type {
   ActionTrace,
   PendingAction,
   Span,
-  Action,
 } from './types.js';
 
 const PROCESS_INTERVAL_MS = 30_000; // 30 seconds
 const INITIAL_DELAY_MS = 25_000; // 25 seconds (staggered after committer's 20s)
 const MAX_RETRIES = 3;
-
-/**
- * Write the resolver's own span — records what the resolver decided.
- */
-function writeResolveSpan(
-  projectId: string,
-  summary: string,
-  parentSpanId: string,
-  meta: Record<string, any>
-): { spanId: string } {
-  const basePath = join(getDataDir(), 'projects', projectId);
-  const spansDir = join(basePath, 'spans');
-  mkdirSync(spansDir, { recursive: true });
-
-  const spanId = randomUUID();
-  const timestamp = new Date().toISOString();
-
-  const span: Span = {
-    id: spanId,
-    version: '1.0',
-    timestamp,
-    summary: `resolve: ${summary}`,
-    step: 'resolve',
-    parent: parentSpanId,
-    meta,
-  };
-
-  writeFileSync(
-    join(spansDir, `${spanId}.json`),
-    JSON.stringify(span, null, 2)
-  );
-
-  return { spanId };
-}
-
-/**
- * Write a next-step Action file to disk.
- * Every pending action must have a corresponding Action file.
- */
-function writeNextAction(
-  projectId: string,
-  actionId: string,
-  actionType: string,
-  resolveSpanId: string,
-  meta: Record<string, any>,
-  reasoning: string
-): void {
-  const basePath = join(getDataDir(), 'projects', projectId);
-  const actionsDir = join(basePath, 'actions');
-  mkdirSync(actionsDir, { recursive: true });
-
-  const action: Action = {
-    id: actionId,
-    version: '1.0',
-    action: actionType,
-    timestamp: new Date().toISOString(),
-    spanId: resolveSpanId,
-    meta,
-    reasoning,
-  };
-
-  writeFileSync(
-    join(actionsDir, `${actionId}.json`),
-    JSON.stringify(action, null, 2)
-  );
-}
 
 // ── Deterministic decision paths ─────────────────────────────────────────────
 // Only handles unambiguous states. Returns null when the situation needs AI
@@ -295,23 +228,23 @@ async function processResolveAction(
   if (pending.meta?.commitError) {
     const errorInfo = pending.meta.commitError;
 
-    const { spanId: resolveSpanId } = writeResolveSpan(
-      projectId,
-      `commit error on trace: ${trace.summary}`,
-      pending.spanId,
-      {
+    const resolveSpan = new SpanWriter(projectId, {
+      step: 'resolve',
+      parentId: pending.spanId,
+      meta: {
         decision: 'noop',
         reason: `git commit failed: ${errorInfo.message}`,
         commitError: errorInfo,
-      }
-    );
+      },
+    });
+    resolveSpan.fail(`resolve: commit error on trace: ${trace.summary}`);
 
     store.removePending(pending.actionId);
 
     store.appendLog({
       ts: new Date().toISOString(),
       traceId: pending.traceId,
-      spanId: resolveSpanId,
+      spanId: resolveSpan.id,
       actionId: pending.actionId,
       step: 'resolve',
       action: 'noop',
@@ -398,42 +331,35 @@ async function executeDecision(
 
     case 'push': {
       // 1. Write resolver's own span (what we decided)
-      const { spanId: resolveSpanId } = writeResolveSpan(
-        projectId,
-        `trace ready to push: ${trace.summary}`,
-        pending.spanId,
-        { decision: 'push', reason }
-      );
+      const resolveSpan = new SpanWriter(projectId, {
+        step: 'resolve',
+        parentId: pending.spanId,
+        meta: { decision: 'push', reason },
+      });
+      resolveSpan.complete(`resolve: trace ready to push: ${trace.summary}`);
 
-      // 2. Write push action file to disk
-      const pushActionId = randomUUID();
+      // 2. Write push action and enqueue
       const pushMeta = {
         ...pending.meta,
         decision: 'push',
       };
 
-      writeNextAction(
-        projectId,
-        pushActionId,
-        'push',
-        resolveSpanId,
-        pushMeta,
-        `Push trace: ${trace.summary}`
-      );
-
-      // 3. Enqueue push pending action
-      store.addPending({
-        traceId: pending.traceId,
-        actionId: pushActionId,
-        spanId: resolveSpanId,
+      const pushAction = new ActionWriter(projectId, {
         action: 'push',
-        summary: `push: ${trace.summary}`,
-        createdAt: new Date().toISOString(),
+        spanId: resolveSpan.id,
+        reasoning: `Push trace: ${trace.summary}`,
         meta: pushMeta,
       });
 
+      enqueueAction(store, {
+        traceId: pending.traceId,
+        action: pushAction,
+        step: 'resolve',
+        summary: `push: ${trace.summary}`,
+      });
+
       trace.steps.push({
-        actionId: pushActionId,
+        actionId: pushAction.id,
         action: 'push',
         status: 'pending',
         timestamp: new Date().toISOString(),
@@ -443,16 +369,6 @@ async function executeDecision(
       tracesRef.current.set(pending.traceId, trace);
       onTracesUpdated();
       store.removePending(pending.actionId);
-
-      store.appendLog({
-        ts: new Date().toISOString(),
-        traceId: pending.traceId,
-        spanId: resolveSpanId,
-        actionId: pushActionId,
-        step: 'resolve',
-        action: 'push',
-        summary: `trace: ${trace.summary} — push enqueued`,
-      });
       break;
     }
 
@@ -532,21 +448,22 @@ async function executeDecision(
       );
 
       // 1. Write resolver's own span (what we decided)
-      const { spanId: resolveSpanId } = writeResolveSpan(
-        projectId,
-        `iterating task #${mapping.taskId}: ${reason}`,
-        pending.spanId,
-        {
+      const resolveSpan = new SpanWriter(projectId, {
+        step: 'resolve',
+        parentId: pending.spanId,
+        meta: {
           decision: 'iterate',
           reason,
           taskId: mapping.taskId,
           newIterationNumber,
           retryCount: trace.retryCount,
-        }
+        },
+      });
+      resolveSpan.complete(
+        `resolve: iterating task #${mapping.taskId}: ${reason}`
       );
 
-      // 2. Write workflow action file to disk (same shape as planner's workflow actions)
-      const workflowActionId = randomUUID();
+      // 2. Write workflow action and enqueue (same shape as planner's workflow actions)
       const workflowName = pending.meta?.workflow ?? 'swe';
       const workflowMeta = {
         workflow: workflowName,
@@ -560,28 +477,22 @@ async function executeDecision(
         },
       };
 
-      writeNextAction(
-        projectId,
-        workflowActionId,
-        'workflow',
-        resolveSpanId,
-        workflowMeta,
-        `${workflowName}: ${task.title} (retry #${trace.retryCount})`
-      );
-
-      // 3. Enqueue workflow pending action (same shape as planner enqueues)
-      store.addPending({
-        traceId: pending.traceId,
-        actionId: workflowActionId,
-        spanId: resolveSpanId,
+      const workflowAction = new ActionWriter(projectId, {
         action: 'workflow',
-        summary: `${workflowName}: ${task.title}`,
-        createdAt: new Date().toISOString(),
+        spanId: resolveSpan.id,
+        reasoning: `${workflowName}: ${task.title} (retry #${trace.retryCount})`,
         meta: workflowMeta,
       });
 
+      enqueueAction(store, {
+        traceId: pending.traceId,
+        action: workflowAction,
+        step: 'resolve',
+        summary: `${workflowName}: ${task.title}`,
+      });
+
       trace.steps.push({
-        actionId: workflowActionId,
+        actionId: workflowAction.id,
         action: workflowName,
         status: 'pending',
         timestamp: new Date().toISOString(),
@@ -591,27 +502,17 @@ async function executeDecision(
       tracesRef.current.set(pending.traceId, trace);
       onTracesUpdated();
       store.removePending(pending.actionId);
-
-      store.appendLog({
-        ts: new Date().toISOString(),
-        traceId: pending.traceId,
-        spanId: resolveSpanId,
-        actionId: workflowActionId,
-        step: 'resolve',
-        action: 'iterate',
-        summary: `task #${mapping.taskId}: ${task.title} — iterate (retry ${trace.retryCount}/${MAX_RETRIES})`,
-      });
       break;
     }
 
     case 'fail': {
       // Write resolver's own span (terminal — no next action)
-      const { spanId: resolveSpanId } = writeResolveSpan(
-        projectId,
-        `trace failed: ${trace.summary}`,
-        pending.spanId,
-        { decision: 'fail', reason }
-      );
+      const resolveSpan = new SpanWriter(projectId, {
+        step: 'resolve',
+        parentId: pending.spanId,
+        meta: { decision: 'fail', reason },
+      });
+      resolveSpan.fail(`resolve: trace failed: ${trace.summary}`);
 
       for (const step of trace.steps) {
         if (step.status === 'pending') {
@@ -627,7 +528,7 @@ async function executeDecision(
       store.appendLog({
         ts: new Date().toISOString(),
         traceId: pending.traceId,
-        spanId: resolveSpanId,
+        spanId: resolveSpan.id,
         actionId: pending.actionId,
         step: 'resolve',
         action: 'fail',
