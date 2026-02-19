@@ -319,6 +319,9 @@ export class StepOrchestrator {
 
       runningStep.status = resultStatus;
       runningStep.reasoning = result.reasoning;
+      if (result.spanId) {
+        runningStep.spanId = result.spanId;
+      }
 
       // Apply trace mutations if present
       if (result.traceMutations?.stepUpdates) {
@@ -331,15 +334,17 @@ export class StepOrchestrator {
         }
       }
 
-      // Add enqueued actions as pending steps in trace
+      // Add enqueued actions as pending steps in trace (skip duplicates)
       for (const enqueued of result.enqueuedActions) {
-        trace.steps.push({
-          actionId: enqueued.actionId,
-          action: enqueued.actionType,
-          status: 'pending',
-          timestamp: new Date().toISOString(),
-          reasoning: enqueued.summary,
-        });
+        if (!trace.steps.some(s => s.actionId === enqueued.actionId)) {
+          trace.steps.push({
+            actionId: enqueued.actionId,
+            action: enqueued.actionType,
+            status: 'pending',
+            timestamp: new Date().toISOString(),
+            reasoning: enqueued.summary,
+          });
+        }
       }
 
       this.traces.set(action.traceId, trace);
@@ -391,8 +396,10 @@ export class StepOrchestrator {
       }
 
       for (const newStep of update.newSteps) {
-        trace.steps.push(newStep);
-        updated = true;
+        if (!trace.steps.some(s => s.actionId === newStep.actionId)) {
+          trace.steps.push(newStep);
+          updated = true;
+        }
       }
 
       this.traces.set(update.traceId, trace);

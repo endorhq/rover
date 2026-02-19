@@ -417,7 +417,7 @@ function ActionTraceRow({ trace }: { trace: ActionTrace }) {
     <Box>
       <Box>
         {trace.steps.map((step, i) => (
-          <Text key={step.actionId}>
+          <Text key={`${step.actionId}-${i}`}>
             <Text color={STEP_COLORS[step.status]}>
               {STEP_FILLED[step.status]}
             </Text>

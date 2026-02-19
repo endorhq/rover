@@ -101,16 +101,6 @@ export const coordinatorStep: Step = {
         summary: `noop (${decision.confidence}): ${pending.summary}`,
       });
 
-      // Add a terminal noop step to the trace
-      ctx.trace.steps.push({
-        actionId: pending.actionId,
-        action: 'noop',
-        status: 'completed',
-        timestamp: new Date().toISOString(),
-        reasoning: decision.reasoning,
-        spanId: span.id,
-      });
-
       return {
         spanId: span.id,
         terminal: true,
