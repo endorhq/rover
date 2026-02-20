@@ -28,6 +28,7 @@ function makeInputs(overrides: Partial<SetupHashInputs> = {}): SetupHashInputs {
     agent: 'claude',
     roverVersion: '1.0.0',
     initScriptContent: '',
+    cacheFilesContent: '',
     mcps: [],
     ...overrides,
   };
@@ -88,6 +89,23 @@ describe('computeSetupHash', () => {
       makeInputs({ initScriptContent: 'apt-get install -y vim' })
     );
     expect(a).not.toBe(b);
+  });
+
+  it('changes when cacheFilesContent changes', () => {
+    const a = computeSetupHash(makeInputs({ cacheFilesContent: '' }));
+    const b = computeSetupHash(
+      makeInputs({
+        cacheFilesContent:
+          'requirements.txt\0flask==2.0\0package-lock.json\0{}',
+      })
+    );
+    expect(a).not.toBe(b);
+  });
+
+  it('produces same hash when cacheFilesContent is empty (backward compat)', () => {
+    const a = computeSetupHash(makeInputs());
+    const b = computeSetupHash(makeInputs({ cacheFilesContent: '' }));
+    expect(a).toBe(b);
   });
 
   it('changes when mcps change', () => {
