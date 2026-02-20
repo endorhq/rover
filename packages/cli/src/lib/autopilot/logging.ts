@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { getDataDir } from 'rover-core';
 import type { Span, Action, SpanStatus } from './types.js';
@@ -109,6 +109,44 @@ export class SpanWriter {
   private write(): void {
     writeFileSync(this.filePath, JSON.stringify(this.data, null, 2));
   }
+}
+
+// ── finalizeSpan ────────────────────────────────────────────────────────────
+
+/**
+ * Finalize an existing span on disk (e.g. a workflow span that was left
+ * `running` because the monitor phase completes it later).
+ *
+ * If the span is already finalized (`completed` is set), this is a no-op.
+ */
+export function finalizeSpan(
+  projectId: string,
+  spanId: string,
+  status: SpanStatus,
+  summary: string,
+  extraMeta?: Record<string, any>
+): void {
+  const spansDir = join(getDataDir(), 'projects', projectId, 'spans');
+  const filePath = join(spansDir, `${spanId}.json`);
+
+  let data: Span;
+  try {
+    data = JSON.parse(readFileSync(filePath, 'utf8'));
+  } catch {
+    return; // Span file not found or unreadable — skip
+  }
+
+  if (data.completed) return; // Already finalized
+
+  data.status = status;
+  data.summary = summary;
+  data.completed = new Date().toISOString();
+
+  if (extraMeta) {
+    data.meta = { ...data.meta, ...extraMeta };
+  }
+
+  writeFileSync(filePath, JSON.stringify(data, null, 2));
 }
 
 // ── ActionWriter ────────────────────────────────────────────────────────────

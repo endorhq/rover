@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { randomUUID } from 'node:crypto';
 import { launch } from 'rover-core';
 import type { FetchStatus, GitHubEvent } from './types.js';
-import { AutopilotStore } from './store.js';
+import type { AutopilotStore } from './store.js';
 import { SpanWriter, ActionWriter, enqueueAction } from './logging.js';
 import { getRepoInfo } from './helpers.js';
 
@@ -227,7 +227,9 @@ export function writeSpanAndAction(
 
 export function useGitHubEvents(
   projectPath: string,
-  projectId: string
+  projectId: string,
+  store: AutopilotStore,
+  onNewEvents?: () => void
 ): {
   status: FetchStatus;
   countdown: number;
@@ -241,19 +243,10 @@ export function useGitHubEvents(
   const [lastRelevantCount, setLastRelevantCount] = useState(0);
   const [lastNewCount, setLastNewCount] = useState(0);
   const repoRef = useRef(getRepoInfo(projectPath));
-  const storeRef = useRef<AutopilotStore | null>(null);
-
-  // Initialize store once
-  if (!storeRef.current) {
-    const store = new AutopilotStore(projectId);
-    store.ensureDir();
-    storeRef.current = store;
-  }
 
   const doFetch = useCallback(async () => {
     const repo = repoRef.current;
-    const store = storeRef.current;
-    if (!repo || !store) {
+    if (!repo) {
       setStatus('error');
       return;
     }
@@ -273,6 +266,7 @@ export function useGitHubEvents(
       // Mark all new event IDs as processed
       if (newEvents.length > 0) {
         store.markEventsProcessed(newEvents.map(e => e.id));
+        onNewEvents?.();
       }
 
       setLastFetchCount(events.length);
@@ -285,7 +279,7 @@ export function useGitHubEvents(
 
     // Reset countdown after fetch completes
     setCountdown(POLL_INTERVAL_MS / 1000);
-  }, [projectId]);
+  }, [projectId, store, onNewEvents]);
 
   // Initial fetch + interval
   useEffect(() => {

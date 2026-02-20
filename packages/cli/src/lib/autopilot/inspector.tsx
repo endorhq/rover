@@ -335,6 +335,7 @@ const STEP_COLORS: Record<ActionStepStatus, string> = {
   running: 'cyan',
   pending: 'gray',
   failed: 'red',
+  error: 'yellow',
 };
 
 const STEP_FILLED: Record<ActionStepStatus, string> = {
@@ -342,6 +343,15 @@ const STEP_FILLED: Record<ActionStepStatus, string> = {
   running: '\u25A0',
   pending: '\u25A1',
   failed: '\u25A0',
+  error: '\u25A0',
+};
+
+const STEP_TERMINAL: Record<ActionStepStatus, string> = {
+  completed: '\u25CF',
+  running: '\u25CF',
+  pending: '\u25CB',
+  failed: '\u25CF',
+  error: '\u25CF',
 };
 
 const LOG_STEP_COLORS: Record<string, string> = {
@@ -393,7 +403,9 @@ function filterTraces(
     const hasRunningOrPending = trace.steps.some(
       s => s.status === 'running' || s.status === 'pending'
     );
-    const hasFailed = trace.steps.some(s => s.status === 'failed');
+    const hasFailed = trace.steps.some(
+      s => s.status === 'failed' || s.status === 'error'
+    );
     const allCompleted = trace.steps.every(s => s.status === 'completed');
 
     if (filter === 'active') return hasRunningOrPending;
@@ -530,7 +542,9 @@ function TracesListView({
                 {trace.steps.map((step, si) => (
                   <Text key={`${step.actionId}-${si}`}>
                     <Text color={STEP_COLORS[step.status]}>
-                      {STEP_FILLED[step.status]}
+                      {step.terminal
+                        ? STEP_TERMINAL[step.status]
+                        : STEP_FILLED[step.status]}
                     </Text>
                     {si < trace.steps.length - 1 ? (
                       <Text dimColor>{'\u2500'}</Text>
@@ -611,12 +625,36 @@ function StepDetailView({
         <Text>{span.step}</Text>
       </Text>
     );
+    if (span.status) {
+      const spanStatusColor =
+        span.status === 'completed'
+          ? 'green'
+          : span.status === 'failed'
+            ? 'red'
+            : span.status === 'error'
+              ? 'yellow'
+              : 'cyan';
+      lines.push(
+        <Text key="span-status">
+          <Text dimColor> Status: </Text>
+          <Text color={spanStatusColor}>{span.status}</Text>
+        </Text>
+      );
+    }
     lines.push(
       <Text key="span-ts">
         <Text dimColor> Timestamp: </Text>
         <Text>{span.timestamp}</Text>
       </Text>
     );
+    if (span.completed) {
+      lines.push(
+        <Text key="span-completed">
+          <Text dimColor> Completed: </Text>
+          <Text>{span.completed}</Text>
+        </Text>
+      );
+    }
     lines.push(
       <Text key="span-summary">
         <Text dimColor> Summary: </Text>
@@ -785,6 +823,7 @@ interface DisplayStep {
   label: string;
   status: ActionStepStatus;
   reasoning?: string;
+  terminal?: boolean;
 }
 
 function buildDisplaySteps(trace: ActionTrace): DisplayStep[] {
@@ -796,6 +835,7 @@ function buildDisplaySteps(trace: ActionTrace): DisplayStep[] {
       label: step.action,
       status: step.status,
       reasoning: step.reasoning,
+      terminal: !!step.terminal,
     });
   }
   return display;
@@ -823,16 +863,34 @@ function loadStepData(
   store: AutopilotStore,
   cache: Map<string, Action | null>
 ): { span: Span | null; actionData: Action | null } {
-  // Check if this display step corresponds to a trace step with a direct spanId
-  // (span-only steps like noop). The trace step index is di - 1 (display 0 = event).
   if (di > 0) {
     const traceStep = trace.steps[di - 1];
-    if (traceStep?.spanId) {
+
+    // Terminal step with spanId: read span directly, no output action
+    if (traceStep?.terminal && traceStep.spanId) {
       const span = store.readSpan(traceStep.spanId);
       return { span, actionData: null };
     }
+
+    // Non-terminal step with spanId: read span directly, also read output
+    // action from the next trace step if available
+    if (traceStep?.spanId) {
+      const span = store.readSpan(traceStep.spanId);
+      let actionData: Action | null = null;
+      if (di < trace.steps.length) {
+        const nextActionId = trace.steps[di].actionId;
+        if (!cache.has(nextActionId)) {
+          cache.set(nextActionId, store.readAction(nextActionId));
+        }
+        actionData = cache.get(nextActionId) ?? null;
+      }
+      return { span, actionData };
+    }
+
+    // No spanId on the trace step: fall through to next-step-action logic
   }
 
+  // di == 0 (event) or fallback: use next trace step's action to find span
   if (di < trace.steps.length) {
     const actionId = trace.steps[di].actionId;
     if (!cache.has(actionId)) {
@@ -929,7 +987,9 @@ function TracesDetailView({
           {isSelected ? ' > ' : '   '}
         </Text>
         <Text>{`${i + 1}. `}</Text>
-        <Text color={color}>{STEP_FILLED[ds.status]}</Text>
+        <Text color={color}>
+          {ds.terminal ? STEP_TERMINAL[ds.status] : STEP_FILLED[ds.status]}
+        </Text>
         <Text color={color}> {ds.label.padEnd(12)}</Text>
         <Text dimColor={!isSelected}>
           {ds.status.padEnd(10)} {ds.reasoning ?? 'pending'}

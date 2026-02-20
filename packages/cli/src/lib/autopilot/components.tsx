@@ -403,6 +403,7 @@ const STEP_COLORS: Record<ActionStepStatus, string> = {
   running: 'cyan',
   pending: 'gray',
   failed: 'red',
+  error: 'yellow',
 };
 
 const STEP_FILLED: Record<ActionStepStatus, string> = {
@@ -410,6 +411,7 @@ const STEP_FILLED: Record<ActionStepStatus, string> = {
   running: '\u25A0', // ■
   pending: '\u25A1', // □
   failed: '\u25A0', // ■
+  error: '\u25A0', // ■
 };
 
 function ActionTraceRow({ trace }: { trace: ActionTrace }) {

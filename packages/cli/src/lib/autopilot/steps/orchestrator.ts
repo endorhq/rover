@@ -101,10 +101,24 @@ export class StepOrchestrator {
     return this.processedCounts.get(actionType) ?? 0;
   }
 
+  /** Request an immediate drain of the pending queue.
+   *  Safe to call from outside — coalesces with any in-flight drain. */
+  requestDrain(): void {
+    this.drain();
+  }
+
   // ── Tick ────────────────────────────────────────────────────────────────
 
   private tick(): void {
-    // Run all monitor() calls
+    this.runMonitors();
+    this.drain();
+  }
+
+  // ── Monitors ─────────────────────────────────────────────────────────
+
+  /** Run all step monitor() calls. Monitors check external state (e.g.
+   *  task completion on disk) and enqueue new actions into the store. */
+  private runMonitors(): void {
     for (const [, step] of this.steps) {
       if (!step.monitor) continue;
 
@@ -123,9 +137,6 @@ export class StepOrchestrator {
         this.applyTraceMutations(mutations);
       }
     }
-
-    // Drain pending queue
-    this.drain();
   }
 
   // ── Drain ───────────────────────────────────────────────────────────────
@@ -143,6 +154,10 @@ export class StepOrchestrator {
 
       while (hadEnqueuedActions) {
         hadEnqueuedActions = false;
+
+        // Check external state before reading pending — monitors may
+        // detect completed tasks and enqueue new actions (e.g. commit).
+        this.runMonitors();
 
         // Read all pending actions
         const pending = this.store.getPending();
@@ -322,19 +337,13 @@ export class StepOrchestrator {
       if (result.spanId) {
         runningStep.spanId = result.spanId;
       }
-
-      // Apply trace mutations if present
-      if (result.traceMutations?.stepUpdates) {
-        for (const update of result.traceMutations.stepUpdates) {
-          const s = trace.steps.find(s => s.actionId === update.actionId);
-          if (s) {
-            s.status = update.status;
-            if (update.reasoning) s.reasoning = update.reasoning;
-          }
-        }
+      if (result.terminal) {
+        runningStep.terminal = true;
       }
 
       // Add enqueued actions as pending steps in trace (skip duplicates)
+      // NOTE: This runs BEFORE traceMutations so that steps can create an
+      // action and immediately mark it completed (e.g. noop end-steps).
       for (const enqueued of result.enqueuedActions) {
         if (!trace.steps.some(s => s.actionId === enqueued.actionId)) {
           trace.steps.push({
@@ -344,6 +353,17 @@ export class StepOrchestrator {
             timestamp: new Date().toISOString(),
             reasoning: enqueued.summary,
           });
+        }
+      }
+
+      // Apply trace mutations if present
+      if (result.traceMutations?.stepUpdates) {
+        for (const update of result.traceMutations.stepUpdates) {
+          const s = trace.steps.find(s => s.actionId === update.actionId);
+          if (s) {
+            s.status = update.status;
+            if (update.reasoning) s.reasoning = update.reasoning;
+          }
         }
       }
 

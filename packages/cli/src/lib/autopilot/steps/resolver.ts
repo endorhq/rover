@@ -216,20 +216,17 @@ function executeDecision(
 
   switch (decision) {
     case 'wait': {
+      const resolveSpan = new SpanWriter(projectId, {
+        step: 'resolve',
+        parentId: pending.spanId,
+        meta: { decision: 'wait', reason },
+      });
+      resolveSpan.complete(`resolve: wait: ${trace.summary}`);
+
       store.removePending(pending.actionId);
 
-      store.appendLog({
-        ts: new Date().toISOString(),
-        traceId: pending.traceId,
-        spanId: pending.spanId,
-        actionId: pending.actionId,
-        step: 'resolve',
-        action: 'wait',
-        summary: `trace: ${trace.summary} — wait: ${reason}`,
-      });
-
       return {
-        spanId: pending.spanId,
+        spanId: resolveSpan.id,
         terminal: true,
         enqueuedActions: [],
         reasoning: `wait: ${reason}`,
@@ -281,21 +278,23 @@ function executeDecision(
 
     case 'iterate': {
       if (!project) {
-        store.removePending(pending.actionId);
-        store.appendLog({
-          ts: new Date().toISOString(),
-          traceId: pending.traceId,
-          spanId: pending.spanId,
-          actionId: pending.actionId,
+        const resolveSpan = new SpanWriter(projectId, {
           step: 'resolve',
-          action: 'fail',
-          summary: `trace: ${trace.summary} — cannot iterate, no project manager`,
+          parentId: pending.spanId,
+          meta: { decision: 'iterate', reason, error: 'no project manager' },
         });
+        resolveSpan.fail(
+          `resolve: cannot iterate, no project manager: ${trace.summary}`
+        );
+
+        store.removePending(pending.actionId);
+
         return {
-          spanId: pending.spanId,
+          spanId: resolveSpan.id,
           terminal: true,
           enqueuedActions: [],
           reasoning: 'fail: no project manager for iterate',
+          status: 'failed',
         };
       }
 
@@ -317,32 +316,49 @@ function executeDecision(
         : undefined;
 
       if (!mapping) {
-        store.removePending(pending.actionId);
-        store.appendLog({
-          ts: new Date().toISOString(),
-          traceId: pending.traceId,
-          spanId: pending.spanId,
-          actionId: pending.actionId,
+        const resolveSpan = new SpanWriter(projectId, {
           step: 'resolve',
-          action: 'fail',
-          summary: `trace: ${trace.summary} — cannot iterate, no task mapping`,
+          parentId: pending.spanId,
+          meta: { decision: 'iterate', reason, error: 'no task mapping' },
         });
+        resolveSpan.fail(
+          `resolve: cannot iterate, no task mapping: ${trace.summary}`
+        );
+
+        store.removePending(pending.actionId);
+
         return {
-          spanId: pending.spanId,
+          spanId: resolveSpan.id,
           terminal: true,
           enqueuedActions: [],
           reasoning: 'fail: no task mapping for failed step',
+          status: 'failed',
         };
       }
 
       const task = project.getTask(mapping.taskId);
       if (!task) {
+        const resolveSpan = new SpanWriter(projectId, {
+          step: 'resolve',
+          parentId: pending.spanId,
+          meta: {
+            decision: 'iterate',
+            reason,
+            error: `task #${mapping.taskId} not found`,
+          },
+        });
+        resolveSpan.fail(
+          `resolve: task #${mapping.taskId} not found: ${trace.summary}`
+        );
+
         store.removePending(pending.actionId);
+
         return {
-          spanId: pending.spanId,
+          spanId: resolveSpan.id,
           terminal: true,
           enqueuedActions: [],
           reasoning: `fail: task #${mapping.taskId} not found`,
+          status: 'failed',
         };
       }
 
@@ -455,21 +471,17 @@ function executeDecision(
 
       store.removePending(pending.actionId);
 
-      store.appendLog({
-        ts: new Date().toISOString(),
-        traceId: pending.traceId,
-        spanId: resolveSpan.id,
-        actionId: pending.actionId,
-        step: 'resolve',
-        action: 'fail',
-        summary: `trace: ${trace.summary} — failed: ${reason}`,
-      });
+      // NOTE: No manual appendLog here — the resolve action was already
+      // logged when the committer enqueued it. Re-logging with the new
+      // resolveSpan would violate the invariant (different spanId, same
+      // actionId).
 
       return {
         spanId: resolveSpan.id,
         terminal: true,
         enqueuedActions: [],
         reasoning: `fail: ${reason}`,
+        status: 'failed',
         traceMutations: {
           stepUpdates,
         },
