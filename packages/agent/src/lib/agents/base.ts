@@ -124,6 +124,10 @@ export abstract class BaseAgent implements Agent {
     return undefined;
   }
 
+  getPromptPreamble(): string {
+    return '';
+  }
+
   getLogSources(): string[] {
     return [];
   }
