@@ -663,6 +663,29 @@ about a specific workflow, including its name, description, inputs, and
 a step-by-step diagram of the workflow flow. The `--raw` flag must show
 the raw YAML content of the workflow definition.
 
+### Feature: Workflow with command step execution
+
+Workflows can contain steps of type `command` in addition to the usual
+`agent` steps. A command step runs a shell command directly (without
+invoking an AI agent) and captures its stdout and stderr as step
+outputs.
+
+When a workflow is run and encounters a command step, Rover must execute
+the specified `command` (with optional `args`) synchronously and capture
+its output. If the command succeeds (exit code 0), the step must be
+marked as successful and its stdout and stderr must be available as step
+outputs for subsequent steps. If the command fails (non-zero exit code)
+and `allow_failure` is not set or is false, the step must be marked as
+failed and the workflow must stop (unless `continueOnError` is enabled
+at the workflow level). If the command fails and `allow_failure` is
+true, the step must be marked as successful and the workflow must
+continue to the next step.
+
+A workflow with mixed step types (both `agent` and `command` steps) must
+execute each step according to its type: command steps run the command
+directly, while agent steps are dispatched to the configured AI agent.
+The step ordering defined in the workflow must be respected.
+
 ---
 
 ## Global Information
