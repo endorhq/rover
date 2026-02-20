@@ -190,7 +190,7 @@ export class OpenCodeAgent extends BaseAgent {
   }
 
   toolArguments(): string[] {
-    const args = ['run', '--format', 'json'];
+    const args = ['acp', '--format', 'json'];
     if (this.model) {
       args.push('--model', this.model);
     }

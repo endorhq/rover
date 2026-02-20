@@ -21,7 +21,7 @@ import {
 } from '@agentclientprotocol/sdk';
 import colors from 'ansi-colors';
 import { execa, type ResultPromise } from 'execa';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { generateRandomId, VERBOSE } from 'rover-core';
 
 // Custom JSON replacer to handle BigInt values
@@ -188,6 +188,16 @@ export class ACPClient implements Client {
         colors.gray('[Client] Read text file called with:'),
         colors.cyan(JSON.stringify(params, jsonReplacer, 2))
       );
+    }
+
+    // Some ACP servers (e.g. Qwen, Gemini) issue a read_text_file before
+    // every write_text_file, likely to diff against existing content. When
+    // writing a new file the read would fail with ENOENT, which the server
+    // treats as a failed write — causing it to fall back to shell commands.
+    // Return empty content for non-existent files so the subsequent write
+    // can proceed normally.
+    if (!existsSync(params.path)) {
+      return Promise.resolve({ content: '' });
     }
 
     let content = readFileSync(params.path, 'utf-8');

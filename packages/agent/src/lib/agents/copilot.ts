@@ -161,14 +161,13 @@ export class CopilotAgent extends BaseAgent {
   }
 
   toolArguments(): string[] {
-    const args = ['--allow-all-tools', '--silent'];
+    const args = ['--acp', '--allow-all-tools', '--silent'];
     if (this.model) {
       args.push('--model', this.model);
     }
     if (VERBOSE) {
       args.push('--log-level', 'all');
     }
-    args.push('-p');
     return args;
   }
 

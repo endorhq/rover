@@ -176,16 +176,12 @@ export class ClaudeAgent extends BaseAgent {
     }
   }
 
+  override get acpCommand(): string {
+    return 'npx';
+  }
+
   toolArguments(): string[] {
-    const args = ['--dangerously-skip-permissions', '--output-format', 'json'];
-    if (this.model) {
-      args.push('--model', this.model);
-    }
-    if (VERBOSE) {
-      args.push('--verbose');
-    }
-    args.push('-p');
-    return args;
+    return ['-y', '@zed-industries/claude-code-acp'];
   }
 
   toolInteractiveArguments(

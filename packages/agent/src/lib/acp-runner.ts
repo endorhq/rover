@@ -29,6 +29,7 @@ import {
   showList,
 } from 'rover-core';
 import { ACPClient } from './acp-client.js';
+import { createAgent } from './agents/index.js';
 import { copyFileSync, rmSync } from 'node:fs';
 
 export interface ACPRunnerStepResult {
@@ -49,36 +50,12 @@ export interface ACPRunnerConfig {
   logger?: JsonlLogger;
 }
 
-/**
- * Get ACP spawn command for a given agent tool
- */
-function getACPSpawnCommand(tool: string): { command: string; args: string[] } {
-  switch (tool.toLowerCase()) {
-    case 'claude':
-      return {
-        command: 'npx',
-        args: ['-y', '@zed-industries/claude-code-acp'],
-      };
-    case 'copilot':
-      return {
-        command: 'copilot',
-        args: ['--acp'],
-      };
-    case 'opencode':
-      return {
-        command: 'opencode',
-        args: ['acp'],
-      };
-    default:
-      throw new Error(`No ACP available for tool ${tool}`);
-  }
-}
-
 export class ACPRunner {
   private workflow: WorkflowManager;
   private inputs: Map<string, string>;
   public stepsOutput: Map<string, Map<string, string>> = new Map();
   private defaultTool: string | undefined;
+  private defaultModel: string | undefined;
   private statusManager?: IterationStatusManager;
   private outputDir?: string;
   private logger?: JsonlLogger;
@@ -96,6 +73,7 @@ export class ACPRunner {
     this.workflow = config.workflow;
     this.inputs = config.inputs;
     this.defaultTool = config.defaultTool;
+    this.defaultModel = config.defaultModel;
     this.statusManager = config.statusManager;
     this.outputDir = config.outputDir;
     this.logger = config.logger;
@@ -114,15 +92,15 @@ export class ACPRunner {
       return;
     }
 
-    const spawnConfig = getACPSpawnCommand(this.tool);
+    const agent = createAgent(this.tool, 'latest', this.defaultModel);
+    const command = agent.acpCommand;
+    const args = agent.toolArguments();
     console.log(
-      colors.blue(
-        `\n🚀 Starting ACP agent: ${spawnConfig.command} ${spawnConfig.args.join(' ')}`
-      )
+      colors.blue(`\n🚀 Starting ACP agent: ${command} ${args.join(' ')}`)
     );
 
     // Spawn the agent as a subprocess
-    this.agentProcess = spawn(spawnConfig.command, spawnConfig.args, {
+    this.agentProcess = spawn(command, args, {
       stdio: ['pipe', 'pipe', 'pipe'],
       env: process.env,
     });

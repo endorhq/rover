@@ -722,7 +722,7 @@ export class Runner {
         instructions += `- **${output.name}**: ${output.description}\n`;
         instructions += `  - Create this file in the current working directory\n`;
 
-        if (this.tool == 'gemini' || this.tool == 'qwen') {
+        if (this.tool == 'gemini') {
           // Gemini has difficulties calling its own tools
           instructions += `  - When creating the file, call the write_file tool using an absolute path based on current directory. THIS IS MANDATORY\n`;
         }
