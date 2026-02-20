@@ -121,14 +121,13 @@ export class QwenAgent extends BaseAgent {
   }
 
   toolArguments(): string[] {
-    const args = ['--yolo'];
+    const args = ['--acp', '--include-directories', '/', '--yolo'];
     if (this.model) {
       args.push('--model', this.model);
     }
     if (VERBOSE) {
       args.push('--debug');
     }
-    args.push('-p');
     return args;
   }
 

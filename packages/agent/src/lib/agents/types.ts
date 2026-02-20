@@ -29,6 +29,7 @@ export interface AgentErrorRecoveryContext {
 export interface Agent {
   name: string;
   binary: string;
+  acpCommand: string;
   version: string;
 
   getRequiredCredentials(): AgentCredentialFile[];
