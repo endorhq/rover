@@ -145,6 +145,10 @@ export interface PusherAIResult {
   summary: string;
 }
 
+export interface NotifyAIResult {
+  message: string;
+}
+
 export type ViewMode = 'main' | 'inspector';
 
 export interface TaskMapping {

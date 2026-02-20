@@ -81,6 +81,12 @@ export const coordinatorStep: Step = {
         'Forced to noop: coordinate is not available as a sub-action.';
     }
 
+    // Route clarify decisions to the notify step
+    if (decision.action === 'clarify') {
+      decision.action = 'notify';
+      decision.meta = { ...decision.meta, originalAction: 'clarify' };
+    }
+
     // Write follow-up action. Every decision produces an action — the
     // coordinator is never an end step.
     const action = new ActionWriter(projectId, {

@@ -11,6 +11,7 @@ import { committerStep } from './committer.js';
 import { resolverStep } from './resolver.js';
 import { pusherStep } from './pusher.js';
 import { noopStep } from './noop.js';
+import { notifyStep } from './notify.js';
 import type { OrchestratorCallbacks } from './types.js';
 
 export type StepStatus = 'idle' | 'processing' | 'error';
@@ -22,6 +23,7 @@ export interface StepStatuses {
   committer: { status: StepStatus; processedCount: number };
   resolver: { status: StepStatus; processedCount: number };
   pusher: { status: StepStatus; processedCount: number };
+  notify: { status: StepStatus; processedCount: number };
   noop: { status: StepStatus; processedCount: number };
 }
 
@@ -32,6 +34,7 @@ const ACTION_TYPE_TO_KEY: Record<string, keyof StepStatuses> = {
   commit: 'committer',
   resolve: 'resolver',
   push: 'pusher',
+  notify: 'notify',
   noop: 'noop',
 };
 
@@ -42,6 +45,7 @@ const DEFAULT_STATUSES: StepStatuses = {
   committer: { status: 'idle', processedCount: 0 },
   resolver: { status: 'idle', processedCount: 0 },
   pusher: { status: 'idle', processedCount: 0 },
+  notify: { status: 'idle', processedCount: 0 },
   noop: { status: 'idle', processedCount: 0 },
 };
 
@@ -111,6 +115,7 @@ export function useStepOrchestrator(
         committerStep,
         resolverStep,
         pusherStep,
+        notifyStep,
         noopStep,
       ],
       store,
