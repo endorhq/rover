@@ -74,8 +74,8 @@ Not every event traverses all steps. The coordinator may decide no action is nee
 
 A single `StepOrchestrator` manages all steps using a hybrid event-driven + fallback interval model:
 
-- **Eager drain**: When new actions are enqueued (e.g. coordinator produces a `plan` action), the orchestrator immediately re-drains the pending queue. This creates natural cascading — event → coordinate → plan → workflow flows without waiting between steps. The drain loop continues as long as there are processable actions (respecting per-step `maxParallel`).
-- **Fallback interval**: A single background timer (30s) runs for `monitor()` calls (detecting workflow task completion), startup recovery (draining actions left from a previous run), and edge cases where the eager drain missed something.
+- **Eager drain**: When new actions are enqueued (e.g. coordinator produces a `plan` action), the orchestrator immediately re-drains the pending queue. This creates natural cascading — event → coordinate → plan → workflow flows without waiting between steps. The drain loop continues as long as there are processable actions (respecting per-step `maxParallel`). Each drain iteration runs `monitor()` calls first, so external state changes (like a workflow task completing in its sandbox) are detected immediately before reading the pending queue.
+- **Fallback interval**: A single background timer (30s) acts as a safety net — it triggers a drain cycle in case an eager drain was missed (e.g. startup recovery, edge cases). It is not the primary mechanism for detecting state changes; the drain loop handles that.
 
 Each step defines a `maxParallel` limit — the maximum concurrent actions being processed for that step type. Steps communicate exclusively through the store: one step writes an action and enqueues a pending entry; another step reads and processes it. There is no direct coupling between steps.
 
@@ -196,11 +196,13 @@ An explicit "no operation" terminal step. Records why the pipeline decided not t
 | | |
 |---|---|
 | **Trigger** | Pending `noop` action |
-| **Input** | Noop action meta (contains the reason from the producing step) |
-| **Span** | `step: "noop"`, `status: "completed"`, summary mirrors the action's reason |
+| **Input** | Noop action meta (contains the reason from the producing step) + full span chain |
+| **Span** | `step: "noop"`, `status: "completed"`, `meta.summary` contains AI-generated trace summary |
 | **Actions** | None (trace ends) |
+| **AI** | Yes — lightweight (haiku) for trace summarization, with fallback |
+| **Max parallel** | 5 |
 
-The noop step is purely a trace bookend. It creates a span, copies the reason into the summary, and completes. No AI, no tools, no side effects.
+The noop step creates a span and generates a concise summary of the entire trace chain using a lightweight AI agent (haiku). The summary is stored in `meta.summary` and describes what the pipeline evaluated and why no action was taken. If the AI call fails, it falls back to a simple concatenation of span summaries. This summary is useful for dashboards and trace inspection — it turns a raw chain of spans into a human-readable sentence.
 
 ### Planner
 
@@ -253,6 +255,8 @@ Handles git operations after a workflow task completes. Stages, commits, and rec
 | **Input** | Commit action meta (references the source workflow) |
 | **Span** | `step: "commit"`, meta contains commit hash, message, or error details |
 | **Actions** | One `resolve` action |
+| **AI** | Yes — has `Bash` tool access for git operations and pre-hook recovery |
+| **Max parallel** | 3 |
 
 **Behavior**:
 
