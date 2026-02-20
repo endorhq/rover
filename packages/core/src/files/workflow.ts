@@ -438,8 +438,8 @@ export class WorkflowManager {
     let error: string | undefined;
 
     const result = launchSync(step.command, step.args, { reject: false });
-    stdout = result.stdout;
-    stderr = result.stderr;
+    stdout = String(result.stdout ?? '');
+    stderr = String(result.stderr ?? '');
 
     if (!result.failed) {
       success = true;
