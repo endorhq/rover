@@ -30,6 +30,8 @@ import {
 } from 'rover-core';
 import { ACPClient } from './acp-client.js';
 import { GeminiACPClient } from './gemini-acp-client.js';
+import { createAgent } from './agents/index.js';
+import type { Agent } from './agents/types.js';
 import { copyFileSync, rmSync } from 'node:fs';
 
 export interface ACPRunnerStepResult {
@@ -48,45 +50,6 @@ export interface ACPRunnerConfig {
   statusManager?: IterationStatusManager;
   outputDir?: string;
   logger?: JsonlLogger;
-}
-
-/**
- * Get ACP spawn command for a given agent tool
- */
-function getACPSpawnCommand(
-  tool: string,
-  model?: string
-): { command: string; args: string[] } {
-  switch (tool.toLowerCase()) {
-    case 'claude':
-      return {
-        command: 'npx',
-        args: ['-y', '@zed-industries/claude-code-acp'],
-      };
-    case 'gemini': {
-      // Gemini implements ACP natively via --experimental-acp flag
-      const args = ['--experimental-acp'];
-      if (model) {
-        args.push('--model', model);
-      }
-      return {
-        command: 'gemini',
-        args,
-      };
-    }
-    case 'copilot':
-      return {
-        command: 'copilot',
-        args: ['--acp'],
-      };
-    case 'opencode':
-      return {
-        command: 'opencode',
-        args: ['acp'],
-      };
-    default:
-      throw new Error(`No ACP available for tool ${tool}`);
-  }
 }
 
 /**
@@ -114,6 +77,7 @@ export class ACPRunner {
   private logger?: JsonlLogger;
 
   // ACP connection state
+  private agent: Agent | null = null;
   private agentProcess: ChildProcess | null = null;
   private connection: ClientSideConnection | null = null;
   private client: ACPClient | null = null;
@@ -157,15 +121,17 @@ export class ACPRunner {
       return;
     }
 
-    const spawnConfig = getACPSpawnCommand(this.tool, this.defaultModel);
+    this.agent = createAgent(this.tool, 'latest', this.defaultModel);
+    const agent = this.agent;
+    const agentArgs = agent.toolArguments();
     console.log(
       colors.blue(
-        `\n🚀 Starting ACP agent: ${spawnConfig.command} ${spawnConfig.args.join(' ')}`
+        `\n🚀 Starting ACP agent: ${agent.acpCommand} ${agentArgs.join(' ')}`
       )
     );
 
     // Spawn the agent as a subprocess
-    this.agentProcess = spawn(spawnConfig.command, spawnConfig.args, {
+    this.agentProcess = spawn(agent.acpCommand, agentArgs, {
       stdio: ['pipe', 'pipe', 'pipe'],
       env: process.env,
     });
@@ -691,6 +657,12 @@ export class ACPRunner {
     // Add output instructions
     const outputInstructions = this.generateOutputInstructions(step);
     prompt += outputInstructions;
+
+    // Prepend agent-specific preamble (e.g. project root hint for Gemini)
+    const preamble = this.agent?.getPromptPreamble?.();
+    if (preamble) {
+      prompt = `${preamble}\n\n${prompt}`;
+    }
 
     // Display warnings if any
     if (warnings.length > 0) {

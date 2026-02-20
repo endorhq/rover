@@ -29,6 +29,7 @@ export interface AgentErrorRecoveryContext {
 export interface Agent {
   name: string;
   binary: string;
+  acpCommand: string;
   version: string;
 
   getRequiredCredentials(): AgentCredentialFile[];
@@ -53,6 +54,12 @@ export interface Agent {
     context: AgentErrorRecoveryContext
   ): Promise<AgentRecoveryResult | null> | AgentRecoveryResult | null;
   extractUsageStats?(parsedResponse: unknown): AgentUsageStats | undefined;
+
+  /**
+   * Returns an optional preamble to prepend to every ACP prompt.
+   * Useful for agent-specific context like working directory hints.
+   */
+  getPromptPreamble?(): string;
 
   /**
    * Returns directories where this agent writes its own logs.

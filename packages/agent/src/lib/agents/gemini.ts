@@ -121,7 +121,7 @@ export class GeminiAgent extends BaseAgent {
   }
 
   toolArguments(): string[] {
-    const args = ['--yolo', '--output-format', 'json', '--include-directories', '/'];
+    const args = ['--experimental-acp', '--include-directories', '/', '--yolo'];
     if (this.model) {
       args.push('--model', this.model);
     }
@@ -135,13 +135,22 @@ export class GeminiAgent extends BaseAgent {
     precontext: string,
     initialPrompt?: string
   ): string[] {
-    let prompt = precontext;
+    const preamble = this.getPromptPreamble();
+    let prompt = preamble;
+
+    if (precontext) {
+      prompt += `\n\n${precontext}`;
+    }
 
     if (initialPrompt) {
       prompt += `\n\nInitial User Prompt:\n\n${initialPrompt}`;
     }
 
     return ['-i', prompt];
+  }
+
+  override getPromptPreamble(): string {
+    return 'The project root is at /workspace.';
   }
 
   override getLogSources(): string[] {
