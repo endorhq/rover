@@ -8,6 +8,7 @@ import {
   ReadTextFileResponse,
   ReleaseTerminalRequest,
   ReleaseTerminalResponse,
+  RequestError,
   RequestPermissionRequest,
   RequestPermissionResponse,
   SessionNotification,
@@ -21,8 +22,23 @@ import {
 } from '@agentclientprotocol/sdk';
 import colors from 'ansi-colors';
 import { execa, type ResultPromise } from 'execa';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
 import { generateRandomId, VERBOSE } from 'rover-core';
+
+/**
+ * Format an error into a human-readable string.
+ * Handles Error instances, plain objects (e.g. JSON-RPC errors), and primitives.
+ */
+function formatError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (error !== null && typeof error === 'object') {
+    return JSON.stringify(error, null, 2);
+  }
+  return String(error);
+}
 
 // Custom JSON replacer to handle BigInt values
 function jsonReplacer(_key: string, value: unknown): unknown {
@@ -68,29 +84,47 @@ export class ACPClient implements Client {
   requestPermission(
     params: RequestPermissionRequest
   ): Promise<RequestPermissionResponse> {
-    if (VERBOSE) {
+    // Always log ACP commands for debugging (can be seen in docker logs)
+    console.log(
+      colors.gray('[ACP] requestPermission called with:'),
+      colors.cyan(JSON.stringify(params, jsonReplacer, 2))
+    );
+
+    // Allow for now - use the first "allow" option from the provided options
+    const allowOption =
+      params.options.find(opt => opt.kind === 'allow_always') ??
+      params.options.find(opt => opt.kind === 'allow_once');
+
+    if (!allowOption) {
       console.log(
-        colors.gray('[Client] Request permission called with:'),
-        colors.cyan(JSON.stringify(params, jsonReplacer, 2))
+        colors.red('[ACP] requestPermission: No allow option found!')
       );
+      throw new Error('No allow option found in permission request');
     }
 
-    // Allow for now - use the optionId from the 'allow_always' option in the request
-    const allowAlwaysOption = params.options.find(
-      opt => opt.kind === 'allow_always'
-    );
-    const optionId = allowAlwaysOption?.optionId ?? 'always';
-
-    return Promise.resolve({
+    const response: RequestPermissionResponse = {
       outcome: {
         outcome: 'selected',
-        optionId,
+        optionId: allowOption.optionId,
       },
-    });
+    };
+
+    console.log(
+      colors.gray('[ACP] requestPermission response:'),
+      colors.green(JSON.stringify(response, jsonReplacer, 2))
+    );
+
+    return Promise.resolve(response);
   }
 
   async sessionUpdate(params: SessionNotification): Promise<void> {
     const update = params.update;
+
+    // Always log session updates for debugging
+    console.log(
+      colors.gray(`[ACP] sessionUpdate: ${update.sessionUpdate}`),
+      colors.cyan(JSON.stringify(update, jsonReplacer, 2).substring(0, 500))
+    );
 
     switch (update.sessionUpdate) {
       case 'agent_message_chunk':
@@ -109,29 +143,32 @@ export class ACPClient implements Client {
         }
         break;
       case 'tool_call':
-        if (VERBOSE) {
-          console.log(
-            colors.gray(`🔧 ${update.title} (${update.status}) ID: `) +
-              colors.cyan(update.toolCallId)
-          );
-        } else if (update.status === 'in_progress') {
+        // Always log tool calls for debugging
+        console.log(
+          colors.gray(
+            `[ACP] tool_call: ${update.title} (${update.status}) ID: `
+          ) + colors.cyan(update.toolCallId)
+        );
+        if (!VERBOSE && update.status === 'in_progress') {
           process.stdout.write(colors.gray(`⚙️  ${update.title}`));
         }
         break;
       case 'tool_call_update':
-        if (VERBOSE) {
-          const statusStr = update.status ? `status: ${update.status}` : '';
-          const titleStr = update.title ? `title: ${update.title}` : '';
-          const parts = [statusStr, titleStr].filter(Boolean).join(', ');
-          console.log(
-            colors.gray(`🔧 Update: `) +
-              colors.cyan(update.toolCallId) +
-              colors.gray(parts ? ` - ${parts}` : '')
-          );
-        } else if (update.status === 'completed') {
-          process.stdout.write(colors.green('.'));
-        } else if (update.status === 'failed') {
-          process.stdout.write(colors.red('.'));
+        // Always log tool call updates for debugging
+        const statusStr = update.status ? `status: ${update.status}` : '';
+        const titleStr = update.title ? `title: ${update.title}` : '';
+        const parts = [statusStr, titleStr].filter(Boolean).join(', ');
+        console.log(
+          colors.gray(`[ACP] tool_call_update: `) +
+            colors.cyan(update.toolCallId) +
+            colors.gray(parts ? ` - ${parts}` : '')
+        );
+        if (!VERBOSE) {
+          if (update.status === 'completed') {
+            process.stdout.write(colors.green('.'));
+          } else if (update.status === 'failed') {
+            process.stdout.write(colors.red('.'));
+          }
         }
         break;
       case 'agent_thought_chunk':
@@ -153,44 +190,90 @@ export class ACPClient implements Client {
       case 'current_mode_update':
       case 'config_option_update':
       case 'session_info_update':
-        if (VERBOSE) {
-          console.log(colors.gray(`[${update.sessionUpdate}]`));
-        }
+        // Already logged above
         break;
       default: {
         const exhaustiveCheck: never = update;
-        if (VERBOSE) {
-          console.log(
-            colors.yellow(
-              `[Unknown session update: ${JSON.stringify(exhaustiveCheck, jsonReplacer, 2)}]`
-            )
-          );
-        }
+        console.log(
+          colors.yellow(
+            `[ACP] Unknown session update: ${JSON.stringify(exhaustiveCheck, jsonReplacer, 2)}`
+          )
+        );
         break;
       }
     }
   }
 
   writeTextFile?(params: WriteTextFileRequest): Promise<WriteTextFileResponse> {
-    if (VERBOSE) {
+    // Always log ACP commands for debugging (can be seen in docker logs)
+    console.log(
+      colors.gray('[ACP] writeTextFile called with:'),
+      colors.cyan(JSON.stringify(params, jsonReplacer, 2))
+    );
+
+    try {
+      // Create parent directories if they don't exist
+      const parentDir = dirname(params.path);
+      mkdirSync(parentDir, { recursive: true });
+
+      writeFileSync(params.path, params.content);
+
       console.log(
-        colors.gray('[Client] Write text file called with:'),
-        colors.cyan(JSON.stringify(params, jsonReplacer, 2))
+        colors.green(
+          `[ACP] writeTextFile: Successfully wrote to ${params.path}`
+        )
       );
+      return Promise.resolve({});
+    } catch (error) {
+      console.log(
+        colors.red(`[ACP] writeTextFile error:`),
+        colors.red(formatError(error))
+      );
+      throw error;
     }
-    writeFileSync(params.path, params.content);
-    return Promise.resolve({});
+  }
+
+  /**
+   * Called when readTextFile encounters a file that does not exist.
+   * Subclasses can override this to customize behavior per agent.
+   * By default, throws a resourceNotFound error.
+   */
+  protected onFileNotFound(path: string): Promise<ReadTextFileResponse> {
+    throw RequestError.resourceNotFound(path);
   }
 
   readTextFile?(params: ReadTextFileRequest): Promise<ReadTextFileResponse> {
-    if (VERBOSE) {
-      console.log(
-        colors.gray('[Client] Read text file called with:'),
-        colors.cyan(JSON.stringify(params, jsonReplacer, 2))
-      );
-    }
+    // Always log ACP commands for debugging (can be seen in docker logs)
+    console.log(
+      colors.gray('[ACP] readTextFile called with:'),
+      colors.cyan(JSON.stringify(params, jsonReplacer, 2))
+    );
 
-    let content = readFileSync(params.path, 'utf-8');
+    let content: string;
+    try {
+      content = readFileSync(params.path, 'utf-8');
+      console.log(
+        colors.green(
+          `[ACP] readTextFile: Read ${content.length} bytes from ${params.path}`
+        )
+      );
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        error.code === 'ENOENT'
+      ) {
+        console.log(
+          colors.yellow(`[ACP] readTextFile: File not found ${params.path}`)
+        );
+        return this.onFileNotFound(params.path);
+      }
+      console.log(
+        colors.red(`[ACP] readTextFile error:`),
+        colors.red(formatError(error))
+      );
+      throw error;
+    }
 
     if (params.line) {
       content = content.split('\n')[params.line - 1] || '';
@@ -200,20 +283,24 @@ export class ACPClient implements Client {
       content = content.split('\n').slice(0, params.limit).join('\n');
     }
 
-    return Promise.resolve({
-      content,
-    });
+    const response = { content };
+    console.log(
+      colors.gray('[ACP] readTextFile response:'),
+      colors.cyan(
+        `{ content: "${content.length > 100 ? content.substring(0, 100) + '...' : content}" }`
+      )
+    );
+    return Promise.resolve(response);
   }
 
   createTerminal?(
     params: CreateTerminalRequest
   ): Promise<CreateTerminalResponse> {
-    if (VERBOSE) {
-      console.log(
-        colors.gray('[Client] Create terminal called with:'),
-        colors.cyan(JSON.stringify(params, jsonReplacer, 2))
-      );
-    }
+    // Always log ACP commands for debugging
+    console.log(
+      colors.gray('[ACP] createTerminal called with:'),
+      colors.cyan(JSON.stringify(params, jsonReplacer, 2))
+    );
 
     const terminalId = `terminal-${generateRandomId()}`;
 
@@ -306,34 +393,48 @@ export class ACPClient implements Client {
   terminalOutput?(
     params: TerminalOutputRequest
   ): Promise<TerminalOutputResponse> {
-    if (VERBOSE) {
-      console.log(
-        colors.gray('[Client] Terminal output called with:'),
-        colors.cyan(JSON.stringify(params, jsonReplacer, 2))
-      );
-    }
+    // Always log ACP commands for debugging
+    console.log(
+      colors.gray('[ACP] terminalOutput called with:'),
+      colors.cyan(JSON.stringify(params, jsonReplacer, 2))
+    );
 
     const state = terminals.get(params.terminalId);
     if (!state) {
+      console.log(
+        colors.red(
+          `[ACP] terminalOutput: Terminal not found: ${params.terminalId}`
+        )
+      );
       throw new Error(`Terminal not found: ${params.terminalId}`);
     }
 
-    return Promise.resolve({
+    const response = {
       output: state.output,
       truncated: state.truncated,
       exitStatus: state.exitStatus,
-    });
+    };
+    console.log(
+      colors.gray(
+        '[ACP] terminalOutput response (output length: ' +
+          state.output.length +
+          ' chars)'
+      ),
+      colors.cyan(
+        JSON.stringify({ ...response, output: '[truncated]' }, jsonReplacer, 2)
+      )
+    );
+    return Promise.resolve(response);
   }
 
   releaseTerminal?(
     params: ReleaseTerminalRequest
   ): Promise<ReleaseTerminalResponse | void> {
-    if (VERBOSE) {
-      console.log(
-        colors.gray('[Client] Release terminal called with:'),
-        colors.cyan(JSON.stringify(params, jsonReplacer, 2))
-      );
-    }
+    // Always log ACP commands for debugging
+    console.log(
+      colors.gray('[ACP] releaseTerminal called with:'),
+      colors.cyan(JSON.stringify(params, jsonReplacer, 2))
+    );
 
     const state = terminals.get(params.terminalId);
 
@@ -343,16 +444,29 @@ export class ACPClient implements Client {
     }
 
     if (!state) {
+      console.log(
+        colors.red(
+          `[ACP] releaseTerminal: Terminal not found: ${params.terminalId}`
+        )
+      );
       throw new Error(`Terminal not found: ${params.terminalId}`);
     }
 
     // Kill the process if still running
     if (state.exitStatus === null) {
+      console.log(
+        colors.gray(
+          `[ACP] releaseTerminal: Killing process for ${params.terminalId}`
+        )
+      );
       state.process.kill();
     }
 
     // Remove from tracking
     terminals.delete(params.terminalId);
+    console.log(
+      colors.green(`[ACP] releaseTerminal: Released ${params.terminalId}`)
+    );
 
     return Promise.resolve({});
   }
@@ -360,44 +474,65 @@ export class ACPClient implements Client {
   async waitForTerminalExit?(
     params: WaitForTerminalExitRequest
   ): Promise<WaitForTerminalExitResponse> {
-    if (VERBOSE) {
-      console.log(
-        colors.gray('[Client] Wait for terminal exit called with:'),
-        colors.cyan(JSON.stringify(params, jsonReplacer, 2))
-      );
-    }
+    // Always log ACP commands for debugging
+    console.log(
+      colors.gray('[ACP] waitForTerminalExit called with:'),
+      colors.cyan(JSON.stringify(params, jsonReplacer, 2))
+    );
 
     const state = terminals.get(params.terminalId);
     if (!state) {
+      console.log(
+        colors.red(
+          `[ACP] waitForTerminalExit: Terminal not found: ${params.terminalId}`
+        )
+      );
       throw new Error(`Terminal not found: ${params.terminalId}`);
     }
 
     // Wait for the process to exit
+    console.log(
+      colors.gray(
+        `[ACP] waitForTerminalExit: Waiting for ${params.terminalId}...`
+      )
+    );
     await state.exitPromise;
 
-    return {
+    const response = {
       exitCode: state.exitStatus?.exitCode ?? null,
       signal: state.exitStatus?.signal ?? null,
     };
+    console.log(
+      colors.gray('[ACP] waitForTerminalExit response:'),
+      colors.cyan(JSON.stringify(response, jsonReplacer, 2))
+    );
+    return response;
   }
 
   killTerminal?(
     params: KillTerminalCommandRequest
   ): Promise<KillTerminalCommandResponse | void> {
-    if (VERBOSE) {
-      console.log(
-        colors.gray('[Client] Kill terminal called with:'),
-        colors.cyan(JSON.stringify(params, jsonReplacer, 2))
-      );
-    }
+    // Always log ACP commands for debugging
+    console.log(
+      colors.gray('[ACP] killTerminal called with:'),
+      colors.cyan(JSON.stringify(params, jsonReplacer, 2))
+    );
 
     const state = terminals.get(params.terminalId);
     if (!state) {
+      console.log(
+        colors.red(
+          `[ACP] killTerminal: Terminal not found: ${params.terminalId}`
+        )
+      );
       throw new Error(`Terminal not found: ${params.terminalId}`);
     }
 
     // Kill the process (sends SIGTERM by default)
     state.process.kill();
+    console.log(
+      colors.green(`[ACP] killTerminal: Killed ${params.terminalId}`)
+    );
 
     return Promise.resolve({});
   }
@@ -406,8 +541,9 @@ export class ACPClient implements Client {
     method: string,
     params: Record<string, unknown>
   ): Promise<Record<string, unknown>> {
-    console.error(
-      colors.red('[Client] Ext method called with:'),
+    // Always log ACP commands for debugging
+    console.log(
+      colors.yellow('[ACP] extMethod called (not implemented):'),
       colors.cyan(method),
       colors.cyan(JSON.stringify(params, jsonReplacer, 2))
     );
@@ -418,8 +554,9 @@ export class ACPClient implements Client {
     method: string,
     params: Record<string, unknown>
   ): Promise<void> {
-    console.error(
-      colors.red('[Client] Ext notification called with:'),
+    // Always log ACP commands for debugging
+    console.log(
+      colors.yellow('[ACP] extNotification called (not implemented):'),
       colors.cyan(method),
       colors.cyan(JSON.stringify(params, jsonReplacer, 2))
     );

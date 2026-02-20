@@ -14,6 +14,10 @@ export abstract class BaseAgent implements Agent {
   version: string;
   model?: string;
 
+  get acpCommand(): string {
+    return this.binary;
+  }
+
   constructor(version: string = 'latest', model?: string) {
     this.version = version;
     this.model = model;
@@ -118,6 +122,10 @@ export abstract class BaseAgent implements Agent {
    */
   extractUsageStats(_parsedResponse: unknown): AgentUsageStats | undefined {
     return undefined;
+  }
+
+  getPromptPreamble(): string {
+    return '';
   }
 
   getLogSources(): string[] {

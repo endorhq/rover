@@ -2,14 +2,9 @@ import { existsSync, copyFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import colors from 'ansi-colors';
-import {
-  AgentCredentialFile,
-  AgentErrorRecoveryContext,
-  AgentRecoveryResult,
-} from './types.js';
+import { AgentCredentialFile } from './types.js';
 import { BaseAgent } from './base.js';
 import { launch, VERBOSE, showList } from 'rover-core';
-import { containsGeminiYoloWarning } from '../utils/gemini.js';
 
 export class GeminiAgent extends BaseAgent {
   name = 'Gemini';
@@ -126,7 +121,7 @@ export class GeminiAgent extends BaseAgent {
   }
 
   toolArguments(): string[] {
-    const args = ['--yolo', '--output-format', 'json'];
+    const args = ['--experimental-acp', '--include-directories', '/', '--yolo'];
     if (this.model) {
       args.push('--model', this.model);
     }
@@ -140,7 +135,12 @@ export class GeminiAgent extends BaseAgent {
     precontext: string,
     initialPrompt?: string
   ): string[] {
-    let prompt = precontext;
+    const preamble = this.getPromptPreamble();
+    let prompt = preamble;
+
+    if (precontext) {
+      prompt += `\n\n${precontext}`;
+    }
 
     if (initialPrompt) {
       prompt += `\n\nInitial User Prompt:\n\n${initialPrompt}`;
@@ -149,41 +149,8 @@ export class GeminiAgent extends BaseAgent {
     return ['-i', prompt];
   }
 
-  async recoverFromError({
-    error,
-  }: AgentErrorRecoveryContext): Promise<AgentRecoveryResult | null> {
-    if (!error || typeof error !== 'object') {
-      return null;
-    }
-
-    const stdout = GeminiAgent.normalizeProcessOutput((error as any)?.stdout);
-    const stderr = GeminiAgent.normalizeProcessOutput((error as any)?.stderr);
-    const messageParts = [
-      stderr,
-      stdout,
-      error instanceof Error ? error.message : '',
-    ].filter(Boolean);
-
-    if (!containsGeminiYoloWarning(messageParts.join('\n'))) {
-      return null;
-    }
-
-    return {
-      rawOutput: stdout,
-      notice: '⚠️  Gemini reported YOLO mode is enabled. Continuing execution.',
-    };
-  }
-
-  private static normalizeProcessOutput(output: unknown): string {
-    if (typeof output === 'string') {
-      return output;
-    }
-
-    if (Buffer.isBuffer(output)) {
-      return output.toString();
-    }
-
-    return '';
+  override getPromptPreamble(): string {
+    return 'The project root is at /workspace.';
   }
 
   override getLogSources(): string[] {

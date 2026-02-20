@@ -354,9 +354,8 @@ export const runCommand = async (
       const tool =
         options.agentTool || workflowManager.defaults?.tool || 'claude';
 
-      // Temporarily ACP usage decision during ACP migration process:
-      // force Claude, Copilot, and OpenCode to always use ACP mode
-      const acpEnabledTools = ['claude', 'copilot', 'opencode'];
+      // ACP usage decision: use ACP mode for agents that support it
+      const acpEnabledTools = ['claude', 'gemini', 'copilot', 'opencode'];
       const useACPMode = acpEnabledTools.includes(tool.toLowerCase());
 
       if (useACPMode) {

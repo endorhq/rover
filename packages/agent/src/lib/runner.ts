@@ -33,7 +33,7 @@ import {
   AuthenticationError,
   TimeoutError,
 } from './errors.js';
-import { basename, join } from 'node:path';
+import { basename, join, resolve } from 'node:path';
 import { createAgent, Agent, AgentUsageStats } from './agents/index.js';
 
 export interface RunnerStepResult {
@@ -720,14 +720,17 @@ export class Runner {
 
       fileOutputs.forEach((output: WorkflowOutput) => {
         instructions += `- **${output.name}**: ${output.description}\n`;
-        instructions += `  - Create this file in the current working directory\n`;
 
         if (this.tool == 'gemini' || this.tool == 'qwen') {
-          // Gemini has difficulties calling its own tools
-          instructions += `  - When creating the file, call the write_file tool using an absolute path based on current directory. THIS IS MANDATORY\n`;
+          // Gemini refuses to write files using relative paths, so we must
+          // provide an absolute path in the prompt.
+          const absolutePath = resolve(output.filename!);
+          instructions += `  - When creating the file, call the write_file tool using the following absolute path. THIS IS MANDATORY\n`;
+          instructions += `  - Filename: \`${absolutePath}\`\n\n`;
+        } else {
+          instructions += `  - Create this file in the current working directory\n`;
+          instructions += `  - Filename: \`${output.filename}\`\n\n`;
         }
-
-        instructions += `  - Filename: \`${output.filename}\`\n\n`;
       });
 
       instructions +=
