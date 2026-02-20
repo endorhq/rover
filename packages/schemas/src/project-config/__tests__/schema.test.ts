@@ -109,8 +109,8 @@ describe('ProjectConfigSchema with projects', () => {
     });
 
     expect(result.projects).toHaveLength(2);
-    expect(result.projects![0].name).toBe('api');
-    expect(result.projects![1].languages).toEqual(['python']);
+    expect(result.projects?.[0].name).toBe('api');
+    expect(result.projects?.[1].languages).toEqual(['python']);
   });
 
   it('should reject a config with invalid projects entries', () => {

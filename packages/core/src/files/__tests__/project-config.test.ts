@@ -962,8 +962,8 @@ describe('ProjectConfigManager - Multi-Project Workspace Support', () => {
     const config = ProjectConfigManager.load(testDir);
 
     expect(config.projects).toHaveLength(2);
-    expect(config.projects![0].name).toBe('api');
-    expect(config.projects![1].name).toBe('frontend');
+    expect(config.projects?.[0].name).toBe('api');
+    expect(config.projects?.[1].name).toBe('frontend');
   });
 
   it('should migrate from 1.3 to 1.4 preserving projects field', () => {
@@ -990,7 +990,7 @@ describe('ProjectConfigManager - Multi-Project Workspace Support', () => {
 
     expect(config.version).toBe('1.4');
     expect(config.projects).toHaveLength(1);
-    expect(config.projects![0].name).toBe('api');
+    expect(config.projects?.[0].name).toBe('api');
 
     const jsonData = JSON.parse(readFileSync('rover.json', 'utf8'));
     expect(jsonData.version).toBe('1.4');
@@ -1225,7 +1225,7 @@ describe('ProjectConfigManager - Multi-Project Workspace Support', () => {
     });
 
     expect(config.projects).toHaveLength(1);
-    expect(config.projects![0].name).toBe('api');
+    expect(config.projects?.[0].name).toBe('api');
 
     // Verify saved to disk
     const jsonData = JSON.parse(readFileSync('rover.json', 'utf8'));
@@ -1240,7 +1240,7 @@ describe('ProjectConfigManager - Multi-Project Workspace Support', () => {
     config.addProject({ name: 'api', path: 'packages/api-v2' });
 
     expect(config.projects).toHaveLength(1);
-    expect(config.projects![0].path).toBe('packages/api');
+    expect(config.projects?.[0].path).toBe('packages/api');
   });
 
   it('removeProject should remove an existing project', () => {
@@ -1268,7 +1268,7 @@ describe('ProjectConfigManager - Multi-Project Workspace Support', () => {
     config.removeProject('api');
 
     expect(config.projects).toHaveLength(1);
-    expect(config.projects![0].name).toBe('web');
+    expect(config.projects?.[0].name).toBe('web');
   });
 
   it('removeProject should remove projects field when last project removed', () => {
