@@ -40,6 +40,7 @@ export interface SetupHashInputs {
   agent: string;
   roverVersion: string;
   initScriptContent: string;
+  cacheFilesContent: string;
   mcps: Array<{
     name: string;
     commandOrUrl: string;
@@ -63,6 +64,7 @@ export function computeSetupHash(inputs: SetupHashInputs): string {
     agent: inputs.agent,
     roverVersion: inputs.roverVersion,
     initScriptContent: inputs.initScriptContent,
+    cacheFilesContent: inputs.cacheFilesContent,
     mcps: [...inputs.mcps]
       .sort((a, b) => a.name.localeCompare(b.name))
       .map(mcp => ({
@@ -175,6 +177,21 @@ export function checkImageCache(
     }
   }
 
+  let cacheFilesContent = '';
+  if (projectConfig.cacheFiles) {
+    const parts: string[] = [];
+    for (const filePath of [...projectConfig.cacheFiles].sort()) {
+      try {
+        const absPath = join(projectConfig.projectRoot, filePath);
+        parts.push(`${filePath}\0${readFileSync(absPath, 'utf-8')}`);
+      } catch {
+        // If a file can't be read, skip it — the hash will change
+        // once the file appears.
+      }
+    }
+    cacheFilesContent = parts.join('\0');
+  }
+
   const hash = computeSetupHash({
     agentImage,
     languages: projectConfig.languages,
@@ -183,6 +200,7 @@ export function checkImageCache(
     agent,
     roverVersion: getVersion(),
     initScriptContent,
+    cacheFilesContent,
     mcps: projectConfig.mcps,
   });
 
