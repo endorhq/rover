@@ -111,6 +111,7 @@ export type PlannerStatus = 'idle' | 'processing' | 'error';
 export type WorkflowRunnerStatus = 'idle' | 'processing' | 'error';
 export type CommitterStatus = 'idle' | 'processing' | 'error';
 export type ResolverStatus = 'idle' | 'processing' | 'error';
+export type PusherStatus = 'idle' | 'processing' | 'error';
 export type ResolverDecision = 'wait' | 'push' | 'iterate' | 'fail';
 
 export interface ResolverAIResult {
@@ -132,6 +133,18 @@ export interface CommitterAIResult {
   recovery_actions_taken: string[];
   summary: string;
 }
+export interface PusherAIResult {
+  status: 'pushed' | 'failed';
+  branches_pushed: string[];
+  pull_request: {
+    url: string | null;
+    created: boolean;
+    existing: boolean;
+  } | null;
+  error: string | null;
+  summary: string;
+}
+
 export type ViewMode = 'main' | 'inspector';
 
 export interface TaskMapping {
