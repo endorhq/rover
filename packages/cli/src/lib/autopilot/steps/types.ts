@@ -55,7 +55,7 @@ export interface StepResult {
    * Step completion status. Defaults to 'completed' if omitted.
    * 'pending' = action is not ready yet, leave it in the queue for retry.
    */
-  status?: 'completed' | 'failed' | 'running' | 'pending';
+  status?: 'completed' | 'failed' | 'running' | 'pending' | 'error';
   /** Direct trace mutations (e.g. resolver marking pending steps failed). */
   traceMutations?: {
     stepUpdates?: Array<{

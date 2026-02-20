@@ -79,7 +79,12 @@ export interface PilotDecision {
   meta: Record<string, any>;
 }
 
-export type ActionStepStatus = 'completed' | 'running' | 'pending' | 'failed';
+export type ActionStepStatus =
+  | 'completed'
+  | 'running'
+  | 'pending'
+  | 'failed'
+  | 'error';
 
 export interface ActionStep {
   actionId: string;
@@ -87,8 +92,10 @@ export interface ActionStep {
   status: ActionStepStatus;
   timestamp: string;
   reasoning?: string;
-  /** For span-only steps (e.g. noop) that have no follow-up action. */
+  /** The span ID created by this step's execution. */
   spanId?: string;
+  /** True when this step is terminal (no follow-up action). */
+  terminal?: boolean;
 }
 
 export interface ActionTrace {
@@ -111,6 +118,10 @@ export interface ResolverAIResult {
   reasoning: string;
   iterate_instructions?: string;
   fail_reason?: string;
+}
+
+export interface SummaryAIResult {
+  summary: string;
 }
 
 export interface CommitterAIResult {

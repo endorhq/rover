@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Box, useInput, useApp, useStdout } from 'ink';
 import type {
   ProjectManager,
@@ -8,6 +8,7 @@ import type {
 import { getVersion } from 'rover-core';
 import type { TaskInfo, LogEntry, WorkSlot, ViewMode } from './types.js';
 import { formatDuration } from './helpers.js';
+import { AutopilotStore } from './store.js';
 import { InfoPanel, SpaceScene, LogBook } from './components.js';
 import { InspectorView } from './inspector.js';
 import { useGitHubEvents } from './events.js';
@@ -134,19 +135,30 @@ export function AutopilotApp({
   const { exit } = useApp();
   const tasks = useTasks(project, refreshInterval);
   const { columns, rows } = useTerminalSize();
+
+  // Single shared store — created once, used by both hooks
+  const storeRef = useRef<AutopilotStore | null>(null);
+  if (!storeRef.current) {
+    const s = new AutopilotStore(project.id);
+    s.ensureDir();
+    storeRef.current = s;
+  }
+  const store = storeRef.current!;
+
+  const { statuses, traces, tracesRef, requestDrain } = useStepOrchestrator(
+    project,
+    project.path,
+    project.id,
+    store
+  );
+
   const {
     status: fetchStatus,
     countdown: fetchCountdown,
     lastFetchCount,
     lastRelevantCount,
     lastNewCount,
-  } = useGitHubEvents(project.path, project.id);
-
-  const { statuses, traces, tracesRef, store } = useStepOrchestrator(
-    project,
-    project.path,
-    project.id
-  );
+  } = useGitHubEvents(project.path, project.id, store, requestDrain);
 
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('main');

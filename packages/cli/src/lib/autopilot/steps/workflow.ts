@@ -6,7 +6,12 @@ import { createSandbox } from '../../sandbox/index.js';
 import { resolveAgentImage } from '../../sandbox/container-common.js';
 import { generateBranchName } from '../../../utils/branch-name.js';
 import { copyEnvironmentFiles } from '../../../utils/env-files.js';
-import { SpanWriter, ActionWriter, enqueueAction } from '../logging.js';
+import {
+  SpanWriter,
+  ActionWriter,
+  enqueueAction,
+  finalizeSpan,
+} from '../logging.js';
 import type { PendingAction, ActionTrace } from '../types.js';
 
 const MAX_RUNNING_TASKS = 3;
@@ -265,18 +270,10 @@ export const workflowStep: Step = {
     });
 
     // 8. Remove processed workflow action from pending
+    // NOTE: No manual appendLog here — the action was already logged when the
+    // planner enqueued it. Re-logging with the new workflowSpan would violate
+    // the invariant (different spanId, same actionId).
     store.removePending(pending.actionId);
-
-    // 9. Write log entry
-    store.appendLog({
-      ts: new Date().toISOString(),
-      traceId: pending.traceId,
-      spanId: workflowSpan.id,
-      actionId: pending.actionId,
-      step: 'workflow',
-      action: 'workflow',
-      summary: `task #${taskId}: ${meta.title} (branch: ${branchName}) — launched`,
-    });
 
     return {
       spanId: workflowSpan.id,
@@ -308,9 +305,24 @@ export const workflowStep: Step = {
       const task = project.getTask(mapping.taskId);
       if (!task) continue;
 
+      // Refresh status from iteration files on disk — the container writes
+      // results there but nothing updates the task status automatically.
+      // May throw if status.json doesn't exist yet (race with sandbox startup).
+      try {
+        task.updateStatusFromIteration();
+      } catch {
+        continue;
+      }
       const taskStatus = task.status;
 
       if (taskStatus === 'COMPLETED') {
+        finalizeSpan(
+          projectId,
+          mapping.workflowSpanId,
+          'completed',
+          `workflow: task #${mapping.taskId} completed on ${mapping.branchName}`
+        );
+
         const pendingForCommit: PendingAction = {
           traceId: mapping.traceId,
           actionId,
@@ -356,6 +368,15 @@ export const workflowStep: Step = {
         });
       } else if (taskStatus === 'FAILED') {
         const errorMessage = task.error ?? 'unknown error';
+
+        finalizeSpan(
+          projectId,
+          mapping.workflowSpanId,
+          'failed',
+          `workflow: task #${mapping.taskId} failed: ${errorMessage}`,
+          { error: errorMessage }
+        );
+
         const pendingForCommit: PendingAction = {
           traceId: mapping.traceId,
           actionId,

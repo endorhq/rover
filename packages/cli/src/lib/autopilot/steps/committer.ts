@@ -171,6 +171,7 @@ export const committerStep: Step = {
           },
         ],
         reasoning: `task #${taskId} failed, skipping commit`,
+        status: 'failed',
       };
     }
 
@@ -282,6 +283,7 @@ export const committerStep: Step = {
         },
       ],
       reasoning,
+      status: result.status === 'failed' ? 'error' : 'completed',
     };
   },
 };

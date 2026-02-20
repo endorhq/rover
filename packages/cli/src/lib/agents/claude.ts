@@ -106,6 +106,7 @@ class ClaudeAI implements AIAgentTool {
 
     if (tools && tools.length > 0) {
       claudeArgs.push('--tools', tools.join(','));
+      claudeArgs.push('--allowedTools', tools.join(','));
     }
 
     if (maxBudget !== undefined) {

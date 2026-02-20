@@ -81,35 +81,8 @@ export const coordinatorStep: Step = {
         'Forced to noop: coordinate is not available as a sub-action.';
     }
 
-    if (decision.action === 'noop') {
-      // Noop is terminal — finalize span, no follow-up action
-      span.complete(
-        `coordinate: ${decision.action} — ${pending.summary}`,
-        decision.meta
-      );
-
-      store.removePending(pending.actionId);
-
-      // Write log for noop
-      store.appendLog({
-        ts: new Date().toISOString(),
-        traceId: pending.traceId,
-        spanId: span.id,
-        actionId: '',
-        step: 'coordinate',
-        action: 'noop',
-        summary: `noop (${decision.confidence}): ${pending.summary}`,
-      });
-
-      return {
-        spanId: span.id,
-        terminal: true,
-        enqueuedActions: [],
-        reasoning: `${decision.action} (${decision.confidence})`,
-      };
-    }
-
-    // Write follow-up action and enqueue it
+    // Write follow-up action. Every decision produces an action — the
+    // coordinator is never an end step.
     const action = new ActionWriter(projectId, {
       action: decision.action,
       spanId: span.id,
@@ -117,17 +90,18 @@ export const coordinatorStep: Step = {
       meta: decision.meta,
     });
 
+    span.complete(
+      `coordinate: ${decision.action} — ${pending.summary}`,
+      decision.meta
+    );
+
+    // Enqueue the action for the next step to pick up (including noop)
     enqueueAction(store, {
       traceId: pending.traceId,
       action,
       step: 'coordinate',
       summary: `${decision.action}: ${pending.summary}`,
     });
-
-    span.complete(
-      `coordinate: ${decision.action} — ${pending.summary}`,
-      decision.meta
-    );
 
     // Remove the processed coordinate action
     store.removePending(pending.actionId);
