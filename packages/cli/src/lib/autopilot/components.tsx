@@ -9,6 +9,7 @@ import type {
   WorkflowRunnerStatus,
   CommitterStatus,
   ResolverStatus,
+  PusherStatus,
   ActionTrace,
   ActionStepStatus,
 } from './types.js';
@@ -250,6 +251,44 @@ function ResolverIndicator({
   );
 }
 
+// ── Pusher Status Indicator ──────────────────────────────────────────────────
+
+const PUSHER_ICONS: Record<PusherStatus, string> = {
+  idle: '\u25CB', // ○
+  processing: '\u21BB', // ↻
+  error: '\u2717', // ✗
+};
+
+const PUSHER_COLORS: Record<PusherStatus, string> = {
+  idle: 'gray',
+  processing: 'magentaBright',
+  error: 'red',
+};
+
+function PusherIndicator({
+  status,
+  processedCount,
+}: {
+  status: PusherStatus;
+  processedCount: number;
+}) {
+  const icon = PUSHER_ICONS[status];
+  const color = PUSHER_COLORS[status];
+  const label =
+    status === 'processing'
+      ? 'pushing...'
+      : status === 'error'
+        ? 'pusher error'
+        : `${processedCount} pushed`;
+
+  return (
+    <Text>
+      <Text color={color}>{icon} </Text>
+      <Text dimColor>{label}</Text>
+    </Text>
+  );
+}
+
 // ── Key Legend ────────────────────────────────────────────────────────────────
 
 function KeyLegend() {
@@ -288,6 +327,8 @@ export function InfoPanel({
   committerProcessedCount,
   resolverStatus,
   resolverProcessedCount,
+  pusherStatus,
+  pusherProcessedCount,
 }: {
   projectName: string;
   agent: string;
@@ -305,6 +346,8 @@ export function InfoPanel({
   committerProcessedCount: number;
   resolverStatus: ResolverStatus;
   resolverProcessedCount: number;
+  pusherStatus: PusherStatus;
+  pusherProcessedCount: number;
 }) {
   return (
     <Box
@@ -354,6 +397,10 @@ export function InfoPanel({
       <ResolverIndicator
         status={resolverStatus}
         processedCount={resolverProcessedCount}
+      />
+      <PusherIndicator
+        status={pusherStatus}
+        processedCount={pusherProcessedCount}
       />
       <Box flexGrow={1} />
       <KeyLegend />

@@ -338,6 +338,28 @@ export function AutopilotApp({
     }
   }, [resolverStatus, resolverProcessedCount]);
 
+  // Log pusher status changes
+  const { status: pusherStatus, processedCount: pusherProcessedCount } =
+    statuses.pusher;
+  useEffect(() => {
+    if (pusherStatus === 'processing') {
+      const ts = new Date().toLocaleTimeString();
+      setLogs(prev => [
+        ...prev.slice(-50),
+        { timestamp: ts, message: 'Pusher: pushing...' },
+      ]);
+    } else if (pusherProcessedCount > 0 && pusherStatus === 'idle') {
+      const ts = new Date().toLocaleTimeString();
+      setLogs(prev => [
+        ...prev.slice(-50),
+        {
+          timestamp: ts,
+          message: `Pusher: ${pusherProcessedCount} pushed`,
+        },
+      ]);
+    }
+  }, [pusherStatus, pusherProcessedCount]);
+
   useInput((input, key) => {
     if (input === 'q' || (key.ctrl && input === 'c')) {
       exit();
@@ -397,6 +419,8 @@ export function AutopilotApp({
             committerProcessedCount={committerProcessedCount}
             resolverStatus={resolverStatus}
             resolverProcessedCount={resolverProcessedCount}
+            pusherStatus={pusherStatus}
+            pusherProcessedCount={pusherProcessedCount}
           />
         </Box>
         {/* Right column: 70% — space scene + work boxes */}
