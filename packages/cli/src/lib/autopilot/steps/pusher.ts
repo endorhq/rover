@@ -260,7 +260,7 @@ export const pusherStep: Step = {
     };
 
     const notifyAction = new ActionWriter(projectId, {
-      action: 'noop',
+      action: 'notify',
       spanId: pushSpan.id,
       reasoning: pushed
         ? `Push completed: ${result.summary}`
@@ -293,7 +293,7 @@ export const pusherStep: Step = {
       enqueuedActions: [
         {
           actionId: notifyAction.id,
-          actionType: 'noop',
+          actionType: 'notify',
           summary: trace.summary,
         },
       ],
