@@ -13,5 +13,11 @@ export {
   type AddWorkflowResult,
   type WorkflowEntry,
 } from './workflow-store.js';
-export { WorkflowManager } from './workflow.js';
+export {
+  WorkflowManager,
+  type StepResult,
+  type AgentStepExecutor,
+  type OnStepComplete,
+  type WorkflowRunResult,
+} from './workflow.js';
 export { JsonlLogger } from './jsonl-logger.js';

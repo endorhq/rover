@@ -102,6 +102,21 @@ Key architectural decisions:
 - **Node version**: Requires Node.js 20+ and pnpm 10+ (see root package.json engines)
 - **Monorepo**: Uses pnpm workspaces for package management
 
+### Process Execution
+
+**Always use `launch` (async) and `launchSync` from `packages/core/src/os.ts` to spawn processes. Do not use the Node.js `child_process` API directly.**
+
+These functions are wrappers around [execa](https://github.com/sindresorhus/execa) that provide consistent behavior across the codebase:
+
+- `launch(command, args?, options?)` - Async process execution. Returns an execa result object.
+- `launchSync(command, args?, options?)` - Synchronous process execution. Returns an execa sync result object.
+
+Key behaviors handled by these wrappers:
+- Proper argument escaping via `parseCommandString` and execa template strings
+- Detached process groups by default (prevents child termination on parent signals)
+- Verbose logging when `VERBOSE` is enabled
+- Consistent stdio option expansion
+
 ## Build Pipeline
 
 The project uses tsdown for bundling with two distinct build modes controlled by the `TSUP_DEV` environment variable.

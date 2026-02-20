@@ -27,17 +27,12 @@ import {
   VERBOSE,
   JsonlLogger,
   showList,
+  type StepResult,
 } from 'rover-core';
 import { ACPClient } from './acp-client.js';
 import { copyFileSync, rmSync } from 'node:fs';
 
-export interface ACPRunnerStepResult {
-  id: string;
-  success: boolean;
-  error?: string;
-  duration: number;
-  outputs: Map<string, string>;
-}
+export interface ACPRunnerStepResult extends StepResult {}
 
 export interface ACPRunnerConfig {
   workflow: WorkflowManager;

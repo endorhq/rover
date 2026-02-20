@@ -7,11 +7,19 @@ import {
   showTitle,
   showProperties,
   showList,
+  type StepResult,
+  type AgentStepExecutor,
+  type OnStepComplete,
 } from 'rover-core';
-import { ROVER_LOG_FILENAME, AGENT_LOGS_DIR } from 'rover-schemas';
+import {
+  ROVER_LOG_FILENAME,
+  AGENT_LOGS_DIR,
+  isAgentStep,
+  type WorkflowAgentStep,
+} from 'rover-schemas';
 import { parseCollectOptions } from '../lib/options.js';
-import { Runner, RunnerStepResult } from '../lib/runner.js';
-import { ACPRunner, ACPRunnerStepResult } from '../lib/acp-runner.js';
+import { Runner } from '../lib/runner.js';
+import { ACPRunner } from '../lib/acp-runner.js';
 import { createAgent } from '../lib/agents/index.js';
 import { cpSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -21,7 +29,7 @@ import { join } from 'node:path';
  */
 function displayStepResults(
   stepName: string,
-  result: RunnerStepResult | ACPRunnerStepResult,
+  result: StepResult,
   _totalDuration: number
 ): void {
   showTitle(`📊 Step Results: ${stepName}`);
@@ -160,7 +168,9 @@ const handleContextInjection = (
     );
 
     for (const step of workflowManager.steps) {
-      step.prompt = contextMessage + step.prompt;
+      if (isAgentStep(step)) {
+        step.prompt = contextMessage + step.prompt;
+      }
     }
   }
 };
@@ -323,7 +333,6 @@ export const runCommand = async (
       output.error = `Input validation failed: ${validation.errors.join(', ')}`;
     } else {
       // Continue with workflow run
-      const stepsOutput: Map<string, Map<string, string>> = new Map();
 
       // Print Steps
       showList(
@@ -331,9 +340,7 @@ export const runCommand = async (
         { title: colors.bold('Steps'), addLineBreak: true }
       );
 
-      let runSteps = 0;
       const totalSteps = workflowManager.steps.length;
-      const stepResults: RunnerStepResult[] = [];
 
       // Log workflow start
       logger?.info(
@@ -359,11 +366,13 @@ export const runCommand = async (
       const acpEnabledTools = ['claude', 'copilot', 'opencode'];
       const useACPMode = acpEnabledTools.includes(tool.toLowerCase());
 
+      // Build the agent step executor based on mode
+      let acpRunner: ACPRunner | undefined;
+
       if (useACPMode) {
         console.log(colors.cyan('\n🔗 ACP Mode enabled'));
 
-        // Create a single ACPRunner instance to be reused across all steps
-        const acpRunner = new ACPRunner({
+        acpRunner = new ACPRunner({
           workflow: workflowManager,
           inputs,
           defaultTool: options.agentTool,
@@ -373,77 +382,28 @@ export const runCommand = async (
           logger,
         });
 
-        try {
-          // Initialize the ACP connection once (protocol handshake)
-          await acpRunner.initializeConnection();
+        await acpRunner.initializeConnection();
+      }
 
-          // Run each step with a fresh session
-          for (
-            let stepIndex = 0;
-            stepIndex < workflowManager.steps.length;
-            stepIndex++
-          ) {
-            const step = workflowManager.steps[stepIndex];
-            runSteps++;
+      const agentStepExecutor: AgentStepExecutor = async (
+        step: WorkflowAgentStep,
+        stepIndex: number,
+        stepsOutput: Map<string, Map<string, string>>
+      ): Promise<StepResult> => {
+        if (useACPMode && acpRunner) {
+          try {
+            await acpRunner.createSession();
 
-            try {
-              // Create a new session for this step
-              await acpRunner.createSession();
-
-              // Inject previous step outputs before running
-              for (const [prevStepId, prevOutputs] of stepsOutput.entries()) {
-                acpRunner.stepsOutput.set(prevStepId, prevOutputs);
-              }
-
-              // Run this single step in its fresh session
-              const result = await acpRunner.runStep(step.id);
-              stepResults.push(result);
-
-              // Display step results
-              displayStepResults(step.name, result, totalDuration);
-              totalDuration += result.duration;
-
-              // Store step outputs for next steps
-              if (result.success) {
-                stepsOutput.set(step.id, result.outputs);
-              } else {
-                const continueOnError =
-                  workflowManager.config?.continueOnError || false;
-                if (!continueOnError) {
-                  console.log(
-                    colors.red(
-                      `\n✗ Step '${step.name}' failed and continueOnError is false. Stopping workflow execution.`
-                    )
-                  );
-                  output.success = false;
-                  output.error = `Workflow stopped due to step failure: ${result.error}`;
-                  break;
-                } else {
-                  console.log(
-                    colors.yellow(
-                      `\n⚠ Step '${step.name}' failed but continueOnError is true. Continuing with next step.`
-                    )
-                  );
-                  stepsOutput.set(step.id, new Map());
-                }
-              }
-            } finally {
-              // Close the session after this step (but keep the connection alive)
-              acpRunner.closeSession();
+            // Inject previous step outputs before running
+            for (const [prevStepId, prevOutputs] of stepsOutput.entries()) {
+              acpRunner.stepsOutput.set(prevStepId, prevOutputs);
             }
+
+            return await acpRunner.runStep(step.id);
+          } finally {
+            acpRunner.closeSession();
           }
-        } finally {
-          // Always close the ACP runner after all steps are complete
-          acpRunner.close();
-        }
-      } else {
-        // Standard subprocess-based execution (existing behavior)
-        for (
-          let stepIndex = 0;
-          stepIndex < workflowManager.steps.length;
-          stepIndex++
-        ) {
-          const step = workflowManager.steps[stepIndex];
+        } else {
           const runner = new Runner(
             workflowManager,
             step.id,
@@ -457,92 +417,75 @@ export const runCommand = async (
             logger
           );
 
-          runSteps++;
-
-          // Run it
-          const result = await runner.run(options.output);
-
-          // Display step results
-          displayStepResults(step.name, result, totalDuration);
-          totalDuration += result.duration;
-
-          // Store step outputs for next steps to use
-          if (result.success) {
-            stepsOutput.set(step.id, result.outputs);
-          } else {
-            // If step failed, decide whether to continue based on workflow config
-            const continueOnError =
-              workflowManager.config?.continueOnError || false;
-            if (!continueOnError) {
-              console.log(
-                colors.red(
-                  `\n✗ Step '${step.name}' failed and continueOnError is false. Stopping workflow execution.`
-                )
-              );
-              output.success = false;
-              output.error = `Workflow stopped due to step failure: ${result.error}`;
-              break;
-            } else {
-              console.log(
-                colors.yellow(
-                  `\n⚠ Step '${step.name}' failed but continueOnError is true. Continuing with next step.`
-                )
-              );
-              // Store empty outputs for failed step
-              stepsOutput.set(step.id, new Map());
-            }
-          }
+          return await runner.run(options.output);
         }
-      }
+      };
 
-      // Display workflow completion summary
-      const successfulSteps = Array.from(stepsOutput.keys()).length;
-      const failedSteps = runSteps - successfulSteps;
-      const skippedSteps = workflowManager.steps.length - runSteps;
+      const onStepComplete: OnStepComplete = (step, result, context) => {
+        displayStepResults(step.name, result, context.totalDuration);
+      };
 
-      let status = colors.green('✓ Workflow Completed Successfully');
-      if (failedSteps > 0) {
-        status = colors.red('✗ Workflow Completed with Errors');
-      } else if (skippedSteps > 0) {
-        status =
-          colors.green('✓ Workflow Completed Successfully ') +
-          colors.yellow('(Some steps were skipped)');
-      }
+      try {
+        const runResult = await workflowManager.run(
+          agentStepExecutor,
+          onStepComplete
+        );
 
-      showTitle('🎉 Workflow Execution Summary');
-      showProperties({
-        Duration: colors.cyan(totalDuration.toFixed(2) + 's'),
-        'Total Steps': colors.cyan(workflowManager.steps.length.toString()),
-        'Successful Steps': colors.green(successfulSteps.toString()),
-        'Failed Steps': colors.red(failedSteps.toString()),
-        'Skipped Steps': colors.yellow(skippedSteps.toString()),
-        Status: status,
-      });
+        totalDuration = runResult.totalDuration;
 
-      // Mark workflow as completed in status file
-      if (failedSteps > 0) {
-        output.success = false;
-        logger?.error('workflow_fail', 'Workflow completed with errors', {
-          taskId: options.taskId,
-          duration: totalDuration,
-          metadata: {
-            successfulSteps,
-            failedSteps,
-            skippedSteps,
-          },
+        // Display workflow completion summary
+        const successfulSteps = Array.from(runResult.stepsOutput.keys()).length;
+        const failedSteps = runResult.runSteps - successfulSteps;
+        const skippedSteps = workflowManager.steps.length - runResult.runSteps;
+
+        let status = colors.green('✓ Workflow Completed Successfully');
+        if (failedSteps > 0) {
+          status = colors.red('✗ Workflow Completed with Errors');
+        } else if (skippedSteps > 0) {
+          status =
+            colors.green('✓ Workflow Completed Successfully ') +
+            colors.yellow('(Some steps were skipped)');
+        }
+
+        showTitle('🎉 Workflow Execution Summary');
+        showProperties({
+          Duration: colors.cyan(runResult.totalDuration.toFixed(2) + 's'),
+          'Total Steps': colors.cyan(workflowManager.steps.length.toString()),
+          'Successful Steps': colors.green(successfulSteps.toString()),
+          'Failed Steps': colors.red(failedSteps.toString()),
+          'Skipped Steps': colors.yellow(skippedSteps.toString()),
+          Status: status,
         });
-      } else {
-        output.success = true;
-        statusManager?.complete('Workflow completed successfully');
-        logger?.info('workflow_complete', 'Workflow completed successfully', {
-          taskId: options.taskId,
-          duration: totalDuration,
-          metadata: {
-            successfulSteps,
-            failedSteps: 0,
-            skippedSteps,
-          },
-        });
+
+        // Mark workflow as completed in status file
+        if (failedSteps > 0) {
+          output.success = false;
+          output.error = runResult.error;
+          logger?.error('workflow_fail', 'Workflow completed with errors', {
+            taskId: options.taskId,
+            duration: runResult.totalDuration,
+            metadata: {
+              successfulSteps,
+              failedSteps,
+              skippedSteps,
+            },
+          });
+        } else {
+          output.success = true;
+          statusManager?.complete('Workflow completed successfully');
+          logger?.info('workflow_complete', 'Workflow completed successfully', {
+            taskId: options.taskId,
+            duration: runResult.totalDuration,
+            metadata: {
+              successfulSteps,
+              failedSteps: 0,
+              skippedSteps,
+            },
+          });
+        }
+      } finally {
+        // Always close the ACP runner after all steps are complete
+        acpRunner?.close();
       }
     }
   } catch (err) {

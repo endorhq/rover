@@ -12,6 +12,7 @@ import {
   IterationStatusManager,
   JsonlLogger,
   showList,
+  type StepResult,
 } from 'rover-core';
 import colors from 'ansi-colors';
 import {
@@ -36,23 +37,13 @@ import {
 import { basename, join } from 'node:path';
 import { createAgent, Agent, AgentUsageStats } from './agents/index.js';
 
-export interface RunnerStepResult {
-  // Step ID
-  id: string;
-  // Run result (success or not)
-  success: boolean;
-  // Error
-  error?: string;
-  // Duration in seconds
-  duration: number;
+export interface RunnerStepResult extends StepResult {
   // Consumed tokens
   tokens?: number;
   // Cost in USD
   cost?: number;
   // Model used (e.g., "claude-haiku-4-5-20251001")
   model?: string;
-  // Parsed output
-  outputs: Map<string, string>;
 }
 
 export class Runner {
