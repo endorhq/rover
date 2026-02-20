@@ -5,7 +5,7 @@
 import { z } from 'zod';
 
 // Current schema version
-export const CURRENT_PROJECT_SCHEMA_VERSION = '1.3';
+export const CURRENT_PROJECT_SCHEMA_VERSION = '1.4';
 
 // Filename constant
 export const PROJECT_CONFIG_FILENAME = 'rover.json';
@@ -121,6 +121,24 @@ export const HooksConfigSchema = z.object({
 });
 
 /**
+ * Sub-project definition for multi-project workspaces
+ */
+export const SubProjectSchema = z.object({
+  /** Sub-project name */
+  name: z.string(),
+  /** Relative path from workspace root */
+  path: z.string(),
+  /** Programming languages used in this sub-project */
+  languages: z.array(LanguageSchema).optional(),
+  /** Package managers used in this sub-project */
+  packageManagers: z.array(PackageManagerSchema).optional(),
+  /** Task managers used in this sub-project */
+  taskManagers: z.array(TaskManagerSchema).optional(),
+  /** Initialization script for this sub-project */
+  initScript: z.string().optional(),
+});
+
+/**
  * Complete project configuration schema
  * Defines the structure of a rover.json file
  */
@@ -147,4 +165,6 @@ export const ProjectConfigSchema = z.object({
   hooks: HooksConfigSchema.optional(),
   /** Optional glob patterns for files to exclude from agent context */
   excludePatterns: z.array(z.string()).optional(),
+  /** Optional sub-projects for multi-project workspaces */
+  projects: z.array(SubProjectSchema).optional(),
 });

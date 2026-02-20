@@ -184,21 +184,33 @@ export class PodmanSandbox extends Sandbox {
       podmanArgs.push('-v', `${contextDir}:/context:Z,ro`);
     }
 
-    // Mount initScript if provided in project config
-    if (projectConfig.initScript) {
-      const initScriptAbsPath = join(
-        projectConfig.projectRoot,
-        projectConfig.initScript
-      );
+    // Mount init scripts (root + per-project)
+    const allInitScripts = projectConfig.allInitScripts;
+    for (let i = 0; i < allInitScripts.length; i++) {
+      const entry = allInitScripts[i];
+      const initScriptAbsPath = join(projectConfig.projectRoot, entry.script);
       if (existsSync(initScriptAbsPath)) {
-        podmanArgs.push('-v', `${initScriptAbsPath}:/init-script.sh:Z,ro`);
+        const mountPath =
+          allInitScripts.length === 1 && !entry.path
+            ? '/init-script.sh'
+            : `/init-script-${i}.sh`;
+        podmanArgs.push('-v', `${initScriptAbsPath}:${mountPath}:Z,ro`);
       } else if (!isJsonMode()) {
         console.log(
           colors.yellow(
-            `⚠ Warning: initScript '${projectConfig.initScript}' does not exist`
+            `⚠ Warning: initScript '${entry.script}' does not exist`
           )
         );
       }
+    }
+
+    // Mount workspace description if projects are configured
+    const workspaceDescPath = setupBuilder.generateWorkspaceDescription();
+    if (workspaceDescPath) {
+      podmanArgs.push(
+        '-v',
+        `${workspaceDescPath}:/workspace/.rover-workspace.json:Z,ro`
+      );
     }
 
     // Get extra args from CLI options and project config, merge them
@@ -461,6 +473,29 @@ export class PodmanSandbox extends Sandbox {
     const hasContext = existsSync(contextDir);
     if (hasContext) {
       podmanArgs.push('-v', `${contextDir}:/context:Z,ro`);
+    }
+
+    // Mount init scripts (root + per-project)
+    const allInitScripts = projectConfig.allInitScripts;
+    for (let i = 0; i < allInitScripts.length; i++) {
+      const entry = allInitScripts[i];
+      const initScriptAbsPath = join(projectConfig.projectRoot, entry.script);
+      if (existsSync(initScriptAbsPath)) {
+        const mountPath =
+          allInitScripts.length === 1 && !entry.path
+            ? '/init-script.sh'
+            : `/init-script-${i}.sh`;
+        podmanArgs.push('-v', `${initScriptAbsPath}:${mountPath}:Z,ro`);
+      }
+    }
+
+    // Mount workspace description if projects are configured
+    const workspaceDescPath = setupBuilder.generateWorkspaceDescription();
+    if (workspaceDescPath) {
+      podmanArgs.push(
+        '-v',
+        `${workspaceDescPath}:/workspace/.rover-workspace.json:Z,ro`
+      );
     }
 
     // Get extra args from CLI options and project config, merge them
