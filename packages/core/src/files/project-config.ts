@@ -19,6 +19,7 @@ import {
   type TaskManager,
   type HooksConfig,
   type NetworkConfig,
+  type SubProject,
 } from 'rover-schemas';
 import { GlobalConfigManager } from './global-config.js';
 
@@ -203,6 +204,7 @@ export class ProjectConfigManager {
       ...(data.excludePatterns !== undefined
         ? { excludePatterns: data.excludePatterns }
         : {}),
+      ...(data.projects !== undefined ? { projects: data.projects } : {}),
     };
 
     return migrated;
@@ -275,6 +277,82 @@ export class ProjectConfigManager {
   get excludePatterns(): string[] | undefined {
     return this.data.excludePatterns;
   }
+  get projects(): SubProject[] | undefined {
+    return this.data.projects;
+  }
+
+  /**
+   * Union of root languages + all sub-project languages (deduplicated)
+   */
+  get allLanguages(): Language[] {
+    const set = new Set<Language>(this.data.languages);
+    if (this.data.projects) {
+      for (const project of this.data.projects) {
+        if (project.languages) {
+          for (const lang of project.languages) {
+            set.add(lang);
+          }
+        }
+      }
+    }
+    return [...set];
+  }
+
+  /**
+   * Union of root package managers + all sub-project package managers (deduplicated)
+   */
+  get allPackageManagers(): PackageManager[] {
+    const set = new Set<PackageManager>(this.data.packageManagers);
+    if (this.data.projects) {
+      for (const project of this.data.projects) {
+        if (project.packageManagers) {
+          for (const pm of project.packageManagers) {
+            set.add(pm);
+          }
+        }
+      }
+    }
+    return [...set];
+  }
+
+  /**
+   * Union of root task managers + all sub-project task managers (deduplicated)
+   */
+  get allTaskManagers(): TaskManager[] {
+    const set = new Set<TaskManager>(this.data.taskManagers);
+    if (this.data.projects) {
+      for (const project of this.data.projects) {
+        if (project.taskManagers) {
+          for (const tm of project.taskManagers) {
+            set.add(tm);
+          }
+        }
+      }
+    }
+    return [...set];
+  }
+
+  /**
+   * Ordered array of init scripts: root sandbox.initScript first,
+   * then each sub-project's initScript with its path.
+   */
+  get allInitScripts(): Array<{ script: string; path?: string }> {
+    const scripts: Array<{ script: string; path?: string }> = [];
+
+    if (this.data.sandbox?.initScript) {
+      scripts.push({ script: this.data.sandbox.initScript });
+    }
+
+    if (this.data.projects) {
+      for (const project of this.data.projects) {
+        if (project.initScript) {
+          scripts.push({ script: project.initScript, path: project.path });
+        }
+      }
+    }
+
+    return scripts;
+  }
 
   // Data Modification (Setters)
   addLanguage(language: Language): void {
@@ -333,6 +411,28 @@ export class ProjectConfigManager {
     const index = this.data.taskManagers.indexOf(taskManager);
     if (index > -1) {
       this.data.taskManagers.splice(index, 1);
+      this.save();
+    }
+  }
+
+  addProject(project: SubProject): void {
+    if (!this.data.projects) {
+      this.data.projects = [];
+    }
+    if (!this.data.projects.some(p => p.name === project.name)) {
+      this.data.projects.push(project);
+      this.save();
+    }
+  }
+
+  removeProject(name: string): void {
+    if (!this.data.projects) return;
+    const index = this.data.projects.findIndex(p => p.name === name);
+    if (index > -1) {
+      this.data.projects.splice(index, 1);
+      if (this.data.projects.length === 0) {
+        delete this.data.projects;
+      }
       this.save();
     }
   }
