@@ -246,7 +246,6 @@ source $HOME/.profile`;
     // --- package installation ---
     let installAllPackages = '';
     if (!useCachedImage) {
-      // Generate installation scripts for languages, package managers, and task managers
       const languagePackages = this.getLanguagePackages();
       const packageManagerPackages = this.getPackageManagerPackages();
       const taskManagerPackages = this.getTaskManagerPackages();
