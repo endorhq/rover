@@ -114,7 +114,8 @@ const mcpCommand = async () => {
     'create-task',
     {
       title: 'Create task',
-      description: 'Create a new Rover task for AI agents to work on',
+      description:
+        'Create a new Rover task for AI agents to work on. Supports GitHub and GitLab context (e.g., github:issue/15, gitlab:mr/42).',
       inputSchema: taskSchema.shape,
     },
     async args => {
@@ -297,7 +298,7 @@ const mcpCommand = async () => {
     {
       title: 'Iterate task',
       description:
-        'Add a new iteration to an existing task with additional instructions',
+        'Add a new iteration to an existing task with additional instructions. Supports GitHub and GitLab context (e.g., github:issue/15, gitlab:mr/42).',
       inputSchema: iterateSchema.shape,
     },
     async args => {

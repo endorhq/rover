@@ -293,7 +293,7 @@ const createTaskForAgent = async (
   jsonMode: boolean,
   networkConfig?: NetworkConfig,
   source?: {
-    type: 'github' | 'manual';
+    type: 'github' | 'gitlab' | 'manual';
     id?: string;
     url?: string;
     title?: string;
@@ -782,7 +782,7 @@ const taskCommand = async (initPrompt?: string, options: TaskOptions = {}) => {
   // Task source (populated when --from-github is used)
   let taskSource:
     | {
-        type: 'github' | 'manual';
+        type: 'github' | 'gitlab' | 'manual';
         id?: string;
         url?: string;
         title?: string;

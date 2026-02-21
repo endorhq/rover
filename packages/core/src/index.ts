@@ -131,6 +131,7 @@ export {
   registerBuiltInProviders,
   LocalFileProvider,
   GitHubProvider,
+  GitLabProvider,
   HTTPSProvider,
   // Manager
   ContextManager,
