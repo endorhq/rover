@@ -110,6 +110,22 @@ describe('environment detection', () => {
       expect(result).toContain('ruby');
     });
 
+    it('should detect Dart from pubspec.yaml', async () => {
+      writeFileSync(join(testDir, 'pubspec.yaml'), 'name: test_app');
+
+      const result = await detectLanguages(testDir);
+
+      expect(result).toContain('dart');
+    });
+
+    it('should detect Dart from pubspec.lock', async () => {
+      writeFileSync(join(testDir, 'pubspec.lock'), '');
+
+      const result = await detectLanguages(testDir);
+
+      expect(result).toContain('dart');
+    });
+
     it('should detect PHP from composer.json', async () => {
       writeFileSync(join(testDir, 'composer.json'), '{}');
 
@@ -238,6 +254,22 @@ describe('environment detection', () => {
       expect(result).toContain('composer');
     });
 
+    it('should detect pub from pubspec.yaml', async () => {
+      writeFileSync(join(testDir, 'pubspec.yaml'), 'name: test_app');
+
+      const result = await detectPackageManagers(testDir);
+
+      expect(result).toContain('pub');
+    });
+
+    it('should detect pub from pubspec.lock', async () => {
+      writeFileSync(join(testDir, 'pubspec.lock'), '');
+
+      const result = await detectPackageManagers(testDir);
+
+      expect(result).toContain('pub');
+    });
+
     it('should detect multiple package managers', async () => {
       writeFileSync(join(testDir, 'package-lock.json'), '{}');
       writeFileSync(join(testDir, 'Cargo.toml'), '');
@@ -341,6 +373,18 @@ describe('environment detection', () => {
 
       expect(result.languages).toContain('rust');
       expect(result.packageManagers).toContain('cargo');
+    });
+
+    it('should detect full environment for Dart/Flutter project', async () => {
+      writeFileSync(join(testDir, 'pubspec.yaml'), 'name: test_app');
+      writeFileSync(join(testDir, 'pubspec.lock'), '');
+      writeFileSync(join(testDir, 'Makefile'), '');
+
+      const result = await detectEnvironment(testDir);
+
+      expect(result.languages).toContain('dart');
+      expect(result.packageManagers).toContain('pub');
+      expect(result.taskManagers).toContain('make');
     });
 
     it('should return empty arrays for empty directory', async () => {

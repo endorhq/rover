@@ -25,6 +25,7 @@ const LANGUAGE_FILES: Record<Language, string[]> = {
     'config.ru',
   ],
   python: ['pyproject.toml', 'uv.lock', 'setup.py', 'setup.cfg'],
+  dart: ['pubspec.yaml', 'pubspec.lock'],
 };
 
 /**
@@ -41,6 +42,7 @@ const PACKAGE_MANAGER_FILES: Record<PackageManager, string[]> = {
   poetry: ['poetry.lock'],
   uv: ['uv.lock'],
   rubygems: ['Gemfile', 'Gemfile.lock'],
+  pub: ['pubspec.lock', 'pubspec.yaml'],
 };
 
 /**
