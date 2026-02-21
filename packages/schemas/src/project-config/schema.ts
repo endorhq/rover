@@ -21,6 +21,7 @@ export const LanguageSchema = z.enum([
   'go',
   'python',
   'ruby',
+  'dart',
 ]);
 
 /**
@@ -53,6 +54,7 @@ export const PackageManagerSchema = z.enum([
   'poetry',
   'uv',
   'rubygems',
+  'pub',
 ]);
 
 /**

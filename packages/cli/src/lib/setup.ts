@@ -29,6 +29,7 @@ import { RustSandboxPackage } from './sandbox/languages/rust.js';
 import { GoSandboxPackage } from './sandbox/languages/go.js';
 import { PythonSandboxPackage } from './sandbox/languages/python.js';
 import { RubySandboxPackage } from './sandbox/languages/ruby.js';
+import { DartSandboxPackage } from './sandbox/languages/dart.js';
 
 // Package manager packages
 import { NpmSandboxPackage } from './sandbox/package-managers/npm.js';
@@ -41,6 +42,7 @@ import { PipSandboxPackage } from './sandbox/package-managers/pip.js';
 import { PoetrySandboxPackage } from './sandbox/package-managers/poetry.js';
 import { UvSandboxPackage } from './sandbox/package-managers/uv.js';
 import { RubygemsSandboxPackage } from './sandbox/package-managers/rubygems.js';
+import { PubSandboxPackage } from './sandbox/package-managers/pub.js';
 
 // Task manager packages
 import { JustSandboxPackage } from './sandbox/task-managers/just.js';
@@ -117,6 +119,9 @@ export class SetupBuilder {
         case 'ruby':
           packages.push(new RubySandboxPackage());
           break;
+        case 'dart':
+          packages.push(new DartSandboxPackage());
+          break;
       }
     }
 
@@ -160,6 +165,9 @@ export class SetupBuilder {
           break;
         case 'rubygems':
           packages.push(new RubygemsSandboxPackage());
+          break;
+        case 'pub':
+          packages.push(new PubSandboxPackage());
           break;
       }
     }
