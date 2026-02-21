@@ -63,6 +63,14 @@ export interface AIAgentTool {
     conflictedContent: string
   ): Promise<string | null>;
 
+  // Resolve merge conflicts returning only the resolved regions
+  resolveMergeConflictsRegions(
+    filePath: string,
+    diffContext: string,
+    conflictedContent: string,
+    regionCount: number
+  ): Promise<string | null>;
+
   // Extract workflow input values from a GitHub issue description
   extractGithubInputs(
     issueDescription: string,
@@ -102,22 +110,22 @@ export class InvokeAIAgentError extends Error {
 /**
  * Retrieve the AIAgentTool instance based on the agent name.
  */
-export const getAIAgentTool = (agent: string): AIAgentTool => {
+export const getAIAgentTool = (agent: string, model?: string): AIAgentTool => {
   switch (agent.toLowerCase()) {
     case 'claude':
-      return new ClaudeAI();
+      return new ClaudeAI(model);
     case 'codex':
-      return new CodexAI();
+      return new CodexAI(model);
     case 'copilot':
       return new CopilotAI();
     case 'cursor':
-      return new CursorAI();
+      return new CursorAI(model);
     case 'gemini':
-      return new GeminiAI();
+      return new GeminiAI(model);
     case 'opencode':
       return new OpenCodeAI();
     case 'qwen':
-      return new QwenAI();
+      return new QwenAI(model);
     default:
       throw new Error(`Unknown AI agent: ${agent}`);
   }
