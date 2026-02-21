@@ -10,9 +10,11 @@ export class DartSandboxPackage extends SandboxPackage {
   }
 
   initScript(): string {
-    // Add Flutter and Dart to PATH
+    // Add Flutter and Dart to PATH, skip flutter precache as the Dart SDK
+    // is already downloaded during the Flutter tool build step.
+    // Using direct SDK paths avoids Flutter wrapper update checks and lock acquisition.
     return `echo 'export PATH="$HOME/.flutter/bin:$HOME/.flutter/bin/cache/dart-sdk/bin:$HOME/.pub-cache/bin:$PATH"' >> $HOME/.profile
-source $HOME/.profile
-flutter precache`;
+echo 'export FLUTTER_GIT_URL=""' >> $HOME/.profile
+source $HOME/.profile`;
   }
 }
