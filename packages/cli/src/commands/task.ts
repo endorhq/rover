@@ -502,22 +502,6 @@ const createTaskForAgent = async (
   const agentImage = resolveAgentImage(projectConfig);
   task.setAgentImage(agentImage);
 
-  // Warn if custom image is outdated
-  if (
-    !jsonMode &&
-    projectConfig.generatedFrom &&
-    projectConfig.agentImage &&
-    !projectConfig.suppressImageWarning
-  ) {
-    const { checkImageStatus } = await import('../lib/image-status.js');
-    const imageStatus = checkImageStatus(projectConfig);
-    if (imageStatus.status === 'outdated') {
-      console.log(colors.yellow('\n⚠ Custom image may be outdated:'));
-      imageStatus.issues?.forEach(issue => console.log(`  • ${issue}`));
-      console.log(colors.dim('  Run `rover image status` for details\n'));
-    }
-  }
-
   // Start sandbox container for task execution
   try {
     const sandbox = await createSandbox(task, processManager, {

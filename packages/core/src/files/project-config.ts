@@ -19,7 +19,6 @@ import {
   type TaskManager,
   type HooksConfig,
   type NetworkConfig,
-  type GeneratedFrom,
 } from 'rover-schemas';
 import { GlobalConfigManager } from './global-config.js';
 
@@ -276,18 +275,6 @@ export class ProjectConfigManager {
   get excludePatterns(): string[] | undefined {
     return this.data.excludePatterns;
   }
-  get generatedFrom(): GeneratedFrom | undefined {
-    return this.data.sandbox?.generatedFrom;
-  }
-  get suppressImageWarning(): boolean {
-    return this.data.sandbox?.suppressImageWarning ?? false;
-  }
-  get skipPackageInstall(): boolean {
-    return this.data.sandbox?.skipPackageInstall ?? false;
-  }
-  get preinstalledAgents(): string[] | undefined {
-    return this.data.sandbox?.preinstalledAgents;
-  }
 
   // Data Modification (Setters)
   addLanguage(language: Language): void {
@@ -352,46 +339,6 @@ export class ProjectConfigManager {
 
   setAttribution(value: boolean): void {
     this.data.attribution = value;
-    this.save();
-  }
-
-  setAgentImage(image: string | undefined): void {
-    if (!this.data.sandbox) {
-      this.data.sandbox = {};
-    }
-    this.data.sandbox.agentImage = image;
-    this.save();
-  }
-
-  setGeneratedFrom(meta: GeneratedFrom | undefined): void {
-    if (!this.data.sandbox) {
-      this.data.sandbox = {};
-    }
-    this.data.sandbox.generatedFrom = meta;
-    this.save();
-  }
-
-  setSuppressImageWarning(value: boolean): void {
-    if (!this.data.sandbox) {
-      this.data.sandbox = {};
-    }
-    this.data.sandbox.suppressImageWarning = value;
-    this.save();
-  }
-
-  setSkipPackageInstall(value: boolean): void {
-    if (!this.data.sandbox) {
-      this.data.sandbox = {};
-    }
-    this.data.sandbox.skipPackageInstall = value;
-    this.save();
-  }
-
-  setPreinstalledAgents(agents: string[] | undefined): void {
-    if (!this.data.sandbox) {
-      this.data.sandbox = {};
-    }
-    this.data.sandbox.preinstalledAgents = agents;
     this.save();
   }
 

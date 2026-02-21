@@ -95,20 +95,6 @@ export const NetworkConfigSchema = z.object({
 });
 
 /**
- * Metadata about when and how a custom image was generated
- */
-export const GeneratedFromSchema = z.object({
-  /** Base image used to generate the custom image */
-  baseImage: z.string(),
-  /** Rover CLI version used to generate the image */
-  roverVersion: z.string(),
-  /** Hash of detected packages for change detection */
-  packagesHash: z.string(),
-  /** ISO timestamp when the image was generated */
-  generatedAt: z.string(),
-});
-
-/**
  * Sandbox configuration for custom agent images and initialization
  */
 export const SandboxConfigSchema = z.object({
@@ -120,14 +106,6 @@ export const SandboxConfigSchema = z.object({
   extraArgs: z.union([z.string(), z.array(z.string())]).optional(),
   /** Network filtering configuration */
   network: NetworkConfigSchema.optional(),
-  /** Metadata about how the custom image was generated */
-  generatedFrom: GeneratedFromSchema.optional(),
-  /** Suppress warnings about outdated custom images */
-  suppressImageWarning: z.boolean().optional(),
-  /** Skip package installation in entrypoint (set by rover image build) */
-  skipPackageInstall: z.boolean().optional(),
-  /** List of agent CLIs pre-installed in the custom image */
-  preinstalledAgents: z.array(z.string()).optional(),
 });
 
 /**
