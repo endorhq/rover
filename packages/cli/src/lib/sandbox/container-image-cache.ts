@@ -47,6 +47,14 @@ export interface SetupHashInputs {
     envs?: string[];
     headers?: string[];
   }>;
+  projects?: Array<{
+    name: string;
+    path: string;
+    languages?: string[];
+    packageManagers?: string[];
+    taskManagers?: string[];
+    initScriptContent?: string;
+  }>;
 }
 
 /**
@@ -55,7 +63,7 @@ export interface SetupHashInputs {
  * of the same values produces the same hash.
  */
 export function computeSetupHash(inputs: SetupHashInputs): string {
-  const normalized = {
+  const normalized: Record<string, unknown> = {
     agentImage: inputs.agentImage,
     languages: [...inputs.languages].sort(),
     packageManagers: [...inputs.packageManagers].sort(),
@@ -73,6 +81,19 @@ export function computeSetupHash(inputs: SetupHashInputs): string {
         headers: [...(mcp.headers || [])].sort(),
       })),
   };
+
+  if (inputs.projects && inputs.projects.length > 0) {
+    normalized.projects = [...inputs.projects]
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map(p => ({
+        name: p.name,
+        path: p.path,
+        languages: [...(p.languages || [])].sort(),
+        packageManagers: [...(p.packageManagers || [])].sort(),
+        taskManagers: [...(p.taskManagers || [])].sort(),
+        initScriptContent: p.initScriptContent || '',
+      }));
+  }
 
   return createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
 }
@@ -175,15 +196,40 @@ export function checkImageCache(
     }
   }
 
+  // Read per-project init script contents for hashing
+  let projects: SetupHashInputs['projects'];
+  if (projectConfig.projects && projectConfig.projects.length > 0) {
+    projects = projectConfig.projects.map(p => {
+      let projectInitContent = '';
+      if (p.initScript) {
+        try {
+          const absPath = join(projectConfig.projectRoot, p.initScript);
+          projectInitContent = readFileSync(absPath, 'utf-8');
+        } catch {
+          // treat as empty
+        }
+      }
+      return {
+        name: p.name,
+        path: p.path,
+        languages: p.languages,
+        packageManagers: p.packageManagers,
+        taskManagers: p.taskManagers,
+        initScriptContent: projectInitContent,
+      };
+    });
+  }
+
   const hash = computeSetupHash({
     agentImage,
-    languages: projectConfig.languages,
-    packageManagers: projectConfig.packageManagers,
-    taskManagers: projectConfig.taskManagers,
+    languages: projectConfig.allLanguages,
+    packageManagers: projectConfig.allPackageManagers,
+    taskManagers: projectConfig.allTaskManagers,
     agent,
     roverVersion: getVersion(),
     initScriptContent,
     mcps: projectConfig.mcps,
+    projects,
   });
 
   const cacheTag = getCacheImageTag(hash);

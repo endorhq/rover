@@ -130,6 +130,7 @@ export type {
   NetworkConfig,
   SandboxConfig,
   HooksConfig,
+  SubProject,
   ProjectConfig,
 } from './project-config/types.js';
 
@@ -143,6 +144,7 @@ export {
   CURRENT_PROJECT_SCHEMA_VERSION,
   PROJECT_CONFIG_FILENAME,
   ProjectConfigSchema,
+  SubProjectSchema,
   NETWORK_MODE_VALUES,
 } from './project-config/schema.js';
 

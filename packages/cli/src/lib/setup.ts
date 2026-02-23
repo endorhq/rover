@@ -96,7 +96,7 @@ export class SetupBuilder {
   private getLanguagePackages(): SandboxPackage[] {
     const packages: SandboxPackage[] = [];
 
-    for (const language of this.projectConfig.languages ?? []) {
+    for (const language of this.projectConfig.allLanguages ?? []) {
       switch (language) {
         case 'javascript':
           packages.push(new JavaScriptSandboxPackage());
@@ -134,7 +134,7 @@ export class SetupBuilder {
   private getPackageManagerPackages(): SandboxPackage[] {
     const packages: SandboxPackage[] = [];
 
-    for (const packageManager of this.projectConfig.packageManagers ?? []) {
+    for (const packageManager of this.projectConfig.allPackageManagers ?? []) {
       switch (packageManager) {
         case 'npm':
           packages.push(new NpmSandboxPackage());
@@ -181,7 +181,7 @@ export class SetupBuilder {
   private getTaskManagerPackages(): SandboxPackage[] {
     const packages: SandboxPackage[] = [];
 
-    for (const taskManager of this.projectConfig.taskManagers ?? []) {
+    for (const taskManager of this.projectConfig.allTaskManagers ?? []) {
       switch (taskManager) {
         case 'just':
           packages.push(new JustSandboxPackage());
@@ -388,20 +388,41 @@ echo -e "\\n📦 Done installing MCP servers"`;
 
     // --- initScript execution ---
     let initScriptExecution = '';
-    if (!useCachedImage && this.projectConfig.initScript) {
-      initScriptExecution = `
-echo -e "\\n======================================="
-echo "🔧 Running initialization script"
-echo "======================================="
-chmod +x /init-script.sh
-/bin/sh /init-script.sh
+    if (!useCachedImage) {
+      const allInitScripts = this.projectConfig.allInitScripts;
+      if (allInitScripts.length > 0) {
+        const scriptBlocks: string[] = [];
+        for (let i = 0; i < allInitScripts.length; i++) {
+          const entry = allInitScripts[i];
+          const mountPath =
+            allInitScripts.length === 1 && !entry.path
+              ? '/init-script.sh'
+              : `/init-script-${i}.sh`;
+          const label = entry.path ? ` (${entry.path})` : '';
+          let block = `echo "🔧 Running initialization script${label}"
+chmod +x ${mountPath}`;
+          if (entry.path) {
+            block += `\ncd /workspace/${entry.path}`;
+          }
+          block += `\n/bin/sh ${mountPath}
 if [ $? -eq 0 ]; then
-  echo "✅ Initialization script completed successfully"
+  echo "✅ Initialization script${label} completed successfully"
 else
-  echo "❌ Initialization script failed"
+  echo "❌ Initialization script${label} failed"
   safe_exit 1
-fi
+fi`;
+          if (entry.path) {
+            block += '\ncd /workspace';
+          }
+          scriptBlocks.push(block);
+        }
+        initScriptExecution = `
+echo -e "\\n======================================="
+echo "🔧 Running initialization scripts"
+echo "======================================="
+${scriptBlocks.join('\n')}
 `;
+      }
     }
 
     // --- sudoers removal ---
@@ -519,6 +540,31 @@ echo "======================================="
     writeFileSync(inputsPath, JSON.stringify(inputs, null, 2), 'utf-8');
 
     return inputsPath;
+  }
+
+  /**
+   * Generate a workspace description JSON file when projects are defined.
+   * Returns the file path, or undefined if no projects are configured.
+   */
+  generateWorkspaceDescription(): string | undefined {
+    const projects = this.projectConfig.projects;
+    if (!projects || projects.length === 0) {
+      return undefined;
+    }
+
+    const description = {
+      projects: projects.map(p => ({
+        name: p.name,
+        path: p.path,
+        languages: p.languages || [],
+        packageManagers: p.packageManagers || [],
+      })),
+    };
+
+    const filePath = join(this.iterationPath, 'workspace-description.json');
+    writeFileSync(filePath, JSON.stringify(description, null, 2), 'utf-8');
+
+    return filePath;
   }
 
   /**

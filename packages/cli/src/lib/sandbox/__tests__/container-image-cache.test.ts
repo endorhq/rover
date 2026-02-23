@@ -177,6 +177,56 @@ describe('computeSetupHash', () => {
     );
     expect(a).toBe(b);
   });
+
+  it('changes when projects are added', () => {
+    const a = computeSetupHash(makeInputs());
+    const b = computeSetupHash(
+      makeInputs({
+        projects: [
+          { name: 'api', path: 'packages/api', languages: ['python'] },
+        ],
+      })
+    );
+    expect(a).not.toBe(b);
+  });
+
+  it('changes when project initScriptContent changes', () => {
+    const a = computeSetupHash(
+      makeInputs({
+        projects: [{ name: 'api', path: 'api', initScriptContent: '' }],
+      })
+    );
+    const b = computeSetupHash(
+      makeInputs({
+        projects: [
+          { name: 'api', path: 'api', initScriptContent: 'npm install' },
+        ],
+      })
+    );
+    expect(a).not.toBe(b);
+  });
+
+  it('is unaffected by project ordering', () => {
+    const projA = {
+      name: 'alpha',
+      path: 'alpha',
+      languages: ['typescript'] as string[],
+    };
+    const projB = {
+      name: 'beta',
+      path: 'beta',
+      languages: ['python'] as string[],
+    };
+    const a = computeSetupHash(makeInputs({ projects: [projA, projB] }));
+    const b = computeSetupHash(makeInputs({ projects: [projB, projA] }));
+    expect(a).toBe(b);
+  });
+
+  it('is stable without projects field', () => {
+    const a = computeSetupHash(makeInputs());
+    const b = computeSetupHash(makeInputs({ projects: undefined }));
+    expect(a).toBe(b);
+  });
 });
 
 describe('getCacheImageTag', () => {
