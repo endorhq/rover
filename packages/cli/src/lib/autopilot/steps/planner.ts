@@ -1,3 +1,4 @@
+import type { WorkflowStore } from 'rover-core';
 import { getUserAIAgent, getAIAgentTool } from '../../agents/index.js';
 import { parseJsonResponse } from '../../../utils/json-parser.js';
 import { SpanWriter, ActionWriter, enqueueAction } from '../logging.js';
@@ -11,12 +12,55 @@ import type {
 } from './types.js';
 import planPromptTemplate from './prompts/plan-prompt.md';
 
-const VALID_WORKFLOWS = new Set([
-  'swe',
-  'code-review',
-  'bug-finder',
-  'security-analyst',
-]);
+/**
+ * Build a Markdown catalog of available workflows from the WorkflowStore.
+ * This is injected into the planner prompt so the AI knows which workflows exist.
+ */
+function buildWorkflowCatalog(workflowStore: WorkflowStore): string {
+  const entries = workflowStore.getAllWorkflowEntries();
+  if (entries.length === 0) {
+    return '*(No workflows available)*';
+  }
+
+  const sections: string[] = [];
+
+  for (const entry of entries) {
+    const wf = entry.workflow;
+    let section = `### \`${wf.name}\` — ${wf.description}\n\n`;
+
+    // Inputs
+    if (wf.inputs.length > 0) {
+      section += '**Inputs**:\n';
+      for (const input of wf.inputs) {
+        const req = input.required ? 'required' : 'optional';
+        const def =
+          input.default !== undefined ? `, default: \`${input.default}\`` : '';
+        section += `- \`${input.name}\` (${input.type}, ${req}${def}) — ${input.description}\n`;
+      }
+      section += '\n';
+    }
+
+    // Outputs
+    if (wf.outputs.length > 0) {
+      section += '**Outputs**:\n';
+      for (const output of wf.outputs) {
+        section += `- \`${output.name}\` (${output.type}) — ${output.description}\n`;
+      }
+      section += '\n';
+    }
+
+    // Steps summary
+    if (wf.steps.length > 0) {
+      section += '**Steps**: ';
+      section += wf.steps.map(s => `\`${s.id}\``).join(' → ');
+      section += '\n';
+    }
+
+    sections.push(section);
+  }
+
+  return sections.join('\n');
+}
 
 function buildPlanUserMessage(
   meta: Record<string, any>,
@@ -72,6 +116,10 @@ function writeWorkflowActions(
         acceptance_criteria: task.acceptance_criteria,
         context: task.context,
         depends_on_action_id: dependsOnActionId,
+        ...(task.inputs ? { inputs: task.inputs } : {}),
+        ...(task.context_uris?.length
+          ? { context_uris: task.context_uris }
+          : {}),
       },
     });
 
@@ -104,7 +152,7 @@ export const plannerStep: Step = {
   dependencies: {} satisfies StepDependencies,
 
   async process(pending: PendingAction, ctx: StepContext): Promise<StepResult> {
-    const { store, projectId, projectPath } = ctx;
+    const { store, projectId, projectPath, workflowStore } = ctx;
 
     // Open the plan span
     const span = new SpanWriter(projectId, {
@@ -118,14 +166,21 @@ export const plannerStep: Step = {
     // Build user message from pending.meta + spans
     const userMessage = buildPlanUserMessage(pending.meta ?? {}, spans);
 
+    // Build system prompt with dynamic workflow catalog
+    let systemPrompt = planPromptTemplate;
+    if (workflowStore) {
+      const catalog = buildWorkflowCatalog(workflowStore);
+      systemPrompt = systemPrompt.replace('{{WORKFLOW_CATALOG}}', catalog);
+    }
+
     // Invoke agent with system prompt and read-only tools
     const agent = getUserAIAgent();
     const agentTool = getAIAgentTool(agent);
     const response = await agentTool.invoke(userMessage, {
       json: true,
       cwd: projectPath,
-      systemPrompt: planPromptTemplate,
-      tools: ['Read', 'Glob', 'Grep'],
+      systemPrompt,
+      tools: ['Read', 'Glob', 'Grep', 'Bash(gh:*)'],
     });
 
     const planResult = parseJsonResponse<PlanResult>(response);
@@ -136,8 +191,11 @@ export const plannerStep: Step = {
     }
 
     for (const task of planResult.tasks) {
-      if (!VALID_WORKFLOWS.has(task.workflow)) {
-        throw new Error(`Invalid workflow type: ${task.workflow}`);
+      if (workflowStore) {
+        const wf = workflowStore.getWorkflow(task.workflow);
+        if (!wf) {
+          throw new Error(`Invalid workflow type: ${task.workflow}`);
+        }
       }
     }
 

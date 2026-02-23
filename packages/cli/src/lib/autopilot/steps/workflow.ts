@@ -1,6 +1,13 @@
 import { join } from 'node:path';
-import { mkdirSync } from 'node:fs';
-import { ProjectConfigManager, IterationManager, Git } from 'rover-core';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import {
+  ProjectConfigManager,
+  IterationManager,
+  Git,
+  ContextManager,
+  generateContextIndex,
+  registerBuiltInProviders,
+} from 'rover-core';
 import { getUserAIAgent } from '../../agents/index.js';
 import { createSandbox } from '../../sandbox/index.js';
 import { resolveAgentImage } from '../../sandbox/container-common.js';
@@ -170,10 +177,21 @@ export const workflowStep: Step = {
 
     // 2. Create Rover task
     const selectedAgent = getUserAIAgent();
+    const inputsMap = new Map([
+      ['description', meta.description ?? pending.summary],
+    ]);
+    if (meta.inputs) {
+      for (const [key, value] of Object.entries(meta.inputs)) {
+        if (typeof value === 'string' && key !== 'description') {
+          inputsMap.set(key, value);
+        }
+      }
+    }
+
     const task = project.createTask({
       title: meta.title ?? pending.summary,
       description: meta.description ?? pending.summary,
-      inputs: new Map([['description', meta.description ?? pending.summary]]),
+      inputs: inputsMap,
       workflowName: meta.workflow ?? 'swe',
       agent: selectedAgent,
       sourceBranch: baseBranch,
@@ -218,6 +236,31 @@ export const workflowStep: Step = {
       meta.title ?? pending.summary,
       meta.description ?? pending.summary
     );
+
+    // 4b. Inject context from context_uris if provided
+    if (meta.context_uris?.length) {
+      try {
+        registerBuiltInProviders();
+        const contextManager = new ContextManager(meta.context_uris, task, {
+          trustAllAuthors: true,
+          cwd: projectPath,
+        });
+        const entries = await contextManager.fetchAndStore();
+
+        // Store context entries in the iteration
+        const iteration = IterationManager.load(iterationPath);
+        iteration.setContext(entries);
+
+        // Generate index.md for the context directory
+        const indexContent = generateContextIndex(entries, task.iterations);
+        writeFileSync(
+          join(contextManager.getContextDir(), 'index.md'),
+          indexContent
+        );
+      } catch {
+        // Context injection is best-effort — don't fail the workflow
+      }
+    }
 
     task.setWorkspace(worktreePath, branchName);
     task.markInProgress();

@@ -1,0 +1,273 @@
+# Code Review Workflow
+# This workflow evaluates code changes and produces structured review feedback
+# with inline comments that can be posted as a GitHub PR review.
+version: '1.0'
+name: 'code-review'
+description: 'Code review workflow that produces structured PR reviews with inline comments'
+
+inputs:
+  - name: description
+    description: 'What to review and focus areas'
+    type: string
+    required: true
+  - name: commits
+    description: 'List of commits in the PR'
+    type: string
+    required: false
+  - name: pr_body
+    description: 'The PR description'
+    type: string
+    required: false
+  - name: base_branch
+    description: 'Base branch for diff'
+    type: string
+    required: false
+    default: main
+
+outputs:
+  - name: review
+    description: 'Structured review data with body, inline comments, and decision'
+    type: file
+    filename: review.json
+  - name: review_markdown
+    description: 'Human-readable review for logging'
+    type: file
+    filename: review.md
+  - name: summary
+    description: 'Brief review summary'
+    type: file
+    filename: summary.md
+
+defaults:
+  tool: claude
+  model: sonnet
+
+config:
+  timeout: 3600
+  continueOnError: false
+
+steps:
+  - id: context
+    type: agent
+    name: 'Change Analysis'
+    prompt: |
+      You are analyzing code changes for a code review.
+
+      Task description: {{inputs.description}}
+      Base branch: {{inputs.base_branch}}
+      PR body: {{inputs.pr_body}}
+      Commits: {{inputs.commits}}
+
+      Follow these steps to complete the analysis:
+
+      ### Phase 1: Gather the diff
+
+      If a `/context` directory exists, read its contents first — it may contain the PR diff and metadata.
+
+      Otherwise, generate the diff:
+      ```
+      git diff {{inputs.base_branch}}...HEAD
+      ```
+
+      ### Phase 2: Categorize changes
+
+      For each changed file, categorize it as one of:
+      - **source**: Application code (`.ts`, `.js`, `.py`, `.go`, etc.)
+      - **test**: Test files
+      - **config**: Configuration files (`.json`, `.yml`, `.toml`, CI configs)
+      - **docs**: Documentation files (`.md`, `.txt`, `.rst`)
+
+      ### Phase 3: Assess change safety
+
+      Evaluate whether the changes are safe to run tests against:
+      - Are there new scripts or modified build/CI configurations?
+      - Are there new or suspicious dependencies added?
+      - Are there large binary additions?
+      - Do any changes modify security-sensitive files?
+
+      If the changes are safe, note that tests can be run. If not, explain why.
+
+      ### Phase 4: Output
+
+      Write your analysis to `context.md` following this template:
+
+      <template>
+      # Change Analysis
+
+      ## Summary
+
+      1-2 sentences describing what the changes do overall.
+
+      ## Changed Files
+
+      ### Source
+      - `path/to/file.ts`: Brief description of changes
+
+      ### Tests
+      - `path/to/test.ts`: Brief description
+
+      ### Config
+      - `path/to/config.yml`: Brief description
+
+      ### Docs
+      - `path/to/doc.md`: Brief description
+
+      ## Safety Assessment
+
+      **Safe to run tests**: yes|no
+      **Reason**: Brief explanation if not safe
+
+      ## Areas of Concern
+
+      - Any initial observations worth flagging for detailed review
+      </template>
+    outputs:
+      - name: context_file
+        description: 'Change analysis file'
+        type: file
+        filename: context.md
+
+  - id: review
+    type: agent
+    name: 'Code Review'
+    prompt: |
+      You are performing a thorough code review.
+
+      Task description: {{inputs.description}}
+      Base branch: {{inputs.base_branch}}
+      PR body: {{inputs.pr_body}}
+      Commits: {{inputs.commits}}
+
+      Change analysis:
+      ```
+      {{steps.context.outputs.context_file}}
+      ```
+
+      Follow these steps to complete the review:
+
+      ### Phase 1: Read the full diff and changed files
+
+      If a `/context` directory exists, read its contents for the PR diff and metadata.
+
+      Otherwise, generate the diff:
+      ```
+      git diff {{inputs.base_branch}}...HEAD
+      ```
+
+      Read each changed file in full to understand the context around the changes.
+
+      ### Phase 2: If the change analysis indicates it is safe, run existing tests
+
+      Only run tests if the safety assessment says "yes". Do not install new dependencies or run unknown scripts.
+
+      ### Phase 3: Review each file
+
+      For each changed file, evaluate:
+      - **Correctness**: Does the code do what it intends? Are there logic errors, off-by-one errors, null handling issues?
+      - **Style**: Does it follow the project's existing patterns and conventions?
+      - **Performance**: Are there obvious performance issues (N+1 queries, unnecessary allocations, missing indexes)?
+      - **Security**: Are there injection risks, exposed secrets, missing input validation, or auth issues?
+      - **Test coverage**: Are the changes adequately tested? Are edge cases covered?
+
+      ### Phase 4: Produce structured output
+
+      You MUST create two files:
+
+      **1. `review.json`** — Structured review data with the following format:
+      ```json
+      {
+        "body": "## Code Review\n\nOverall assessment of the changes...",
+        "decision": "approve|request-changes|comment",
+        "comments": [
+          {
+            "path": "relative/path/to/file.ts",
+            "line": 42,
+            "body": "Description of the issue and suggestion for improvement."
+          }
+        ]
+      }
+      ```
+
+      The `decision` field must be one of:
+      - `approve` — Changes look good, no blocking issues
+      - `request-changes` — There are issues that must be addressed before merging
+      - `comment` — Observations and suggestions but nothing blocking
+
+      The `comments` array contains inline review comments. Each comment must have:
+      - `path`: The file path relative to the repository root
+      - `line`: The line number in the changed file where the comment applies
+      - `body`: A clear, actionable description of the issue or suggestion
+
+      Guidelines for comments:
+      - Only comment on lines that are part of the diff (changed or added lines)
+      - Be specific and actionable — explain what the problem is and how to fix it
+      - Include code suggestions where appropriate using markdown code blocks
+      - Prioritize correctness and security issues over style nitpicks
+
+      **2. `review.md`** — Human-readable version of the same review:
+
+      <template>
+      # Code Review
+
+      ## Overall Assessment
+
+      Brief summary of the review findings and overall quality.
+
+      ## Decision: approve|request-changes|comment
+
+      ## Findings
+
+      ### `path/to/file.ts`
+
+      **Line N**: Description of the issue
+      **Severity**: Critical | Major | Minor | Suggestion
+      **Recommendation**: How to fix it
+
+      ## Summary
+
+      - N issues found (X critical, Y major, Z minor)
+      - Overall recommendation
+      </template>
+    outputs:
+      - name: review_file
+        description: 'Structured review JSON'
+        type: file
+        filename: review.json
+      - name: review_markdown_file
+        description: 'Human-readable review'
+        type: file
+        filename: review.md
+
+  - id: summary
+    type: agent
+    name: 'Review Summary'
+    prompt: |
+      You are writing a brief summary of the code review outcome.
+
+      Review:
+      ```
+      {{steps.review.outputs.review_markdown_file}}
+      ```
+
+      Write a brief summary to `summary.md`:
+
+      <template>
+      # Review Summary
+
+      ## Decision
+
+      approve|request-changes|comment
+
+      ## Key Findings
+
+      - 1-3 bullet points of the most important findings
+
+      ## Recommendation
+
+      1-2 sentences summarizing the recommendation
+      </template>
+    outputs:
+      - name: summary_file
+        description: 'Brief review summary'
+        type: file
+        filename: summary.md

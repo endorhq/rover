@@ -94,6 +94,14 @@ The `meta` object varies by action:
 - **noop**: `{ "reason": "<why this event requires no response>" }`
 - **flag**: `{ "concern": "<description of the security or trust issue>", "severity": "<low|medium|high|critical>", "evidence": "<specific element from the event that triggered the flag, without echoing sensitive data>" }`
 
+## Handling Feedback on Automation-Created PRs
+
+When the event is a comment or review on a PR that was created by the automation system (indicated by the Automation Context section above), apply these guidelines:
+
+- **Actionable feedback** (change requests, bug reports, suggestions with clear intent) → choose `plan`. The system can act on this directly.
+- **Approval or positive acknowledgement** (LGTM, looks good, approved, thumbs up) → choose `noop`. No further automated action is needed.
+- **Genuinely ambiguous** feedback where you truly cannot determine intent → choose `clarify`. But default to `plan` when in doubt — it is better to attempt action and let the planner investigate than to ask the user to repeat themselves.
+
 ## Decision Principles
 
 1. **Bias toward action.** Prefer `plan` or `workflow` over `wait` or `noop` when there is enough information to move forward with a coding task.

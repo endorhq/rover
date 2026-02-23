@@ -3,6 +3,7 @@ import type { ProjectManager } from 'rover-core';
 import type { ActionTrace } from '../types.js';
 import type { AutopilotStore } from '../store.js';
 import { getRepoInfo } from '../helpers.js';
+import { initWorkflowStore } from '../../workflow.js';
 import { StepOrchestrator } from './orchestrator.js';
 import { coordinatorStep } from './coordinator.js';
 import { plannerStep } from './planner.js';
@@ -102,6 +103,7 @@ export function useStepOrchestrator(
 
   useEffect(() => {
     const repoInfo = getRepoInfo(projectPath);
+    const workflowStore = initWorkflowStore(projectPath);
     const callbacks: OrchestratorCallbacks = {
       onTracesUpdated,
       onStatusChanged,
@@ -125,6 +127,7 @@ export function useStepOrchestrator(
       owner: repoInfo?.owner,
       repo: repoInfo?.repo,
       project,
+      workflowStore,
       callbacks,
     });
 

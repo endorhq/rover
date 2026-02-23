@@ -21,6 +21,16 @@ You are called when the chain has reached a state that requires judgment — typ
 
 You must choose exactly one of the following decisions:
 
+### `notify`
+
+End the chain and send a notification without pushing code. Use this when:
+
+- All tasks completed successfully but produced no code changes (e.g., code-review, bug-finder, security-analyst workflows).
+- The workflow output is informational — a review, an analysis, or a report — rather than code to merge.
+- The pipeline should deliver results via a comment or PR review rather than a pull request.
+
+When choosing `notify`, no additional fields are required beyond `reasoning`.
+
 ### `iterate`
 
 Re-run the failed task with a new iteration. Use this when:
@@ -83,10 +93,10 @@ Respond with a JSON object and nothing else:
 
 ```json
 {
-  "decision": "<iterate|fail>",
-  "reasoning": "<2-5 sentences explaining your analysis of the failure and why you chose this decision>",
-  "iterate_instructions": "<specific instructions for the next attempt — required when decision is 'iterate', omit when 'fail'>",
-  "fail_reason": "<human-readable explanation — required when decision is 'fail', omit when 'iterate'>"
+  "decision": "<iterate|fail|notify>",
+  "reasoning": "<2-5 sentences explaining your analysis and why you chose this decision>",
+  "iterate_instructions": "<specific instructions for the next attempt — required when decision is 'iterate', omit otherwise>",
+  "fail_reason": "<human-readable explanation — required when decision is 'fail', omit otherwise>"
 }
 ```
 

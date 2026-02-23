@@ -112,10 +112,10 @@ export type WorkflowRunnerStatus = 'idle' | 'processing' | 'error';
 export type CommitterStatus = 'idle' | 'processing' | 'error';
 export type ResolverStatus = 'idle' | 'processing' | 'error';
 export type PusherStatus = 'idle' | 'processing' | 'error';
-export type ResolverDecision = 'wait' | 'push' | 'iterate' | 'fail';
+export type ResolverDecision = 'wait' | 'push' | 'notify' | 'iterate' | 'fail';
 
 export interface ResolverAIResult {
-  decision: 'iterate' | 'fail';
+  decision: 'iterate' | 'fail' | 'notify';
   reasoning: string;
   iterate_instructions?: string;
   fail_reason?: string;
@@ -162,9 +162,11 @@ export interface TaskMapping {
 
 export interface PlanTask {
   title: string;
-  workflow: 'swe' | 'code-review' | 'bug-finder' | 'security-analyst';
+  workflow: string;
   description: string;
   acceptance_criteria: string[];
+  inputs?: Record<string, string>;
+  context_uris?: string[];
   context: {
     files: string[];
     references: string[];

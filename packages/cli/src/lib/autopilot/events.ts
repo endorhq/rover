@@ -5,6 +5,7 @@ import type { FetchStatus, GitHubEvent } from './types.js';
 import type { AutopilotStore } from './store.js';
 import { SpanWriter, ActionWriter, enqueueAction } from './logging.js';
 import { getRepoInfo } from './helpers.js';
+import { ROVER_FOOTER_MARKER } from './constants.js';
 
 const POLL_INTERVAL_MS = 60_000; // 1 minute
 
@@ -109,6 +110,9 @@ function extractRelevantEvent(event: GitHubEvent): RelevantEvent | null {
 
     case 'IssueCommentEvent':
       if (payload.action !== 'created') return null;
+      // Skip self-generated comments (posted by Rover)
+      if ((payload.comment?.body ?? '').includes(ROVER_FOOTER_MARKER))
+        return null;
       return {
         summary: `new comment on #${payload.issue?.number}`,
         meta: {
@@ -125,6 +129,9 @@ function extractRelevantEvent(event: GitHubEvent): RelevantEvent | null {
 
     case 'PullRequestReviewEvent':
       if (payload.action !== 'submitted') return null;
+      // Skip self-generated reviews (posted by Rover)
+      if ((payload.review?.body ?? '').includes(ROVER_FOOTER_MARKER))
+        return null;
       return {
         summary: `new review on PR #${payload.pull_request?.number}`,
         meta: {
@@ -141,6 +148,9 @@ function extractRelevantEvent(event: GitHubEvent): RelevantEvent | null {
 
     case 'PullRequestReviewCommentEvent':
       if (payload.action !== 'created') return null;
+      // Skip self-generated review comments (posted by Rover)
+      if ((payload.comment?.body ?? '').includes(ROVER_FOOTER_MARKER))
+        return null;
       return {
         summary: `new review comment on PR #${payload.pull_request?.number}`,
         meta: {

@@ -1,4 +1,4 @@
-import type { ProjectManager } from 'rover-core';
+import type { ProjectManager, WorkflowStore } from 'rover-core';
 import type {
   ActionStepStatus,
   ActionStep,
@@ -36,6 +36,7 @@ export interface StepContext {
   owner?: string;
   repo?: string;
   project?: ProjectManager;
+  workflowStore?: WorkflowStore;
 }
 
 // ── Step result (returned by process, applied by orchestrator) ──────────────
@@ -90,6 +91,7 @@ export interface MonitorContext {
   owner?: string;
   repo?: string;
   project?: ProjectManager;
+  workflowStore?: WorkflowStore;
 }
 
 export interface Step {

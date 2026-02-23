@@ -86,7 +86,7 @@ export async function fetchContextForAction(
           'view',
           String(num),
           '--json',
-          'title,body,state,mergedAt,reviewDecision,comments,closedAt',
+          'title,body,state,headRefName,mergedAt,reviewDecision,comments,closedAt',
         ]);
         if (!data) return null;
         // Keep only recent comments to reduce token usage
@@ -123,7 +123,7 @@ export async function fetchContextForAction(
         'view',
         String(num),
         '--json',
-        'title,body,state,mergedAt,mergedBy,reviewDecision,reviewRequests,reviews,statusCheckRollup,mergeable,closedAt',
+        'title,body,state,headRefName,mergedAt,mergedBy,reviewDecision,reviewRequests,reviews,statusCheckRollup,mergeable,closedAt',
       ]);
       if (!data) return null;
       // Summarize statusCheckRollup

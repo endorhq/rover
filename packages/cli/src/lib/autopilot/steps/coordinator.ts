@@ -2,7 +2,7 @@ import { getUserAIAgent, getAIAgentTool } from '../../agents/index.js';
 import { parseJsonResponse } from '../../../utils/json-parser.js';
 import { SpanWriter, ActionWriter, enqueueAction } from '../logging.js';
 import { fetchContextForAction } from '../context.js';
-import type { PendingAction, PilotDecision } from '../types.js';
+import type { PendingAction, PilotDecision, TaskMapping } from '../types.js';
 import type {
   Step,
   StepConfig,
@@ -12,11 +12,36 @@ import type {
 } from './types.js';
 import pilotPromptTemplate from './prompts/pilot-prompt.md';
 
+interface RoverContext {
+  taskId: number;
+  branchName: string;
+  traceId?: string;
+}
+
 function buildPilotPrompt(
   meta: Record<string, any>,
-  context: { type: string; data: Record<string, any> } | null
+  context: { type: string; data: Record<string, any> } | null,
+  roverContext?: RoverContext
 ): string {
   let prompt = pilotPromptTemplate;
+
+  if (roverContext) {
+    prompt += '\n\n---\n\n## Automation Context\n\n';
+    prompt +=
+      'This PR was **created by the Rover automation system** as part of an earlier task.\n\n';
+    prompt += `- **Task ID**: ${roverContext.taskId}\n`;
+    prompt += `- **Branch**: \`${roverContext.branchName}\`\n`;
+    if (roverContext.traceId) {
+      prompt += `- **Original Trace**: \`${roverContext.traceId}\`\n`;
+    }
+    prompt += '\n';
+    prompt +=
+      'When users provide actionable feedback on a Rover-created PR, prefer `plan` over `clarify`. ';
+    prompt +=
+      'If the feedback is approval or positive acknowledgement, use `noop`. ';
+    prompt +=
+      'Only use `clarify` when the feedback is genuinely ambiguous and you cannot determine intent.\n';
+  }
 
   prompt += '\n\n---\n\n## Event\n\n```json\n';
   prompt += JSON.stringify(meta, null, 2);
@@ -64,8 +89,25 @@ export const coordinatorStep: Step = {
       ? await fetchContextForAction(owner, repo, pending.meta)
       : null;
 
+    // Check if this PR was created by Rover via task mappings
+    let roverContext: RoverContext | undefined;
+    const headRefName = context?.data?.headRefName as string | undefined;
+    if (headRefName) {
+      const allMappings = store.getAllTaskMappings();
+      for (const [, mapping] of Object.entries(allMappings)) {
+        if (mapping.branchName === headRefName) {
+          roverContext = {
+            taskId: mapping.taskId,
+            branchName: mapping.branchName,
+            traceId: mapping.traceId,
+          };
+          break;
+        }
+      }
+    }
+
     // Build prompt and invoke Pilot
-    const prompt = buildPilotPrompt(pending.meta ?? {}, context);
+    const prompt = buildPilotPrompt(pending.meta ?? {}, context, roverContext);
     const agent = getUserAIAgent();
     const agentTool = getAIAgentTool(agent);
     const response = await agentTool.invoke(prompt, {

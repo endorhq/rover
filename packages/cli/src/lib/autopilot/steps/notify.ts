@@ -2,6 +2,7 @@ import { launch } from 'rover-core';
 import { getUserAIAgent, getAIAgentTool } from '../../agents/index.js';
 import { parseJsonResponse } from '../../../utils/json-parser.js';
 import { SpanWriter } from '../logging.js';
+import { ROVER_FOOTER_MARKER } from '../constants.js';
 import type {
   Span,
   ActionTrace,
@@ -16,6 +17,12 @@ import type {
   StepResult,
 } from './types.js';
 import notifyPromptTemplate from './prompts/notify-prompt.md';
+
+// ── Rover footer ──────────────────────────────────────────────────────────
+
+export function buildRoverFooter(traceId: string, actionId: string): string {
+  return `\n\n<details>\n${ROVER_FOOTER_MARKER}\n\nTrace: \`${traceId}\` | Action: \`${actionId}\`\n\n</details>`;
+}
 
 // ── Channel resolution ─────────────────────────────────────────────────────
 
@@ -145,10 +152,87 @@ async function postComment(
   }
 }
 
+// ── PR review posting ───────────────────────────────────────────────────────
+
+interface ReviewData {
+  body: string;
+  decision: string;
+  comments: Array<{ path: string; line: number; body: string }>;
+}
+
+/**
+ * Map review decision to GitHub PR review event.
+ */
+function mapDecisionToEvent(decision: string): string {
+  switch (decision) {
+    case 'approve':
+      return 'APPROVE';
+    case 'request-changes':
+      return 'REQUEST_CHANGES';
+    case 'comment':
+    default:
+      return 'COMMENT';
+  }
+}
+
+/**
+ * Post a proper GitHub PR review with inline comments.
+ */
+async function postPRReview(
+  prNumber: number,
+  review: ReviewData,
+  owner: string,
+  repo: string
+): Promise<{ success: boolean; error?: string }> {
+  const event = mapDecisionToEvent(review.decision);
+
+  const payload = JSON.stringify({
+    body: review.body,
+    event,
+    comments: review.comments.map(c => ({
+      path: c.path,
+      line: c.line,
+      body: c.body,
+    })),
+  });
+
+  try {
+    const result = await launch(
+      'gh',
+      [
+        'api',
+        `repos/${owner}/${repo}/pulls/${prNumber}/reviews`,
+        '--method',
+        'POST',
+        '--input',
+        '-',
+      ],
+      {
+        env: { GH_REPO: `${owner}/${repo}` },
+        input: payload,
+      }
+    );
+
+    if (result.failed) {
+      return {
+        success: false,
+        error: result.stderr?.toString() ?? 'gh api review failed',
+      };
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err.message ?? 'unknown error posting PR review',
+    };
+  }
+}
+
 // ── Step implementation ────────────────────────────────────────────────────
 
 const GITHUB_COMMENT_LIMIT = 65536;
-const TRUNCATION_LIMIT = 60000;
+const TRUNCATION_LIMIT = 59850; // Leave room for the Rover footer (~150 chars)
 
 export const notifyStep: Step = {
   config: {
@@ -225,14 +309,49 @@ export const notifyStep: Step = {
         '\n\n---\n*Message truncated due to length.*';
     }
 
-    // 6. Post the comment if we have a channel
+    // 5b. Append the Rover footer for self-comment detection
+    const footer = buildRoverFooter(pending.traceId, pending.actionId);
+    message += footer;
+
+    // 6. Post the comment (or PR review) if we have a channel
     let posted = false;
     let postError: string | undefined;
+    let usedReviewAPI = false;
 
     if (channel && owner && repo) {
-      const result = await postComment(channel, message, owner, repo);
-      posted = result.success;
-      postError = result.error;
+      // If review data is present and we're targeting a PR, use the review API
+      if (meta.review && channel.command === 'pr') {
+        usedReviewAPI = true;
+        const review = meta.review as ReviewData;
+        // Append footer to review body for self-comment detection
+        review.body = (review.body || '') + footer;
+        const reviewResult = await postPRReview(
+          channel.number,
+          review,
+          owner,
+          repo
+        );
+        posted = reviewResult.success;
+        postError = reviewResult.error;
+
+        // Fall back to a regular comment if the review API fails
+        if (!posted) {
+          const fallbackMessage = review.body || message;
+          const commentResult = await postComment(
+            channel,
+            fallbackMessage,
+            owner,
+            repo
+          );
+          posted = commentResult.success;
+          postError = posted ? undefined : commentResult.error;
+          usedReviewAPI = false;
+        }
+      } else {
+        const result = await postComment(channel, message, owner, repo);
+        posted = result.success;
+        postError = result.error;
+      }
     }
 
     // 7. Create and finalize the span
@@ -242,9 +361,11 @@ export const notifyStep: Step = {
         : null,
       posted,
       messageLength: message.length,
+      ...(usedReviewAPI ? { usedReviewAPI: true } : {}),
       ...(aiReasoning ? { aiReasoning } : {}),
       ...(postError ? { postError } : {}),
       ...(meta.originalAction ? { originalAction: meta.originalAction } : {}),
+      ...(meta.reviewWorkflow ? { reviewWorkflow: true } : {}),
     };
 
     const span = new SpanWriter(projectId, {
@@ -256,9 +377,8 @@ export const notifyStep: Step = {
     if (!channel) {
       span.complete(`notify: no comment target (trace ends silently)`);
     } else if (posted) {
-      span.complete(
-        `notify: commented on ${channel.command} #${channel.number}`
-      );
+      const method = usedReviewAPI ? 'reviewed' : 'commented on';
+      span.complete(`notify: ${method} ${channel.command} #${channel.number}`);
     } else {
       span.fail(
         `notify: failed to post on ${channel.command} #${channel.number}: ${postError ?? 'unknown'}`

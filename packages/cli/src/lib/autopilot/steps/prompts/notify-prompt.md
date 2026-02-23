@@ -57,9 +57,10 @@ Only applies when `notify` is `true`:
 
 ### Handling Different Outcomes
 
-1. **Push failure** (`context.pushed === false`): Explain what went wrong concisely. Mention what was attempted.
-2. **Clarification** (`context.originalAction === 'clarify'`): Compose a polite clarification request using the questions in `context.questions`. Present each question clearly.
-3. **General failure**: Summarize the pipeline outcome and note what failed.
+1. **Code review** (`context.reviewWorkflow === true`): The structured review data is available in `context.review`. When present, the review body is already formatted as a GitHub-flavored Markdown comment. Use it directly as the message — do not rewrite or summarize it. The inline comments are posted separately via the GitHub review API, so do not include them in the message body. Always notify for code reviews.
+2. **Push failure** (`context.pushed === false`): Explain what went wrong concisely. Mention what was attempted.
+3. **Clarification** (`context.originalAction === 'clarify'`): Compose a polite clarification request using the questions in `context.questions`. Present each question clearly.
+4. **General failure**: Summarize the pipeline outcome and note what failed.
 
 ### Security — NEVER Include
 

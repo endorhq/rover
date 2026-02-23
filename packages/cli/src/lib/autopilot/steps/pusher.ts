@@ -2,6 +2,7 @@ import { Git, launch } from 'rover-core';
 import { getUserAIAgent, getAIAgentTool } from '../../agents/index.js';
 import { parseJsonResponse } from '../../../utils/json-parser.js';
 import { SpanWriter, ActionWriter, enqueueAction } from '../logging.js';
+import { ROVER_FOOTER_MARKER } from '../constants.js';
 import type { PendingAction, PusherAIResult, TaskMapping } from '../types.js';
 import type {
   Step,
@@ -81,6 +82,8 @@ function buildPusherUserMessage(opts: {
   traceSummary: string;
   existingPR: { number: number; url: string; state: string } | null;
   eventMeta: Record<string, any>;
+  traceId: string;
+  actionId: string;
 }): string {
   let msg = '## Push Context\n\n';
 
@@ -118,6 +121,20 @@ function buildPusherUserMessage(opts: {
     }
     msg += '\n';
   }
+
+  msg += '## Required Footer\n\n';
+  msg +=
+    'When creating a PR, you MUST append the following HTML block at the very end of the PR body. ';
+  msg +=
+    'This is used for automation tracking and must be included verbatim:\n\n';
+  msg += '```html\n';
+  msg += '<details>\n';
+  msg += `${ROVER_FOOTER_MARKER}\n`;
+  msg += '\n';
+  msg += `Trace: \`${opts.traceId}\` | Action: \`${opts.actionId}\`\n`;
+  msg += '\n';
+  msg += '</details>\n';
+  msg += '```\n\n';
 
   return msg;
 }
@@ -208,6 +225,8 @@ export const pusherStep: Step = {
       traceSummary: trace.summary,
       existingPR,
       eventMeta,
+      traceId: pending.traceId,
+      actionId: pending.actionId,
     });
 
     // Determine a working directory — use the first task's worktree if available

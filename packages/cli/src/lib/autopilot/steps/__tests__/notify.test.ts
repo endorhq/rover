@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Span, ActionTrace, PendingAction } from '../../types.js';
-import { resolveChannel, buildFallbackMessage, notifyStep } from '../notify.js';
+import {
+  resolveChannel,
+  buildFallbackMessage,
+  buildRoverFooter,
+  notifyStep,
+} from '../notify.js';
+import { ROVER_FOOTER_MARKER } from '../../constants.js';
 import type { StepContext } from '../types.js';
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
@@ -285,9 +291,13 @@ describe('notifyStep.process', () => {
     expect(result.terminal).toBe(true);
     expect(result.status).toBe('completed');
     expect(result.reasoning).toContain('commented on issue #42');
+    // The posted message should include the Rover footer
+    const postedBody = mockLaunch.mock.calls[0][1][4] as string;
+    expect(postedBody).toContain('Task completed successfully.');
+    expect(postedBody).toContain(ROVER_FOOTER_MARKER);
     expect(mockLaunch).toHaveBeenCalledWith(
       'gh',
-      ['issue', 'comment', '42', '--body', 'Task completed successfully.'],
+      ['issue', 'comment', '42', '--body', postedBody],
       { env: { GH_REPO: 'test-owner/test-repo' } }
     );
     expect(ctx.store.removePending).toHaveBeenCalledWith('action-1');
@@ -328,12 +338,10 @@ describe('notifyStep.process', () => {
     const result = await notifyStep.process(makePending(), ctx);
 
     expect(result.terminal).toBe(true);
-    // The fallback message should have been posted
-    expect(mockLaunch).toHaveBeenCalledWith(
-      'gh',
-      ['issue', 'comment', '1', '--body', 'Coordinated task'],
-      expect.any(Object)
-    );
+    // The fallback message should have been posted (with footer appended)
+    const fallbackBody = mockLaunch.mock.calls[0][1][4] as string;
+    expect(fallbackBody).toContain('Coordinated task');
+    expect(fallbackBody).toContain(ROVER_FOOTER_MARKER);
   });
 
   it('marks span as failed when comment delivery fails', async () => {
@@ -457,5 +465,24 @@ describe('notifyStep.process', () => {
     const span = spanWriterInstances[0];
     expect(span.complete).toHaveBeenCalled();
     expect(span.meta.skipped).toBe(true);
+  });
+});
+
+describe('buildRoverFooter', () => {
+  it('includes the footer marker', () => {
+    const footer = buildRoverFooter('trace-abc', 'action-xyz');
+    expect(footer).toContain(ROVER_FOOTER_MARKER);
+  });
+
+  it('includes trace and action IDs', () => {
+    const footer = buildRoverFooter('trace-abc', 'action-xyz');
+    expect(footer).toContain('`trace-abc`');
+    expect(footer).toContain('`action-xyz`');
+  });
+
+  it('wraps content in details tags', () => {
+    const footer = buildRoverFooter('t1', 'a1');
+    expect(footer).toContain('<details>');
+    expect(footer).toContain('</details>');
   });
 });
