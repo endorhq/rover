@@ -170,8 +170,11 @@ export const notifyStep: Step = {
     // 2. Resolve the GitHub delivery channel
     const channel = owner && repo ? resolveChannel(spans, owner, repo) : null;
 
-    // 3. Compose the message via AI (haiku), with fallback
-    let message: string;
+    // 3. Ask AI whether notification is needed and compose message
+    let shouldNotify = true;
+    let message = '';
+    let aiReasoning = '';
+
     try {
       const userMessage = buildNotifyUserMessage(spans, trace, meta);
       const agent = getUserAIAgent();
@@ -182,19 +185,47 @@ export const notifyStep: Step = {
         systemPrompt: notifyPromptTemplate,
       });
       const result = parseJsonResponse<NotifyAIResult>(response);
+      shouldNotify = result.notify;
       message = result.message;
+      aiReasoning = result.reasoning ?? '';
     } catch {
+      // AI failed — fall back to posting so we don't silently drop failures
       message = buildFallbackMessage(spans, trace);
     }
 
-    // 4. Truncate if necessary
+    // 4. If AI decided notification is not needed, end the trace silently
+    if (!shouldNotify) {
+      const span = new SpanWriter(projectId, {
+        step: 'notify',
+        parentId: pending.spanId,
+        meta: {
+          skipped: true,
+          aiReasoning,
+          ...(meta.originalAction
+            ? { originalAction: meta.originalAction }
+            : {}),
+        },
+      });
+
+      span.complete(`notify: skipped — ${aiReasoning || 'not needed'}`);
+      store.removePending(pending.actionId);
+
+      return {
+        spanId: span.id,
+        terminal: true,
+        enqueuedActions: [],
+        reasoning: `skipped: ${aiReasoning || 'notification not needed'}`,
+      };
+    }
+
+    // 5. Truncate if necessary
     if (message.length > TRUNCATION_LIMIT) {
       message =
         message.slice(0, TRUNCATION_LIMIT) +
         '\n\n---\n*Message truncated due to length.*';
     }
 
-    // 5. Post the comment if we have a channel
+    // 6. Post the comment if we have a channel
     let posted = false;
     let postError: string | undefined;
 
@@ -204,13 +235,14 @@ export const notifyStep: Step = {
       postError = result.error;
     }
 
-    // 6. Create and finalize the span
+    // 7. Create and finalize the span
     const spanMeta: Record<string, any> = {
       channel: channel
         ? { command: channel.command, number: channel.number }
         : null,
       posted,
       messageLength: message.length,
+      ...(aiReasoning ? { aiReasoning } : {}),
       ...(postError ? { postError } : {}),
       ...(meta.originalAction ? { originalAction: meta.originalAction } : {}),
     };
@@ -233,7 +265,7 @@ export const notifyStep: Step = {
       );
     }
 
-    // 7. Clean up and return terminal
+    // 8. Clean up and return terminal
     store.removePending(pending.actionId);
 
     return {

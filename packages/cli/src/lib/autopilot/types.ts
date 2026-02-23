@@ -146,7 +146,9 @@ export interface PusherAIResult {
 }
 
 export interface NotifyAIResult {
+  notify: boolean;
   message: string;
+  reasoning: string;
 }
 
 export type ViewMode = 'main' | 'inspector';

@@ -268,7 +268,11 @@ describe('notifyStep.process', () => {
     (ctx.store.getSpanTrace as any).mockReturnValue([rootSpan]);
 
     mockInvoke.mockResolvedValue(
-      JSON.stringify({ message: 'Task completed successfully.' })
+      JSON.stringify({
+        notify: true,
+        message: 'Task completed successfully.',
+        reasoning: 'User needs to know',
+      })
     );
     mockLaunch.mockResolvedValue({ failed: false, stdout: '', stderr: '' });
 
@@ -294,7 +298,13 @@ describe('notifyStep.process', () => {
     const ctx = makeStepContext();
     (ctx.store.getSpanTrace as any).mockReturnValue([rootSpan]);
 
-    mockInvoke.mockResolvedValue(JSON.stringify({ message: 'Done.' }));
+    mockInvoke.mockResolvedValue(
+      JSON.stringify({
+        notify: true,
+        message: 'Done.',
+        reasoning: 'informational',
+      })
+    );
 
     const result = await notifyStep.process(makePending(), ctx);
 
@@ -333,7 +343,13 @@ describe('notifyStep.process', () => {
     const ctx = makeStepContext();
     (ctx.store.getSpanTrace as any).mockReturnValue([rootSpan]);
 
-    mockInvoke.mockResolvedValue(JSON.stringify({ message: 'Comment body' }));
+    mockInvoke.mockResolvedValue(
+      JSON.stringify({
+        notify: true,
+        message: 'Comment body',
+        reasoning: 'failure needs reporting',
+      })
+    );
     mockLaunch.mockResolvedValue({
       failed: true,
       stdout: '',
@@ -360,7 +376,9 @@ describe('notifyStep.process', () => {
 
     mockInvoke.mockResolvedValue(
       JSON.stringify({
+        notify: true,
         message: 'Could you clarify the expected behavior?',
+        reasoning: 'clarification needed from user',
       })
     );
     mockLaunch.mockResolvedValue({ failed: false, stdout: '', stderr: '' });
@@ -390,7 +408,13 @@ describe('notifyStep.process', () => {
     const ctx = makeStepContext({ owner: undefined, repo: undefined });
     (ctx.store.getSpanTrace as any).mockReturnValue([rootSpan]);
 
-    mockInvoke.mockResolvedValue(JSON.stringify({ message: 'Done.' }));
+    mockInvoke.mockResolvedValue(
+      JSON.stringify({
+        notify: true,
+        message: 'Done.',
+        reasoning: 'informational',
+      })
+    );
 
     const result = await notifyStep.process(makePending(), ctx);
 
@@ -398,5 +422,40 @@ describe('notifyStep.process', () => {
     expect(result.status).toBe('completed');
     expect(result.reasoning).toBe('no comment target');
     expect(mockLaunch).not.toHaveBeenCalled();
+  });
+
+  it('skips posting when AI decides notification is not needed', async () => {
+    const rootSpan = makeSpan({
+      meta: { type: 'IssuesEvent', issueNumber: 7 },
+    });
+    const ctx = makeStepContext();
+    (ctx.store.getSpanTrace as any).mockReturnValue([rootSpan]);
+
+    mockInvoke.mockResolvedValue(
+      JSON.stringify({
+        notify: false,
+        message: '',
+        reasoning: 'PR was created and is already linked on the issue',
+      })
+    );
+
+    const pending = makePending({
+      meta: {
+        pushed: true,
+        pullRequestUrl: 'https://github.com/o/r/pull/1',
+      },
+    });
+
+    const result = await notifyStep.process(pending, ctx);
+
+    expect(result.terminal).toBe(true);
+    expect(result.status).toBeUndefined(); // defaults to 'completed'
+    expect(result.reasoning).toContain('skipped');
+    expect(result.reasoning).toContain('PR was created');
+    expect(mockLaunch).not.toHaveBeenCalled();
+
+    const span = spanWriterInstances[0];
+    expect(span.complete).toHaveBeenCalled();
+    expect(span.meta.skipped).toBe(true);
   });
 });
