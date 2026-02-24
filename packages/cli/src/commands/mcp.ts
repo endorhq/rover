@@ -99,8 +99,20 @@ const mcpCommand = async () => {
   // Task command schema
   const taskSchema = z.object({
     initPrompt: z.string(),
-    fromGithub: z.string().optional(),
-    includeComments: z.boolean().optional(),
+    fromGithub: z
+      .string()
+      .optional()
+      .describe('Deprecated. Use context with github:issue/<number> instead.'),
+    fromGitlab: z
+      .string()
+      .optional()
+      .describe('Deprecated. Use context with gitlab:issue/<number> instead.'),
+    includeComments: z
+      .boolean()
+      .optional()
+      .describe(
+        'Deprecated. Use contextTrustAllAuthors instead. Requires fromGithub or fromGitlab.'
+      ),
     sourceBranch: z.string().optional(),
     targetBranch: z.string().optional(),
     agent: z.nativeEnum(AI_AGENT).optional(),
