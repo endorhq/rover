@@ -1,4 +1,4 @@
-import { launchSync, Git, getRepoInfo } from '../../index.js';
+import { launchSync, Git } from '../../index.js';
 import type {
   ContextEntry,
   ContextProvider,
@@ -212,9 +212,38 @@ export class GitLabProvider implements ContextProvider {
       );
     }
 
-    const repoInfo = getRepoInfo(remoteUrl);
-    if (repoInfo) {
-      return repoInfo.projectPath;
+    return this.parseGitLabRepoInfo(remoteUrl);
+  }
+
+  /**
+   * Parse project path from a git remote URL.
+   *
+   * We intentionally accept ANY git remote URL format here, not just gitlab.com.
+   * The user has already declared their intent by using the `gitlab:` URI scheme
+   * (e.g., `gitlab:issue/15`). This declaration means "treat this repo as GitLab".
+   *
+   * This approach supports:
+   * - Standard gitlab.com URLs (SSH and HTTPS)
+   * - Self-hosted GitLab instances (e.g., `git.mycompany.com`, `code.internal.com`)
+   * - SSH aliases for multiple accounts
+   * - Nested group paths (e.g., `group/subgroup/repo`)
+   *
+   * If the remote isn't actually a GitLab repo (or glab CLI isn't configured for it),
+   * the `glab` command will fail with a clear error message.
+   */
+  private parseGitLabRepoInfo(remoteUrl: string): string {
+    // SCP-style: git@host:path/to/repo.git
+    const scpMatch = remoteUrl.match(/^[^@]+@[^:]+:(.+?)(?:\.git)?$/);
+    if (scpMatch && !remoteUrl.includes('://')) {
+      return scpMatch[1];
+    }
+
+    // URL-style: https://host/path or ssh://git@host/path
+    const urlMatch = remoteUrl.match(
+      /^(?:https?|ssh):\/\/(?:[^@]+@)?[^/:]+(?::\d+)?\/(.+?)(?:\.git)?$/
+    );
+    if (urlMatch) {
+      return urlMatch[1];
     }
 
     throw new ContextFetchError(
