@@ -133,6 +133,8 @@ export const WorkflowCommandStepSchema = WorkflowBaseStepSchema.extend({
   command: z.string(),
   /** Command arguments */
   args: z.array(z.string()).optional(),
+  /** Whether to allow the command to fail without stopping the workflow */
+  allow_failure: z.boolean().optional(),
   /** Expected outputs from this step */
   outputs: z.array(WorkflowOutputSchema).optional(),
 });
@@ -186,14 +188,10 @@ export const WorkflowSequentialStepSchema: z.ZodType<any> =
  * Forward declared for recursive types
  */
 // biome-ignore lint/suspicious/noExplicitAny: Required for recursive Zod schema type inference
-export const WorkflowStepSchema: z.ZodType<any> = WorkflowAgentStepSchema;
-// export const WorkflowStepSchema: z.ZodType<any> = z.union([
-//   WorkflowAgentStepSchema,
-//   // CommandStepSchema,
-//   // ConditionalStepSchema,
-//   // ParallelStepSchema,
-//   // SequentialStepSchema,
-// ]);
+export const WorkflowStepSchema: z.ZodType<any> = z.discriminatedUnion('type', [
+  WorkflowAgentStepSchema,
+  WorkflowCommandStepSchema,
+]);
 
 /**
  * Complete agent workflow schema

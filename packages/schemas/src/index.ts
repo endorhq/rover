@@ -18,6 +18,7 @@ export {
   type WorkflowSequentialStep,
   type WorkflowCommandStep,
   isAgentStep,
+  isCommandStep,
 } from './workflow/types.js';
 
 export {

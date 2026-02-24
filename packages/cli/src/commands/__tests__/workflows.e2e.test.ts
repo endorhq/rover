@@ -15,6 +15,7 @@
  */
 
 import { beforeEach, afterEach, describe, it, expect } from 'vitest';
+import { SKIP_REAL_AGENT_TESTS } from './e2e-utils.js';
 import {
   mkdtempSync,
   rmSync,
@@ -118,6 +119,92 @@ steps:
     type: agent
     description: Implement changes
     prompt: "Implement the identified improvements"
+`;
+
+  /**
+   * Workflow YAML with command type steps only
+   */
+  const commandWorkflowYaml = `name: command-workflow
+description: A workflow with command steps for testing
+version: "1.0"
+steps:
+  - id: check
+    name: Check environment
+    type: command
+    command: echo
+    args:
+      - "hello from command step"
+  - id: list-files
+    name: List files
+    type: command
+    command: ls
+    args:
+      - "-la"
+`;
+
+  /**
+   * Workflow YAML with a command step that uses allow_failure
+   */
+  const commandAllowFailureWorkflowYaml = `name: command-allow-failure
+description: A workflow with allow_failure command step
+version: "1.0"
+steps:
+  - id: failing-step
+    name: Failing step
+    type: command
+    command: "false"
+    allow_failure: true
+  - id: next-step
+    name: Next step
+    type: command
+    command: echo
+    args:
+      - "continued after failure"
+`;
+
+  /**
+   * Workflow YAML with a failing command step (no allow_failure)
+   */
+  const failingCommandWorkflowYaml = `name: failing-command
+description: A workflow with a failing command step
+version: "1.0"
+steps:
+  - id: fail
+    name: Fail step
+    type: command
+    command: "false"
+  - id: next
+    name: Next step (should not run)
+    type: command
+    command: echo
+    args:
+      - "should not reach here"
+`;
+
+  /**
+   * Workflow YAML with mixed agent and command steps
+   */
+  const mixedWorkflowYaml = `name: mixed-workflow
+description: A workflow with both agent and command steps
+version: "1.0"
+steps:
+  - id: build
+    name: Build
+    type: command
+    command: echo
+    args:
+      - "building..."
+  - id: analyze
+    name: Analyze
+    type: agent
+    description: Analyze the build output
+    prompt: "Analyze the codebase"
+  - id: lint
+    name: Lint
+    type: command
+    command: echo
+    args:
+      - "linting..."
 `;
 
   beforeEach(async () => {
@@ -497,6 +584,245 @@ steps:
       expect(output.workflow).toBeDefined();
       expect(output.workflow.name).toBeDefined();
     });
+  });
+
+  describe('workflow with command step execution', () => {
+    it('should add a workflow containing command type steps', async () => {
+      const workflowFile = join(testDir, 'command-workflow.yml');
+      writeFileSync(workflowFile, commandWorkflowYaml);
+
+      const result = await runRover([
+        'workflows',
+        'add',
+        workflowFile,
+        '--json',
+      ]);
+
+      expect(result.exitCode).toBe(0);
+
+      const output = JSON.parse(result.stdout);
+      expect(output.success).toBe(true);
+      expect(output.workflow).toBeDefined();
+      expect(output.workflow.name).toBe('command-workflow');
+    });
+
+    it('should display command step type when inspecting a workflow with command steps', async () => {
+      const workflowFile = join(testDir, 'command-workflow.yml');
+      writeFileSync(workflowFile, commandWorkflowYaml);
+
+      await runRover(['workflows', 'add', workflowFile, '--json']);
+
+      const result = await runRover([
+        'workflows',
+        'inspect',
+        'command-workflow',
+        '--json',
+      ]);
+
+      expect(result.exitCode).toBe(0);
+
+      const output = JSON.parse(result.stdout);
+      expect(output.workflow.steps).toBeDefined();
+      expect(output.workflow.steps.length).toBe(2);
+      // Verify all steps are of type 'command'
+      expect(
+        output.workflow.steps.every(
+          (s: { type: string }) => s.type === 'command'
+        )
+      ).toBe(true);
+    });
+
+    it('should add a workflow with allow_failure on command steps', async () => {
+      const workflowFile = join(testDir, 'allow-failure-workflow.yml');
+      writeFileSync(workflowFile, commandAllowFailureWorkflowYaml);
+
+      const result = await runRover([
+        'workflows',
+        'add',
+        workflowFile,
+        '--name',
+        'command-allow-failure',
+        '--json',
+      ]);
+
+      expect(result.exitCode).toBe(0);
+
+      const output = JSON.parse(result.stdout);
+      expect(output.success).toBe(true);
+      expect(output.workflow.name).toBe('command-allow-failure');
+    });
+
+    it('should add a workflow with mixed agent and command step types', async () => {
+      const workflowFile = join(testDir, 'mixed-workflow.yml');
+      writeFileSync(workflowFile, mixedWorkflowYaml);
+
+      const result = await runRover([
+        'workflows',
+        'add',
+        workflowFile,
+        '--json',
+      ]);
+
+      expect(result.exitCode).toBe(0);
+
+      const output = JSON.parse(result.stdout);
+      expect(output.success).toBe(true);
+      expect(output.workflow.name).toBe('mixed-workflow');
+    });
+
+    it('should show mixed step types when inspecting a workflow with both agent and command steps', async () => {
+      const workflowFile = join(testDir, 'mixed-workflow.yml');
+      writeFileSync(workflowFile, mixedWorkflowYaml);
+
+      await runRover(['workflows', 'add', workflowFile, '--json']);
+
+      const result = await runRover([
+        'workflows',
+        'inspect',
+        'mixed-workflow',
+        '--json',
+      ]);
+
+      expect(result.exitCode).toBe(0);
+
+      const output = JSON.parse(result.stdout);
+      expect(output.workflow.steps.length).toBe(3);
+      const stepTypes = output.workflow.steps.map(
+        (s: { type: string }) => s.type
+      );
+      expect(stepTypes).toContain('command');
+      expect(stepTypes).toContain('agent');
+    });
+
+    /**
+     * SKIPPED: Tests require real AI agent execution
+     *
+     * Why skipped:
+     *   Command step execution tests require the workflow to actually run inside a
+     *   Docker container. With mock Docker, workflows never execute, so command step
+     *   behavior cannot be verified.
+     *
+     * TODO: To unskip these tests:
+     *   1. Set ROVER_E2E_REAL_AGENT=true environment variable
+     *   2. Ensure Docker is running and can pull the rover agent image
+     *   3. Ensure a valid AI agent (Claude CLI, Gemini CLI, etc.) is installed and authenticated
+     *   4. Run with: ROVER_E2E_REAL_AGENT=true pnpm e2e-test --grep "command step execution behavior"
+     */
+    describe.skipIf(SKIP_REAL_AGENT_TESTS)(
+      'command step execution behavior',
+      () => {
+        const waitForTaskTerminal = async (
+          taskId: number,
+          timeoutMs: number = 600000
+        ): Promise<string> => {
+          const startTime = Date.now();
+          while (Date.now() - startTime < timeoutMs) {
+            const inspectResult = await runRover([
+              'inspect',
+              String(taskId),
+              '--json',
+            ]);
+            if (inspectResult.exitCode === 0) {
+              const task = JSON.parse(inspectResult.stdout);
+              if (task.status === 'COMPLETED' || task.status === 'FAILED') {
+                return task.status;
+              }
+            }
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
+          throw new Error(
+            `Timeout waiting for task ${taskId} to reach terminal status`
+          );
+        };
+
+        it('should execute a command step successfully and capture its output', async () => {
+          const workflowFile = join(testDir, 'command-workflow.yml');
+          writeFileSync(workflowFile, commandWorkflowYaml);
+
+          await runRover(['workflows', 'add', workflowFile, '--json']);
+
+          const result = await runRover([
+            'task',
+            '-y',
+            'Run command workflow',
+            '--workflow',
+            'command-workflow',
+            '--json',
+          ]);
+
+          expect(result.exitCode).toBe(0);
+
+          const status = await waitForTaskTerminal(1);
+          expect(status).toBe('COMPLETED');
+        });
+
+        it('should stop workflow when command step fails without allow_failure', async () => {
+          const workflowFile = join(testDir, 'failing-command-workflow.yml');
+          writeFileSync(workflowFile, failingCommandWorkflowYaml);
+
+          await runRover(['workflows', 'add', workflowFile, '--json']);
+
+          const result = await runRover([
+            'task',
+            '-y',
+            'Run failing command workflow',
+            '--workflow',
+            'failing-command',
+            '--json',
+          ]);
+
+          expect(result.exitCode).toBe(0);
+
+          const status = await waitForTaskTerminal(1);
+          // Workflow should fail because command step failed
+          expect(status).toBe('FAILED');
+        });
+
+        it('should continue workflow when command step fails with allow_failure set to true', async () => {
+          const workflowFile = join(testDir, 'allow-failure-workflow.yml');
+          writeFileSync(workflowFile, commandAllowFailureWorkflowYaml);
+
+          await runRover(['workflows', 'add', workflowFile, '--json']);
+
+          const result = await runRover([
+            'task',
+            '-y',
+            'Run allow-failure workflow',
+            '--workflow',
+            'command-allow-failure',
+            '--json',
+          ]);
+
+          expect(result.exitCode).toBe(0);
+
+          const status = await waitForTaskTerminal(1);
+          // Workflow should complete because allow_failure is true
+          expect(status).toBe('COMPLETED');
+        });
+
+        it('should execute mixed workflow with both agent and command steps in correct order', async () => {
+          const workflowFile = join(testDir, 'mixed-workflow.yml');
+          writeFileSync(workflowFile, mixedWorkflowYaml);
+
+          await runRover(['workflows', 'add', workflowFile, '--json']);
+
+          const result = await runRover([
+            'task',
+            '-y',
+            'Run mixed workflow',
+            '--workflow',
+            'mixed-workflow',
+            '--json',
+          ]);
+
+          expect(result.exitCode).toBe(0);
+
+          const status = await waitForTaskTerminal(1);
+          // Mixed workflow should complete with both step types
+          expect(['COMPLETED', 'FAILED']).toContain(status);
+        });
+      }
+    );
   });
 });
 

@@ -59,3 +59,7 @@ export type Workflow = z.infer<typeof WorkflowSchema>;
 export function isAgentStep(step: WorkflowStep): step is WorkflowAgentStep {
   return step.type === 'agent';
 }
+
+export function isCommandStep(step: WorkflowStep): step is WorkflowCommandStep {
+  return step.type === 'command';
+}

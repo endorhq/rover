@@ -12,6 +12,7 @@ import {
   IterationStatusManager,
   JsonlLogger,
   showList,
+  type StepResult,
 } from 'rover-core';
 import colors from 'ansi-colors';
 import {
@@ -36,23 +37,13 @@ import {
 import { basename, join, resolve } from 'node:path';
 import { createAgent, Agent, AgentUsageStats } from './agents/index.js';
 
-export interface RunnerStepResult {
-  // Step ID
-  id: string;
-  // Run result (success or not)
-  success: boolean;
-  // Error
-  error?: string;
-  // Duration in seconds
-  duration: number;
+export interface RunnerStepResult extends StepResult {
   // Consumed tokens
   tokens?: number;
   // Cost in USD
   cost?: number;
   // Model used (e.g., "claude-haiku-4-5-20251001")
   model?: string;
-  // Parsed output
-  outputs: Map<string, string>;
 }
 
 export class Runner {
@@ -722,7 +713,7 @@ export class Runner {
         instructions += `- **${output.name}**: ${output.description}\n`;
 
         if (this.tool == 'gemini' || this.tool == 'qwen') {
-          // Gemini refuses to write files using relative paths, so we must
+          // Gemini and Qwen refuse to write files using relative paths, so we must
           // provide an absolute path in the prompt.
           const absolutePath = resolve(output.filename!);
           instructions += `  - When creating the file, call the write_file tool using the following absolute path. THIS IS MANDATORY\n`;

@@ -9,13 +9,21 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parse as parseYaml } from 'yaml';
-import { WorkflowManager } from '../workflow.js';
+import {
+  WorkflowManager,
+  type StepResult,
+  type WorkflowRunner,
+  type OnStepComplete,
+} from '../workflow.js';
 import type {
   Workflow,
   WorkflowAgentStep,
+  WorkflowCommandStep,
+  WorkflowStep,
   WorkflowInput,
   WorkflowOutput,
 } from 'rover-schemas';
+import { isAgentStep, isCommandStep } from 'rover-schemas';
 
 describe('WorkflowManager', () => {
   let testDir: string;
@@ -1191,6 +1199,538 @@ steps:
       workflow.save();
       const reloaded = WorkflowManager.load(workflowPath);
       expect(reloaded.name).toBe('test-workflow');
+    });
+  });
+
+  describe('command step schema validation', () => {
+    it('should load a workflow with a valid command step', () => {
+      const yamlContent = `
+version: '1.0'
+name: test-workflow
+description: Test workflow with command step
+inputs: []
+outputs: []
+steps:
+  - id: build
+    type: command
+    name: Build project
+    command: npm run build
+`;
+
+      writeFileSync(workflowPath, yamlContent, 'utf8');
+
+      const workflow = WorkflowManager.load(workflowPath);
+      expect(workflow.steps).toHaveLength(1);
+      expect(workflow.steps[0].type).toBe('command');
+      expect(workflow.steps[0].command).toBe('npm run build');
+    });
+
+    it('should load a command step with args and allow_failure', () => {
+      const yamlContent = `
+version: '1.0'
+name: test-workflow
+description: Test workflow
+inputs: []
+outputs: []
+steps:
+  - id: test
+    type: command
+    name: Run tests
+    command: npm
+    args:
+      - run
+      - test
+    allow_failure: true
+`;
+
+      writeFileSync(workflowPath, yamlContent, 'utf8');
+
+      const workflow = WorkflowManager.load(workflowPath);
+      const step = workflow.steps[0];
+      expect(step.type).toBe('command');
+      expect(step.command).toBe('npm');
+      expect(step.args).toEqual(['run', 'test']);
+      expect(step.allow_failure).toBe(true);
+    });
+
+    it('should reject a command step missing the command field', () => {
+      const yamlContent = `
+version: '1.0'
+name: test-workflow
+description: Test workflow
+inputs: []
+outputs: []
+steps:
+  - id: bad-step
+    type: command
+    name: Missing command
+`;
+
+      writeFileSync(workflowPath, yamlContent, 'utf8');
+
+      expect(() => {
+        WorkflowManager.load(workflowPath);
+      }).toThrow();
+    });
+
+    it('should load a workflow with mixed agent and command steps', () => {
+      const yamlContent = `
+version: '1.0'
+name: mixed-workflow
+description: Workflow with both agent and command steps
+inputs: []
+outputs: []
+steps:
+  - id: build
+    type: command
+    name: Build project
+    command: npm run build
+  - id: analyze
+    type: agent
+    name: Analyze build output
+    prompt: Analyze the build results
+`;
+
+      writeFileSync(workflowPath, yamlContent, 'utf8');
+
+      const workflow = WorkflowManager.load(workflowPath);
+      expect(workflow.steps).toHaveLength(2);
+      expect(workflow.steps[0].type).toBe('command');
+      expect(workflow.steps[1].type).toBe('agent');
+    });
+
+    it('should default allow_failure to undefined when not specified', () => {
+      const yamlContent = `
+version: '1.0'
+name: test-workflow
+description: Test workflow
+inputs: []
+outputs: []
+steps:
+  - id: build
+    type: command
+    name: Build
+    command: make build
+`;
+
+      writeFileSync(workflowPath, yamlContent, 'utf8');
+
+      const workflow = WorkflowManager.load(workflowPath);
+      expect(workflow.steps[0].allow_failure).toBeUndefined();
+    });
+  });
+
+  describe('type guards', () => {
+    it('isAgentStep should return true for agent steps', () => {
+      const step: WorkflowAgentStep = {
+        id: 'agent1',
+        type: 'agent',
+        name: 'Agent Step',
+        prompt: 'Do something',
+      };
+      expect(isAgentStep(step)).toBe(true);
+      expect(isCommandStep(step)).toBe(false);
+    });
+
+    it('isCommandStep should return true for command steps', () => {
+      const step: WorkflowCommandStep = {
+        id: 'cmd1',
+        type: 'command',
+        name: 'Command Step',
+        command: 'echo hello',
+      };
+      expect(isCommandStep(step)).toBe(true);
+      expect(isAgentStep(step)).toBe(false);
+    });
+
+    it('isCommandStep should return false for agent steps', () => {
+      const step: WorkflowAgentStep = {
+        id: 'agent1',
+        type: 'agent',
+        name: 'Agent Step',
+        prompt: 'Do something',
+      };
+      expect(isCommandStep(step)).toBe(false);
+    });
+  });
+
+  describe('run()', () => {
+    it('should execute command steps directly', async () => {
+      const steps: WorkflowCommandStep[] = [
+        {
+          id: 'cmd1',
+          type: 'command',
+          name: 'Echo hello',
+          command: 'echo',
+          args: ['hello'],
+        },
+      ];
+
+      const workflow = WorkflowManager.create(
+        workflowPath,
+        'cmd-workflow',
+        'Command workflow',
+        [],
+        [],
+        steps
+      );
+
+      const runner: WorkflowRunner = {
+        runAgentStep: async () => {
+          throw new Error('Should not be called for command steps');
+        },
+      };
+
+      const result = await workflow.run(runner);
+
+      expect(result.success).toBe(true);
+      expect(result.stepResults).toHaveLength(1);
+      expect(result.stepResults[0].success).toBe(true);
+      expect(result.stepResults[0].id).toBe('cmd1');
+      expect(result.stepsOutput.has('cmd1')).toBe(true);
+      expect(result.runSteps).toBe(1);
+      expect(result.totalSteps).toBe(1);
+    });
+
+    it('should delegate agent steps to the executor callback', async () => {
+      const steps: WorkflowAgentStep[] = [
+        {
+          id: 'agent1',
+          type: 'agent',
+          name: 'Agent Step',
+          prompt: 'Do something',
+        },
+      ];
+
+      const workflow = WorkflowManager.create(
+        workflowPath,
+        'agent-workflow',
+        'Agent workflow',
+        [],
+        [],
+        steps
+      );
+
+      const runner: WorkflowRunner = {
+        runAgentStep: async step => {
+          return {
+            id: step.id,
+            success: true,
+            duration: 1.5,
+            outputs: new Map([['result', 'done']]),
+          };
+        },
+      };
+
+      const result = await workflow.run(runner);
+
+      expect(result.success).toBe(true);
+      expect(result.stepResults).toHaveLength(1);
+      expect(result.stepResults[0].id).toBe('agent1');
+      expect(result.stepsOutput.get('agent1')?.get('result')).toBe('done');
+    });
+
+    it('should stop on failure when continueOnError is false', async () => {
+      const steps: WorkflowAgentStep[] = [
+        {
+          id: 'fail-step',
+          type: 'agent',
+          name: 'Failing Step',
+          prompt: 'Fail',
+        },
+        {
+          id: 'skip-step',
+          type: 'agent',
+          name: 'Skipped Step',
+          prompt: 'Should not run',
+        },
+      ];
+
+      const workflow = WorkflowManager.create(
+        workflowPath,
+        'fail-workflow',
+        'Failing workflow',
+        [],
+        [],
+        steps
+      );
+
+      const runner: WorkflowRunner = {
+        runAgentStep: async step => {
+          return {
+            id: step.id,
+            success: false,
+            error: 'Something went wrong',
+            duration: 0.5,
+            outputs: new Map(),
+          };
+        },
+      };
+
+      const result = await workflow.run(runner);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Workflow stopped due to step failure');
+      expect(result.stepResults).toHaveLength(1);
+      expect(result.runSteps).toBe(1);
+    });
+
+    it('should continue on failure when continueOnError is true', async () => {
+      const yamlContent = `
+version: '1.0'
+name: continue-workflow
+description: Continue on error workflow
+inputs: []
+outputs: []
+config:
+  continueOnError: true
+steps:
+  - id: fail-step
+    type: agent
+    name: Failing Step
+    prompt: Fail
+  - id: pass-step
+    type: agent
+    name: Passing Step
+    prompt: Pass
+`;
+
+      writeFileSync(workflowPath, yamlContent, 'utf8');
+      const workflow = WorkflowManager.load(workflowPath);
+
+      let callCount = 0;
+      const runner: WorkflowRunner = {
+        runAgentStep: async step => {
+          callCount++;
+          if (step.id === 'fail-step') {
+            return {
+              id: step.id,
+              success: false,
+              error: 'Step failed',
+              duration: 0.5,
+              outputs: new Map(),
+            };
+          }
+          return {
+            id: step.id,
+            success: true,
+            duration: 1.0,
+            outputs: new Map([['result', 'ok']]),
+          };
+        },
+      };
+
+      const result = await workflow.run(runner);
+
+      expect(callCount).toBe(2);
+      expect(result.success).toBe(true);
+      expect(result.stepResults).toHaveLength(2);
+      expect(result.runSteps).toBe(2);
+      // Failed step gets empty outputs in stepsOutput
+      expect(result.stepsOutput.has('fail-step')).toBe(true);
+      expect(result.stepsOutput.get('fail-step')?.size).toBe(0);
+      // Passing step has its outputs
+      expect(result.stepsOutput.get('pass-step')?.get('result')).toBe('ok');
+    });
+
+    it('should accumulate stepsOutput across steps', async () => {
+      const steps: WorkflowAgentStep[] = [
+        {
+          id: 'step1',
+          type: 'agent',
+          name: 'Step 1',
+          prompt: 'First',
+        },
+        {
+          id: 'step2',
+          type: 'agent',
+          name: 'Step 2',
+          prompt: 'Second',
+        },
+      ];
+
+      const workflow = WorkflowManager.create(
+        workflowPath,
+        'accumulate-workflow',
+        'Accumulate outputs',
+        [],
+        [],
+        steps
+      );
+
+      const runner: WorkflowRunner = {
+        runAgentStep: async (step, _stepIndex, stepsOutput) => {
+          // Step 2 should see step 1's outputs
+          if (step.id === 'step2') {
+            expect(stepsOutput.has('step1')).toBe(true);
+            expect(stepsOutput.get('step1')?.get('data')).toBe('from-step1');
+          }
+          return {
+            id: step.id,
+            success: true,
+            duration: 0.1,
+            outputs: new Map([['data', `from-${step.id}`]]),
+          };
+        },
+      };
+
+      const result = await workflow.run(runner);
+
+      expect(result.success).toBe(true);
+      expect(result.stepsOutput.get('step1')?.get('data')).toBe('from-step1');
+      expect(result.stepsOutput.get('step2')?.get('data')).toBe('from-step2');
+    });
+
+    it('should call onStepComplete after each step', async () => {
+      const steps: WorkflowAgentStep[] = [
+        {
+          id: 'step1',
+          type: 'agent',
+          name: 'Step 1',
+          prompt: 'First',
+        },
+        {
+          id: 'step2',
+          type: 'agent',
+          name: 'Step 2',
+          prompt: 'Second',
+        },
+      ];
+
+      const workflow = WorkflowManager.create(
+        workflowPath,
+        'callback-workflow',
+        'Callback workflow',
+        [],
+        [],
+        steps
+      );
+
+      const runner: WorkflowRunner = {
+        runAgentStep: async step => ({
+          id: step.id,
+          success: true,
+          duration: 1.0,
+          outputs: new Map(),
+        }),
+      };
+
+      const completedSteps: Array<{
+        step: WorkflowStep;
+        result: StepResult;
+        context: {
+          stepIndex: number;
+          totalSteps: number;
+          runSteps: number;
+          totalDuration: number;
+        };
+      }> = [];
+
+      const onComplete: OnStepComplete = (step, result, context) => {
+        completedSteps.push({ step, result, context });
+      };
+
+      await workflow.run(runner, onComplete);
+
+      expect(completedSteps).toHaveLength(2);
+      expect(completedSteps[0].step.id).toBe('step1');
+      expect(completedSteps[0].context.stepIndex).toBe(0);
+      expect(completedSteps[0].context.totalSteps).toBe(2);
+      expect(completedSteps[0].context.runSteps).toBe(1);
+      expect(completedSteps[1].step.id).toBe('step2');
+      expect(completedSteps[1].context.stepIndex).toBe(1);
+      expect(completedSteps[1].context.runSteps).toBe(2);
+    });
+
+    it('should handle mixed command and agent steps', async () => {
+      const yamlContent = `
+version: '1.0'
+name: mixed-workflow
+description: Mixed command and agent steps
+inputs: []
+outputs: []
+steps:
+  - id: build
+    type: command
+    name: Build
+    command: echo
+    args:
+      - built
+  - id: analyze
+    type: agent
+    name: Analyze
+    prompt: Analyze build output
+  - id: lint
+    type: command
+    name: Lint
+    command: echo
+    args:
+      - linted
+`;
+
+      writeFileSync(workflowPath, yamlContent, 'utf8');
+      const workflow = WorkflowManager.load(workflowPath);
+
+      const runner: WorkflowRunner = {
+        runAgentStep: async step => ({
+          id: step.id,
+          success: true,
+          duration: 2.0,
+          outputs: new Map([['analysis', 'looks good']]),
+        }),
+      };
+
+      const result = await workflow.run(runner);
+
+      expect(result.success).toBe(true);
+      expect(result.stepResults).toHaveLength(3);
+      expect(result.runSteps).toBe(3);
+      expect(result.stepsOutput.has('build')).toBe(true);
+      expect(result.stepsOutput.has('analyze')).toBe(true);
+      expect(result.stepsOutput.has('lint')).toBe(true);
+    });
+
+    it('should respect allow_failure on command steps', async () => {
+      const yamlContent = `
+version: '1.0'
+name: allow-failure-workflow
+description: Allow failure workflow
+inputs: []
+outputs: []
+steps:
+  - id: maybe-fail
+    type: command
+    name: Maybe Fail
+    command: /bin/sh
+    args:
+      - -c
+      - "exit 1"
+    allow_failure: true
+  - id: continue-step
+    type: agent
+    name: Continue
+    prompt: Continue after failure
+`;
+
+      writeFileSync(workflowPath, yamlContent, 'utf8');
+      const workflow = WorkflowManager.load(workflowPath);
+
+      const runner: WorkflowRunner = {
+        runAgentStep: async step => ({
+          id: step.id,
+          success: true,
+          duration: 0.5,
+          outputs: new Map(),
+        }),
+      };
+
+      const result = await workflow.run(runner);
+
+      expect(result.success).toBe(true);
+      expect(result.stepResults).toHaveLength(2);
+      // The command step with allow_failure should be treated as success
+      expect(result.stepResults[0].success).toBe(true);
+      expect(result.runSteps).toBe(2);
     });
   });
 });

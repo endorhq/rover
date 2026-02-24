@@ -21,6 +21,7 @@ export const LanguageSchema = z.enum([
   'go',
   'python',
   'ruby',
+  'dart',
 ]);
 
 /**
@@ -53,6 +54,7 @@ export const PackageManagerSchema = z.enum([
   'poetry',
   'uv',
   'rubygems',
+  'pub',
 ]);
 
 /**
@@ -106,6 +108,8 @@ export const SandboxConfigSchema = z.object({
   extraArgs: z.union([z.string(), z.array(z.string())]).optional(),
   /** Network filtering configuration */
   network: NetworkConfigSchema.optional(),
+  /** Files whose contents are included in the cache hash for invalidation */
+  cacheFiles: z.array(z.string()).optional(),
 });
 
 /**

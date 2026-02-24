@@ -27,20 +27,15 @@ import {
   VERBOSE,
   JsonlLogger,
   showList,
+  type StepResult,
 } from 'rover-core';
 import { ACPClient } from './acp-client.js';
-import { GeminiACPClient } from './gemini-acp-client.js';
+import { GeminiOrQwenACPClient } from './gemini-or-qwen-acp-client.js';
 import { createAgent } from './agents/index.js';
 import type { Agent } from './agents/types.js';
 import { copyFileSync, rmSync } from 'node:fs';
 
-export interface ACPRunnerStepResult {
-  id: string;
-  success: boolean;
-  error?: string;
-  duration: number;
-  outputs: Map<string, string>;
-}
+export interface ACPRunnerStepResult extends StepResult {}
 
 export interface ACPRunnerConfig {
   workflow: WorkflowManager;
@@ -65,6 +60,7 @@ function formatError(error: unknown): string {
   }
   return String(error);
 }
+
 
 export class ACPRunner {
   private workflow: WorkflowManager;
@@ -106,7 +102,8 @@ export class ACPRunner {
   private createACPClient(): ACPClient {
     switch (this.tool.toLowerCase()) {
       case 'gemini':
-        return new GeminiACPClient();
+      case 'qwen':
+        return new GeminiOrQwenACPClient();
       default:
         return new ACPClient();
     }

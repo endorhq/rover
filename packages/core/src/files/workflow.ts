@@ -10,19 +10,62 @@ import {
   WorkflowLoadError,
   WorkflowValidationError,
   isAgentStep,
+  isCommandStep,
   type Workflow,
   type WorkflowInput,
   type WorkflowOutput,
   type WorkflowStep,
   type WorkflowAgentStep,
+  type WorkflowCommandStep,
   type WorkflowDefaults,
   type WorkflowConfig,
   type WorkflowAgentTool,
   ZodError,
 } from 'rover-schemas';
+import { launchSync } from '../os.js';
+import colors from 'ansi-colors';
 
 // Default step timeout in seconds
 const DEFAULT_STEP_TIMEOUT = 60 * 30; // 30 minutes
+
+export interface StepResult {
+  id: string;
+  success: boolean;
+  error?: string;
+  duration: number;
+  outputs: Map<string, string>;
+}
+
+export type AgentStepExecutor = (
+  step: WorkflowAgentStep,
+  stepIndex: number,
+  stepsOutput: Map<string, Map<string, string>>
+) => Promise<StepResult>;
+
+export interface WorkflowRunner {
+  runAgentStep: AgentStepExecutor;
+}
+
+export type OnStepComplete = (
+  step: WorkflowStep,
+  result: StepResult,
+  context: {
+    stepIndex: number;
+    totalSteps: number;
+    runSteps: number;
+    totalDuration: number;
+  }
+) => void;
+
+export interface WorkflowRunResult {
+  success: boolean;
+  error?: string;
+  totalDuration: number;
+  stepResults: StepResult[];
+  stepsOutput: Map<string, Map<string, string>>;
+  runSteps: number;
+  totalSteps: number;
+}
 
 /**
  * Workflow configuration class for loading and managing agent workflow definitions.
@@ -378,6 +421,153 @@ export class WorkflowManager {
    */
   toObject(): Workflow {
     return this.data;
+  }
+
+  /**
+   * Execute a command step as a child process.
+   * Returns a StepResult with stdout/stderr captured.
+   */
+  private executeCommandStep(step: WorkflowCommandStep): StepResult {
+    const displayCommand = step.args
+      ? `${step.command} ${step.args.join(' ')}`
+      : step.command;
+
+    console.log(colors.cyan(`\n⚡ Running command step: ${step.name}`));
+    console.log(colors.gray(`   $ ${displayCommand}\n`));
+
+    const startTime = Date.now();
+    let stdout = '';
+    let stderr = '';
+    let success = false;
+    let error: string | undefined;
+
+    const result = launchSync(step.command, step.args, { reject: false });
+    stdout = String(result.stdout ?? '');
+    stderr = String(result.stderr ?? '');
+
+    if (!result.failed) {
+      success = true;
+      if (stdout) {
+        console.log(stdout);
+      }
+    } else {
+      error = stderr || result.message || 'Command failed';
+
+      if (step.allow_failure) {
+        console.log(
+          colors.yellow(
+            `⚠ Command step '${step.name}' failed but allow_failure is true. Continuing.`
+          )
+        );
+        if (stderr) {
+          console.log(colors.yellow(stderr));
+        }
+        success = true;
+      } else {
+        console.log(colors.red(`✗ Command step '${step.name}' failed.`));
+        if (stderr) {
+          console.log(colors.red(stderr));
+        }
+        success = false;
+      }
+    }
+
+    const duration = (Date.now() - startTime) / 1000;
+    const outputs = new Map<string, string>();
+    if (stdout) {
+      outputs.set('stdout', stdout);
+    }
+    if (stderr) {
+      outputs.set('stderr', stderr);
+    }
+
+    return {
+      id: step.id,
+      success,
+      error: success ? undefined : error,
+      duration,
+      outputs,
+    };
+  }
+
+  /**
+   * Run all workflow steps in sequence.
+   * Command steps are executed directly; agent steps are delegated to the provided executor.
+   *
+   * @param agentStepExecutor - Callback to execute agent steps
+   * @param onStepComplete - Optional callback invoked after each step completes
+   * @returns WorkflowRunResult with overall success, step results, and outputs
+   */
+  async run(
+    runner: WorkflowRunner,
+    onStepComplete?: OnStepComplete
+  ): Promise<WorkflowRunResult> {
+    const stepsOutput: Map<string, Map<string, string>> = new Map();
+    const stepResults: StepResult[] = [];
+    const totalSteps = this._steps.length;
+    let runSteps = 0;
+    let totalDuration = 0;
+    let workflowSuccess = true;
+    let workflowError: string | undefined;
+
+    for (let stepIndex = 0; stepIndex < this._steps.length; stepIndex++) {
+      const step = this._steps[stepIndex];
+      runSteps++;
+
+      let result: StepResult;
+
+      if (isCommandStep(step)) {
+        result = this.executeCommandStep(step);
+      } else if (isAgentStep(step)) {
+        result = await runner.runAgentStep(step, stepIndex, stepsOutput);
+      } else {
+        // Unknown step type - skip
+        continue;
+      }
+
+      stepResults.push(result);
+      totalDuration += result.duration;
+
+      onStepComplete?.(step, result, {
+        stepIndex,
+        totalSteps,
+        runSteps,
+        totalDuration,
+      });
+
+      if (result.success) {
+        stepsOutput.set(step.id, result.outputs);
+      } else {
+        const continueOnError = this.data.config?.continueOnError || false;
+        if (!continueOnError) {
+          console.log(
+            colors.red(
+              `\n✗ Step '${step.name}' failed and continueOnError is false. Stopping workflow execution.`
+            )
+          );
+          workflowSuccess = false;
+          workflowError = `Workflow stopped due to step failure: ${result.error}`;
+          break;
+        } else {
+          console.log(
+            colors.yellow(
+              `\n⚠ Step '${step.name}' failed but continueOnError is true. Continuing with next step.`
+            )
+          );
+          stepsOutput.set(step.id, new Map());
+        }
+      }
+    }
+
+    return {
+      success: workflowSuccess,
+      error: workflowError,
+      totalDuration,
+      stepResults,
+      stepsOutput,
+      runSteps,
+      totalSteps,
+    };
   }
 
   /**
