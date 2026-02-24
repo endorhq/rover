@@ -459,6 +459,58 @@ describe('GitLabProvider', () => {
       expect(entries).toHaveLength(1);
       expect(entries[0].name).toBe('Issue #42: Enterprise Issue');
     });
+
+    it('should support self-hosted instances without "gitlab" in hostname', async () => {
+      MockGit.mockImplementation(
+        () =>
+          ({
+            remoteUrl: vi
+              .fn()
+              .mockReturnValue('git@code.internal.com:team/project.git'),
+          }) as unknown as Git
+      );
+
+      const issueResponse = {
+        iid: 10,
+        title: 'Internal Issue',
+        description: 'Issue body',
+        state: 'opened',
+        labels: [],
+        assignees: [],
+        author: { username: 'employee' },
+        created_at: '2024-01-15T10:00:00Z',
+        updated_at: '2024-01-20T15:30:00Z',
+      };
+
+      mockLaunchSync.mockImplementation((cmd, args) => {
+        if (cmd === 'glab' && args?.[0] === '--version') {
+          return { exitCode: 0 } as ReturnType<typeof launchSync>;
+        }
+        if (cmd === 'glab' && args?.[0] === 'issue' && args?.[1] === 'view') {
+          expect(args).toContain('team/project');
+          return {
+            exitCode: 0,
+            stdout: JSON.stringify(issueResponse),
+          } as ReturnType<typeof launchSync>;
+        }
+        if (cmd === 'glab' && args?.[0] === 'api') {
+          return {
+            exitCode: 0,
+            stdout: '[]',
+          } as ReturnType<typeof launchSync>;
+        }
+        return { exitCode: 1 } as ReturnType<typeof launchSync>;
+      });
+
+      const provider = new GitLabProvider(new URL('gitlab:issue/10'), {
+        originalUri: 'gitlab:issue/10',
+        trustAllAuthors: true,
+      });
+
+      const entries = await provider.build();
+      expect(entries).toHaveLength(1);
+      expect(entries[0].name).toBe('Issue #10: Internal Issue');
+    });
   });
 
   describe('Issue Building', () => {

@@ -459,6 +459,7 @@ export class Git {
     try {
       launchSync('git', ['rebase', '--abort'], {
         cwd: options.worktreePath ?? this.cwd,
+        env: { ...process.env, GIT_EDITOR: 'true' },
       });
     } catch (_err) {
       // Ignore abort errors

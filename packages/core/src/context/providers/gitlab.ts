@@ -196,27 +196,28 @@ export class GitLabProvider implements ContextProvider {
    * The user has already declared their intent by using the `gitlab:` URI scheme
    * (e.g., `gitlab:issue/15`). This declaration means "treat this repo as GitLab".
    *
-   * Unlike GitHub (which only needs owner/repo), GitLab supports nested groups
-   * (e.g., group/subgroup/repo), so we extract the full path after the host.
+   * This approach supports:
+   * - Standard gitlab.com URLs (SSH and HTTPS)
+   * - Self-hosted GitLab instances (e.g., `git.mycompany.com`, `code.internal.com`)
+   * - SSH aliases for multiple accounts
+   * - Nested group paths (e.g., `group/subgroup/repo`)
+   *
+   * If the remote isn't actually a GitLab repo (or glab CLI isn't configured for it),
+   * the `glab` command will fail with a clear error message.
    */
   private parseGitLabRepoInfo(remoteUrl: string): string {
-    // Remove .git suffix
-    const url = remoteUrl.replace(/\.git$/, '');
-
-    // SCP-style SSH: git@host:path (no :// in URL)
-    if (!url.includes('://')) {
-      const scpMatch = url.match(/:(.+)$/);
-      if (scpMatch) {
-        const path = scpMatch[1];
-        if (path.includes('/')) return path;
-      }
+    // SCP-style: git@host:path/to/repo.git
+    const scpMatch = remoteUrl.match(/^[^@]+@[^:]+:(.+?)(?:\.git)?$/);
+    if (scpMatch && !remoteUrl.includes('://')) {
+      return scpMatch[1];
     }
 
-    // URL-style: scheme://[user@]host[:port]/path
-    const urlMatch = url.match(/:\/\/[^/]+\/(.+)$/);
+    // URL-style: https://host/path or ssh://git@host/path
+    const urlMatch = remoteUrl.match(
+      /^(?:https?|ssh):\/\/(?:[^@]+@)?[^/:]+(?::\d+)?\/(.+?)(?:\.git)?$/
+    );
     if (urlMatch) {
-      const path = urlMatch[1];
-      if (path.includes('/')) return path;
+      return urlMatch[1];
     }
 
     throw new ContextFetchError(
