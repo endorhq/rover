@@ -5,6 +5,7 @@ This end to end testing description focuses on the `rover` CLI.
 ## Suite
 
 - [Initialization](#initialization)
+- [Worktree Context Detection](#worktree-context-detection)
 - [Task Creation](#task-creation)
 - [Task Listing](#task-listing)
 - [Task Inspection](#task-inspection)
@@ -54,12 +55,13 @@ default when running non-interactively with the `--yes` flag.
 
 Rover must inspect the repository to identify the programming languages,
 package managers, and task managers in use. For languages, it must
-detect TypeScript, JavaScript, Rust, Python, Go, PHP, and others based
-on the presence of characteristic files (e.g., `tsconfig.json` for
+detect TypeScript, JavaScript, Rust, Python, Go, PHP, Dart, and others
+based on the presence of characteristic files (e.g., `tsconfig.json` for
 TypeScript, `Cargo.toml` for Rust, `pyproject.toml` for Python,
-`go.mod` for Go, `composer.json` for PHP). For package managers, it must
-detect npm, pnpm, yarn, cargo, uv, pip, poetry, gomod, composer, and
-others based on lock files and configuration files. For task managers, it
+`go.mod` for Go, `composer.json` for PHP, `pubspec.yaml` for Dart). For
+package managers, it must detect npm, pnpm, yarn, cargo, uv, pip,
+poetry, gomod, composer, pub, and others based on lock files and
+configuration files. For task managers, it
 must detect Make, Just, and Task based on the presence of `Makefile`,
 `Justfile`, and `Taskfile.yml` respectively. Polyglot projects with
 multiple languages, package managers, and task managers must be detected
@@ -104,6 +106,25 @@ After successful initialization, the project must have a valid
 listed in `.gitignore`. The project must be registered in the global
 Rover store. Running any subsequent Rover command in this directory must
 recognize the project as initialized.
+
+---
+
+## Worktree Context Detection
+
+When Rover commands are run from inside a git worktree (as opposed to
+the main checkout), Rover must detect this context and redirect
+operations to the main repository root. This ensures tasks, configs, and
+state are resolved consistently regardless of which worktree the user is
+in.
+
+### Feature: Worktree detection and notification
+
+When a user runs a Rover command from inside a git worktree and has not
+specified a `--project` option, Rover must detect that the current
+directory is a worktree, display a notification indicating the main
+project root being used, and resolve all operations against the main
+repository instead of the worktree. The notification must not appear when
+running in `--json` mode or when `--project` is explicitly set.
 
 ---
 
