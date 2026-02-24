@@ -67,6 +67,13 @@ type GitLabMRResponse = {
 };
 
 /**
+ * GitLab MR approvals API response shape.
+ */
+type GitLabApprovalsResponse = {
+  approved_by: Array<{ user: { username: string } }>;
+};
+
+/**
  * Context provider for GitLab issues and merge requests.
  *
  * Supported URI formats:
@@ -407,8 +414,14 @@ export class GitLabProvider implements ContextProvider {
       this.parsed.number
     );
 
+    // Fetch approvals for reviewer state
+    const approvedUsers =
+      mr.reviewers.length > 0
+        ? this.fetchApprovals(projectPath, this.parsed.number)
+        : null;
+
     // Format MR content as markdown
-    const mrContent = this.formatMRContent(mr, notes);
+    const mrContent = this.formatMRContent(mr, notes, approvedUsers);
 
     // Format diff content
     const diffContent = this.formatDiffContent(mr, diff);
@@ -467,7 +480,11 @@ export class GitLabProvider implements ContextProvider {
    * User-generated content (description, comments) is wrapped in code blocks
    * with guardrails to prevent prompt injection.
    */
-  private formatMRContent(mr: GitLabMRResponse, notes: GitLabNote[]): string {
+  private formatMRContent(
+    mr: GitLabMRResponse,
+    notes: GitLabNote[],
+    approvedUsers: Set<string> | null
+  ): string {
     const lines: string[] = [];
 
     lines.push(`# MR !${mr.iid}: ${mr.title}`);
@@ -481,9 +498,14 @@ export class GitLabProvider implements ContextProvider {
     }
 
     if (mr.reviewers.length > 0) {
-      lines.push(
-        `**Reviewers:** ${mr.reviewers.map(r => `@${r.username}`).join(', ')}`
-      );
+      const reviewerList = mr.reviewers.map(r => {
+        if (approvedUsers) {
+          const state = approvedUsers.has(r.username) ? 'approved' : 'pending';
+          return `@${r.username} (${state})`;
+        }
+        return `@${r.username}`;
+      });
+      lines.push(`**Reviewers:** ${reviewerList.join(', ')}`);
     }
 
     lines.push('');
@@ -582,6 +604,35 @@ export class GitLabProvider implements ContextProvider {
       return notes.filter(n => !n.system);
     } catch {
       return [];
+    }
+  }
+
+  /**
+   * Fetch approvals for a merge request via the GitLab API.
+   * Returns a Set of approved usernames, or null on any failure.
+   */
+  private fetchApprovals(
+    projectPath: string,
+    mrNumber: number
+  ): Set<string> | null {
+    const encodedPath = encodeURIComponent(projectPath);
+    const result = launchSync(
+      'glab',
+      ['api', `projects/${encodedPath}/merge_requests/${mrNumber}/approvals`],
+      { reject: false }
+    );
+
+    if (result.exitCode !== 0) {
+      return null;
+    }
+
+    try {
+      const data: GitLabApprovalsResponse = JSON.parse(
+        result.stdout?.toString() || '{}'
+      );
+      return new Set((data.approved_by || []).map(a => a.user.username));
+    } catch {
+      return null;
     }
   }
 
