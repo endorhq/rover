@@ -18,6 +18,7 @@ if (!isProd) {
   entryPoints = {
     ...entryPoints,
     'utils/command-reference': './utils/command-reference.ts',
+    'debug-step': './src/debug-step.ts',
   };
 }
 

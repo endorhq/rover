@@ -1,7 +1,7 @@
-import type { WorkflowStore } from 'rover-core';
 import { getUserAIAgent, getAIAgentTool } from '../../agents/index.js';
 import { parseJsonResponse } from '../../../utils/json-parser.js';
 import { SpanWriter, ActionWriter, enqueueAction } from '../logging.js';
+import { buildWorkflowCatalog } from '../helpers.js';
 import { buildPlannerQuery, fetchMemoryContext } from '../memory/reader.js';
 import type { PendingAction, PlanResult, PlanTask, Span } from '../types.js';
 import type {
@@ -12,56 +12,6 @@ import type {
   StepResult,
 } from './types.js';
 import planPromptTemplate from './prompts/plan-prompt.md';
-
-/**
- * Build a Markdown catalog of available workflows from the WorkflowStore.
- * This is injected into the planner prompt so the AI knows which workflows exist.
- */
-function buildWorkflowCatalog(workflowStore: WorkflowStore): string {
-  const entries = workflowStore.getAllWorkflowEntries();
-  if (entries.length === 0) {
-    return '*(No workflows available)*';
-  }
-
-  const sections: string[] = [];
-
-  for (const entry of entries) {
-    const wf = entry.workflow;
-    let section = `### \`${wf.name}\` — ${wf.description}\n\n`;
-
-    // Inputs
-    if (wf.inputs.length > 0) {
-      section += '**Inputs**:\n';
-      for (const input of wf.inputs) {
-        const req = input.required ? 'required' : 'optional';
-        const def =
-          input.default !== undefined ? `, default: \`${input.default}\`` : '';
-        section += `- \`${input.name}\` (${input.type}, ${req}${def}) — ${input.description}\n`;
-      }
-      section += '\n';
-    }
-
-    // Outputs
-    if (wf.outputs.length > 0) {
-      section += '**Outputs**:\n';
-      for (const output of wf.outputs) {
-        section += `- \`${output.name}\` (${output.type}) — ${output.description}\n`;
-      }
-      section += '\n';
-    }
-
-    // Steps summary
-    if (wf.steps.length > 0) {
-      section += '**Steps**: ';
-      section += wf.steps.map(s => `\`${s.id}\``).join(' → ');
-      section += '\n';
-    }
-
-    sections.push(section);
-  }
-
-  return sections.join('\n');
-}
 
 function buildPlanUserMessage(
   meta: Record<string, any>,

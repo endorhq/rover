@@ -1,9 +1,9 @@
 import { getUserAIAgent, getAIAgentTool } from '../../agents/index.js';
 import { parseJsonResponse } from '../../../utils/json-parser.js';
 import { SpanWriter, ActionWriter, enqueueAction } from '../logging.js';
-import { fetchContextForAction } from '../context.js';
+import { buildWorkflowCatalog } from '../helpers.js';
 import { buildCoordinatorQuery, fetchMemoryContext } from '../memory/reader.js';
-import type { PendingAction, PilotDecision, TaskMapping } from '../types.js';
+import type { PendingAction, PilotDecision } from '../types.js';
 import type {
   Step,
   StepConfig,
@@ -13,55 +13,24 @@ import type {
 } from './types.js';
 import pilotPromptTemplate from './prompts/pilot-prompt.md';
 
-interface RoverContext {
-  taskId: number;
-  branchName: string;
-  traceId?: string;
-}
-
-function buildPilotPrompt(
-  meta: Record<string, any>,
-  context: { type: string; data: Record<string, any> } | null,
-  roverContext?: RoverContext,
-  memorySection?: string
+export function buildPilotPrompt(
+  memorySection?: string,
+  workflowCatalog?: string
 ): string {
   let prompt = pilotPromptTemplate;
 
-  if (roverContext) {
-    prompt += '\n\n---\n\n## Automation Context\n\n';
-    prompt +=
-      'This PR was **created by the Rover automation system** as part of an earlier task.\n\n';
-    prompt += `- **Task ID**: ${roverContext.taskId}\n`;
-    prompt += `- **Branch**: \`${roverContext.branchName}\`\n`;
-    if (roverContext.traceId) {
-      prompt += `- **Original Trace**: \`${roverContext.traceId}\`\n`;
-    }
-    prompt += '\n';
-    prompt +=
-      'When users provide actionable feedback on a Rover-created PR, prefer `plan` over `clarify`. ';
-    prompt +=
-      'If the feedback is approval or positive acknowledgement, use `noop`. ';
-    prompt +=
-      'Only use `clarify` when the feedback is genuinely ambiguous and you cannot determine intent.\n';
-  }
+  // Inject workflow catalog
+  prompt = prompt.replace(
+    '{{WORKFLOW_CATALOG}}',
+    workflowCatalog || '*(No workflows available)*'
+  );
 
   if (memorySection) {
     prompt += '\n\n---\n\n' + memorySection;
   }
 
-  prompt += '\n\n---\n\n## Event\n\n```json\n';
-  prompt += JSON.stringify(meta, null, 2);
-  prompt += '\n```\n';
-
-  if (context) {
-    prompt += '\n## Additional Context\n\n```json\n';
-    prompt += JSON.stringify(context.data, null, 2);
-    prompt += '\n```\n';
-  }
-
-  prompt += '\n## Workflows\n\nNo workflows are currently available.\n';
   prompt +=
-    '\n## Constraint\n\nThe `coordinate` action is NOT available for this decision. You must choose one of the other actions.\n';
+    '\n\n## Constraint\n\nThe `coordinate` action is NOT available for this decision. You must choose one of the other actions.\n';
 
   return prompt;
 }
@@ -72,16 +41,10 @@ export const coordinatorStep: Step = {
     maxParallel: 3,
   } satisfies StepConfig,
 
-  dependencies: {
-    needsOwnerRepo: true,
-  } satisfies StepDependencies,
+  dependencies: {} satisfies StepDependencies,
 
   async process(pending: PendingAction, ctx: StepContext): Promise<StepResult> {
-    const { store, projectId, owner, repo } = ctx;
-
-    if (!owner || !repo) {
-      throw new Error('Coordinator requires owner and repo');
-    }
+    const { store, projectId, projectPath } = ctx;
 
     // Open the coordinator span
     const span = new SpanWriter(projectId, {
@@ -90,44 +53,31 @@ export const coordinatorStep: Step = {
       meta: pending.meta ?? {},
     });
 
-    // Fetch additional context
-    const context = pending.meta
-      ? await fetchContextForAction(owner, repo, pending.meta)
-      : null;
-
-    // Check if this PR was created by Rover via task mappings
-    let roverContext: RoverContext | undefined;
-    const headRefName = context?.data?.headRefName as string | undefined;
-    if (headRefName) {
-      const allMappings = store.getAllTaskMappings();
-      for (const [, mapping] of Object.entries(allMappings)) {
-        if (mapping.branchName === headRefName) {
-          roverContext = {
-            taskId: mapping.taskId,
-            branchName: mapping.branchName,
-            traceId: mapping.traceId,
-          };
-          break;
-        }
-      }
-    }
+    // Build workflow catalog
+    const catalog = ctx.workflowStore
+      ? buildWorkflowCatalog(ctx.workflowStore)
+      : '*(No workflows available)*';
 
     // Fetch memory context for this event
     const memoryQuery = buildCoordinatorQuery(pending.meta ?? {});
     const memory = await fetchMemoryContext(ctx.memoryStore, memoryQuery, 5);
 
-    // Build prompt and invoke Pilot
-    const prompt = buildPilotPrompt(
-      pending.meta ?? {},
-      context,
-      roverContext,
-      memory.content || undefined
-    );
+    // Build system prompt and user message
+    const systemPrompt = buildPilotPrompt(memory.content || undefined, catalog);
+
+    const userMessage =
+      '## Event\n\n```json\n' +
+      JSON.stringify(pending.meta ?? {}, null, 2) +
+      '\n```\n';
+
     const agent = getUserAIAgent();
     const agentTool = getAIAgentTool(agent);
-    const response = await agentTool.invoke(prompt, {
+    const response = await agentTool.invoke(userMessage, {
       json: true,
-      model: 'haiku',
+      model: 'sonnet',
+      cwd: projectPath,
+      systemPrompt,
+      tools: ['Read', 'Glob', 'Grep', 'Bash(gh:*)', 'Bash(git:*)'],
     });
     const decision = parseJsonResponse<PilotDecision>(response);
 
