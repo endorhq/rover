@@ -42,6 +42,10 @@ export type AgentStepExecutor = (
   stepsOutput: Map<string, Map<string, string>>
 ) => Promise<StepResult>;
 
+export interface WorkflowRunner {
+  runAgentStep: AgentStepExecutor;
+}
+
 export type OnStepComplete = (
   step: WorkflowStep,
   result: StepResult,
@@ -495,7 +499,7 @@ export class WorkflowManager {
    * @returns WorkflowRunResult with overall success, step results, and outputs
    */
   async run(
-    agentStepExecutor: AgentStepExecutor,
+    runner: WorkflowRunner,
     onStepComplete?: OnStepComplete
   ): Promise<WorkflowRunResult> {
     const stepsOutput: Map<string, Map<string, string>> = new Map();
@@ -515,7 +519,7 @@ export class WorkflowManager {
       if (isCommandStep(step)) {
         result = this.executeCommandStep(step);
       } else if (isAgentStep(step)) {
-        result = await agentStepExecutor(step, stepIndex, stepsOutput);
+        result = await runner.runAgentStep(step, stepIndex, stepsOutput);
       } else {
         // Unknown step type - skip
         continue;

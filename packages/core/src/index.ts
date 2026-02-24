@@ -91,6 +91,7 @@ export {
   JsonlLogger,
   type StepResult,
   type AgentStepExecutor,
+  type WorkflowRunner,
   type OnStepComplete,
   type WorkflowRunResult,
   type WorkflowMetadata,

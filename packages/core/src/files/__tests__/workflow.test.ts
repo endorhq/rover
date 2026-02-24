@@ -12,7 +12,7 @@ import { parse as parseYaml } from 'yaml';
 import {
   WorkflowManager,
   type StepResult,
-  type AgentStepExecutor,
+  type WorkflowRunner,
   type OnStepComplete,
 } from '../workflow.js';
 import type {
@@ -1375,11 +1375,13 @@ steps:
         steps
       );
 
-      const agentExecutor: AgentStepExecutor = async () => {
-        throw new Error('Should not be called for command steps');
+      const runner: WorkflowRunner = {
+        runAgentStep: async () => {
+          throw new Error('Should not be called for command steps');
+        },
       };
 
-      const result = await workflow.run(agentExecutor);
+      const result = await workflow.run(runner);
 
       expect(result.success).toBe(true);
       expect(result.stepResults).toHaveLength(1);
@@ -1409,16 +1411,18 @@ steps:
         steps
       );
 
-      const agentExecutor: AgentStepExecutor = async step => {
-        return {
-          id: step.id,
-          success: true,
-          duration: 1.5,
-          outputs: new Map([['result', 'done']]),
-        };
+      const runner: WorkflowRunner = {
+        runAgentStep: async step => {
+          return {
+            id: step.id,
+            success: true,
+            duration: 1.5,
+            outputs: new Map([['result', 'done']]),
+          };
+        },
       };
 
-      const result = await workflow.run(agentExecutor);
+      const result = await workflow.run(runner);
 
       expect(result.success).toBe(true);
       expect(result.stepResults).toHaveLength(1);
@@ -1451,17 +1455,19 @@ steps:
         steps
       );
 
-      const agentExecutor: AgentStepExecutor = async step => {
-        return {
-          id: step.id,
-          success: false,
-          error: 'Something went wrong',
-          duration: 0.5,
-          outputs: new Map(),
-        };
+      const runner: WorkflowRunner = {
+        runAgentStep: async step => {
+          return {
+            id: step.id,
+            success: false,
+            error: 'Something went wrong',
+            duration: 0.5,
+            outputs: new Map(),
+          };
+        },
       };
 
-      const result = await workflow.run(agentExecutor);
+      const result = await workflow.run(runner);
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('Workflow stopped due to step failure');
@@ -1493,26 +1499,28 @@ steps:
       const workflow = WorkflowManager.load(workflowPath);
 
       let callCount = 0;
-      const agentExecutor: AgentStepExecutor = async step => {
-        callCount++;
-        if (step.id === 'fail-step') {
+      const runner: WorkflowRunner = {
+        runAgentStep: async step => {
+          callCount++;
+          if (step.id === 'fail-step') {
+            return {
+              id: step.id,
+              success: false,
+              error: 'Step failed',
+              duration: 0.5,
+              outputs: new Map(),
+            };
+          }
           return {
             id: step.id,
-            success: false,
-            error: 'Step failed',
-            duration: 0.5,
-            outputs: new Map(),
+            success: true,
+            duration: 1.0,
+            outputs: new Map([['result', 'ok']]),
           };
-        }
-        return {
-          id: step.id,
-          success: true,
-          duration: 1.0,
-          outputs: new Map([['result', 'ok']]),
-        };
+        },
       };
 
-      const result = await workflow.run(agentExecutor);
+      const result = await workflow.run(runner);
 
       expect(callCount).toBe(2);
       expect(result.success).toBe(true);
@@ -1550,25 +1558,23 @@ steps:
         steps
       );
 
-      const agentExecutor: AgentStepExecutor = async (
-        step,
-        _stepIndex,
-        stepsOutput
-      ) => {
-        // Step 2 should see step 1's outputs
-        if (step.id === 'step2') {
-          expect(stepsOutput.has('step1')).toBe(true);
-          expect(stepsOutput.get('step1')?.get('data')).toBe('from-step1');
-        }
-        return {
-          id: step.id,
-          success: true,
-          duration: 0.1,
-          outputs: new Map([['data', `from-${step.id}`]]),
-        };
+      const runner: WorkflowRunner = {
+        runAgentStep: async (step, _stepIndex, stepsOutput) => {
+          // Step 2 should see step 1's outputs
+          if (step.id === 'step2') {
+            expect(stepsOutput.has('step1')).toBe(true);
+            expect(stepsOutput.get('step1')?.get('data')).toBe('from-step1');
+          }
+          return {
+            id: step.id,
+            success: true,
+            duration: 0.1,
+            outputs: new Map([['data', `from-${step.id}`]]),
+          };
+        },
       };
 
-      const result = await workflow.run(agentExecutor);
+      const result = await workflow.run(runner);
 
       expect(result.success).toBe(true);
       expect(result.stepsOutput.get('step1')?.get('data')).toBe('from-step1');
@@ -1600,12 +1606,14 @@ steps:
         steps
       );
 
-      const agentExecutor: AgentStepExecutor = async step => ({
-        id: step.id,
-        success: true,
-        duration: 1.0,
-        outputs: new Map(),
-      });
+      const runner: WorkflowRunner = {
+        runAgentStep: async step => ({
+          id: step.id,
+          success: true,
+          duration: 1.0,
+          outputs: new Map(),
+        }),
+      };
 
       const completedSteps: Array<{
         step: WorkflowStep;
@@ -1622,7 +1630,7 @@ steps:
         completedSteps.push({ step, result, context });
       };
 
-      await workflow.run(agentExecutor, onComplete);
+      await workflow.run(runner, onComplete);
 
       expect(completedSteps).toHaveLength(2);
       expect(completedSteps[0].step.id).toBe('step1');
@@ -1663,14 +1671,16 @@ steps:
       writeFileSync(workflowPath, yamlContent, 'utf8');
       const workflow = WorkflowManager.load(workflowPath);
 
-      const agentExecutor: AgentStepExecutor = async step => ({
-        id: step.id,
-        success: true,
-        duration: 2.0,
-        outputs: new Map([['analysis', 'looks good']]),
-      });
+      const runner: WorkflowRunner = {
+        runAgentStep: async step => ({
+          id: step.id,
+          success: true,
+          duration: 2.0,
+          outputs: new Map([['analysis', 'looks good']]),
+        }),
+      };
 
-      const result = await workflow.run(agentExecutor);
+      const result = await workflow.run(runner);
 
       expect(result.success).toBe(true);
       expect(result.stepResults).toHaveLength(3);
@@ -1705,14 +1715,16 @@ steps:
       writeFileSync(workflowPath, yamlContent, 'utf8');
       const workflow = WorkflowManager.load(workflowPath);
 
-      const agentExecutor: AgentStepExecutor = async step => ({
-        id: step.id,
-        success: true,
-        duration: 0.5,
-        outputs: new Map(),
-      });
+      const runner: WorkflowRunner = {
+        runAgentStep: async step => ({
+          id: step.id,
+          success: true,
+          duration: 0.5,
+          outputs: new Map(),
+        }),
+      };
 
-      const result = await workflow.run(agentExecutor);
+      const result = await workflow.run(runner);
 
       expect(result.success).toBe(true);
       expect(result.stepResults).toHaveLength(2);

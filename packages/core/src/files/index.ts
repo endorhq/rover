@@ -17,6 +17,7 @@ export {
   WorkflowManager,
   type StepResult,
   type AgentStepExecutor,
+  type WorkflowRunner,
   type OnStepComplete,
   type WorkflowRunResult,
 } from './workflow.js';

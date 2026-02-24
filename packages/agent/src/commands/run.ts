@@ -8,7 +8,7 @@ import {
   showProperties,
   showList,
   type StepResult,
-  type AgentStepExecutor,
+  type WorkflowRunner,
   type OnStepComplete,
 } from 'rover-core';
 import {
@@ -385,40 +385,42 @@ export const runCommand = async (
         await acpRunner.initializeConnection();
       }
 
-      const agentStepExecutor: AgentStepExecutor = async (
-        step: WorkflowAgentStep,
-        stepIndex: number,
-        stepsOutput: Map<string, Map<string, string>>
-      ): Promise<StepResult> => {
-        if (useACPMode && acpRunner) {
-          try {
-            await acpRunner.createSession();
+      const runner: WorkflowRunner = {
+        runAgentStep: async (
+          step: WorkflowAgentStep,
+          stepIndex: number,
+          stepsOutput: Map<string, Map<string, string>>
+        ): Promise<StepResult> => {
+          if (useACPMode && acpRunner) {
+            try {
+              await acpRunner.createSession();
 
-            // Inject previous step outputs before running
-            for (const [prevStepId, prevOutputs] of stepsOutput.entries()) {
-              acpRunner.stepsOutput.set(prevStepId, prevOutputs);
+              // Inject previous step outputs before running
+              for (const [prevStepId, prevOutputs] of stepsOutput.entries()) {
+                acpRunner.stepsOutput.set(prevStepId, prevOutputs);
+              }
+
+              return await acpRunner.runStep(step.id);
+            } finally {
+              acpRunner.closeSession();
             }
+          } else {
+            const stepRunner = new Runner(
+              workflowManager,
+              step.id,
+              inputs,
+              stepsOutput,
+              options.agentTool,
+              options.agentModel,
+              statusManager,
+              totalSteps,
+              stepIndex,
+              logger
+            );
 
-            return await acpRunner.runStep(step.id);
-          } finally {
-            acpRunner.closeSession();
+            return await stepRunner.run(options.output);
           }
-        } else {
-          const runner = new Runner(
-            workflowManager,
-            step.id,
-            inputs,
-            stepsOutput,
-            options.agentTool,
-            options.agentModel,
-            statusManager,
-            totalSteps,
-            stepIndex,
-            logger
-          );
-
-          return await runner.run(options.output);
-        }
+        },
       };
 
       const onStepComplete: OnStepComplete = (step, result, context) => {
@@ -426,10 +428,7 @@ export const runCommand = async (
       };
 
       try {
-        const runResult = await workflowManager.run(
-          agentStepExecutor,
-          onStepComplete
-        );
+        const runResult = await workflowManager.run(runner, onStepComplete);
 
         totalDuration = runResult.totalDuration;
 
