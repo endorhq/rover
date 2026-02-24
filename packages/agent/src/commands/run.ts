@@ -362,7 +362,13 @@ export const runCommand = async (
         options.agentTool || workflowManager.defaults?.tool || 'claude';
 
       // ACP usage decision: use ACP mode for agents that support it
-      const acpEnabledTools = ['claude', 'gemini', 'copilot', 'opencode', 'qwen'];
+      const acpEnabledTools = [
+        'claude',
+        'gemini',
+        'copilot',
+        'opencode',
+        'qwen',
+      ];
       const useACPMode = acpEnabledTools.includes(tool.toLowerCase());
 
       // Build the agent step executor based on mode

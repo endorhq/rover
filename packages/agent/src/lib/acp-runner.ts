@@ -61,7 +61,6 @@ function formatError(error: unknown): string {
   return String(error);
 }
 
-
 export class ACPRunner {
   private workflow: WorkflowManager;
   private inputs: Map<string, string>;
