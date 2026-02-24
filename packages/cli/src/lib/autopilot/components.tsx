@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Box, Text } from 'ink';
 import type {
   FetchStatus,
@@ -39,11 +39,25 @@ const FETCH_COLORS: Record<FetchStatus, string> = {
 
 function FetchIndicator({
   status,
-  countdown,
+  lastFetchAt,
+  pollIntervalSec,
 }: {
   status: FetchStatus;
-  countdown: number;
+  lastFetchAt: number;
+  pollIntervalSec: number;
 }) {
+  const [countdown, setCountdown] = useState(pollIntervalSec);
+
+  useEffect(() => {
+    const update = () => {
+      const elapsed = Math.floor((Date.now() - lastFetchAt) / 1000);
+      setCountdown(Math.max(0, pollIntervalSec - elapsed));
+    };
+    update();
+    const timer = setInterval(update, 1000);
+    return () => clearInterval(timer);
+  }, [lastFetchAt, pollIntervalSec]);
+
   const icon = FETCH_ICONS[status];
   const color = FETCH_COLORS[status];
   const label =
@@ -316,7 +330,8 @@ export function InfoPanel({
   version,
   height,
   fetchStatus,
-  fetchCountdown,
+  lastFetchAt,
+  pollIntervalSec,
   coordinatorStatus,
   processedCount,
   plannerStatus,
@@ -335,7 +350,8 @@ export function InfoPanel({
   version: string;
   height: number;
   fetchStatus: FetchStatus;
-  fetchCountdown: number;
+  lastFetchAt: number;
+  pollIntervalSec: number;
   coordinatorStatus: CoordinatorStatus;
   processedCount: number;
   plannerStatus: PlannerStatus;
@@ -377,7 +393,11 @@ export function InfoPanel({
         <Text color="white">{version}</Text>
       </Text>
       <Text> </Text>
-      <FetchIndicator status={fetchStatus} countdown={fetchCountdown} />
+      <FetchIndicator
+        status={fetchStatus}
+        lastFetchAt={lastFetchAt}
+        pollIntervalSec={pollIntervalSec}
+      />
       <CoordinatorIndicator
         status={coordinatorStatus}
         processedCount={processedCount}
@@ -547,8 +567,10 @@ export function SpaceScene({
       setLines(rendered);
     };
 
+    // Use a slower tick over SSH to reduce flicker from streaming ANSI writes
+    const interval = process.env.SSH_CONNECTION ? 1200 : 800;
     tick();
-    const timer = setInterval(tick, 300);
+    const timer = setInterval(tick, interval);
     return () => clearInterval(timer);
   }, [width, height]);
 

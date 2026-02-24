@@ -11,7 +11,7 @@ import { formatDuration } from './helpers.js';
 import { AutopilotStore } from './store.js';
 import { InfoPanel, SpaceScene, LogBook } from './components.js';
 import { InspectorView } from './inspector.js';
-import { useGitHubEvents } from './events.js';
+import { useGitHubEvents, POLL_INTERVAL_SEC } from './events.js';
 import { useStepOrchestrator } from './steps/use-orchestrator.js';
 import { getUserAIAgent } from '../agents/index.js';
 
@@ -154,7 +154,7 @@ export function AutopilotApp({
 
   const {
     status: fetchStatus,
-    countdown: fetchCountdown,
+    lastFetchAt,
     lastFetchCount,
     lastRelevantCount,
     lastNewCount,
@@ -180,185 +180,171 @@ export function AutopilotApp({
     setLogs(entries);
   }, [store]);
 
-  // Log task status changes
-  useEffect(() => {
-    if (tasks.length === 0) return;
-    const ts = new Date().toLocaleTimeString();
-    const running = tasks.filter(t =>
-      ['IN_PROGRESS', 'ITERATING'].includes(t.status)
-    ).length;
-    const completed = tasks.filter(t =>
-      ['COMPLETED', 'MERGED', 'PUSHED'].includes(t.status)
-    ).length;
-    const failed = tasks.filter(t => t.status === 'FAILED').length;
-
-    setLogs(prev => [
-      ...prev.slice(-50),
-      {
-        timestamp: ts,
-        message: `Tasks: ${tasks.length} total, ${running} running, ${completed} completed, ${failed} failed`,
-      },
-    ]);
-  }, [tasks.map(t => `${t.id}:${t.status}`).join(',')]);
-
-  // Log GitHub event fetch results
-  useEffect(() => {
-    if (fetchStatus === 'done') {
-      const ts = new Date().toLocaleTimeString();
-      setLogs(prev => [
-        ...prev.slice(-50),
-        {
-          timestamp: ts,
-          message: `GitHub: ${lastNewCount} new events (${lastRelevantCount} relevant, ${lastFetchCount} fetched)`,
-        },
-      ]);
-    } else if (fetchStatus === 'error') {
-      const ts = new Date().toLocaleTimeString();
-      setLogs(prev => [
-        ...prev.slice(-50),
-        {
-          timestamp: ts,
-          message: 'GitHub: failed to fetch events',
-        },
-      ]);
-    }
-  }, [fetchStatus, lastFetchCount, lastRelevantCount, lastNewCount]);
-
-  // Log coordinator status changes
+  // Destructure step statuses for the InfoPanel and consolidated log effect
   const { status: coordinatorStatus, processedCount } = statuses.coordinator;
-  useEffect(() => {
-    if (coordinatorStatus === 'processing') {
-      const ts = new Date().toLocaleTimeString();
-      setLogs(prev => [
-        ...prev.slice(-50),
-        { timestamp: ts, message: 'Coordinator: processing...' },
-      ]);
-    } else if (processedCount > 0 && coordinatorStatus === 'idle') {
-      const ts = new Date().toLocaleTimeString();
-      setLogs(prev => [
-        ...prev.slice(-50),
-        {
-          timestamp: ts,
-          message: `Coordinator: ${processedCount} processed`,
-        },
-      ]);
-    }
-  }, [coordinatorStatus, processedCount]);
-
-  // Log planner status changes
   const { status: plannerStatus, processedCount: plannerProcessedCount } =
     statuses.planner;
-  useEffect(() => {
-    if (plannerStatus === 'processing') {
-      const ts = new Date().toLocaleTimeString();
-      setLogs(prev => [
-        ...prev.slice(-50),
-        { timestamp: ts, message: 'Planner: processing...' },
-      ]);
-    } else if (plannerProcessedCount > 0 && plannerStatus === 'idle') {
-      const ts = new Date().toLocaleTimeString();
-      setLogs(prev => [
-        ...prev.slice(-50),
-        {
-          timestamp: ts,
-          message: `Planner: ${plannerProcessedCount} processed`,
-        },
-      ]);
-    }
-  }, [plannerStatus, plannerProcessedCount]);
-
-  // Log workflow runner status changes
   const {
     status: workflowRunnerStatus,
     processedCount: workflowRunnerProcessedCount,
   } = statuses.workflow;
-  useEffect(() => {
-    if (workflowRunnerStatus === 'processing') {
-      const ts = new Date().toLocaleTimeString();
-      setLogs(prev => [
-        ...prev.slice(-50),
-        { timestamp: ts, message: 'Workflow runner: processing...' },
-      ]);
-    } else if (
-      workflowRunnerProcessedCount > 0 &&
-      workflowRunnerStatus === 'idle'
-    ) {
-      const ts = new Date().toLocaleTimeString();
-      setLogs(prev => [
-        ...prev.slice(-50),
-        {
-          timestamp: ts,
-          message: `Workflow runner: ${workflowRunnerProcessedCount} tasks created`,
-        },
-      ]);
-    }
-  }, [workflowRunnerStatus, workflowRunnerProcessedCount]);
-
-  // Log committer status changes
   const { status: committerStatus, processedCount: committerProcessedCount } =
     statuses.committer;
-  useEffect(() => {
-    if (committerStatus === 'processing') {
-      const ts = new Date().toLocaleTimeString();
-      setLogs(prev => [
-        ...prev.slice(-50),
-        { timestamp: ts, message: 'Committer: processing...' },
-      ]);
-    } else if (committerProcessedCount > 0 && committerStatus === 'idle') {
-      const ts = new Date().toLocaleTimeString();
-      setLogs(prev => [
-        ...prev.slice(-50),
-        {
-          timestamp: ts,
-          message: `Committer: ${committerProcessedCount} committed`,
-        },
-      ]);
-    }
-  }, [committerStatus, committerProcessedCount]);
-
-  // Log resolver status changes
   const { status: resolverStatus, processedCount: resolverProcessedCount } =
     statuses.resolver;
-  useEffect(() => {
-    if (resolverStatus === 'processing') {
-      const ts = new Date().toLocaleTimeString();
-      setLogs(prev => [
-        ...prev.slice(-50),
-        { timestamp: ts, message: 'Resolver: processing...' },
-      ]);
-    } else if (resolverProcessedCount > 0 && resolverStatus === 'idle') {
-      const ts = new Date().toLocaleTimeString();
-      setLogs(prev => [
-        ...prev.slice(-50),
-        {
-          timestamp: ts,
-          message: `Resolver: ${resolverProcessedCount} resolved`,
-        },
-      ]);
-    }
-  }, [resolverStatus, resolverProcessedCount]);
-
-  // Log pusher status changes
   const { status: pusherStatus, processedCount: pusherProcessedCount } =
     statuses.pusher;
+
+  // Build a stable key for all the values that should trigger a log update.
+  // A single effect produces one setLogs call instead of up to 8 separate ones.
+  const taskKey = tasks.map(t => `${t.id}:${t.status}`).join(',');
+  const statusKey = [
+    fetchStatus,
+    lastFetchCount,
+    lastRelevantCount,
+    lastNewCount,
+    coordinatorStatus,
+    processedCount,
+    plannerStatus,
+    plannerProcessedCount,
+    workflowRunnerStatus,
+    workflowRunnerProcessedCount,
+    committerStatus,
+    committerProcessedCount,
+    resolverStatus,
+    resolverProcessedCount,
+    pusherStatus,
+    pusherProcessedCount,
+  ].join(',');
+
+  const prevStatusKeyRef = useRef(statusKey);
+  const prevTaskKeyRef = useRef(taskKey);
+
   useEffect(() => {
-    if (pusherStatus === 'processing') {
-      const ts = new Date().toLocaleTimeString();
-      setLogs(prev => [
-        ...prev.slice(-50),
-        { timestamp: ts, message: 'Pusher: pushing...' },
-      ]);
-    } else if (pusherProcessedCount > 0 && pusherStatus === 'idle') {
-      const ts = new Date().toLocaleTimeString();
-      setLogs(prev => [
-        ...prev.slice(-50),
-        {
-          timestamp: ts,
-          message: `Pusher: ${pusherProcessedCount} pushed`,
-        },
-      ]);
+    const newEntries: LogEntry[] = [];
+    const ts = new Date().toLocaleTimeString();
+
+    // Task status changes
+    if (taskKey !== prevTaskKeyRef.current && tasks.length > 0) {
+      const running = tasks.filter(t =>
+        ['IN_PROGRESS', 'ITERATING'].includes(t.status)
+      ).length;
+      const completed = tasks.filter(t =>
+        ['COMPLETED', 'MERGED', 'PUSHED'].includes(t.status)
+      ).length;
+      const failed = tasks.filter(t => t.status === 'FAILED').length;
+      newEntries.push({
+        timestamp: ts,
+        message: `Tasks: ${tasks.length} total, ${running} running, ${completed} completed, ${failed} failed`,
+      });
     }
-  }, [pusherStatus, pusherProcessedCount]);
+
+    // GitHub fetch results
+    if (fetchStatus === 'done') {
+      newEntries.push({
+        timestamp: ts,
+        message: `GitHub: ${lastNewCount} new events (${lastRelevantCount} relevant, ${lastFetchCount} fetched)`,
+      });
+    } else if (fetchStatus === 'error') {
+      newEntries.push({
+        timestamp: ts,
+        message: 'GitHub: failed to fetch events',
+      });
+    }
+
+    // Step status changes — collected in a single pass
+    const stepEntries: Array<{
+      label: string;
+      status: string;
+      count: number;
+      processing: string;
+      idle: string;
+    }> = [
+      {
+        label: 'Coordinator',
+        status: coordinatorStatus,
+        count: processedCount,
+        processing: 'processing...',
+        idle: 'processed',
+      },
+      {
+        label: 'Planner',
+        status: plannerStatus,
+        count: plannerProcessedCount,
+        processing: 'processing...',
+        idle: 'processed',
+      },
+      {
+        label: 'Workflow runner',
+        status: workflowRunnerStatus,
+        count: workflowRunnerProcessedCount,
+        processing: 'processing...',
+        idle: 'tasks created',
+      },
+      {
+        label: 'Committer',
+        status: committerStatus,
+        count: committerProcessedCount,
+        processing: 'committing...',
+        idle: 'committed',
+      },
+      {
+        label: 'Resolver',
+        status: resolverStatus,
+        count: resolverProcessedCount,
+        processing: 'resolving...',
+        idle: 'resolved',
+      },
+      {
+        label: 'Pusher',
+        status: pusherStatus,
+        count: pusherProcessedCount,
+        processing: 'pushing...',
+        idle: 'pushed',
+      },
+    ];
+
+    for (const entry of stepEntries) {
+      if (entry.status === 'processing') {
+        newEntries.push({
+          timestamp: ts,
+          message: `${entry.label}: ${entry.processing}`,
+        });
+      } else if (entry.count > 0 && entry.status === 'idle') {
+        newEntries.push({
+          timestamp: ts,
+          message: `${entry.label}: ${entry.count} ${entry.idle}`,
+        });
+      }
+    }
+
+    prevStatusKeyRef.current = statusKey;
+    prevTaskKeyRef.current = taskKey;
+
+    if (newEntries.length > 0) {
+      setLogs(prev => [...prev.slice(-50), ...newEntries]);
+    }
+  }, [
+    taskKey,
+    tasks,
+    fetchStatus,
+    lastFetchCount,
+    lastRelevantCount,
+    lastNewCount,
+    statusKey,
+    coordinatorStatus,
+    processedCount,
+    plannerStatus,
+    plannerProcessedCount,
+    workflowRunnerStatus,
+    workflowRunnerProcessedCount,
+    committerStatus,
+    committerProcessedCount,
+    resolverStatus,
+    resolverProcessedCount,
+    pusherStatus,
+    pusherProcessedCount,
+  ]);
 
   useInput((input, key) => {
     if (input === 'q' || (key.ctrl && input === 'c')) {
@@ -408,7 +394,8 @@ export function AutopilotApp({
             version={version}
             height={topHeight}
             fetchStatus={fetchStatus}
-            fetchCountdown={fetchCountdown}
+            lastFetchAt={lastFetchAt}
+            pollIntervalSec={POLL_INTERVAL_SEC}
             coordinatorStatus={coordinatorStatus}
             processedCount={processedCount}
             plannerStatus={plannerStatus}

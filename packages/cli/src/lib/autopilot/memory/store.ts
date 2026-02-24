@@ -24,6 +24,9 @@ export class MemoryStore {
   private collectionName: string;
   private qmdAvailable: boolean | null = null;
 
+  /** Serializes all QMD process launches to avoid parallel CPU/memory spikes. */
+  private qmdQueue: Promise<void> = Promise.resolve();
+
   constructor(projectId: string) {
     this.projectId = projectId;
     this.basePath = join(
@@ -87,15 +90,16 @@ export class MemoryStore {
   }
 
   /**
-   * Search memory using QMD hybrid search.
+   * Search memory using QMD BM25 keyword search.
    * Returns empty results if QMD is unavailable.
+   * Serialized via qmdQueue to prevent parallel QMD processes.
    */
   async search(query: string, limit = 5): Promise<MemorySearchResult[]> {
     if (!(await this.isQmdAvailable())) return [];
 
-    try {
+    return this.enqueueQmd(async () => {
       const result = await launch('qmd', [
-        'query',
+        'search',
         query,
         '--collection',
         this.collectionName,
@@ -128,26 +132,42 @@ export class MemoryStore {
       }
 
       return [];
-    } catch {
-      return [];
-    }
+    });
   }
 
   /**
-   * Trigger QMD embedding for the collection (fire-and-forget).
+   * Trigger QMD embedding for the collection.
+   * Serialized via qmdQueue so it doesn't overlap with searches.
    * Only re-embeds changed files, so this is fast.
    */
   async triggerEmbed(): Promise<void> {
     if (!(await this.isQmdAvailable())) return;
 
-    try {
-      // Fire-and-forget: don't await the result
-      launch('qmd', ['embed', '--collection', this.collectionName]).catch(
-        () => {}
-      );
-    } catch {
-      // Ignore errors — embedding is best-effort
-    }
+    // Enqueue but don't await — callers don't need the result.
+    // The queue ensures it won't overlap with concurrent searches.
+    this.enqueueQmd(async () => {
+      await launch('qmd', ['embed', '--collection', this.collectionName]);
+    }).catch(() => {});
+  }
+
+  /**
+   * Enqueue a QMD operation so only one runs at a time.
+   * Concurrent callers wait in line instead of spawning parallel processes.
+   */
+  private enqueueQmd<T>(fn: () => Promise<T>): Promise<T> {
+    const prev = this.qmdQueue;
+    let resolve: (v: T) => void;
+    let reject: (e: unknown) => void;
+    const result = new Promise<T>((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+
+    this.qmdQueue = prev
+      .then(() => fn().then(resolve!, reject!))
+      .catch(() => {});
+
+    return result;
   }
 
   /**

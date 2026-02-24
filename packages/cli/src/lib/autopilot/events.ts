@@ -235,6 +235,8 @@ export function writeSpanAndAction(
   return { spanId: span.id, actionId: action.id, traceId };
 }
 
+export const POLL_INTERVAL_SEC = POLL_INTERVAL_MS / 1000;
+
 export function useGitHubEvents(
   projectPath: string,
   projectId: string,
@@ -242,13 +244,13 @@ export function useGitHubEvents(
   onNewEvents?: () => void
 ): {
   status: FetchStatus;
-  countdown: number;
+  lastFetchAt: number;
   lastFetchCount: number;
   lastRelevantCount: number;
   lastNewCount: number;
 } {
   const [status, setStatus] = useState<FetchStatus>('idle');
-  const [countdown, setCountdown] = useState(POLL_INTERVAL_MS / 1000);
+  const [lastFetchAt, setLastFetchAt] = useState(Date.now);
   const [lastFetchCount, setLastFetchCount] = useState(0);
   const [lastRelevantCount, setLastRelevantCount] = useState(0);
   const [lastNewCount, setLastNewCount] = useState(0);
@@ -287,8 +289,7 @@ export function useGitHubEvents(
       setStatus('error');
     }
 
-    // Reset countdown after fetch completes
-    setCountdown(POLL_INTERVAL_MS / 1000);
+    setLastFetchAt(Date.now());
   }, [projectId, store, onNewEvents]);
 
   // Initial fetch + interval
@@ -298,13 +299,11 @@ export function useGitHubEvents(
     return () => clearInterval(timer);
   }, [doFetch]);
 
-  // Countdown ticker (every second)
-  useEffect(() => {
-    const tick = setInterval(() => {
-      setCountdown(prev => Math.max(0, prev - 1));
-    }, 1000);
-    return () => clearInterval(tick);
-  }, []);
-
-  return { status, countdown, lastFetchCount, lastRelevantCount, lastNewCount };
+  return {
+    status,
+    lastFetchAt,
+    lastFetchCount,
+    lastRelevantCount,
+    lastNewCount,
+  };
 }
