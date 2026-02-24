@@ -749,6 +749,10 @@ describe('GitLabProvider', () => {
       },
     ];
 
+    const mrApprovalsResponse = {
+      approved_by: [{ user: { username: 'bob' } }],
+    };
+
     const diffContent = `diff --git a/src/feature.ts b/src/feature.ts
 new file mode 100644
 index 0000000..1234567
@@ -777,6 +781,13 @@ index 0000000..1234567
           } as ReturnType<typeof launchSync>;
         }
         if (cmd === 'glab' && args?.[0] === 'api') {
+          const apiUrl = String(args?.[1] || '');
+          if (apiUrl.includes('/approvals')) {
+            return {
+              exitCode: 0,
+              stdout: JSON.stringify(mrApprovalsResponse),
+            } as ReturnType<typeof launchSync>;
+          }
           return {
             exitCode: 0,
             stdout: JSON.stringify(mrNotesResponse),
@@ -853,7 +864,9 @@ index 0000000..1234567
       expect(content).toContain('**State:** opened');
       expect(content).toContain('**Branch:** feature/thing');
       expect(content).toContain('**Draft:** No');
-      expect(content).toContain('**Reviewers:** @bob, @carol');
+      expect(content).toContain(
+        '**Reviewers:** @bob (approved), @carol (pending)'
+      );
       expect(content).toContain('## Comments');
       expect(content).toContain('@bob');
       expect(content).toContain('Looks good!');
@@ -891,6 +904,13 @@ index 0000000..1234567
           return { exitCode: 0, stdout: '' } as ReturnType<typeof launchSync>;
         }
         if (cmd === 'glab' && args?.[0] === 'api') {
+          const apiUrl = String(args?.[1] || '');
+          if (apiUrl.includes('/approvals')) {
+            return {
+              exitCode: 0,
+              stdout: JSON.stringify({ approved_by: [] }),
+            } as ReturnType<typeof launchSync>;
+          }
           return {
             exitCode: 0,
             stdout: '[]',
@@ -932,6 +952,13 @@ index 0000000..1234567
           return { exitCode: 0, stdout: '' } as ReturnType<typeof launchSync>;
         }
         if (cmd === 'glab' && args?.[0] === 'api') {
+          const apiUrl = String(args?.[1] || '');
+          if (apiUrl.includes('/approvals')) {
+            return {
+              exitCode: 0,
+              stdout: JSON.stringify({ approved_by: [] }),
+            } as ReturnType<typeof launchSync>;
+          }
           return {
             exitCode: 0,
             stdout: '[]',
@@ -971,6 +998,13 @@ index 0000000..1234567
           return { exitCode: 0, stdout: '' } as ReturnType<typeof launchSync>;
         }
         if (cmd === 'glab' && args?.[0] === 'api') {
+          const apiUrl = String(args?.[1] || '');
+          if (apiUrl.includes('/approvals')) {
+            return {
+              exitCode: 0,
+              stdout: JSON.stringify({ approved_by: [] }),
+            } as ReturnType<typeof launchSync>;
+          }
           return {
             exitCode: 0,
             stdout: '[]',
@@ -988,6 +1022,227 @@ index 0000000..1234567
       const metadata = entries[0].metadata as PRMetadata;
 
       expect(metadata.mergeable).toBeUndefined();
+    });
+
+    it('should show all reviewers as approved when all have approved', async () => {
+      const allApprovedResponse = {
+        approved_by: [
+          { user: { username: 'bob' } },
+          { user: { username: 'carol' } },
+        ],
+      };
+      mockLaunchSync.mockImplementation((cmd, args) => {
+        if (cmd === 'glab' && args?.[0] === '--version') {
+          return { exitCode: 0 } as ReturnType<typeof launchSync>;
+        }
+        if (cmd === 'glab' && args?.[0] === 'mr' && args?.[1] === 'view') {
+          return {
+            exitCode: 0,
+            stdout: JSON.stringify(mrResponse),
+          } as ReturnType<typeof launchSync>;
+        }
+        if (cmd === 'glab' && args?.[0] === 'mr' && args?.[1] === 'diff') {
+          return { exitCode: 0, stdout: '' } as ReturnType<typeof launchSync>;
+        }
+        if (cmd === 'glab' && args?.[0] === 'api') {
+          const apiUrl = String(args?.[1] || '');
+          if (apiUrl.includes('/approvals')) {
+            return {
+              exitCode: 0,
+              stdout: JSON.stringify(allApprovedResponse),
+            } as ReturnType<typeof launchSync>;
+          }
+          return {
+            exitCode: 0,
+            stdout: '[]',
+          } as ReturnType<typeof launchSync>;
+        }
+        return { exitCode: 1 } as ReturnType<typeof launchSync>;
+      });
+
+      const provider = new GitLabProvider(new URL('gitlab:owner/repo/mr/42'), {
+        originalUri: 'gitlab:owner/repo/mr/42',
+        trustAllAuthors: true,
+      });
+
+      const entries = await provider.build();
+      const content = entries[0].content!;
+
+      expect(content).toContain(
+        '**Reviewers:** @bob (approved), @carol (approved)'
+      );
+    });
+
+    it('should show all reviewers as pending when none have approved', async () => {
+      mockLaunchSync.mockImplementation((cmd, args) => {
+        if (cmd === 'glab' && args?.[0] === '--version') {
+          return { exitCode: 0 } as ReturnType<typeof launchSync>;
+        }
+        if (cmd === 'glab' && args?.[0] === 'mr' && args?.[1] === 'view') {
+          return {
+            exitCode: 0,
+            stdout: JSON.stringify(mrResponse),
+          } as ReturnType<typeof launchSync>;
+        }
+        if (cmd === 'glab' && args?.[0] === 'mr' && args?.[1] === 'diff') {
+          return { exitCode: 0, stdout: '' } as ReturnType<typeof launchSync>;
+        }
+        if (cmd === 'glab' && args?.[0] === 'api') {
+          const apiUrl = String(args?.[1] || '');
+          if (apiUrl.includes('/approvals')) {
+            return {
+              exitCode: 0,
+              stdout: JSON.stringify({ approved_by: [] }),
+            } as ReturnType<typeof launchSync>;
+          }
+          return {
+            exitCode: 0,
+            stdout: '[]',
+          } as ReturnType<typeof launchSync>;
+        }
+        return { exitCode: 1 } as ReturnType<typeof launchSync>;
+      });
+
+      const provider = new GitLabProvider(new URL('gitlab:owner/repo/mr/42'), {
+        originalUri: 'gitlab:owner/repo/mr/42',
+        trustAllAuthors: true,
+      });
+
+      const entries = await provider.build();
+      const content = entries[0].content!;
+
+      expect(content).toContain(
+        '**Reviewers:** @bob (pending), @carol (pending)'
+      );
+    });
+
+    it('should fallback to names only when approvals API fails', async () => {
+      mockLaunchSync.mockImplementation((cmd, args) => {
+        if (cmd === 'glab' && args?.[0] === '--version') {
+          return { exitCode: 0 } as ReturnType<typeof launchSync>;
+        }
+        if (cmd === 'glab' && args?.[0] === 'mr' && args?.[1] === 'view') {
+          return {
+            exitCode: 0,
+            stdout: JSON.stringify(mrResponse),
+          } as ReturnType<typeof launchSync>;
+        }
+        if (cmd === 'glab' && args?.[0] === 'mr' && args?.[1] === 'diff') {
+          return { exitCode: 0, stdout: '' } as ReturnType<typeof launchSync>;
+        }
+        if (cmd === 'glab' && args?.[0] === 'api') {
+          const apiUrl = String(args?.[1] || '');
+          if (apiUrl.includes('/approvals')) {
+            return {
+              exitCode: 1,
+              stderr: 'API error',
+            } as ReturnType<typeof launchSync>;
+          }
+          return {
+            exitCode: 0,
+            stdout: '[]',
+          } as ReturnType<typeof launchSync>;
+        }
+        return { exitCode: 1 } as ReturnType<typeof launchSync>;
+      });
+
+      const provider = new GitLabProvider(new URL('gitlab:owner/repo/mr/42'), {
+        originalUri: 'gitlab:owner/repo/mr/42',
+        trustAllAuthors: true,
+      });
+
+      const entries = await provider.build();
+      const content = entries[0].content!;
+
+      // Should fallback to names without approval state
+      expect(content).toContain('**Reviewers:** @bob, @carol');
+      expect(content).not.toContain('(approved)');
+      expect(content).not.toContain('(pending)');
+    });
+
+    it('should fallback to names only when approvals API returns invalid JSON', async () => {
+      mockLaunchSync.mockImplementation((cmd, args) => {
+        if (cmd === 'glab' && args?.[0] === '--version') {
+          return { exitCode: 0 } as ReturnType<typeof launchSync>;
+        }
+        if (cmd === 'glab' && args?.[0] === 'mr' && args?.[1] === 'view') {
+          return {
+            exitCode: 0,
+            stdout: JSON.stringify(mrResponse),
+          } as ReturnType<typeof launchSync>;
+        }
+        if (cmd === 'glab' && args?.[0] === 'mr' && args?.[1] === 'diff') {
+          return { exitCode: 0, stdout: '' } as ReturnType<typeof launchSync>;
+        }
+        if (cmd === 'glab' && args?.[0] === 'api') {
+          const apiUrl = String(args?.[1] || '');
+          if (apiUrl.includes('/approvals')) {
+            return {
+              exitCode: 0,
+              stdout: 'not valid json{{{',
+            } as ReturnType<typeof launchSync>;
+          }
+          return {
+            exitCode: 0,
+            stdout: '[]',
+          } as ReturnType<typeof launchSync>;
+        }
+        return { exitCode: 1 } as ReturnType<typeof launchSync>;
+      });
+
+      const provider = new GitLabProvider(new URL('gitlab:owner/repo/mr/42'), {
+        originalUri: 'gitlab:owner/repo/mr/42',
+        trustAllAuthors: true,
+      });
+
+      const entries = await provider.build();
+      const content = entries[0].content!;
+
+      // Should fallback to names without approval state
+      expect(content).toContain('**Reviewers:** @bob, @carol');
+      expect(content).not.toContain('(approved)');
+      expect(content).not.toContain('(pending)');
+    });
+
+    it('should not call approvals API when MR has no reviewers', async () => {
+      const noReviewersMR = { ...mrResponse, reviewers: [] };
+      mockLaunchSync.mockImplementation((cmd, args) => {
+        if (cmd === 'glab' && args?.[0] === '--version') {
+          return { exitCode: 0 } as ReturnType<typeof launchSync>;
+        }
+        if (cmd === 'glab' && args?.[0] === 'mr' && args?.[1] === 'view') {
+          return {
+            exitCode: 0,
+            stdout: JSON.stringify(noReviewersMR),
+          } as ReturnType<typeof launchSync>;
+        }
+        if (cmd === 'glab' && args?.[0] === 'mr' && args?.[1] === 'diff') {
+          return { exitCode: 0, stdout: '' } as ReturnType<typeof launchSync>;
+        }
+        if (cmd === 'glab' && args?.[0] === 'api') {
+          const apiUrl = String(args?.[1] || '');
+          if (apiUrl.includes('/approvals')) {
+            throw new Error(
+              'Approvals API should not be called when no reviewers'
+            );
+          }
+          return {
+            exitCode: 0,
+            stdout: '[]',
+          } as ReturnType<typeof launchSync>;
+        }
+        return { exitCode: 1 } as ReturnType<typeof launchSync>;
+      });
+
+      const provider = new GitLabProvider(new URL('gitlab:owner/repo/mr/42'), {
+        originalUri: 'gitlab:owner/repo/mr/42',
+        trustAllAuthors: true,
+      });
+
+      const entries = await provider.build();
+      const content = entries[0].content!;
+
+      expect(content).not.toContain('**Reviewers:**');
     });
   });
 
