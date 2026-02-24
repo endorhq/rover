@@ -1,13 +1,13 @@
-You are tasked with extracting specific workflow input values from a GitHub issue description.
+You are tasked with extracting specific workflow input values from an issue description.
 
-**GitHub Issue Description:**
+**Issue Description:**
 %issueDescription%
 
 **Required Workflow Inputs:**
 %inputsMetadata%
 
 **Task:**
-Analyze the GitHub issue description above and extract the values for each required workflow input. Use the input descriptions and labels as hints for what to look for in the issue text.
+Analyze the issue description above and extract the values for each required workflow input. Use the input descriptions and labels as hints for what to look for in the issue text.
 
 **Instructions:**
 

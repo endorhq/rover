@@ -20,6 +20,8 @@ export { createGetVersion, getVersion } from './version.js';
 
 export { Git, type GitOptions } from './git.js';
 
+export { getRepoInfo, type RepoInfo } from './repo-info.js';
+
 export {
   requiredClaudeCredentials,
   requiredBedrockCredentials,
@@ -126,6 +128,7 @@ export {
   registerBuiltInProviders,
   LocalFileProvider,
   GitHubProvider,
+  GitLabProvider,
   HTTPSProvider,
   // Manager
   ContextManager,

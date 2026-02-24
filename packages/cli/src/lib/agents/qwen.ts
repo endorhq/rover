@@ -166,11 +166,11 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
     }
   }
 
-  async extractGithubInputs(
+  async extractIssueInputs(
     issueDescription: string,
     inputs: WorkflowInput[]
   ): Promise<Record<string, any> | null> {
-    const prompt = this.promptBuilder.extractGithubInputsPrompt(
+    const prompt = this.promptBuilder.extractIssueInputsPrompt(
       issueDescription,
       inputs
     );

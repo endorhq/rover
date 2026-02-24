@@ -132,6 +132,41 @@ export class GitHubProvider implements ContextProvider {
   }
 
   /**
+   * Fetch only the issue description (body) from a GitHub issue.
+   * Returns the body string, or null on failure.
+   */
+  static fetchIssueDescription(
+    issueNumber: number,
+    owner: string,
+    repo: string
+  ): string | null {
+    const result = launchSync(
+      'gh',
+      [
+        'issue',
+        'view',
+        String(issueNumber),
+        '-R',
+        `${owner}/${repo}`,
+        '--json',
+        'body',
+      ],
+      { reject: false }
+    );
+
+    if (result.exitCode !== 0) {
+      return null;
+    }
+
+    try {
+      const issue = JSON.parse(result.stdout?.toString() || '{}');
+      return issue.body || '';
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Parse a GitHub URI pathname into its components.
    *
    * Patterns:
