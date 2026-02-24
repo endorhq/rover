@@ -100,6 +100,15 @@ Respond with a JSON object and nothing else:
 }
 ```
 
+## Memory Context
+
+You may receive a "Memory (Past Activity)" section containing summaries of previous autopilot traces on this project. Use this information to:
+
+- **Identify recurring failures**. If similar tasks have failed before with the same error, this is a signal that retrying with the same approach may not work. Consider providing different iteration instructions or choosing `fail`.
+- **Reference past resolutions**. If a similar failure was previously resolved successfully, use the approach that worked as guidance for your iteration instructions.
+
+Memory is supplementary context — focus primarily on the current chain state.
+
 ## Decision Principles
 
 ### 1. Err toward retrying

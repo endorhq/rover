@@ -2,6 +2,7 @@ import { getUserAIAgent, getAIAgentTool } from '../../agents/index.js';
 import { parseJsonResponse } from '../../../utils/json-parser.js';
 import { SpanWriter, ActionWriter, enqueueAction } from '../logging.js';
 import { fetchContextForAction } from '../context.js';
+import { buildCoordinatorQuery, fetchMemoryContext } from '../memory/reader.js';
 import type { PendingAction, PilotDecision, TaskMapping } from '../types.js';
 import type {
   Step,
@@ -21,7 +22,8 @@ interface RoverContext {
 function buildPilotPrompt(
   meta: Record<string, any>,
   context: { type: string; data: Record<string, any> } | null,
-  roverContext?: RoverContext
+  roverContext?: RoverContext,
+  memorySection?: string
 ): string {
   let prompt = pilotPromptTemplate;
 
@@ -41,6 +43,10 @@ function buildPilotPrompt(
       'If the feedback is approval or positive acknowledgement, use `noop`. ';
     prompt +=
       'Only use `clarify` when the feedback is genuinely ambiguous and you cannot determine intent.\n';
+  }
+
+  if (memorySection) {
+    prompt += '\n\n---\n\n' + memorySection;
   }
 
   prompt += '\n\n---\n\n## Event\n\n```json\n';
@@ -106,8 +112,17 @@ export const coordinatorStep: Step = {
       }
     }
 
+    // Fetch memory context for this event
+    const memoryQuery = buildCoordinatorQuery(pending.meta ?? {});
+    const memory = await fetchMemoryContext(ctx.memoryStore, memoryQuery, 5);
+
     // Build prompt and invoke Pilot
-    const prompt = buildPilotPrompt(pending.meta ?? {}, context, roverContext);
+    const prompt = buildPilotPrompt(
+      pending.meta ?? {},
+      context,
+      roverContext,
+      memory.content || undefined
+    );
     const agent = getUserAIAgent();
     const agentTool = getAIAgentTool(agent);
     const response = await agentTool.invoke(prompt, {

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import type { ProjectManager } from 'rover-core';
 import type { ActionTrace } from '../types.js';
 import type { AutopilotStore } from '../store.js';
+import { MemoryStore } from '../memory/store.js';
 import { getRepoInfo } from '../helpers.js';
 import { initWorkflowStore } from '../../workflow.js';
 import { StepOrchestrator } from './orchestrator.js';
@@ -104,10 +105,14 @@ export function useStepOrchestrator(
   useEffect(() => {
     const repoInfo = getRepoInfo(projectPath);
     const workflowStore = initWorkflowStore(projectPath);
+    const memoryStore = new MemoryStore(projectId);
     const callbacks: OrchestratorCallbacks = {
       onTracesUpdated,
       onStatusChanged,
     };
+
+    // Setup memory store (async, non-blocking)
+    memoryStore.ensureSetup().catch(() => {});
 
     const orchestrator = new StepOrchestrator({
       steps: [
@@ -128,6 +133,7 @@ export function useStepOrchestrator(
       repo: repoInfo?.repo,
       project,
       workflowStore,
+      memoryStore,
       callbacks,
     });
 

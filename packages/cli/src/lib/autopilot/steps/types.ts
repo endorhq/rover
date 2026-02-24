@@ -6,6 +6,7 @@ import type {
   PendingAction,
 } from '../types.js';
 import type { AutopilotStore } from '../store.js';
+import type { MemoryStore } from '../memory/store.js';
 
 // ── Step configuration ──────────────────────────────────────────────────────
 
@@ -37,6 +38,7 @@ export interface StepContext {
   repo?: string;
   project?: ProjectManager;
   workflowStore?: WorkflowStore;
+  memoryStore?: MemoryStore;
 }
 
 // ── Step result (returned by process, applied by orchestrator) ──────────────
@@ -92,6 +94,7 @@ export interface MonitorContext {
   repo?: string;
   project?: ProjectManager;
   workflowStore?: WorkflowStore;
+  memoryStore?: MemoryStore;
 }
 
 export interface Step {

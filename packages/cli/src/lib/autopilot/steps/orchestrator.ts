@@ -1,6 +1,7 @@
 import type { ProjectManager, WorkflowStore } from 'rover-core';
 import type { ActionTrace, ActionStep, PendingAction } from '../types.js';
 import type { AutopilotStore } from '../store.js';
+import type { MemoryStore } from '../memory/store.js';
 import type {
   Step,
   StepResult,
@@ -37,6 +38,7 @@ export class StepOrchestrator {
   private repo?: string;
   private project?: ProjectManager;
   private workflowStore?: WorkflowStore;
+  private memoryStore?: MemoryStore;
   private callbacks: OrchestratorCallbacks;
   private fallbackIntervalMs: number;
 
@@ -56,6 +58,7 @@ export class StepOrchestrator {
     repo?: string;
     project?: ProjectManager;
     workflowStore?: WorkflowStore;
+    memoryStore?: MemoryStore;
     callbacks: OrchestratorCallbacks;
     fallbackIntervalMs?: number;
   }) {
@@ -71,6 +74,7 @@ export class StepOrchestrator {
     this.repo = opts.repo;
     this.project = opts.project;
     this.workflowStore = opts.workflowStore;
+    this.memoryStore = opts.memoryStore;
     this.callbacks = opts.callbacks;
     this.fallbackIntervalMs =
       opts.fallbackIntervalMs ?? DEFAULT_FALLBACK_INTERVAL_MS;
@@ -134,6 +138,7 @@ export class StepOrchestrator {
         repo: this.repo,
         project: this.project,
         workflowStore: this.workflowStore,
+        memoryStore: this.memoryStore,
       };
 
       const mutations = step.monitor(ctx);
@@ -321,6 +326,7 @@ export class StepOrchestrator {
         repo: this.repo,
         project: this.project,
         workflowStore: this.workflowStore,
+        memoryStore: this.memoryStore,
       };
 
       // Call step.process()

@@ -3,6 +3,7 @@ import { getUserAIAgent, getAIAgentTool } from '../../agents/index.js';
 import { parseJsonResponse } from '../../../utils/json-parser.js';
 import { SpanWriter } from '../logging.js';
 import { ROVER_FOOTER_MARKER } from '../constants.js';
+import { recordTraceCompletion } from '../memory/writer.js';
 import type {
   Span,
   ActionTrace,
@@ -292,6 +293,12 @@ export const notifyStep: Step = {
       });
 
       span.complete(`notify: skipped — ${aiReasoning || 'not needed'}`);
+
+      // Record trace completion in memory
+      await recordTraceCompletion(ctx.memoryStore, trace, spans, store, {
+        decision: 'notify-skipped',
+      });
+
       store.removePending(pending.actionId);
 
       return {
@@ -385,7 +392,14 @@ export const notifyStep: Step = {
       );
     }
 
-    // 8. Clean up and return terminal
+    // 8. Record trace completion in memory
+    const prUrl = (meta.pullRequestUrl as string) ?? null;
+    await recordTraceCompletion(ctx.memoryStore, trace, spans, store, {
+      decision: 'notify',
+      prUrl: prUrl ?? undefined,
+    });
+
+    // 9. Clean up and return terminal
     store.removePending(pending.actionId);
 
     return {

@@ -1,5 +1,6 @@
 import { SpanWriter } from '../logging.js';
 import { summarizeChain } from '../summarizer.js';
+import { recordTraceCompletion } from '../memory/writer.js';
 import type { PendingAction } from '../types.js';
 import type {
   Step,
@@ -34,6 +35,11 @@ export const noopStep: Step = {
     });
 
     span.complete(`noop: ${chainSummary}`);
+
+    // Record trace completion in memory
+    await recordTraceCompletion(ctx.memoryStore, ctx.trace, spans, store, {
+      decision: 'noop',
+    });
 
     // Remove the processed action
     store.removePending(pending.actionId);

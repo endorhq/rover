@@ -154,6 +154,16 @@ Respond with a JSON object and nothing else:
 - **execution_order**: `parallel` if all tasks can run simultaneously, `sequential` if they must run in order, `mixed` if some can be parallel and others have dependencies.
 - **reasoning**: Justification for the decomposition. Explain the trade-off between granularity and context overhead.
 
+## Memory Context
+
+You may receive a "Memory (Past Activity)" section in the user message containing summaries of previous autopilot traces on this project. Use this information to:
+
+- **Review prior changes**. If a similar directive was planned before, check what files were changed and what approach was taken. Avoid proposing the same changes to files that were recently modified for the same purpose.
+- **Learn from failed approaches**. If past traces show that a particular approach failed (e.g., a certain file was changed but the task still failed), consider an alternative approach.
+- **Maintain consistency**. If past plans established patterns or conventions, follow them unless the current directive explicitly calls for a different approach.
+
+Memory is supplementary context — always verify current codebase state through your own exploration in Phase 2.
+
 ## Planning Principles
 
 ### 1. Prefer fewer tasks

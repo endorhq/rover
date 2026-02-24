@@ -4,6 +4,7 @@ import { IterationManager } from 'rover-core';
 import { getUserAIAgent, getAIAgentTool } from '../../agents/index.js';
 import { parseJsonResponse } from '../../../utils/json-parser.js';
 import { SpanWriter, ActionWriter, enqueueAction } from '../logging.js';
+import { buildResolverQuery, fetchMemoryContext } from '../memory/reader.js';
 import type {
   PendingAction,
   ResolverDecision,
@@ -159,12 +160,19 @@ async function askAIForDecision(
 
   const spans = store.getSpanTrace(pending.spanId);
 
-  const userMessage = buildResolverUserMessage(
+  let userMessage = buildResolverUserMessage(
     trace,
     pending,
     failedStepDetails,
     spans
   );
+
+  // Fetch and prepend memory context
+  const memoryQuery = buildResolverQuery(trace, failedStepDetails);
+  const memory = await fetchMemoryContext(ctx.memoryStore, memoryQuery, 3);
+  if (memory.content) {
+    userMessage = memory.content + '\n' + userMessage;
+  }
 
   const agent = getUserAIAgent();
   const agentTool = getAIAgentTool(agent);

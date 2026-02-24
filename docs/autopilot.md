@@ -476,6 +476,97 @@ The marker constant is defined in `constants.ts` and shared between the notify s
 
 The footer is **not** AI-generated attribution — it is a system tracking mechanism. It is explicitly exempt from the "no AI-generated attribution" rule in the pusher prompt.
 
+## Memory
+
+The autopilot maintains a per-project memory layer that gives AI-backed steps context about past activity. Without memory, each trace is stateless — the coordinator may re-plan issues already addressed, the planner may propose approaches that failed before, and the resolver may try the same fix repeatedly. Memory solves this by recording trace outcomes and making them searchable.
+
+### Architecture
+
+Memory is stored as daily markdown files indexed by [QMD](https://github.com/qmdnotes/qmd), a local markdown search engine. QMD provides hybrid search (BM25 keyword + semantic vector matching) so steps can find relevant past activity even when the wording differs from the current event.
+
+**Two layers**:
+
+| Layer | Storage | Purpose |
+|---|---|---|
+| **Daily activity log** | `memory/daily/YYYY-MM-DD.md` | One file per day. Appended to when each trace reaches a terminal step. Contains trace summaries, decisions, outcomes, files changed, PR URLs. This is the primary searchable corpus. ~365 files/year. |
+| **Long-term patterns** *(future)* | `memory/long-term/YYYY-WNN.md` | Weekly AI-generated distillation of daily logs into recurring patterns and lessons. ~52 files/year. |
+
+Per-trace files are **not** created — trace summaries are appended as sections within daily logs. This keeps the total file count well under 500 per year.
+
+### Which Steps Use Memory
+
+Memory is read by the three AI decision-making steps where historical context changes outcomes. Memory is written by the two terminal steps where traces complete.
+
+| Step | Reads | Writes | Value |
+|---|---|---|---|
+| **Coordinator** | Yes (up to 5 results) | — | Avoids re-processing handled events, recognizes patterns |
+| **Planner** | Yes (up to 5 results) | — | Knows what was changed before, what approaches worked/failed |
+| **Resolver** | Yes (up to 3 results) | — | Finds past fixes for similar failures |
+| **Noop** | — | Yes | Records trace completion (terminal step) |
+| **Notify** | — | Yes | Records trace completion (terminal step) |
+| **Committer / Pusher** | — | — | Execution steps — memory doesn't change their behavior |
+
+### Daily Log Format
+
+Each daily log file contains timestamped sections, one per completed trace:
+
+```markdown
+# Daily Activity Log — 2026-02-23
+
+## [14:32] opened #42 "Add retry logic" → plan
+
+- **Trace**: abc-123-def
+- **Event**: IssuesEvent
+- **Decision**: plan
+- **Outcome**: 2 step(s) completed, committed on branch rover/task-15
+- **Files changed**: src/lib/autopilot/steps/resolver.ts, src/lib/autopilot/steps/__tests__/resolver.test.ts
+- **PR**: https://github.com/org/repo/pull/99
+
+---
+
+## [15:10] created #42 "LGTM, looks good" → noop
+
+- **Trace**: def-456-ghi
+- **Event**: IssueCommentEvent
+- **Decision**: noop
+- **Outcome**: 1 step(s) completed
+
+---
+```
+
+This format is optimized for QMD indexing — each section has clear headings with event type, issue/PR numbers, and file paths as searchable text.
+
+### QMD Integration
+
+**Setup** (on autopilot start): `MemoryStore.ensureSetup()` creates the `memory/daily/` directory, registers it as a QMD collection (`qmd collection add rover-<projectId> <path>`), and sets collection context so QMD understands the content.
+
+**Search** (before AI decisions): Steps call `MemoryStore.search(query, limit)`, which runs `qmd query "<query>" --collection rover-<projectId> --json --limit N`. All steps use hybrid search (keyword + semantic). Results are formatted into a `## Memory (Past Activity)` section and injected into the AI prompt. Content is capped at 4,000 characters to respect token budgets.
+
+**Embedding** (after trace completion): After writing a daily log entry, `MemoryStore.triggerEmbed()` fires a non-blocking `qmd embed --collection rover-<projectId>`. QMD only re-embeds changed files, so this is fast. This keeps the vector index fresh for the next search.
+
+**Graceful degradation**: If QMD is not installed, all memory operations return empty results silently. The autopilot functions normally without QMD — memory is an enhancement, not a requirement. QMD availability is checked once at startup and cached.
+
+### How Memory Is Injected
+
+Each reading step builds a search query tailored to its context:
+
+- **Coordinator**: Queries by event type, action, issue/PR number, and title. Example: `"IssuesEvent opened #42 Add retry logic"`. Finds past decisions about the same or similar events.
+- **Planner**: Queries by plan scope, event title, and coordinator scope. Example: `"implement retry logic for task pipeline"`. Finds prior changes and failed approaches in the same area.
+- **Resolver**: Queries by trace summary and failure details (first line of error, task title). Example: `"failure: test timeout in resolver task-15"`. Finds past resolutions for similar failures.
+
+The formatted results are injected into the AI prompt as a `## Memory (Past Activity)` section. Each AI prompt template (pilot, plan, resolve) includes instructions on how to interpret memory — as advisory context, not binding instruction.
+
+### How Memory Is Written
+
+Terminal steps (`noop`, `notify`) call `recordTraceCompletion()` after finalizing their span. This function:
+
+1. Walks the trace's spans to extract event type, coordinator decision, outcome, files changed, PR URL, and branch name.
+2. Formats the data as a markdown section.
+3. Appends it to today's daily log file via `MemoryStore.appendDailyEntry()`.
+4. Triggers a non-blocking QMD embed to update the vector index.
+
+Both the "notification sent" and "notification skipped" paths in the notify step record memory, ensuring all traces are captured regardless of whether a GitHub comment was posted.
+
 ## Storage
 
 ### File Layout
@@ -490,10 +581,13 @@ The footer is **not** AI-generated attribution — it is a system tracking mecha
     ├── cursor.json            # Processed event IDs (deduplication)
     ├── state.json             # Pending action queue + task mappings
     ├── traces.json            # Trace state for UI and restart recovery
-    └── log.jsonl              # Structured log (rotated at 5MB, 3 backups)
+    ├── log.jsonl              # Structured log (rotated at 5MB, 3 backups)
+    └── memory/
+        └── daily/
+            └── YYYY-MM-DD.md  # Daily activity log (one per day)
 ```
 
-Spans and actions are stored as individual JSON files at the **project level**, not inside `autopilot/`. This keeps them accessible to other Rover features and easy to inspect individually. The `autopilot/` subdirectory contains only operational state specific to the autopilot pipeline.
+Spans and actions are stored as individual JSON files at the **project level**, not inside `autopilot/`. This keeps them accessible to other Rover features and easy to inspect individually. The `autopilot/` subdirectory contains only operational state specific to the autopilot pipeline. Memory files live under `autopilot/memory/` and are indexed by QMD for search.
 
 ### Span Format
 
@@ -589,3 +683,5 @@ Spans and actions are stored as individual JSON files at the **project level**, 
 11. **No AI-generated attribution.** AI agents must not inject their own branding into git artifacts — no "Generated by Claude Code", "Generated with Codex", "Co-Authored-By: Claude", or similar lines in commit messages, PR titles, or PR bodies. The only allowed attribution is the Rover trailer (`Co-Authored-By: Rover <noreply@endor.dev>`) when the project has attribution enabled. This is enforced via agent system prompts for steps that produce git artifacts.
 
 12. **Never re-process your own output.** Every message the pipeline posts to GitHub carries a Rover footer marker. The event step filters out any incoming event whose body contains this marker. This is the primary defense against feedback loops — without it, a clarification comment posted by the bot would re-enter the pipeline as a new event, potentially triggering another clarification, ad infinitum. The marker is a simple string match, not dependent on usernames or API tokens, so it works regardless of which GitHub account the bot uses.
+
+13. **Memory is context, not instruction.** AI-backed steps receive past activity summaries via the memory layer, but memory does not override current analysis. An agent should use memory to avoid redundant work, learn from past failures, and recognize patterns — but always evaluate the current event on its own merits. Memory degrades gracefully: if QMD is unavailable, steps function without it.

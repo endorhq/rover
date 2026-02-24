@@ -2,6 +2,7 @@ import type { WorkflowStore } from 'rover-core';
 import { getUserAIAgent, getAIAgentTool } from '../../agents/index.js';
 import { parseJsonResponse } from '../../../utils/json-parser.js';
 import { SpanWriter, ActionWriter, enqueueAction } from '../logging.js';
+import { buildPlannerQuery, fetchMemoryContext } from '../memory/reader.js';
 import type { PendingAction, PlanResult, PlanTask, Span } from '../types.js';
 import type {
   Step,
@@ -164,7 +165,14 @@ export const plannerStep: Step = {
     const spans = store.getSpanTrace(pending.spanId);
 
     // Build user message from pending.meta + spans
-    const userMessage = buildPlanUserMessage(pending.meta ?? {}, spans);
+    let userMessage = buildPlanUserMessage(pending.meta ?? {}, spans);
+
+    // Fetch and append memory context
+    const memoryQuery = buildPlannerQuery(pending.meta ?? {}, spans);
+    const memory = await fetchMemoryContext(ctx.memoryStore, memoryQuery, 5);
+    if (memory.content) {
+      userMessage += '\n' + memory.content;
+    }
 
     // Build system prompt with dynamic workflow catalog
     let systemPrompt = planPromptTemplate;
