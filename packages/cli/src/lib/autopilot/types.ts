@@ -13,15 +13,6 @@ export interface LogEntry {
   message: string;
 }
 
-export type WorkSlotStatus = 'idle' | 'running' | 'done' | 'error';
-
-export interface WorkSlot {
-  id: number;
-  label: string;
-  status: WorkSlotStatus;
-  fill: string;
-}
-
 export type FetchStatus = 'idle' | 'fetching' | 'done' | 'error';
 
 export interface GitHubEvent {

@@ -43,7 +43,7 @@ const autopilotCommand = async (options: { refresh?: string } = {}) => {
 
   const refreshInterval = options.refresh
     ? Number.parseInt(options.refresh, 10)
-    : 3;
+    : 30;
 
   // Ensure spans/ and actions/ directories exist before any step runs
   ensureTraceDirs(project.id);

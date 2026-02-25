@@ -50,96 +50,20 @@ export function formatDuration(startTime?: string, endTime?: string): string {
   return `${seconds}s`;
 }
 
-const STAR_CHARS = ['.', '\u00B7', '*', '+', '\u2022'];
-const STAR_SPEEDS = [1, 1, 2, 2, 3];
-
-interface Star {
-  x: number;
-  y: number;
-  char: string;
-  speed: number;
+export function timeAgo(timestamp: string): string {
+  const diff = Date.now() - new Date(timestamp).getTime();
+  const seconds = Math.floor(diff / 1000);
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ago`;
 }
 
-export function createStarField(width: number, height: number): Star[] {
-  const count = Math.floor((width * height) / 18);
-  const stars: Star[] = [];
-  for (let i = 0; i < count; i++) {
-    const idx = Math.floor(Math.random() * STAR_CHARS.length);
-    stars.push({
-      x: Math.floor(Math.random() * width),
-      y: Math.floor(Math.random() * height),
-      char: STAR_CHARS[idx],
-      speed: STAR_SPEEDS[idx],
-    });
-  }
-  return stars;
-}
-
-export function advanceStars(
-  stars: Star[],
-  width: number,
-  height: number
-): Star[] {
-  return stars.map(s => {
-    let nx = s.x - s.speed;
-    if (nx < 0) {
-      nx = width - 1;
-      return {
-        ...s,
-        x: nx,
-        y: Math.floor(Math.random() * height),
-      };
-    }
-    return { ...s, x: nx };
-  });
-}
-
-export function renderStarField(
-  stars: Star[],
-  width: number,
-  height: number
-): string[] {
-  const grid: string[][] = Array.from({ length: height }, () =>
-    Array(width).fill(' ')
-  );
-
-  for (const s of stars) {
-    if (s.y >= 0 && s.y < height && s.x >= 0 && s.x < width) {
-      grid[s.y][s.x] = s.char;
-    }
-  }
-
-  return grid.map(row => row.join(''));
-}
-
-// A small planet rendered near the bottom of the space scene
-const PLANET_ART = [
-  '        .--.',
-  "      .'    `.",
-  '     /  O  o  \\',
-  '    |     .    |',
-  '     \\  o    /',
-  "      `.  .'",
-  "        `'",
-];
-
-export function getPlanetArt(): string[] {
-  return PLANET_ART;
-}
-
-export function getSlotFill(
-  status: 'idle' | 'running' | 'done' | 'error'
-): string {
-  switch (status) {
-    case 'idle':
-      return '\u2591';
-    case 'running':
-      return '\u2593';
-    case 'done':
-      return '\u2588';
-    case 'error':
-      return '\u2573';
-  }
+export function progressBar(progress: number, barWidth: number): string {
+  const filled = Math.round((progress / 100) * barWidth);
+  const empty = barWidth - filled;
+  return '\u2588'.repeat(filled) + '\u2591'.repeat(empty);
 }
 
 /**

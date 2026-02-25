@@ -1,4 +1,10 @@
-import React, { useReducer, useEffect, useRef, useCallback } from 'react';
+import React, {
+  useReducer,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+} from 'react';
 import { Box, Text, useInput } from 'ink';
 import type {
   Action,
@@ -12,6 +18,15 @@ import type {
   Span,
 } from './types.js';
 import type { AutopilotStore } from './store.js';
+import {
+  STEP_COLORS,
+  STEP_FILLED,
+  STEP_TERMINAL,
+  TASK_STATUS_COLORS,
+  TASK_STATUS_LABELS,
+  SectionHeader,
+} from './components.js';
+import { timeAgo, progressBar } from './helpers.js';
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -73,6 +88,21 @@ const LOG_STEP_FILTERS: (string | null)[] = [
   'resolve',
 ];
 
+// ── Colors ──────────────────────────────────────────────────────────────────
+
+const LOG_STEP_COLORS: Record<string, string> = {
+  event: 'yellow',
+  coordinate: 'cyan',
+  plan: 'magenta',
+  workflow: 'blue',
+  commit: 'green',
+  resolve: 'yellow',
+};
+
+const LOG_BG = '#000000';
+
+// ── State ───────────────────────────────────────────────────────────────────
+
 function initialState(): InspectorState {
   return {
     activeTab: 'traces',
@@ -84,7 +114,7 @@ function initialState(): InspectorState {
     traceStepSelectedIndex: 0,
     traceStepDrillDown: false,
     traceStepDetailScroll: 0,
-    logScroll: -1, // -1 means auto-scroll to bottom
+    logScroll: -1,
     logSearch: '',
     logSearchActive: false,
     logStepFilter: null,
@@ -328,63 +358,7 @@ function inspectorReducer(
   }
 }
 
-// ── Colors ──────────────────────────────────────────────────────────────────
-
-const STEP_COLORS: Record<ActionStepStatus, string> = {
-  completed: 'green',
-  running: 'cyan',
-  pending: 'gray',
-  failed: 'red',
-  error: 'yellow',
-};
-
-const STEP_FILLED: Record<ActionStepStatus, string> = {
-  completed: '\u25A0',
-  running: '\u25A0',
-  pending: '\u25A1',
-  failed: '\u25A0',
-  error: '\u25A0',
-};
-
-const STEP_TERMINAL: Record<ActionStepStatus, string> = {
-  completed: '\u25CF',
-  running: '\u25CF',
-  pending: '\u25CB',
-  failed: '\u25CF',
-  error: '\u25CF',
-};
-
-const LOG_STEP_COLORS: Record<string, string> = {
-  event: 'yellow',
-  coordinate: 'cyan',
-  plan: 'magenta',
-  workflow: 'blue',
-  commit: 'green',
-  resolve: 'yellow',
-};
-
-const TASK_STATUS_COLORS: Record<string, string> = {
-  IN_PROGRESS: 'cyan',
-  ITERATING: 'cyan',
-  COMPLETED: 'green',
-  MERGED: 'green',
-  PUSHED: 'green',
-  FAILED: 'red',
-  PENDING: 'gray',
-  NEW: 'gray',
-};
-
 // ── Utility ─────────────────────────────────────────────────────────────────
-
-function timeAgo(timestamp: string): string {
-  const diff = Date.now() - new Date(timestamp).getTime();
-  const seconds = Math.floor(diff / 1000);
-  if (seconds < 60) return `${seconds}s ago`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  return `${hours}h ago`;
-}
 
 function formatTimestamp(ts: string): string {
   try {
@@ -417,83 +391,73 @@ function filterTraces(
 
 // ── Sub-Components ──────────────────────────────────────────────────────────
 
-function InspectorHeader() {
+const InspectorTabs = React.memo(function InspectorTabs({
+  activeTab,
+}: {
+  activeTab: InspectorTab;
+}) {
   return (
-    <Box>
+    <Box gap={1}>
       <Text bold color="cyan">
         INSPECTOR
       </Text>
-    </Box>
-  );
-}
-
-function InspectorTabs({ activeTab }: { activeTab: InspectorTab }) {
-  return (
-    <Box gap={1}>
+      <Text dimColor>{'  '}</Text>
       {TABS.map(tab => (
         <Text
           key={tab}
           bold={tab === activeTab}
           color={tab === activeTab ? 'cyan' : 'gray'}
         >
-          {tab === activeTab ? `[${tab.toUpperCase()}]` : ` ${tab} `}
+          {tab === activeTab ? `[${tab.toUpperCase()}]` : `  ${tab}  `}
         </Text>
       ))}
     </Box>
   );
-}
+});
 
-function InspectorFooter({
+const InspectorFooter = React.memo(function InspectorFooter({
   activeTab,
   state,
 }: {
   activeTab: InspectorTab;
   state: InspectorState;
 }) {
-  const parts: string[] = ['Tab:switch', 'Up/Dn:navigate'];
+  const parts: string[] = ['\u21B9:tab', '\u2191\u2193:nav'];
 
   if (activeTab === 'traces') {
     if (state.traceDrillDown && state.traceStepDrillDown) {
       parts.push('Esc:back');
     } else if (state.traceDrillDown) {
-      parts.push('Enter:step detail', 'Esc:back');
+      parts.push('\u21B5:step', 'Esc:back');
     } else {
-      parts.push('Enter:detail', 'f:filter');
+      parts.push('\u21B5:detail', 'f:filter');
     }
   }
 
   if (activeTab === 'logs') {
-    parts.push('/:search', 's:step filter');
+    parts.push('/:search', 's:step');
   }
 
   if (activeTab === 'pending') {
-    if (state.pendingDrillDown) {
-      parts.push('Esc:back');
-    } else {
-      parts.push('Enter:detail');
-    }
+    parts.push(state.pendingDrillDown ? 'Esc:back' : '\u21B5:detail');
   }
 
   if (activeTab === 'tasks') {
-    if (state.taskDrillDown) {
-      parts.push('Esc:back');
-    } else {
-      parts.push('Enter:detail');
-    }
+    parts.push(state.taskDrillDown ? 'Esc:back' : '\u21B5:detail');
   }
 
-  parts.push('Esc:back', 'i:close');
+  parts.push('i:close');
 
   return (
     <Box>
       <Text dimColor>{parts.join('  ')}</Text>
     </Box>
   );
-}
+});
 
 // ── Traces Panel ────────────────────────────────────────────────────────────
 
-function TracesListView({
+const TracesListView = React.memo(function TracesListView({
   traces,
   selectedIndex,
   filter,
@@ -504,12 +468,14 @@ function TracesListView({
   filter: TraceFilter;
   visibleHeight: number;
 }) {
-  const filtered = filterTraces(traces, filter);
-  const sorted = [...filtered].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
+  const sorted = useMemo(() => {
+    const filtered = filterTraces(traces, filter);
+    return [...filtered].sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+  }, [traces, filter]);
 
-  // Center selected item in viewport
   const startIndex = Math.max(
     0,
     Math.min(
@@ -521,22 +487,26 @@ function TracesListView({
 
   return (
     <Box flexDirection="column">
-      <Text>
-        <Text dimColor> Filter: </Text>
-        <Text color="yellow">{filter}</Text>
-        <Text dimColor> (f to cycle)</Text>
-      </Text>
-      <Text> </Text>
+      <Box gap={2}>
+        <Text dimColor>
+          {' '}
+          Filter: <Text color="yellow">{filter}</Text> (f)
+        </Text>
+        <Text dimColor>
+          {sorted.length} trace{sorted.length !== 1 ? 's' : ''}
+        </Text>
+      </Box>
       {sorted.length === 0 ? (
         <Text dimColor> No traces match filter</Text>
       ) : (
         visible.map((trace, i) => {
           const realIndex = startIndex + i;
           const isSelected = realIndex === selectedIndex;
+          const age = timeAgo(trace.createdAt);
           return (
             <Box key={trace.traceId}>
               <Text color={isSelected ? 'cyan' : undefined}>
-                {isSelected ? ' > ' : '   '}
+                {isSelected ? ' \u25B8 ' : '   '}
               </Text>
               <Box>
                 {trace.steps.map((step, si) => (
@@ -552,273 +522,26 @@ function TracesListView({
                   </Text>
                 ))}
               </Box>
-              <Text> </Text>
-              <Text
-                color={isSelected ? 'white' : undefined}
-                dimColor={!isSelected}
-                wrap="truncate"
-              >
-                {trace.summary}
-              </Text>
+              <Text>{'  '}</Text>
+              <Box flexGrow={1}>
+                <Text
+                  color={isSelected ? 'white' : undefined}
+                  dimColor={!isSelected}
+                  wrap="truncate"
+                >
+                  {trace.summary}
+                </Text>
+              </Box>
+              <Text dimColor>{` ${age.padStart(8)}`}</Text>
             </Box>
           );
         })
       )}
     </Box>
   );
-}
-
-function StepDetailView({
-  stepLabel,
-  stepStatus,
-  displayIndex,
-  actionData,
-  span,
-  scroll,
-  visibleHeight,
-  width,
-}: {
-  stepLabel: string;
-  stepStatus: ActionStepStatus;
-  displayIndex: number;
-  actionData: Action | null;
-  span: Span | null;
-  scroll: number;
-  visibleHeight: number;
-  width: number;
-}) {
-  const lines: React.ReactNode[] = [];
-  const sep = '\u2500'.repeat(Math.max(1, width - 6));
-
-  // Header
-  lines.push(
-    <Text key="h1" bold>
-      <Text> Step #{displayIndex + 1}: </Text>
-      <Text color={STEP_COLORS[stepStatus]}>{stepLabel}</Text>
-      <Text dimColor> ({stepStatus})</Text>
-    </Text>
-  );
-  lines.push(
-    <Text key="sep1" dimColor>
-      {' '}
-      {sep}
-    </Text>
-  );
-
-  // Span section
-  if (span) {
-    lines.push(
-      <Text key="span-title" bold>
-        {' '}
-        SPAN
-      </Text>
-    );
-    lines.push(
-      <Text key="span-id">
-        <Text dimColor> ID: </Text>
-        <Text>{span.id}</Text>
-      </Text>
-    );
-    lines.push(
-      <Text key="span-step">
-        <Text dimColor> Step: </Text>
-        <Text>{span.step}</Text>
-      </Text>
-    );
-    if (span.status) {
-      const spanStatusColor =
-        span.status === 'completed'
-          ? 'green'
-          : span.status === 'failed'
-            ? 'red'
-            : span.status === 'error'
-              ? 'yellow'
-              : 'cyan';
-      lines.push(
-        <Text key="span-status">
-          <Text dimColor> Status: </Text>
-          <Text color={spanStatusColor}>{span.status}</Text>
-        </Text>
-      );
-    }
-    lines.push(
-      <Text key="span-ts">
-        <Text dimColor> Timestamp: </Text>
-        <Text>{span.timestamp}</Text>
-      </Text>
-    );
-    if (span.completed) {
-      lines.push(
-        <Text key="span-completed">
-          <Text dimColor> Completed: </Text>
-          <Text>{span.completed}</Text>
-        </Text>
-      );
-    }
-    lines.push(
-      <Text key="span-summary">
-        <Text dimColor> Summary: </Text>
-        <Text>{span.summary}</Text>
-      </Text>
-    );
-    lines.push(
-      <Text key="span-parent">
-        <Text dimColor> Parent: </Text>
-        <Text>{span.parent ?? '(none)'}</Text>
-      </Text>
-    );
-
-    if (span.meta && Object.keys(span.meta).length > 0) {
-      lines.push(<Text key="span-meta-sep"> </Text>);
-      lines.push(
-        <Text key="span-meta-title" bold>
-          {' '}
-          SPAN META
-        </Text>
-      );
-      const metaStr = JSON.stringify(span.meta, null, 2);
-      const metaLines = metaStr.split('\n');
-      for (let mi = 0; mi < metaLines.length; mi++) {
-        lines.push(
-          <Text key={`span-meta-${mi}`} dimColor wrap="truncate">
-            {'  '}
-            {metaLines[mi]}
-          </Text>
-        );
-      }
-    }
-  } else {
-    lines.push(<Text key="no-span-sep"> </Text>);
-    lines.push(
-      <Text key="no-span-title" bold>
-        {' '}
-        SPAN
-      </Text>
-    );
-    const waitingArt = [
-      '',
-      '          _~^~^~_',
-      '      \\) /  o o  \\ (/',
-      "        '_   -   _'",
-      "        / '-----' \\",
-      '',
-      '    Waiting for span data...',
-      '    This step has not produced',
-      '    its span yet.',
-      '',
-    ];
-    for (let wi = 0; wi < waitingArt.length; wi++) {
-      lines.push(
-        <Text key={`wait-span-${wi}`} dimColor>
-          {'  '}
-          {waitingArt[wi]}
-        </Text>
-      );
-    }
-  }
-
-  // Action section
-  lines.push(
-    <Text key="sep2" dimColor>
-      {' '}
-      {sep}
-    </Text>
-  );
-  if (actionData) {
-    lines.push(
-      <Text key="action-title" bold>
-        {' '}
-        OUTPUT ACTION
-      </Text>
-    );
-    lines.push(
-      <Text key="action-id">
-        <Text dimColor> ID: </Text>
-        <Text>{actionData.id}</Text>
-      </Text>
-    );
-    lines.push(
-      <Text key="action-action">
-        <Text dimColor> Action: </Text>
-        <Text>{actionData.action}</Text>
-      </Text>
-    );
-    lines.push(
-      <Text key="action-ts">
-        <Text dimColor> Timestamp: </Text>
-        <Text>{actionData.timestamp}</Text>
-      </Text>
-    );
-    lines.push(
-      <Text key="action-reasoning" wrap="truncate">
-        <Text dimColor> Reasoning: </Text>
-        <Text>{actionData.reasoning}</Text>
-      </Text>
-    );
-
-    if (actionData.meta && Object.keys(actionData.meta).length > 0) {
-      lines.push(<Text key="action-meta-sep"> </Text>);
-      lines.push(
-        <Text key="action-meta-title" bold>
-          {' '}
-          ACTION META
-        </Text>
-      );
-      const metaStr = JSON.stringify(actionData.meta, null, 2);
-      const metaLines = metaStr.split('\n');
-      for (let mi = 0; mi < metaLines.length; mi++) {
-        lines.push(
-          <Text key={`action-meta-${mi}`} dimColor wrap="truncate">
-            {'  '}
-            {metaLines[mi]}
-          </Text>
-        );
-      }
-    }
-  } else {
-    lines.push(<Text key="no-action-sep"> </Text>);
-    lines.push(
-      <Text key="no-action-title" bold>
-        {' '}
-        OUTPUT ACTION
-      </Text>
-    );
-    const waitingArt = [
-      '',
-      '        .     *   .   *',
-      '     *    .  \\|/  .    *',
-      '       .  --=*=--  .',
-      '     *    .  /|\\  .    *',
-      '        .     *   .   *',
-      '',
-      '    Waiting for output action...',
-      '    This step has not decided',
-      '    what to do next.',
-      '',
-    ];
-    for (let wi = 0; wi < waitingArt.length; wi++) {
-      lines.push(
-        <Text key={`wait-action-${wi}`} dimColor>
-          {'  '}
-          {waitingArt[wi]}
-        </Text>
-      );
-    }
-  }
-
-  const sliced = lines.slice(scroll, scroll + visibleHeight);
-  return (
-    <Box flexDirection="column" height={visibleHeight}>
-      {sliced.map((line, i) => (
-        <Box key={`row-${i}`}>{line}</Box>
-      ))}
-    </Box>
-  );
-}
+});
 
 // Build the display list for trace steps.
-// Display index 0 = "event" (the trigger), indices 1..N = trace.steps[0..N-1].
-// Total display count = trace.steps.length + 1.
 interface DisplayStep {
   label: string;
   status: ActionStepStatus;
@@ -841,22 +564,6 @@ function buildDisplaySteps(trace: ActionTrace): DisplayStep[] {
   return display;
 }
 
-// Resolve the span and output action for a display step.
-//
-// Each trace step's actionId identifies the action being executed at that step.
-// That action's spanId points to the span that CREATED it (the previous step's
-// span). So to get a step's OWN span and the action it PRODUCED, we look at
-// the NEXT trace step's action:
-//   trace.steps[di].actionId  →  action.spanId = step di's own span
-//                             →  the action itself = what step di produced
-//
-// Display index mapping:
-//   di=0 (event)     → trace.steps[0].actionId gives event span + event output
-//   di=1..N-1        → trace.steps[di].actionId gives step di's span + output
-//   di=N (last step) → no trace.steps[N], data not yet available
-//
-// Special case: span-only steps (e.g. noop) have a spanId on the step itself
-// and no follow-up action. These are always the last step in the trace.
 function loadStepData(
   di: number,
   trace: ActionTrace,
@@ -866,14 +573,11 @@ function loadStepData(
   if (di > 0) {
     const traceStep = trace.steps[di - 1];
 
-    // Terminal step with spanId: read span directly, no output action
     if (traceStep?.terminal && traceStep.spanId) {
       const span = store.readSpan(traceStep.spanId);
       return { span, actionData: null };
     }
 
-    // Non-terminal step with spanId: read span directly, also read output
-    // action from the next trace step if available
     if (traceStep?.spanId) {
       const span = store.readSpan(traceStep.spanId);
       let actionData: Action | null = null;
@@ -886,11 +590,8 @@ function loadStepData(
       }
       return { span, actionData };
     }
-
-    // No spanId on the trace step: fall through to next-step-action logic
   }
 
-  // di == 0 (event) or fallback: use next trace step's action to find span
   if (di < trace.steps.length) {
     const actionId = trace.steps[di].actionId;
     if (!cache.has(actionId)) {
@@ -900,8 +601,205 @@ function loadStepData(
     const span = actionData?.spanId ? store.readSpan(actionData.spanId) : null;
     return { span, actionData };
   }
-  // Last display step: no next trace step to reference
   return { span: null, actionData: null };
+}
+
+function StepDetailView({
+  stepLabel,
+  stepStatus,
+  displayIndex,
+  actionData,
+  span,
+  scroll,
+  visibleHeight,
+  width,
+}: {
+  stepLabel: string;
+  stepStatus: ActionStepStatus;
+  displayIndex: number;
+  actionData: Action | null;
+  span: Span | null;
+  scroll: number;
+  visibleHeight: number;
+  width: number;
+}) {
+  const lines: React.ReactNode[] = [];
+  const sep = '\u2500'.repeat(Math.max(1, width - 4));
+
+  // Header — human-readable summary first
+  lines.push(
+    <Text key="h1" bold>
+      <Text>{` Step #${displayIndex + 1}: `}</Text>
+      <Text color={STEP_COLORS[stepStatus]}>{stepLabel}</Text>
+      <Text dimColor>{` (${stepStatus})`}</Text>
+    </Text>
+  );
+
+  // Summary (most useful info first)
+  if (span?.summary) {
+    lines.push(
+      <Text key="summary" wrap="truncate">
+        <Text dimColor>{' Summary: '}</Text>
+        <Text>{span.summary}</Text>
+      </Text>
+    );
+  }
+  if (actionData?.reasoning) {
+    lines.push(
+      <Text key="reasoning" wrap="truncate">
+        <Text dimColor>{' Reasoning: '}</Text>
+        <Text>{actionData.reasoning}</Text>
+      </Text>
+    );
+  }
+
+  lines.push(
+    <Text key="sep1" dimColor>
+      {` ${sep}`}
+    </Text>
+  );
+
+  // Span details
+  if (span) {
+    lines.push(
+      <Text key="span-title" bold>
+        {' SPAN'}
+      </Text>
+    );
+    lines.push(
+      <Text key="span-step">
+        <Text dimColor>{' Step: '}</Text>
+        <Text>{span.step}</Text>
+        {span.status ? (
+          <Text>
+            <Text dimColor>{'  Status: '}</Text>
+            <Text
+              color={
+                span.status === 'completed'
+                  ? 'green'
+                  : span.status === 'failed'
+                    ? 'red'
+                    : span.status === 'error'
+                      ? 'yellow'
+                      : 'cyan'
+              }
+            >
+              {span.status}
+            </Text>
+          </Text>
+        ) : null}
+      </Text>
+    );
+    lines.push(
+      <Text key="span-ts">
+        <Text dimColor>{' Created: '}</Text>
+        <Text>{span.timestamp}</Text>
+        {span.completed ? (
+          <Text>
+            <Text dimColor>{'  Completed: '}</Text>
+            <Text>{span.completed}</Text>
+          </Text>
+        ) : null}
+      </Text>
+    );
+    lines.push(
+      <Text key="span-id">
+        <Text dimColor>{' ID: '}</Text>
+        <Text dimColor>{span.id}</Text>
+        {span.parent ? (
+          <Text>
+            <Text dimColor>{'  Parent: '}</Text>
+            <Text dimColor>{span.parent}</Text>
+          </Text>
+        ) : null}
+      </Text>
+    );
+
+    if (span.meta && Object.keys(span.meta).length > 0) {
+      lines.push(
+        <Text key="span-meta-title" bold>
+          {' SPAN META'}
+        </Text>
+      );
+      const metaStr = JSON.stringify(span.meta, null, 2);
+      const metaLines = metaStr.split('\n');
+      for (let mi = 0; mi < metaLines.length; mi++) {
+        lines.push(
+          <Text key={`span-meta-${mi}`} dimColor wrap="truncate">
+            {'  '}
+            {metaLines[mi]}
+          </Text>
+        );
+      }
+    }
+  } else {
+    lines.push(
+      <Text key="no-span" dimColor>
+        {' Span not yet available'}
+      </Text>
+    );
+  }
+
+  // Output action
+  lines.push(
+    <Text key="sep2" dimColor>
+      {` ${sep}`}
+    </Text>
+  );
+  if (actionData) {
+    lines.push(
+      <Text key="action-title" bold>
+        {' OUTPUT ACTION'}
+      </Text>
+    );
+    lines.push(
+      <Text key="action-action">
+        <Text dimColor>{' Action: '}</Text>
+        <Text>{actionData.action}</Text>
+        <Text dimColor>{'  '}</Text>
+        <Text dimColor>{actionData.timestamp}</Text>
+      </Text>
+    );
+    lines.push(
+      <Text key="action-id">
+        <Text dimColor>{' ID: '}</Text>
+        <Text dimColor>{actionData.id}</Text>
+      </Text>
+    );
+
+    if (actionData.meta && Object.keys(actionData.meta).length > 0) {
+      lines.push(
+        <Text key="action-meta-title" bold>
+          {' ACTION META'}
+        </Text>
+      );
+      const metaStr = JSON.stringify(actionData.meta, null, 2);
+      const metaLines = metaStr.split('\n');
+      for (let mi = 0; mi < metaLines.length; mi++) {
+        lines.push(
+          <Text key={`action-meta-${mi}`} dimColor wrap="truncate">
+            {'  '}
+            {metaLines[mi]}
+          </Text>
+        );
+      }
+    }
+  } else {
+    lines.push(
+      <Text key="no-action" dimColor>
+        {' Output action not yet available'}
+      </Text>
+    );
+  }
+
+  const sliced = lines.slice(scroll, scroll + visibleHeight);
+  return (
+    <Box flexDirection="column" height={visibleHeight}>
+      {sliced.map((line, i) => (
+        <Box key={`row-${i}`}>{line}</Box>
+      ))}
+    </Box>
+  );
 }
 
 function TracesDetailView({
@@ -924,7 +822,6 @@ function TracesDetailView({
   const actionCache = useRef<Map<string, Action | null>>(new Map());
   const displaySteps = buildDisplaySteps(trace);
 
-  // Step drill-down mode
   if (stepDrillDown && displaySteps[selectedStepIndex]) {
     const ds = displaySteps[selectedStepIndex];
     const { span, actionData } = loadStepData(
@@ -948,58 +845,49 @@ function TracesDetailView({
     );
   }
 
-  // Step selection mode
   const lines: React.ReactNode[] = [];
 
-  // Header
+  // Human-readable header
   lines.push(
     <Text key="h1" bold>
       {' '}
-      Trace: {trace.summary}
+      {trace.summary}
     </Text>
   );
   lines.push(
     <Text key="h2" dimColor>
       {' '}
-      Created: {trace.createdAt}
+      {timeAgo(trace.createdAt)}
+      {trace.retryCount ? ` \u00B7 ${trace.retryCount} retries` : ''}
     </Text>
   );
   lines.push(
     <Text key="sep1" dimColor>
-      {' '}
-      {'\u2500'.repeat(Math.max(1, width - 6))}
+      {` ${'\u2500'.repeat(Math.max(1, width - 4))}`}
     </Text>
   );
 
-  // Steps (selectable) — includes event + trace steps
-  lines.push(
-    <Text key="steps-title" bold>
-      {' '}
-      STEPS
-    </Text>
-  );
+  // Steps
   displaySteps.forEach((ds, i) => {
     const isSelected = i === selectedStepIndex;
     const color = STEP_COLORS[ds.status];
     lines.push(
       <Text key={`step-${i}`} wrap="truncate">
         <Text color={isSelected ? 'cyan' : undefined}>
-          {isSelected ? ' > ' : '   '}
+          {isSelected ? ' \u25B8 ' : '   '}
         </Text>
-        <Text>{`${i + 1}. `}</Text>
         <Text color={color}>
           {ds.terminal ? STEP_TERMINAL[ds.status] : STEP_FILLED[ds.status]}
         </Text>
-        <Text color={color}> {ds.label.padEnd(12)}</Text>
+        <Text color={color}>{` ${ds.label.padEnd(12)}`}</Text>
         <Text dimColor={!isSelected}>
-          {ds.status.padEnd(10)} {ds.reasoning ?? 'pending'}
+          {`${ds.status.padEnd(10)} ${ds.reasoning ?? 'pending'}`}
         </Text>
       </Text>
     );
   });
 
-  // Viewport scrolling: center selected step
-  const headerLines = 4; // h1, h2, sep1, steps-title
+  const headerLines = 3;
   const selectedLinePos = headerLines + selectedStepIndex;
   const idealStart = Math.max(
     0,
@@ -1018,7 +906,7 @@ function TracesDetailView({
   );
 }
 
-function TracesPanel({
+const TracesPanel = React.memo(function TracesPanel({
   traces,
   store,
   state,
@@ -1031,7 +919,6 @@ function TracesPanel({
   visibleHeight: number;
   width: number;
 }) {
-  // In drill-down mode, find trace by ID (stable across reorders)
   const selectedTrace = state.traceDrillDown
     ? (traces.find(c => c.traceId === state.traceSelectedId) ?? null)
     : null;
@@ -1055,21 +942,23 @@ function TracesPanel({
       traces={traces}
       selectedIndex={state.traceSelectedIndex}
       filter={state.traceFilter}
-      visibleHeight={visibleHeight - 2}
+      visibleHeight={visibleHeight - 1}
     />
   );
-}
+});
 
 // ── Logs Panel ──────────────────────────────────────────────────────────────
 
-function LogsPanel({
+const LogsPanel = React.memo(function LogsPanel({
   store,
   state,
   visibleHeight,
+  width,
 }: {
   store: AutopilotStore;
   state: InspectorState;
   visibleHeight: number;
+  width: number;
 }) {
   const [logs, setLogs] = React.useState<AutopilotLogEntry[]>([]);
 
@@ -1080,60 +969,70 @@ function LogsPanel({
     return () => clearInterval(timer);
   }, [store]);
 
-  // Apply filters
-  let filtered = logs;
-  if (state.logStepFilter) {
-    filtered = filtered.filter(l => l.step === state.logStepFilter);
-  }
-  if (state.logSearch) {
-    const search = state.logSearch.toLowerCase();
-    filtered = filtered.filter(l => l.summary.toLowerCase().includes(search));
-  }
+  const filtered = useMemo(() => {
+    let result = logs;
+    if (state.logStepFilter) {
+      result = result.filter(l => l.step === state.logStepFilter);
+    }
+    if (state.logSearch) {
+      const search = state.logSearch.toLowerCase();
+      result = result.filter(l => l.summary.toLowerCase().includes(search));
+    }
+    return result;
+  }, [logs, state.logStepFilter, state.logSearch]);
 
-  // Scrolling
+  const contentRows = visibleHeight - 2;
   const effectiveScroll =
     state.logScroll === -1
-      ? Math.max(0, filtered.length - visibleHeight + 2)
+      ? Math.max(0, filtered.length - contentRows)
       : state.logScroll;
   const visible = filtered.slice(
     effectiveScroll,
-    effectiveScroll + visibleHeight - 2
+    effectiveScroll + contentRows
   );
-
+  const fill = ' '.repeat(width);
   const stepLabel = state.logStepFilter ?? 'all';
 
   return (
     <Box flexDirection="column">
-      <Box>
-        <Text dimColor> Search: </Text>
-        {state.logSearchActive ? (
-          <Text color="yellow">{state.logSearch}_</Text>
-        ) : (
-          <Text dimColor>{state.logSearch || '(/ to toggle)'}</Text>
-        )}
-        <Text dimColor> Step: </Text>
-        <Text color="yellow">{stepLabel}</Text>
-        <Text dimColor> (s to cycle)</Text>
+      <Box gap={2}>
+        <Box>
+          <Text dimColor>{' /'}</Text>
+          {state.logSearchActive ? (
+            <Text color="yellow">{state.logSearch}_</Text>
+          ) : (
+            <Text dimColor>{state.logSearch || 'search'}</Text>
+          )}
+        </Box>
+        <Text dimColor>
+          step:<Text color="yellow">{stepLabel}</Text>(s)
+        </Text>
+        <Text dimColor>
+          {filtered.length} entr{filtered.length !== 1 ? 'ies' : 'y'}
+        </Text>
       </Box>
-      <Text dimColor> {'\u2500'.repeat(50)}</Text>
       {filtered.length === 0 ? (
-        <Text dimColor> No log entries</Text>
+        <Text backgroundColor={LOG_BG}>
+          <Text dimColor>{' No log entries'}</Text>
+          <Text>{fill}</Text>
+        </Text>
       ) : (
         visible.map((entry, i) => {
           const color = LOG_STEP_COLORS[entry.step] ?? 'gray';
           return (
-            <Text key={i} wrap="truncate">
-              <Text dimColor> {formatTimestamp(entry.ts)} </Text>
+            <Text key={i} wrap="truncate" backgroundColor={LOG_BG}>
+              <Text dimColor>{` ${formatTimestamp(entry.ts)} `}</Text>
               <Text color={color}>{entry.step.padEnd(12)}</Text>
               <Text dimColor>{entry.action.padEnd(12)}</Text>
               <Text>{entry.summary}</Text>
+              <Text>{fill}</Text>
             </Text>
           );
         })
       )}
     </Box>
   );
-}
+});
 
 // ── Pending Panel ───────────────────────────────────────────────────────────
 
@@ -1148,48 +1047,42 @@ function PendingDetailView({
     ? JSON.stringify(action.meta, null, 2)
     : '(no meta)';
   const metaLines = metaStr.split('\n');
+  const sep = '\u2500'.repeat(Math.max(1, width - 4));
 
   return (
     <Box flexDirection="column">
-      <Text bold> Pending Action</Text>
-      <Text dimColor> {'\u2500'.repeat(Math.max(1, width - 6))}</Text>
+      {/* Human-readable summary first */}
+      <Text bold>{` ${action.action}: ${action.summary}`}</Text>
+      <Text dimColor>{` ${timeAgo(action.createdAt)}`}</Text>
+      <Text dimColor>{` ${sep}`}</Text>
       <Text>
-        <Text dimColor> Trace: </Text>
-        <Text>{action.traceId}</Text>
+        <Text dimColor>{' Trace: '}</Text>
+        <Text dimColor>{action.traceId}</Text>
       </Text>
       <Text>
-        <Text dimColor> Action ID: </Text>
-        <Text>{action.actionId}</Text>
+        <Text dimColor>{' Action: '}</Text>
+        <Text dimColor>{action.actionId}</Text>
       </Text>
       <Text>
-        <Text dimColor> Span ID: </Text>
-        <Text>{action.spanId}</Text>
+        <Text dimColor>{' Span: '}</Text>
+        <Text dimColor>{action.spanId}</Text>
       </Text>
-      <Text>
-        <Text dimColor> Action: </Text>
-        <Text>{action.action}</Text>
-      </Text>
-      <Text>
-        <Text dimColor> Summary: </Text>
-        <Text>{action.summary}</Text>
-      </Text>
-      <Text>
-        <Text dimColor> Created: </Text>
-        <Text>{action.createdAt}</Text>
-      </Text>
-      <Text> </Text>
-      <Text bold> META</Text>
-      {metaLines.map((line, i) => (
-        <Text key={i} dimColor wrap="truncate">
-          {' '}
-          {line}
-        </Text>
-      ))}
+      {metaLines.length > 1 || metaStr !== '(no meta)' ? (
+        <>
+          <Text bold>{' META'}</Text>
+          {metaLines.map((line, i) => (
+            <Text key={i} dimColor wrap="truncate">
+              {'  '}
+              {line}
+            </Text>
+          ))}
+        </>
+      ) : null}
     </Box>
   );
 }
 
-function PendingPanel({
+const PendingPanel = React.memo(function PendingPanel({
   store,
   state,
   visibleHeight,
@@ -1218,22 +1111,22 @@ function PendingPanel({
     );
   }
 
-  // Center selected item in viewport
   const startIndex = Math.max(
     0,
     Math.min(
       state.pendingSelectedIndex - Math.floor(visibleHeight / 2),
-      Math.max(0, pending.length - visibleHeight + 2)
+      Math.max(0, pending.length - visibleHeight + 1)
     )
   );
-  const visible = pending.slice(startIndex, startIndex + visibleHeight - 2);
+  const visible = pending.slice(startIndex, startIndex + visibleHeight - 1);
 
   return (
     <Box flexDirection="column">
-      <Text bold> Pending Actions ({pending.length})</Text>
-      <Text dimColor> {'\u2500'.repeat(Math.max(1, width - 6))}</Text>
+      <Text dimColor>
+        {` ${pending.length} pending action${pending.length !== 1 ? 's' : ''}`}
+      </Text>
       {pending.length === 0 ? (
-        <Text dimColor> No pending actions</Text>
+        <Text dimColor>{' Queue is empty'}</Text>
       ) : (
         visible.map((p, i) => {
           const realIndex = startIndex + i;
@@ -1242,32 +1135,25 @@ function PendingPanel({
           return (
             <Text key={`${p.actionId}-${i}`} wrap="truncate">
               <Text color={isSelected ? 'cyan' : undefined}>
-                {isSelected ? ' > ' : '   '}
+                {isSelected ? ' \u25B8 ' : '   '}
               </Text>
-              <Text color={color}>[{p.action}]</Text>
-              <Text> </Text>
+              <Text color={color}>{p.action.padEnd(12)}</Text>
               <Text
                 color={isSelected ? 'white' : undefined}
                 dimColor={!isSelected}
               >
                 {p.summary}
               </Text>
-              <Text dimColor> {timeAgo(p.createdAt)}</Text>
+              <Text dimColor>{` ${timeAgo(p.createdAt)}`}</Text>
             </Text>
           );
         })
       )}
     </Box>
   );
-}
+});
 
 // ── Tasks Panel ─────────────────────────────────────────────────────────────
-
-function progressBar(progress: number, barWidth: number): string {
-  const filled = Math.round((progress / 100) * barWidth);
-  const empty = barWidth - filled;
-  return '\u2588'.repeat(filled) + '\u2591'.repeat(empty);
-}
 
 function TaskDetailView({
   actionId,
@@ -1287,142 +1173,79 @@ function TaskDetailView({
   width: number;
 }) {
   const lines: React.ReactNode[] = [];
-  const sep = '\u2500'.repeat(Math.max(1, width - 6));
+  const sep = '\u2500'.repeat(Math.max(1, width - 4));
 
   const status = taskInfo?.status ?? 'PENDING';
   const statusColor = TASK_STATUS_COLORS[status] ?? 'gray';
+  const statusLabel = TASK_STATUS_LABELS[status] ?? status;
 
-  // Header
+  // Human-readable header
   lines.push(
     <Text key="h1" bold>
-      {' '}
-      Task #{mapping.taskId}: {taskInfo?.title ?? '(unknown)'}
+      {` Task #${mapping.taskId}: ${taskInfo?.title ?? '(unknown)'}`}
     </Text>
   );
-  lines.push(
-    <Text key="sep1" dimColor>
-      {' '}
-      {sep}
-    </Text>
-  );
-
-  // Status section
   lines.push(
     <Text key="status">
-      <Text dimColor> Status: </Text>
       <Text color={statusColor} bold>
-        {status}
+        {` ${statusLabel}`}
       </Text>
+      {taskInfo ? (
+        <Text dimColor>
+          {`  ${taskInfo.agent}  ${taskInfo.duration}  iter ${taskInfo.iteration}`}
+        </Text>
+      ) : null}
     </Text>
   );
 
   if (taskInfo) {
-    const barWidth = Math.min(30, Math.max(10, width - 25));
+    const barWidth = Math.min(30, Math.max(10, width - 20));
     lines.push(
       <Text key="progress">
-        <Text dimColor> Progress: </Text>
+        <Text dimColor> </Text>
         <Text color={taskInfo.progress >= 100 ? 'green' : 'cyan'}>
-          [{progressBar(taskInfo.progress, barWidth)}]
+          {progressBar(taskInfo.progress, barWidth)}
         </Text>
-        <Text> {taskInfo.progress}%</Text>
-      </Text>
-    );
-
-    lines.push(
-      <Text key="agent">
-        <Text dimColor> Agent: </Text>
-        <Text>{taskInfo.agent}</Text>
-      </Text>
-    );
-    lines.push(
-      <Text key="duration">
-        <Text dimColor> Duration: </Text>
-        <Text>{taskInfo.duration}</Text>
-      </Text>
-    );
-    lines.push(
-      <Text key="iteration">
-        <Text dimColor> Iterations: </Text>
-        <Text>{taskInfo.iteration}</Text>
+        <Text>{` ${taskInfo.progress}%`}</Text>
       </Text>
     );
   }
 
   lines.push(
     <Text key="branch">
-      <Text dimColor> Branch: </Text>
+      <Text dimColor>{' Branch: '}</Text>
       <Text>{mapping.branchName}</Text>
     </Text>
   );
 
-  // IDs section
-  lines.push(<Text key="sep2"> </Text>);
   lines.push(
-    <Text key="ids-title" bold>
-      {' '}
-      IDENTIFIERS
+    <Text key="sep1" dimColor>
+      {` ${sep}`}
     </Text>
   );
-  lines.push(
-    <Text key="task-id">
-      <Text dimColor> Task ID: </Text>
-      <Text>{mapping.taskId}</Text>
-    </Text>
-  );
-  lines.push(
-    <Text key="action-id">
-      <Text dimColor> Action ID: </Text>
-      <Text>{actionId}</Text>
-    </Text>
-  );
-  if (actionData?.spanId) {
-    lines.push(
-      <Text key="span-id">
-        <Text dimColor> Span ID: </Text>
-        <Text>{actionData.spanId}</Text>
-      </Text>
-    );
-  }
 
-  // Action details
+  // Action details (human-readable fields first)
   if (actionData) {
-    lines.push(<Text key="sep3"> </Text>);
-    lines.push(
-      <Text key="action-title" bold>
-        {' '}
-        ACTION DETAILS
-      </Text>
-    );
-
     const meta = actionData.meta;
     if (meta.workflow) {
       lines.push(
         <Text key="workflow">
-          <Text dimColor> Workflow: </Text>
+          <Text dimColor>{' Workflow: '}</Text>
           <Text>{meta.workflow}</Text>
-        </Text>
-      );
-    }
-    if (meta.title) {
-      lines.push(
-        <Text key="meta-title">
-          <Text dimColor> Title: </Text>
-          <Text>{meta.title}</Text>
         </Text>
       );
     }
     if (meta.description) {
       lines.push(
         <Text key="desc-label" dimColor>
-          {' '}
-          Description:
+          {' Description:'}
         </Text>
       );
       const descLines = String(meta.description).split('\n');
       for (let di = 0; di < descLines.length; di++) {
         lines.push(
           <Text key={`desc-${di}`} wrap="truncate">
-            <Text dimColor> {'  '}</Text>
+            <Text dimColor>{'   '}</Text>
             <Text>{descLines[di]}</Text>
           </Text>
         );
@@ -1434,17 +1257,15 @@ function TaskDetailView({
       Array.isArray(meta.acceptance_criteria) &&
       meta.acceptance_criteria.length > 0
     ) {
-      lines.push(<Text key="sep4"> </Text>);
       lines.push(
         <Text key="criteria-title" bold>
-          {' '}
-          ACCEPTANCE CRITERIA
+          {' ACCEPTANCE CRITERIA'}
         </Text>
       );
       for (let ci = 0; ci < meta.acceptance_criteria.length; ci++) {
         lines.push(
           <Text key={`criteria-${ci}`} wrap="truncate">
-            <Text dimColor> {'\u2022'} </Text>
+            <Text dimColor>{` \u2022 `}</Text>
             <Text>{meta.acceptance_criteria[ci]}</Text>
           </Text>
         );
@@ -1454,17 +1275,15 @@ function TaskDetailView({
     if (meta.context) {
       const ctx = meta.context;
       if (ctx.files && Array.isArray(ctx.files) && ctx.files.length > 0) {
-        lines.push(<Text key="sep5"> </Text>);
         lines.push(
           <Text key="files-title" bold>
-            {' '}
-            CONTEXT FILES
+            {' CONTEXT FILES'}
           </Text>
         );
         for (let fi = 0; fi < ctx.files.length; fi++) {
           lines.push(
             <Text key={`file-${fi}`} dimColor>
-              {' '}
+              {'   '}
               {ctx.files[fi]}
             </Text>
           );
@@ -1473,7 +1292,7 @@ function TaskDetailView({
       if (ctx.depends_on) {
         lines.push(
           <Text key="depends">
-            <Text dimColor> Depends on: </Text>
+            <Text dimColor>{' Depends on: '}</Text>
             <Text>{ctx.depends_on}</Text>
           </Text>
         );
@@ -1481,23 +1300,39 @@ function TaskDetailView({
     }
 
     if (actionData.reasoning) {
-      lines.push(<Text key="sep6"> </Text>);
+      lines.push(
+        <Text key="sep2" dimColor>
+          {` ${sep}`}
+        </Text>
+      );
       lines.push(
         <Text key="reasoning-title" bold>
-          {' '}
-          REASONING
+          {' REASONING'}
         </Text>
       );
       const reasonLines = actionData.reasoning.split('\n');
       for (let ri = 0; ri < reasonLines.length; ri++) {
         lines.push(
           <Text key={`reason-${ri}`} wrap="truncate">
-            <Text dimColor> </Text>
-            <Text>{reasonLines[ri]}</Text>
+            {'  '}
+            {reasonLines[ri]}
           </Text>
         );
       }
     }
+
+    // IDs at the bottom (technical details)
+    lines.push(
+      <Text key="sep3" dimColor>
+        {` ${sep}`}
+      </Text>
+    );
+    lines.push(
+      <Text key="ids" dimColor>
+        {` task:${mapping.taskId}  action:${actionId.slice(0, 8)}..`}
+        {actionData.spanId ? `  span:${actionData.spanId.slice(0, 8)}..` : ''}
+      </Text>
+    );
   }
 
   const sliced = lines.slice(scroll, scroll + visibleHeight);
@@ -1510,7 +1345,7 @@ function TaskDetailView({
   );
 }
 
-function TasksPanel({
+const TasksPanel = React.memo(function TasksPanel({
   store,
   tasks,
   state,
@@ -1537,12 +1372,10 @@ function TasksPanel({
 
   const entries = Object.entries(mappings);
 
-  // Drill-down: find selected entry by actionId (stable across reorders)
   if (state.taskDrillDown && state.taskSelectedActionId) {
     const selectedActionId = state.taskSelectedActionId;
     const mapping = mappings[selectedActionId];
     if (mapping) {
-      // Load action data if not cached
       if (!actionCache.current.has(selectedActionId)) {
         actionCache.current.set(
           selectedActionId,
@@ -1566,51 +1399,61 @@ function TasksPanel({
     }
   }
 
-  // Center selected item in viewport
   const startIndex = Math.max(
     0,
     Math.min(
       state.taskSelectedIndex - Math.floor(visibleHeight / 2),
-      Math.max(0, entries.length - visibleHeight + 2)
+      Math.max(0, entries.length - visibleHeight + 1)
     )
   );
-  const visible = entries.slice(startIndex, startIndex + visibleHeight - 2);
+  const visible = entries.slice(startIndex, startIndex + visibleHeight - 1);
 
   return (
     <Box flexDirection="column">
-      <Text bold> Task Mappings ({entries.length})</Text>
-      <Text dimColor> {'\u2500'.repeat(Math.max(1, width - 6))}</Text>
+      <Text dimColor>
+        {` ${entries.length} task mapping${entries.length !== 1 ? 's' : ''}`}
+      </Text>
       {entries.length === 0 ? (
-        <Text dimColor> No task mappings</Text>
+        <Text dimColor>{' No task mappings'}</Text>
       ) : (
-        visible.map(([actionId, mapping], i) => {
+        visible.map(([aid, mapping], i) => {
           const realIndex = startIndex + i;
           const isSelected = realIndex === state.taskSelectedIndex;
 
-          // Find matching task info
           const taskInfo = tasks.find(t => t.id === mapping.taskId);
           const status = taskInfo?.status ?? 'PENDING';
           const statusColor = TASK_STATUS_COLORS[status] ?? 'gray';
+          const statusLabel = TASK_STATUS_LABELS[status] ?? status;
           const duration = taskInfo?.duration ?? '--';
+          const title = taskInfo?.title ?? '';
 
           return (
-            <Text key={actionId} wrap="truncate">
+            <Box key={aid}>
               <Text color={isSelected ? 'cyan' : undefined}>
-                {isSelected ? ' > ' : '   '}
+                {isSelected ? ' \u25B8 ' : '   '}
               </Text>
-              <Text dimColor>{actionId.slice(0, 6)}..</Text>
-              <Text dimColor> {'\u2192'} </Text>
-              <Text>#{mapping.taskId}</Text>
-              <Text dimColor> {mapping.branchName.padEnd(20)}</Text>
-              <Text color={statusColor}> {status.padEnd(12)}</Text>
-              <Text dimColor> {duration}</Text>
-            </Text>
+              <Text>{`#${String(mapping.taskId).padEnd(3)}`}</Text>
+              <Text color={statusColor} bold>
+                {` ${statusLabel.padEnd(9)}`}
+              </Text>
+              <Text dimColor>{` ${mapping.branchName.padEnd(20)}`}</Text>
+              <Box flexGrow={1}>
+                <Text
+                  dimColor={!isSelected}
+                  color={isSelected ? 'white' : undefined}
+                  wrap="truncate"
+                >
+                  {` ${title}`}
+                </Text>
+              </Box>
+              <Text dimColor>{` ${duration.padStart(6)}`}</Text>
+            </Box>
           );
         })
       )}
     </Box>
   );
-}
+});
 
 // ── Main Inspector View ─────────────────────────────────────────────────────
 
@@ -1637,14 +1480,12 @@ export function InspectorView({
     initialState
   );
 
-  // Compute max indices for current tab's list
   const getMaxIndex = useCallback((): number => {
     if (state.activeTab === 'traces') {
       if (state.traceDrillDown) {
         if (state.traceStepDrillDown) {
-          return 999; // step detail uses scroll
+          return 999;
         }
-        // Step selection: display list = event + trace.steps
         const selectedTrace = traces.find(
           c => c.traceId === state.traceSelectedId
         );
@@ -1653,7 +1494,7 @@ export function InspectorView({
       const filtered = filterTraces(traces, state.traceFilter);
       return Math.max(0, filtered.length - 1);
     }
-    return 999; // logs use scroll, not index
+    return 999;
   }, [
     state.activeTab,
     state.traceFilter,
@@ -1664,13 +1505,11 @@ export function InspectorView({
   ]);
 
   useInput((input, key) => {
-    // Close inspector with 'i' (only when not in search mode)
     if (input === 'i' && !key.ctrl && !key.meta && !state.logSearchActive) {
       onClose();
       return;
     }
 
-    // Search mode input handling
     if (state.logSearchActive && state.activeTab === 'logs') {
       if (key.escape) {
         dispatch({ type: 'ESCAPE' });
@@ -1684,7 +1523,6 @@ export function InspectorView({
         dispatch({ type: 'TOGGLE_LOG_SEARCH' });
         return;
       }
-      // Regular character input
       if (input && !key.ctrl && !key.meta) {
         dispatch({ type: 'LOG_SEARCH_CHAR', char: input });
         return;
@@ -1692,7 +1530,6 @@ export function InspectorView({
       return;
     }
 
-    // Tab navigation
     if (key.tab && !key.shift) {
       dispatch({ type: 'NEXT_TAB' });
       return;
@@ -1702,7 +1539,6 @@ export function InspectorView({
       return;
     }
 
-    // Arrow navigation
     if (key.upArrow) {
       dispatch({ type: 'MOVE_UP' });
       return;
@@ -1712,10 +1548,8 @@ export function InspectorView({
       return;
     }
 
-    // Enter / Escape
     if (key.return) {
       if (state.activeTab === 'traces' && !state.traceDrillDown) {
-        // Resolve the traceId from the current sorted/filtered list
         const filtered = filterTraces(traces, state.traceFilter);
         const sorted = [...filtered].sort(
           (a, b) =>
@@ -1726,7 +1560,6 @@ export function InspectorView({
           dispatch({ type: 'ENTER', traceId: selected.traceId });
         }
       } else if (state.activeTab === 'tasks' && !state.taskDrillDown) {
-        // Resolve the actionId from the current task mappings
         const mappingEntries = Object.entries(store.getAllTaskMappings());
         const selected = mappingEntries[state.taskSelectedIndex];
         if (selected) {
@@ -1738,7 +1571,6 @@ export function InspectorView({
       return;
     }
     if (key.escape) {
-      // If in drill-down or search, go back
       if (
         (state.activeTab === 'traces' && state.traceDrillDown) ||
         (state.activeTab === 'pending' && state.pendingDrillDown) ||
@@ -1752,7 +1584,6 @@ export function InspectorView({
       return;
     }
 
-    // Tab-specific keys
     if (input === '/' && state.activeTab === 'logs') {
       dispatch({ type: 'TOGGLE_LOG_SEARCH' });
       return;
@@ -1771,21 +1602,13 @@ export function InspectorView({
     }
   });
 
-  // Panel area: total height minus header(1) + tabs(1) + separator(1) + footer(1) + border(2) + padding
-  const panelHeight = Math.max(1, height - 8);
+  // No borders: header(1) + separator(1) + footer(1) = 3 reserved lines
+  const panelHeight = Math.max(1, height - 3);
 
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="round"
-      borderColor="cyan"
-      paddingX={1}
-      width={width}
-      height={height}
-    >
-      <InspectorHeader />
+    <Box flexDirection="column" width={width} height={height}>
       <InspectorTabs activeTab={state.activeTab} />
-      <Text dimColor>{'\u2500'.repeat(Math.max(1, width - 4))}</Text>
+      <SectionHeader title="" width={width} />
 
       <Box flexDirection="column" flexGrow={1}>
         {state.activeTab === 'traces' && (
@@ -1798,7 +1621,12 @@ export function InspectorView({
           />
         )}
         {state.activeTab === 'logs' && (
-          <LogsPanel store={store} state={state} visibleHeight={panelHeight} />
+          <LogsPanel
+            store={store}
+            state={state}
+            visibleHeight={panelHeight}
+            width={width}
+          />
         )}
         {state.activeTab === 'pending' && (
           <PendingPanel

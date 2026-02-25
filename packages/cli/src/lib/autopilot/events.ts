@@ -1,15 +1,13 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
 import { randomUUID } from 'node:crypto';
 import { launch } from 'rover-core';
-import type { FetchStatus, GitHubEvent } from './types.js';
+import type { GitHubEvent } from './types.js';
 import type { AutopilotStore } from './store.js';
 import { SpanWriter, ActionWriter, enqueueAction } from './logging.js';
-import { getRepoInfo } from './helpers.js';
 import { ROVER_FOOTER_MARKER } from './constants.js';
 
-const POLL_INTERVAL_MS = 60_000; // 1 minute
+export const POLL_INTERVAL_MS = 60_000; // 1 minute
 
-async function fetchEvents(
+export async function fetchEvents(
   owner: string,
   repo: string
 ): Promise<GitHubEvent[]> {
@@ -235,75 +233,3 @@ export function writeSpanAndAction(
   return { spanId: span.id, actionId: action.id, traceId };
 }
 
-export const POLL_INTERVAL_SEC = POLL_INTERVAL_MS / 1000;
-
-export function useGitHubEvents(
-  projectPath: string,
-  projectId: string,
-  store: AutopilotStore,
-  onNewEvents?: () => void
-): {
-  status: FetchStatus;
-  lastFetchAt: number;
-  lastFetchCount: number;
-  lastRelevantCount: number;
-  lastNewCount: number;
-} {
-  const [status, setStatus] = useState<FetchStatus>('idle');
-  const [lastFetchAt, setLastFetchAt] = useState(Date.now);
-  const [lastFetchCount, setLastFetchCount] = useState(0);
-  const [lastRelevantCount, setLastRelevantCount] = useState(0);
-  const [lastNewCount, setLastNewCount] = useState(0);
-  const repoRef = useRef(getRepoInfo(projectPath));
-
-  const doFetch = useCallback(async () => {
-    const repo = repoRef.current;
-    if (!repo) {
-      setStatus('error');
-      return;
-    }
-
-    setStatus('fetching');
-    try {
-      const events = await fetchEvents(repo.owner, repo.repo);
-      const relevant = filterRelevantEvents(events);
-
-      // Deduplicate against cursor
-      const newEvents = relevant.filter(e => !store.isEventProcessed(e.id));
-
-      for (const event of newEvents) {
-        writeSpanAndAction(projectId, event, store);
-      }
-
-      // Mark all new event IDs as processed
-      if (newEvents.length > 0) {
-        store.markEventsProcessed(newEvents.map(e => e.id));
-        onNewEvents?.();
-      }
-
-      setLastFetchCount(events.length);
-      setLastRelevantCount(relevant.length);
-      setLastNewCount(newEvents.length);
-      setStatus('done');
-    } catch {
-      setStatus('error');
-    }
-
-    setLastFetchAt(Date.now());
-  }, [projectId, store, onNewEvents]);
-
-  // Initial fetch + interval
-  useEffect(() => {
-    doFetch();
-    const timer = setInterval(doFetch, POLL_INTERVAL_MS);
-    return () => clearInterval(timer);
-  }, [doFetch]);
-
-  return {
-    status,
-    lastFetchAt,
-    lastFetchCount,
-    lastRelevantCount,
-    lastNewCount,
-  };
-}

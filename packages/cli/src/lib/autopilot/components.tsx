@@ -1,471 +1,16 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Box, Text } from 'ink';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { progressBar, timeAgo } from './helpers.js';
 import type {
-  FetchStatus,
-  LogEntry,
-  WorkSlot,
-  CoordinatorStatus,
-  PlannerStatus,
-  WorkflowRunnerStatus,
-  CommitterStatus,
-  ResolverStatus,
-  PusherStatus,
-  ActionTrace,
   ActionStepStatus,
+  ActionTrace,
+  LogEntry,
+  TaskInfo,
 } from './types.js';
-import {
-  createStarField,
-  advanceStars,
-  renderStarField,
-  getPlanetArt,
-  getSlotFill,
-} from './helpers.js';
 
-// ── Fetch Status Indicator ───────────────────────────────────────────────────
+// ── Shared Color Maps (exported for inspector) ─────────────────────────────
 
-const FETCH_ICONS: Record<FetchStatus, string> = {
-  idle: '\u25CB', // ○
-  fetching: '\u21BB', // ↻
-  done: '\u25CF', // ●
-  error: '\u2717', // ✗
-};
-
-const FETCH_COLORS: Record<FetchStatus, string> = {
-  idle: 'gray',
-  fetching: 'yellow',
-  done: 'green',
-  error: 'red',
-};
-
-function FetchIndicator({
-  status,
-  lastFetchAt,
-  pollIntervalSec,
-}: {
-  status: FetchStatus;
-  lastFetchAt: number;
-  pollIntervalSec: number;
-}) {
-  const [countdown, setCountdown] = useState(pollIntervalSec);
-
-  useEffect(() => {
-    const update = () => {
-      const elapsed = Math.floor((Date.now() - lastFetchAt) / 1000);
-      setCountdown(Math.max(0, pollIntervalSec - elapsed));
-    };
-    update();
-    const timer = setInterval(update, 1000);
-    return () => clearInterval(timer);
-  }, [lastFetchAt, pollIntervalSec]);
-
-  const icon = FETCH_ICONS[status];
-  const color = FETCH_COLORS[status];
-  const label =
-    status === 'fetching'
-      ? 'syncing...'
-      : status === 'error'
-        ? 'sync failed'
-        : `next ${countdown}s`;
-
-  return (
-    <Text>
-      <Text color={color}>{icon} </Text>
-      <Text dimColor>{label}</Text>
-    </Text>
-  );
-}
-
-// ── Coordinator Status Indicator ─────────────────────────────────────────────
-
-const COORDINATOR_ICONS: Record<CoordinatorStatus, string> = {
-  idle: '\u25CB', // ○
-  processing: '\u21BB', // ↻
-  error: '\u2717', // ✗
-};
-
-const COORDINATOR_COLORS: Record<CoordinatorStatus, string> = {
-  idle: 'gray',
-  processing: 'cyan',
-  error: 'red',
-};
-
-function CoordinatorIndicator({
-  status,
-  processedCount,
-}: {
-  status: CoordinatorStatus;
-  processedCount: number;
-}) {
-  const icon = COORDINATOR_ICONS[status];
-  const color = COORDINATOR_COLORS[status];
-  const label =
-    status === 'processing'
-      ? 'coordinating...'
-      : status === 'error'
-        ? 'coordinator error'
-        : `${processedCount} processed`;
-
-  return (
-    <Text>
-      <Text color={color}>{icon} </Text>
-      <Text dimColor>{label}</Text>
-    </Text>
-  );
-}
-
-// ── Planner Status Indicator ─────────────────────────────────────────────────
-
-const PLANNER_ICONS: Record<PlannerStatus, string> = {
-  idle: '\u25CB', // ○
-  processing: '\u21BB', // ↻
-  error: '\u2717', // ✗
-};
-
-const PLANNER_COLORS: Record<PlannerStatus, string> = {
-  idle: 'gray',
-  processing: 'magenta',
-  error: 'red',
-};
-
-function PlannerIndicator({
-  status,
-  processedCount,
-}: {
-  status: PlannerStatus;
-  processedCount: number;
-}) {
-  const icon = PLANNER_ICONS[status];
-  const color = PLANNER_COLORS[status];
-  const label =
-    status === 'processing'
-      ? 'planning...'
-      : status === 'error'
-        ? 'planner error'
-        : `${processedCount} planned`;
-
-  return (
-    <Text>
-      <Text color={color}>{icon} </Text>
-      <Text dimColor>{label}</Text>
-    </Text>
-  );
-}
-
-// ── Workflow Runner Status Indicator ─────────────────────────────────────────
-
-const WORKFLOW_RUNNER_ICONS: Record<WorkflowRunnerStatus, string> = {
-  idle: '\u25CB', // ○
-  processing: '\u21BB', // ↻
-  error: '\u2717', // ✗
-};
-
-const WORKFLOW_RUNNER_COLORS: Record<WorkflowRunnerStatus, string> = {
-  idle: 'gray',
-  processing: 'blue',
-  error: 'red',
-};
-
-function WorkflowRunnerIndicator({
-  status,
-  processedCount,
-}: {
-  status: WorkflowRunnerStatus;
-  processedCount: number;
-}) {
-  const icon = WORKFLOW_RUNNER_ICONS[status];
-  const color = WORKFLOW_RUNNER_COLORS[status];
-  const label =
-    status === 'processing'
-      ? 'launching...'
-      : status === 'error'
-        ? 'runner error'
-        : `${processedCount} launched`;
-
-  return (
-    <Text>
-      <Text color={color}>{icon} </Text>
-      <Text dimColor>{label}</Text>
-    </Text>
-  );
-}
-
-// ── Committer Status Indicator ────────────────────────────────────────────────
-
-const COMMITTER_ICONS: Record<CommitterStatus, string> = {
-  idle: '\u25CB', // ○
-  processing: '\u21BB', // ↻
-  error: '\u2717', // ✗
-};
-
-const COMMITTER_COLORS: Record<CommitterStatus, string> = {
-  idle: 'gray',
-  processing: 'green',
-  error: 'red',
-};
-
-function CommitterIndicator({
-  status,
-  processedCount,
-}: {
-  status: CommitterStatus;
-  processedCount: number;
-}) {
-  const icon = COMMITTER_ICONS[status];
-  const color = COMMITTER_COLORS[status];
-  const label =
-    status === 'processing'
-      ? 'committing...'
-      : status === 'error'
-        ? 'committer error'
-        : `${processedCount} committed`;
-
-  return (
-    <Text>
-      <Text color={color}>{icon} </Text>
-      <Text dimColor>{label}</Text>
-    </Text>
-  );
-}
-
-// ── Resolver Status Indicator ────────────────────────────────────────────────
-
-const RESOLVER_ICONS: Record<ResolverStatus, string> = {
-  idle: '\u25CB', // ○
-  processing: '\u21BB', // ↻
-  error: '\u2717', // ✗
-};
-
-const RESOLVER_COLORS: Record<ResolverStatus, string> = {
-  idle: 'gray',
-  processing: 'yellow',
-  error: 'red',
-};
-
-function ResolverIndicator({
-  status,
-  processedCount,
-}: {
-  status: ResolverStatus;
-  processedCount: number;
-}) {
-  const icon = RESOLVER_ICONS[status];
-  const color = RESOLVER_COLORS[status];
-  const label =
-    status === 'processing'
-      ? 'resolving...'
-      : status === 'error'
-        ? 'resolver error'
-        : `${processedCount} resolved`;
-
-  return (
-    <Text>
-      <Text color={color}>{icon} </Text>
-      <Text dimColor>{label}</Text>
-    </Text>
-  );
-}
-
-// ── Pusher Status Indicator ──────────────────────────────────────────────────
-
-const PUSHER_ICONS: Record<PusherStatus, string> = {
-  idle: '\u25CB', // ○
-  processing: '\u21BB', // ↻
-  error: '\u2717', // ✗
-};
-
-const PUSHER_COLORS: Record<PusherStatus, string> = {
-  idle: 'gray',
-  processing: 'magentaBright',
-  error: 'red',
-};
-
-function PusherIndicator({
-  status,
-  processedCount,
-}: {
-  status: PusherStatus;
-  processedCount: number;
-}) {
-  const icon = PUSHER_ICONS[status];
-  const color = PUSHER_COLORS[status];
-  const label =
-    status === 'processing'
-      ? 'pushing...'
-      : status === 'error'
-        ? 'pusher error'
-        : `${processedCount} pushed`;
-
-  return (
-    <Text>
-      <Text color={color}>{icon} </Text>
-      <Text dimColor>{label}</Text>
-    </Text>
-  );
-}
-
-// ── Key Legend ────────────────────────────────────────────────────────────────
-
-function KeyLegend() {
-  return (
-    <Box flexDirection="column">
-      <Text dimColor>{'\u2500'.repeat(14)}</Text>
-      <Text dimColor>keys:</Text>
-      <Text>
-        <Text color="gray">i </Text>
-        <Text dimColor>inspector</Text>
-      </Text>
-      <Text>
-        <Text color="gray">q </Text>
-        <Text dimColor>quit</Text>
-      </Text>
-    </Box>
-  );
-}
-
-// ── Info Panel (left column) ─────────────────────────────────────────────────
-
-export function InfoPanel({
-  projectName,
-  agent,
-  version,
-  height,
-  fetchStatus,
-  lastFetchAt,
-  pollIntervalSec,
-  coordinatorStatus,
-  processedCount,
-  plannerStatus,
-  plannerProcessedCount,
-  workflowRunnerStatus,
-  workflowRunnerProcessedCount,
-  committerStatus,
-  committerProcessedCount,
-  resolverStatus,
-  resolverProcessedCount,
-  pusherStatus,
-  pusherProcessedCount,
-}: {
-  projectName: string;
-  agent: string;
-  version: string;
-  height: number;
-  fetchStatus: FetchStatus;
-  lastFetchAt: number;
-  pollIntervalSec: number;
-  coordinatorStatus: CoordinatorStatus;
-  processedCount: number;
-  plannerStatus: PlannerStatus;
-  plannerProcessedCount: number;
-  workflowRunnerStatus: WorkflowRunnerStatus;
-  workflowRunnerProcessedCount: number;
-  committerStatus: CommitterStatus;
-  committerProcessedCount: number;
-  resolverStatus: ResolverStatus;
-  resolverProcessedCount: number;
-  pusherStatus: PusherStatus;
-  pusherProcessedCount: number;
-}) {
-  return (
-    <Box
-      flexDirection="column"
-      borderStyle="round"
-      borderColor="cyan"
-      paddingX={1}
-      height={height}
-    >
-      <Text bold color="cyan">
-        ROVER
-      </Text>
-      <Text bold color="cyan">
-        AUTOPILOT
-      </Text>
-      <Text> </Text>
-      <Text>
-        <Text dimColor>project </Text>
-        <Text color="white">{projectName}</Text>
-      </Text>
-      <Text>
-        <Text dimColor>agent </Text>
-        <Text color="white">{agent}</Text>
-      </Text>
-      <Text>
-        <Text dimColor>version </Text>
-        <Text color="white">{version}</Text>
-      </Text>
-      <Text> </Text>
-      <FetchIndicator
-        status={fetchStatus}
-        lastFetchAt={lastFetchAt}
-        pollIntervalSec={pollIntervalSec}
-      />
-      <CoordinatorIndicator
-        status={coordinatorStatus}
-        processedCount={processedCount}
-      />
-      <PlannerIndicator
-        status={plannerStatus}
-        processedCount={plannerProcessedCount}
-      />
-      <WorkflowRunnerIndicator
-        status={workflowRunnerStatus}
-        processedCount={workflowRunnerProcessedCount}
-      />
-      <CommitterIndicator
-        status={committerStatus}
-        processedCount={committerProcessedCount}
-      />
-      <ResolverIndicator
-        status={resolverStatus}
-        processedCount={resolverProcessedCount}
-      />
-      <PusherIndicator
-        status={pusherStatus}
-        processedCount={pusherProcessedCount}
-      />
-      <Box flexGrow={1} />
-      <KeyLegend />
-    </Box>
-  );
-}
-
-// ── Work Boxes (compact — 2 rows) ───────────────────────────────────────────
-
-function WorkBox({ slot }: { slot: WorkSlot }) {
-  const fill = getSlotFill(slot.status);
-  const color =
-    slot.status === 'done'
-      ? 'green'
-      : slot.status === 'error'
-        ? 'red'
-        : slot.status === 'running'
-          ? 'cyan'
-          : 'gray';
-
-  return (
-    <Box flexDirection="column">
-      <Text color={color}>
-        [{fill}
-        {fill}
-        {fill}]
-      </Text>
-      <Text dimColor>{slot.label.padStart(4).slice(0, 5)}</Text>
-    </Box>
-  );
-}
-
-export function WorkBoxes({ slots }: { slots: WorkSlot[] }) {
-  return (
-    <Box gap={1} flexWrap="wrap">
-      {slots.map(s => (
-        <WorkBox key={s.id} slot={s} />
-      ))}
-    </Box>
-  );
-}
-
-// ── Action Trace Row ─────────────────────────────────────────────────────────
-
-const STEP_COLORS: Record<ActionStepStatus, string> = {
+export const STEP_COLORS: Record<ActionStepStatus, string> = {
   completed: 'green',
   running: 'cyan',
   pending: 'gray',
@@ -473,22 +18,150 @@ const STEP_COLORS: Record<ActionStepStatus, string> = {
   error: 'yellow',
 };
 
-const STEP_FILLED: Record<ActionStepStatus, string> = {
+export const STEP_FILLED: Record<ActionStepStatus, string> = {
   completed: '\u25A0', // ■
-  running: '\u25A0', // ■
+  running: '\u25A0',
   pending: '\u25A1', // □
-  failed: '\u25A0', // ■
-  error: '\u25A0', // ■
+  failed: '\u25A0',
+  error: '\u25A0',
 };
 
-function ActionTraceRow({ trace }: { trace: ActionTrace }) {
+export const STEP_TERMINAL: Record<ActionStepStatus, string> = {
+  completed: '\u25CF', // ●
+  running: '\u25CF',
+  pending: '\u25CB', // ○
+  failed: '\u25CF',
+  error: '\u25CF',
+};
+
+export const TASK_STATUS_COLORS: Record<string, string> = {
+  IN_PROGRESS: 'cyan',
+  ITERATING: 'cyan',
+  COMPLETED: 'green',
+  MERGED: 'green',
+  PUSHED: 'green',
+  FAILED: 'red',
+  PENDING: 'gray',
+  NEW: 'gray',
+};
+
+export const TASK_STATUS_LABELS: Record<string, string> = {
+  IN_PROGRESS: 'RUNNING',
+  ITERATING: 'RUNNING',
+  COMPLETED: 'DONE',
+  MERGED: 'DONE',
+  PUSHED: 'PUSHED',
+  FAILED: 'FAILED',
+  PENDING: 'PENDING',
+  NEW: 'NEW',
+};
+
+// ── Rover Header ────────────────────────────────────────────────────────────
+
+const TEAL_600 = '#0d9488';
+const TEAL_400 = '#2dd4bf';
+
+export const RoverHeader = React.memo(function RoverHeader({
+  version,
+  agent,
+  projectName,
+  coordinatorActive,
+  workflowActive,
+  resolverActive,
+}: {
+  version: string;
+  agent: string;
+  projectName: string;
+  coordinatorActive: boolean;
+  workflowActive: boolean;
+  resolverActive: boolean;
+}) {
+  return (
+    <Box flexDirection="column">
+      <Text> </Text>
+      <Box>
+        {/* Left: ASCII art + info */}
+        <Box flexDirection="column">
+          <Box>
+            <Text color={TEAL_600}>
+              {' \u256D\u2550\u2550\u2550\u2550\u256E  '}
+            </Text>
+            <Text bold>{'Rover '}</Text>
+            <Text dimColor>{'\u00B7 '}</Text>
+            <Text dimColor>{`v${version}`}</Text>
+          </Box>
+          <Box>
+            <Text color={TEAL_600}>{'\u2759\u2502 '}</Text>
+            <Text color={TEAL_400}>{'\u2588\u2588'}</Text>
+            <Text color={TEAL_600}>{' \u2502\u2759 '}</Text>
+            <Text>{agent}</Text>
+          </Box>
+          <Box>
+            <Text color={TEAL_600}>
+              {' \u2570\u2550\u2550\u2550\u2550\u256F  '}
+            </Text>
+            <Text color="cyan">{'\u25C8 '}</Text>
+            <Text color="cyan">{projectName}</Text>
+          </Box>
+        </Box>
+        <Box flexGrow={1} />
+        {/* Right: status box */}
+        <Box borderStyle="round" borderColor="gray" paddingX={1}>
+          <Text>{'status '}</Text>
+          <Text color={coordinatorActive ? 'cyan' : 'gray'}>
+            {coordinatorActive ? '\u25CF' : '\u25CB'}
+          </Text>
+          <Text> </Text>
+          <Text color={workflowActive ? 'blue' : 'gray'}>
+            {workflowActive ? '\u25CF' : '\u25CB'}
+          </Text>
+          <Text> </Text>
+          <Text color={resolverActive ? 'yellow' : 'gray'}>
+            {resolverActive ? '\u25CF' : '\u25CB'}
+          </Text>
+        </Box>
+      </Box>
+      <Text> </Text>
+    </Box>
+  );
+});
+
+// ── Section Header ──────────────────────────────────────────────────────────
+
+export const SectionHeader = React.memo(function SectionHeader({
+  title,
+  width,
+}: {
+  title: string;
+  width: number;
+}) {
+  const lineLen = Math.max(1, width - title.length - 2);
   return (
     <Box>
+      <Text dimColor>{` ${title} `}</Text>
+      <Text dimColor>{'\u2500'.repeat(lineLen)}</Text>
+    </Box>
+  );
+});
+
+// ── Action Trace Row ────────────────────────────────────────────────────────
+
+const ActionTraceRow = React.memo(function ActionTraceRow({
+  trace,
+}: {
+  trace: ActionTrace;
+}) {
+  const age = timeAgo(trace.createdAt);
+  return (
+    <Box>
+      <Text> </Text>
       <Box>
         {trace.steps.map((step, i) => (
           <Text key={`${step.actionId}-${i}`}>
             <Text color={STEP_COLORS[step.status]}>
-              {STEP_FILLED[step.status]}
+              {step.terminal
+                ? STEP_TERMINAL[step.status]
+                : STEP_FILLED[step.status]}
             </Text>
             {i < trace.steps.length - 1 ? (
               <Text dimColor>{'\u2500'}</Text>
@@ -496,145 +169,272 @@ function ActionTraceRow({ trace }: { trace: ActionTrace }) {
           </Text>
         ))}
       </Box>
-      <Text> </Text>
-      <Text dimColor>{trace.summary}</Text>
+      <Text>{'  '}</Text>
+      <Box flexGrow={1}>
+        <Text dimColor wrap="truncate">
+          {trace.summary}
+        </Text>
+      </Box>
+      <Text dimColor>{` ${age.padStart(8)}`}</Text>
     </Box>
   );
-}
+});
 
-// ── Action Trace List (for main view) ────────────────────────────────────────
+// ── Traces Section ──────────────────────────────────────────────────────────
 
-export function ActionTraceList({
+export const TracesSection = React.memo(function TracesSection({
   traces,
   maxVisible,
 }: {
   traces: ActionTrace[];
   maxVisible: number;
 }) {
-  if (traces.length === 0) return null;
+  const sorted = useMemo(() => {
+    return [...traces]
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      )
+      .slice(0, maxVisible);
+  }, [traces, maxVisible]);
 
-  const visible = traces.slice(-maxVisible);
+  if (sorted.length === 0) {
+    return <Text dimColor>{' Waiting for events...'}</Text>;
+  }
 
   return (
-    <Box flexDirection="column" paddingX={1}>
-      {visible.map(trace => (
+    <Box flexDirection="column">
+      {sorted.map(trace => (
         <ActionTraceRow key={trace.traceId} trace={trace} />
       ))}
     </Box>
   );
+});
+
+
+// ── Star Field ──────────────────────────────────────────────────────────────
+
+const STAR_WIDTH = 20;
+
+// 0 = empty, 1+ = star variant index
+type StarCell = number;
+
+interface StarVariant {
+  char: string;
+  color: string | undefined;
 }
 
-// ── Space Scene (right column) ───────────────────────────────────────────────
+const STAR_VARIANTS: StarVariant[] = [
+  { char: '\u00B7', color: undefined }, //  ·  dim white
+  { char: '\u00B7', color: '#6b7280' }, //  ·  grey
+  { char: '.', color: '#4b5563' },      //  .  dark grey
+  { char: '+', color: '#7dd3fc' },      //  +  sky blue
+  { char: '*', color: undefined },      //  *  dim white
+  { char: '*', color: '#c4b5fd' },      //  *  violet
+  { char: '\u2022', color: '#fbbf24' }, //  •  amber
+  { char: '\u2219', color: '#0d9488' }, //  ∙  teal
+  { char: '\u2734', color: '#f9a8d4' }, //  ✴  pink
+  { char: '\u2726', color: '#93c5fd' }, //  ✦  blue
+];
 
-export function SpaceScene({
-  width,
+interface StarLayer {
+  density: number;
+  variants: number[]; // indices into STAR_VARIANTS
+  interval: number;
+}
+
+const LAYERS: StarLayer[] = [
+  { density: 0.04, variants: [0, 1, 2, 3], interval: 2000 },    // far, slow
+  { density: 0.02, variants: [4, 5, 6, 7, 8, 9], interval: 1200 }, // near, fast
+];
+
+function randomColumn(rows: number, layer: StarLayer): StarCell[] {
+  return Array.from({ length: rows }, () => {
+    if (Math.random() >= layer.density) return 0;
+    return layer.variants[Math.floor(Math.random() * layer.variants.length)]! + 1;
+  });
+}
+
+function buildGrid(rows: number, cols: number, layer: StarLayer): StarCell[][] {
+  return Array.from({ length: cols }, () => randomColumn(rows, layer));
+}
+
+function shiftGrid(grid: StarCell[][], rows: number, layer: StarLayer): StarCell[][] {
+  return [...grid.slice(1), randomColumn(rows, layer)];
+}
+
+export const StarField = React.memo(function StarField({
   height,
-  slots,
-  traces,
 }: {
-  width: number;
   height: number;
-  slots: WorkSlot[];
-  traces: ActionTrace[];
 }) {
-  const starsRef = useRef(createStarField(width, height));
-  const [lines, setLines] = useState<string[]>([]);
+  const gridsRef = useRef(
+    LAYERS.map(l => buildGrid(height, STAR_WIDTH, l))
+  );
+  const [grids, setGrids] = useState(() => gridsRef.current);
 
   useEffect(() => {
-    // re-initialize stars when dimensions change
-    starsRef.current = createStarField(width, height);
-  }, [width, height]);
+    const timers = LAYERS.map((layer, idx) =>
+      setInterval(() => {
+        const next = shiftGrid(gridsRef.current[idx]!, height, layer);
+        gridsRef.current = gridsRef.current.map((g, i) =>
+          i === idx ? next : g
+        );
+        setGrids([...gridsRef.current]);
+      }, layer.interval)
+    );
+    return () => timers.forEach(clearInterval);
+  }, [height]);
 
-  useEffect(() => {
-    const tick = () => {
-      starsRef.current = advanceStars(starsRef.current, width, height);
-      const rendered = renderStarField(starsRef.current, width, height);
-
-      // overlay planet art near the bottom-right
-      const planet = getPlanetArt();
-      const planetStartRow = Math.max(0, height - planet.length - 1);
-      for (let i = 0; i < planet.length; i++) {
-        const row = planetStartRow + i;
-        if (row < rendered.length) {
-          const pLine = planet[i];
-          const col = Math.max(0, width - pLine.length - 2);
-          const before = rendered[row].slice(0, col);
-          const after = rendered[row].slice(col + pLine.length);
-          rendered[row] = before + pLine + after;
+  const cells = useMemo(
+    () =>
+      Array.from({ length: height }, (_, row) => {
+        const line: StarCell[] = [];
+        for (let col = 0; col < STAR_WIDTH; col++) {
+          let cell: StarCell = 0;
+          for (let l = LAYERS.length - 1; l >= 0; l--) {
+            const v = grids[l]?.[col]?.[row] ?? 0;
+            if (v > 0) {
+              cell = v;
+              break;
+            }
+          }
+          line.push(cell);
         }
-      }
-
-      setLines(rendered);
-    };
-
-    // Use a slower tick over SSH to reduce flicker from streaming ANSI writes
-    const interval = process.env.SSH_CONNECTION ? 1200 : 800;
-    tick();
-    const timer = setInterval(tick, interval);
-    return () => clearInterval(timer);
-  }, [width, height]);
-
-  // Reserve rows: 3 for compact boxes + traces
-  const boxRows = 3;
-  const traceRows = Math.min(traces.length, 4);
-  const reservedRows = boxRows + traceRows;
-  const starLines = lines.slice(reservedRows);
+        return line;
+      }),
+    [grids, height]
+  );
 
   return (
-    <Box flexDirection="column" height={height}>
-      <Box height={boxRows} paddingX={1} paddingTop={1}>
-        <WorkBoxes slots={slots} />
-      </Box>
-      {traces.length > 0 && (
-        <Box height={traceRows}>
-          <ActionTraceList traces={traces} maxVisible={traceRows} />
-        </Box>
-      )}
-      <Box flexDirection="column" flexGrow={1}>
-        {starLines.map((line, i) => (
-          <Text key={i} dimColor>
-            {line}
-          </Text>
-        ))}
-      </Box>
+    <Box flexDirection="column" width={STAR_WIDTH}>
+      {cells.map((line, i) => (
+        <Text key={i} dimColor>
+          {line.map((cell, j) => {
+            if (cell === 0) return ' ';
+            const v = STAR_VARIANTS[cell - 1]!;
+            return v.color ? (
+              <Text key={j} color={v.color} dimColor>
+                {v.char}
+              </Text>
+            ) : (
+              v.char
+            );
+          })}
+        </Text>
+      ))}
     </Box>
   );
-}
+});
 
-// ── Log Book (bottom row) ────────────────────────────────────────────────────
+// ── Task Row ────────────────────────────────────────────────────────────────
 
-export function LogBook({
+const TaskRow = React.memo(function TaskRow({
+  task,
+  width,
+}: {
+  task: TaskInfo;
+  width: number;
+}) {
+  const statusLabel = TASK_STATUS_LABELS[task.status] ?? task.status;
+  const statusColor = TASK_STATUS_COLORS[task.status] ?? 'gray';
+  const barWidth = 10;
+  const bar = progressBar(task.progress, barWidth);
+  const titleMaxLen = Math.max(10, width - 58);
+
+  return (
+    <Box>
+      <Text dimColor>{` #${String(task.id).padEnd(3)}`}</Text>
+      <Text color={statusColor} bold>
+        {` ${statusLabel.padEnd(9)}`}
+      </Text>
+      <Text dimColor>{` ${task.agent.padEnd(16)}`}</Text>
+      <Text wrap="truncate">{` ${task.title.slice(0, titleMaxLen)}`}</Text>
+      <Box flexGrow={1} />
+      <Text color={task.progress >= 100 ? 'green' : 'cyan'}>{` ${bar}`}</Text>
+      <Text>{` ${String(task.progress).padStart(3)}%`}</Text>
+      <Text dimColor>{` ${task.duration.padStart(6)}`}</Text>
+    </Box>
+  );
+});
+
+// ── Tasks Section ───────────────────────────────────────────────────────────
+
+export const TasksSection = React.memo(function TasksSection({
+  tasks,
+  maxVisible,
+  width,
+}: {
+  tasks: TaskInfo[];
+  maxVisible: number;
+  width: number;
+}) {
+  const visible = useMemo(
+    () => tasks.slice(0, maxVisible),
+    [tasks, maxVisible]
+  );
+
+  if (visible.length === 0) {
+    return <Text dimColor>{' No tasks'}</Text>;
+  }
+
+  return (
+    <Box flexDirection="column">
+      {visible.map(task => (
+        <TaskRow key={task.id} task={task} width={width} />
+      ))}
+    </Box>
+  );
+});
+
+// ── Log Book ────────────────────────────────────────────────────────────────
+
+const LOG_BG = '#000000';
+
+export const LogBook = React.memo(function LogBook({
   entries,
   height,
+  width,
 }: {
   entries: LogEntry[];
   height: number;
+  width: number;
 }) {
-  // show most recent entries that fit
-  const visibleCount = Math.max(1, height - 2); // account for border
-  const visible = entries.slice(-visibleCount);
+  const visible = useMemo(() => entries.slice(-height), [entries, height]);
+  const emptyRows = Math.max(0, height - Math.max(1, visible.length));
+  const fill = ' '.repeat(width);
 
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="round"
-      borderColor="gray"
-      height={height}
-      paddingX={1}
-    >
-      <Text bold dimColor>
-        LOG
-      </Text>
+    <Box flexDirection="column" height={height}>
       {visible.length === 0 ? (
-        <Text dimColor>Waiting for events...</Text>
+        <Text backgroundColor={LOG_BG}>
+          <Text dimColor>{' Waiting for events...'}</Text>
+          <Text>{fill}</Text>
+        </Text>
       ) : (
         visible.map((entry, i) => (
-          <Text key={i} wrap="truncate">
-            <Text dimColor>{entry.timestamp} </Text>
+          <Text key={i} wrap="truncate" backgroundColor={LOG_BG}>
+            <Text dimColor>{` ${entry.timestamp} `}</Text>
             <Text>{entry.message}</Text>
+            <Text>{fill}</Text>
           </Text>
         ))
       )}
+      {Array.from({ length: emptyRows }, (_, i) => (
+        <Text key={`pad-${i}`} backgroundColor={LOG_BG}>
+          {fill}
+        </Text>
+      ))}
     </Box>
   );
-}
+});
+
+// ── Key Legend ───────────────────────────────────────────────────────────────
+
+export const KeyLegend = React.memo(function KeyLegend() {
+  return (
+    <Box justifyContent="flex-end">
+      <Text dimColor>{'i:inspector  q:quit '}</Text>
+    </Box>
+  );
+});
