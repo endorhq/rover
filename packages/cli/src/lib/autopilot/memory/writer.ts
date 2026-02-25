@@ -127,5 +127,5 @@ export async function recordTraceCompletion(
   const formatted = formatDailyEntry(entry);
 
   memoryStore.appendDailyEntry(formatted);
-  await memoryStore.triggerEmbed();
+  await memoryStore.update();
 }

@@ -100,14 +100,39 @@ Respond with a JSON object and nothing else:
 }
 ```
 
-## Memory Context
+## Memory Search (MANDATORY)
 
-You may receive a "Memory (Past Activity)" section containing summaries of previous autopilot traces on this project. Use this information to:
+You have access to project memory via the `qmd` tool. The memory collection for this project is `{{MEMORY_COLLECTION}}`. **You MUST search memory before making your decision.** Past traces reveal whether this failure has occurred before and how it was resolved.
 
-- **Identify recurring failures**. If similar tasks have failed before with the same error, this is a signal that retrying with the same approach may not work. Consider providing different iteration instructions or choosing `fail`.
-- **Reference past resolutions**. If a similar failure was previously resolved successfully, use the approach that worked as guidance for your iteration instructions.
+### How to search
 
-Memory is supplementary context — focus primarily on the current chain state.
+All flags must come **before** the query string. Use `-n` to limit results.
+
+```bash
+qmd search --collection {{MEMORY_COLLECTION}} -n 5 "#42"
+```
+
+### Search strategy — start with references, then refine
+
+Memory uses keyword matching. The key to getting results is to search by **identifying references** first — issue numbers, PR numbers, task titles — not generic error terms.
+
+1. **First, search by reference** — the issue/PR number or task title is the strongest identifier. Search `"#42"` or `"retry logic task"`, not `"type error"`. References anchor results to the exact chain.
+2. **Then, try reference + one keyword** to narrow: `"#42 failed"` or `"#42 type error"`. Two or three terms is the sweet spot.
+3. **Avoid generic-only queries** — `"type error"` or `"failed"` without a reference will return too many unrelated results or nothing useful. Always anchor to a reference when one exists.
+4. **Fall back to keywords only** when there is no reference. In that case, use the most distinctive term: a specific error code, a file path, or a module name.
+
+If a search returns no results, try fewer terms — not more. If `qmd` returns an error or is unavailable, proceed without memory context.
+
+### When to search
+
+- **Before deciding**, search for the issue/PR number or task title to check if a similar failure occurred before and how it was resolved.
+- **When considering iterate**, search for past iteration instructions that worked for similar failures.
+
+### How to use results
+
+- **Identify recurring failures**. If similar tasks failed before with the same error, retrying with the same approach may not work. Consider different iteration instructions or choosing `fail`.
+- **Reference past resolutions**. If a similar failure was previously resolved, use the approach that worked as guidance for your iteration instructions.
+- Focus primarily on the current chain state — memory is supplementary context.
 
 ## Decision Principles
 

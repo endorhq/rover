@@ -4,7 +4,6 @@ import { IterationManager } from 'rover-core';
 import { getUserAIAgent, getAIAgentTool } from '../../agents/index.js';
 import { parseJsonResponse } from '../../../utils/json-parser.js';
 import { SpanWriter, ActionWriter, enqueueAction } from '../logging.js';
-import { buildResolverQuery, fetchMemoryContext } from '../memory/reader.js';
 import type {
   PendingAction,
   ResolverDecision,
@@ -167,19 +166,19 @@ async function askAIForDecision(
     spans
   );
 
-  // Fetch and prepend memory context
-  const memoryQuery = buildResolverQuery(trace, failedStepDetails);
-  const memory = await fetchMemoryContext(ctx.memoryStore, memoryQuery, 3);
-  if (memory.content) {
-    userMessage = memory.content + '\n' + userMessage;
-  }
+  // Build system prompt with memory collection
+  const systemPrompt = resolvePromptTemplate.replaceAll(
+    '{{MEMORY_COLLECTION}}',
+    ctx.memoryStore?.collectionName || 'rover-memory'
+  );
 
   const agent = getUserAIAgent();
   const agentTool = getAIAgentTool(agent);
   const response = await agentTool.invoke(userMessage, {
     json: true,
     cwd: projectPath,
-    systemPrompt: resolvePromptTemplate,
+    systemPrompt,
+    tools: ['Bash(qmd:*)'],
   });
 
   const result = parseJsonResponse<ResolverAIResult>(response);

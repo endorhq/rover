@@ -2,7 +2,6 @@ import { getUserAIAgent, getAIAgentTool } from '../../agents/index.js';
 import { parseJsonResponse } from '../../../utils/json-parser.js';
 import { SpanWriter, ActionWriter, enqueueAction } from '../logging.js';
 import { buildWorkflowCatalog } from '../helpers.js';
-import { buildPlannerQuery, fetchMemoryContext } from '../memory/reader.js';
 import type { PendingAction, PlanResult, PlanTask, Span } from '../types.js';
 import type {
   Step,
@@ -117,19 +116,16 @@ export const plannerStep: Step = {
     // Build user message from pending.meta + spans
     let userMessage = buildPlanUserMessage(pending.meta ?? {}, spans);
 
-    // Fetch and append memory context
-    const memoryQuery = buildPlannerQuery(pending.meta ?? {}, spans);
-    const memory = await fetchMemoryContext(ctx.memoryStore, memoryQuery, 5);
-    if (memory.content) {
-      userMessage += '\n' + memory.content;
-    }
-
-    // Build system prompt with dynamic workflow catalog
+    // Build system prompt with dynamic workflow catalog and memory collection
     let systemPrompt = planPromptTemplate;
     if (workflowStore) {
       const catalog = buildWorkflowCatalog(workflowStore);
       systemPrompt = systemPrompt.replace('{{WORKFLOW_CATALOG}}', catalog);
     }
+    systemPrompt = systemPrompt.replaceAll(
+      '{{MEMORY_COLLECTION}}',
+      ctx.memoryStore?.collectionName || 'rover-memory'
+    );
 
     // Invoke agent with system prompt and read-only tools
     const agent = getUserAIAgent();
@@ -138,7 +134,7 @@ export const plannerStep: Step = {
       json: true,
       cwd: projectPath,
       systemPrompt,
-      tools: ['Read', 'Glob', 'Grep', 'Bash(gh:*)'],
+      tools: ['Read', 'Glob', 'Grep', 'Bash(gh:*)', 'Bash(qmd:*)'],
     });
 
     const planResult = parseJsonResponse<PlanResult>(response);

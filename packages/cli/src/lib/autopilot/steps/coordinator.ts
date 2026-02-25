@@ -2,7 +2,6 @@ import { getUserAIAgent, getAIAgentTool } from '../../agents/index.js';
 import { parseJsonResponse } from '../../../utils/json-parser.js';
 import { SpanWriter, ActionWriter, enqueueAction } from '../logging.js';
 import { buildWorkflowCatalog } from '../helpers.js';
-import { buildCoordinatorQuery, fetchMemoryContext } from '../memory/reader.js';
 import type { PendingAction, PilotDecision } from '../types.js';
 import type {
   Step,
@@ -14,8 +13,8 @@ import type {
 import pilotPromptTemplate from './prompts/pilot-prompt.md';
 
 export function buildPilotPrompt(
-  memorySection?: string,
-  workflowCatalog?: string
+  workflowCatalog?: string,
+  memoryCollection?: string
 ): string {
   let prompt = pilotPromptTemplate;
 
@@ -25,9 +24,11 @@ export function buildPilotPrompt(
     workflowCatalog || '*(No workflows available)*'
   );
 
-  if (memorySection) {
-    prompt += '\n\n---\n\n' + memorySection;
-  }
+  // Inject memory collection name
+  prompt = prompt.replaceAll(
+    '{{MEMORY_COLLECTION}}',
+    memoryCollection || 'rover-memory'
+  );
 
   prompt +=
     '\n\n## Constraint\n\nThe `coordinate` action is NOT available for this decision. You must choose one of the other actions.\n';
@@ -58,12 +59,11 @@ export const coordinatorStep: Step = {
       ? buildWorkflowCatalog(ctx.workflowStore)
       : '*(No workflows available)*';
 
-    // Fetch memory context for this event
-    const memoryQuery = buildCoordinatorQuery(pending.meta ?? {});
-    const memory = await fetchMemoryContext(ctx.memoryStore, memoryQuery, 5);
-
     // Build system prompt and user message
-    const systemPrompt = buildPilotPrompt(memory.content || undefined, catalog);
+    const systemPrompt = buildPilotPrompt(
+      catalog,
+      ctx.memoryStore?.collectionName
+    );
 
     const userMessage =
       '## Event\n\n```json\n' +
@@ -77,7 +77,14 @@ export const coordinatorStep: Step = {
       model: 'sonnet',
       cwd: projectPath,
       systemPrompt,
-      tools: ['Read', 'Glob', 'Grep', 'Bash(gh:*)', 'Bash(git:*)'],
+      tools: [
+        'Read',
+        'Glob',
+        'Grep',
+        'Bash(gh:*)',
+        'Bash(git:*)',
+        'Bash(qmd:*)',
+      ],
     });
     const decision = parseJsonResponse<PilotDecision>(response);
 

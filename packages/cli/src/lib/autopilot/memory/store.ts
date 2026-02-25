@@ -21,7 +21,7 @@ export class MemoryStore {
   private projectId: string;
   private basePath: string;
   private dailyPath: string;
-  private collectionName: string;
+  public readonly collectionName: string;
   private qmdAvailable: boolean | null = null;
 
   /** Serializes all QMD process launches to avoid parallel CPU/memory spikes. */
@@ -54,8 +54,9 @@ export class MemoryStore {
       await launch('qmd', [
         'collection',
         'add',
-        this.collectionName,
         this.dailyPath,
+        '--name',
+        this.collectionName,
       ]);
     } catch {
       // QMD collection may already exist — ignore errors
@@ -136,17 +137,17 @@ export class MemoryStore {
   }
 
   /**
-   * Trigger QMD embedding for the collection.
+   * Trigger QMD update and embed processing for the collection.
    * Serialized via qmdQueue so it doesn't overlap with searches.
    * Only re-embeds changed files, so this is fast.
    */
-  async triggerEmbed(): Promise<void> {
+  async update(): Promise<void> {
     if (!(await this.isQmdAvailable())) return;
 
     // Enqueue but don't await — callers don't need the result.
     // The queue ensures it won't overlap with concurrent searches.
     this.enqueueQmd(async () => {
-      await launch('qmd', ['embed', '--collection', this.collectionName]);
+      await launch('qmd', ['update']);
     }).catch(() => {});
   }
 

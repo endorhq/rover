@@ -154,15 +154,41 @@ Respond with a JSON object and nothing else:
 - **execution_order**: `parallel` if all tasks can run simultaneously, `sequential` if they must run in order, `mixed` if some can be parallel and others have dependencies.
 - **reasoning**: Justification for the decomposition. Explain the trade-off between granularity and context overhead.
 
-## Memory Context
+## Memory Search (MANDATORY)
 
-You may receive a "Memory (Past Activity)" section in the user message containing summaries of previous autopilot traces on this project. Use this information to:
+You have access to project memory via the `qmd` tool. The memory collection for this project is `{{MEMORY_COLLECTION}}`. **You MUST search memory before finalizing your plan.** Past traces contain prior approaches, failed attempts, and patterns that directly affect your planning decisions.
 
-- **Review prior changes**. If a similar directive was planned before, check what files were changed and what approach was taken. Avoid proposing the same changes to files that were recently modified for the same purpose.
-- **Learn from failed approaches**. If past traces show that a particular approach failed (e.g., a certain file was changed but the task still failed), consider an alternative approach.
+### How to search
+
+All flags must come **before** the query string. Use `-n` to limit results.
+
+```bash
+qmd search --collection {{MEMORY_COLLECTION}} -n 5 "#15"
+```
+
+### Search strategy — start with references, then refine
+
+Memory uses keyword matching. The key to getting results is to search by **identifying references** first — issue numbers, PR numbers, branch names — not generic terms.
+
+1. **First, search by reference** — the issue/PR number is the strongest identifier. Search `"#15"` or `"PR #8"`, not `"authentication refactor"`. References anchor results to the exact context.
+2. **Then, try reference + one keyword** to narrow: `"#15 failed"` or `"#15 resolver"`. Two or three terms is the sweet spot.
+3. **Avoid generic-only queries** — `"refactor"` or `"authentication"` without a reference will return too many unrelated results or nothing useful. Always anchor to a reference when one exists.
+4. **Fall back to keywords only** when there is no reference. In that case, use the most distinctive term: a file path, a module name, or a specific error code.
+
+If a search returns no results, try fewer terms — not more. If `qmd` returns an error or is unavailable, proceed without memory context.
+
+### When to search
+
+- **During Phase 1** (understanding the directive): search for referenced issue/PR numbers to find prior plans for the same or similar work.
+- **During Phase 2** (exploring the codebase): search for file paths or module names you discover to check if past traces modified them and what the outcome was.
+- **Before finalizing**: search for failed approaches to avoid repeating them.
+
+### How to use results
+
+- **Review prior changes**. If a similar directive was planned before, check what approach was taken. Avoid proposing the same changes to files that were recently modified for the same purpose.
+- **Learn from failed approaches**. If past traces show a particular approach failed, consider an alternative.
 - **Maintain consistency**. If past plans established patterns or conventions, follow them unless the current directive explicitly calls for a different approach.
-
-Memory is supplementary context — always verify current codebase state through your own exploration in Phase 2.
+- Always verify current codebase state through your own exploration — memory is supplementary context.
 
 ## Planning Principles
 

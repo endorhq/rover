@@ -34,11 +34,6 @@ import { spawn } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { findOrRegisterProject } from 'rover-core';
-import {
-  buildCoordinatorQuery,
-  buildPlannerQuery,
-  fetchMemoryContext,
-} from './lib/autopilot/memory/reader.js';
 import { MemoryStore } from './lib/autopilot/memory/store.js';
 import { buildPilotPrompt } from './lib/autopilot/steps/coordinator.js';
 import { buildWorkflowCatalog } from './lib/autopilot/helpers.js';
@@ -111,20 +106,12 @@ const AGENT_CONFIGS: Record<AgentName, AgentConfig> = {
     modelArgs: model => ['--model', model],
     promptAsArg: false,
     systemPromptSetup: systemPrompt => {
-      // Write system prompt to a temp file to avoid shell quoting issues
-      const dir = mkdtempSync(join(tmpdir(), 'rover-codex-'));
-      const filePath = join(dir, 'system-prompt.md');
-      writeFileSync(filePath, systemPrompt, 'utf8');
       return {
-        args: ['--config', `developer_instructions_file=${filePath}`],
-        cleanup: () => {
-          try {
-            unlinkSync(filePath);
-          } catch {}
-        },
+        args: ['--config', `developer_instructions='${systemPrompt}'`],
+        cleanup: () => {},
       };
     },
-    toolArgs: () => [],
+    toolArgs: () => ['--full-auto'],
   },
 
   gemini: {
@@ -153,7 +140,7 @@ const AGENT_CONFIGS: Record<AgentName, AgentConfig> = {
 };
 
 const SUPPORTED_AGENTS: AgentName[] = ['claude', 'codex', 'gemini'];
-const DEFAULT_TOOLS = 'Read,Glob,Grep,Bash(gh:*),Bash(git:*)';
+const DEFAULT_TOOLS = 'Read,Glob,Grep,Bash(gh:*),Bash(git:*),Bash(qmd:*)';
 
 // ── Generic agent invocation ────────────────────────────────────────────────
 
@@ -283,9 +270,6 @@ function parseAgentOutput(rawOutput: string): string {
 // ── Coordinate step ─────────────────────────────────────────────────────────
 
 interface CoordinateContext {
-  memoryContent: string;
-  memoryCount: number;
-  memoryQuery: string;
   systemPrompt: string;
   userMessage: string;
 }
@@ -295,18 +279,11 @@ async function gatherCoordinateContext(
   projectId: string,
   projectPath: string
 ): Promise<CoordinateContext> {
-  // 1. Memory context
-  header('Memory context');
+  // 1. Memory collection
+  header('Memory');
   const memoryStore = new MemoryStore(projectId);
   await memoryStore.ensureSetup();
-  const memoryQuery = buildCoordinatorQuery(meta);
-  dim(`  Query: "${memoryQuery}"`);
-  const memory = await fetchMemoryContext(memoryStore, memoryQuery, 5);
-  if (memory.content) {
-    console.log(colors.green(`  ${memory.count} result(s) found`));
-  } else {
-    dim('  (no results)');
-  }
+  dim(`  Collection: ${memoryStore.collectionName}`);
 
   // 2. Build system prompt (identical to coordinator.ts)
   header('Assembling prompt');
@@ -315,8 +292,8 @@ async function gatherCoordinateContext(
   const entries = workflowStore.getAllWorkflowEntries();
   dim(`  Loaded ${entries.length} workflow(s)`);
   const systemPrompt = buildPilotPrompt(
-    memory.content || undefined,
-    workflowCatalog
+    workflowCatalog,
+    memoryStore.collectionName
   );
   dim(`  System prompt: ${systemPrompt.length} characters`);
 
@@ -326,9 +303,6 @@ async function gatherCoordinateContext(
   dim(`  User message: ${userMessage.length} characters`);
 
   return {
-    memoryContent: memory.content,
-    memoryCount: memory.count,
-    memoryQuery,
     systemPrompt,
     userMessage,
   };
@@ -470,21 +444,13 @@ async function runPlan(
     }
   }
 
-  // Memory context
-  header('Memory context');
+  // Memory collection
+  header('Memory');
   const memoryStore = new MemoryStore(projectId);
   await memoryStore.ensureSetup();
-  const memoryQuery = buildPlannerQuery(meta, spans);
-  dim(`  Query: "${memoryQuery}"`);
-  const memory = await fetchMemoryContext(memoryStore, memoryQuery, 5);
-  if (memory.content) {
-    console.log(colors.green(`  ${memory.count} result(s) found`));
-    userMessage += '\n' + memory.content;
-  } else {
-    dim('  (no results)');
-  }
+  dim(`  Collection: ${memoryStore.collectionName}`);
 
-  // Build system prompt with real workflow catalog
+  // Build system prompt with real workflow catalog and memory collection
   header('Workflows');
   const workflowStore = initWorkflowStore(projectPath);
   const workflowCatalog = buildWorkflowCatalog(workflowStore);
@@ -492,6 +458,10 @@ async function runPlan(
   dim(`  Loaded ${entries.length} workflow(s)`);
   let systemPrompt: string = planPromptTemplate;
   systemPrompt = systemPrompt.replace('{{WORKFLOW_CATALOG}}', workflowCatalog);
+  systemPrompt = systemPrompt.replaceAll(
+    '{{MEMORY_COLLECTION}}',
+    memoryStore.collectionName
+  );
 
   // For prompt-only, show both system and user messages
   const fullPrompt = `${systemPrompt}\n\n---\n\n${userMessage}`;
