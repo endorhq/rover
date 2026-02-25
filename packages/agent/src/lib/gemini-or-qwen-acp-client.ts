@@ -1,5 +1,6 @@
 import type { ReadTextFileResponse } from '@agentclientprotocol/sdk';
 import colors from 'ansi-colors';
+import { VERBOSE } from 'rover-core';
 import { ACPClient } from './acp-client.js';
 
 /**
@@ -14,11 +15,13 @@ export class GeminiOrQwenACPClient extends ACPClient {
   protected override onFileNotFound(
     path: string
   ): Promise<ReadTextFileResponse> {
-    console.log(
-      colors.yellow(
-        `[ACP] readTextFile: Returning empty content for missing file ${path} (Gemini/Qwen)`
-      )
-    );
+    if (VERBOSE) {
+      console.log(
+        colors.yellow(
+          `[ACP] readTextFile: Returning empty content for missing file ${path} (Gemini/Qwen)`
+        )
+      );
+    }
     return Promise.resolve({ content: '' });
   }
 }

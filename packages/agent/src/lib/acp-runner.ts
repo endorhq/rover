@@ -132,11 +132,13 @@ export class ACPRunner {
       env: process.env,
     });
 
-    // Always forward stderr for debugging (can be seen in docker logs)
+    // Forward stderr for debugging when VERBOSE is enabled
     if (this.agentProcess.stderr) {
       this.agentProcess.stderr.on('data', (chunk: Buffer) => {
-        const text = chunk.toString();
-        console.log(colors.yellow(`[ACP Agent stderr] ${text.trim()}`));
+        if (VERBOSE) {
+          const text = chunk.toString();
+          console.log(colors.yellow(`[ACP Agent stderr] ${text.trim()}`));
+        }
       });
     }
 
@@ -168,17 +170,21 @@ export class ACPRunner {
         },
       };
 
-      console.log(
-        colors.gray('[ACP] Sending initialize request:'),
-        colors.cyan(JSON.stringify(initRequest, null, 2))
-      );
+      if (VERBOSE) {
+        console.log(
+          colors.gray('[ACP] Sending initialize request:'),
+          colors.cyan(JSON.stringify(initRequest, null, 2))
+        );
+      }
 
       const initResult = await this.connection.initialize(initRequest);
 
-      console.log(
-        colors.gray('[ACP] Initialize response:'),
-        colors.cyan(JSON.stringify(initResult, null, 2))
-      );
+      if (VERBOSE) {
+        console.log(
+          colors.gray('[ACP] Initialize response:'),
+          colors.cyan(JSON.stringify(initResult, null, 2))
+        );
+      }
 
       this.isConnectionInitialized = true;
 
@@ -226,17 +232,21 @@ export class ACPRunner {
         mcpServers,
       };
 
-      console.log(
-        colors.gray('[ACP] Sending newSession request:'),
-        colors.cyan(JSON.stringify(sessionRequest, null, 2))
-      );
+      if (VERBOSE) {
+        console.log(
+          colors.gray('[ACP] Sending newSession request:'),
+          colors.cyan(JSON.stringify(sessionRequest, null, 2))
+        );
+      }
 
       const sessionResult = await this.connection.newSession(sessionRequest);
 
-      console.log(
-        colors.gray('[ACP] newSession response:'),
-        colors.cyan(JSON.stringify(sessionResult, null, 2))
-      );
+      if (VERBOSE) {
+        console.log(
+          colors.gray('[ACP] newSession response:'),
+          colors.cyan(JSON.stringify(sessionResult, null, 2))
+        );
+      }
 
       this.sessionId = sessionResult.sessionId;
       this.isSessionCreated = true;
@@ -340,23 +350,27 @@ export class ACPRunner {
         }
       }
 
-      console.log(
-        colors.gray(
-          '[ACP] Sending prompt request (prompt length: ' +
-            prompt.length +
-            ' chars)'
-        )
-      );
+      if (VERBOSE) {
+        console.log(
+          colors.gray(
+            '[ACP] Sending prompt request (prompt length: ' +
+              prompt.length +
+              ' chars)'
+          )
+        );
+      }
 
       const promptResult = await this.connection.prompt({
         sessionId: this.sessionId,
         prompt: promptContent,
       });
 
-      console.log(
-        colors.gray('[ACP] Prompt response:'),
-        colors.cyan(JSON.stringify(promptResult, null, 2))
-      );
+      if (VERBOSE) {
+        console.log(
+          colors.gray('[ACP] Prompt response:'),
+          colors.cyan(JSON.stringify(promptResult, null, 2))
+        );
+      }
 
       // Stop capturing and get the accumulated response
       const response = this.client.stopCapturing();
@@ -503,9 +517,11 @@ export class ACPRunner {
       // Send the prompt via ACP session
       const promptResult = await this.sendPrompt(prompt);
 
-      console.log(
-        colors.gray(`\n✅ Agent completed with: ${promptResult.stopReason}`)
-      );
+      if (VERBOSE) {
+        console.log(
+          colors.gray(`\n✅ Agent completed with: ${promptResult.stopReason}`)
+        );
+      }
 
       // Store common outputs
       outputs.set('raw_output', `Stop reason: ${promptResult.stopReason}`);
@@ -1002,7 +1018,9 @@ export class ACPRunner {
    */
   closeSession(): void {
     if (this.sessionId) {
-      console.log(colors.gray(`🔌 Closing session: ${this.sessionId}`));
+      if (VERBOSE) {
+        console.log(colors.gray(`🔌 Closing session: ${this.sessionId}`));
+      }
       this.sessionId = null;
       this.isSessionCreated = false;
     }
@@ -1013,7 +1031,9 @@ export class ACPRunner {
    */
   close(): void {
     if (this.agentProcess) {
-      console.log(colors.gray('\n🔌 Closing ACP connection...'));
+      if (VERBOSE) {
+        console.log(colors.gray('\n🔌 Closing ACP connection...'));
+      }
       this.agentProcess.kill('SIGTERM');
       this.agentProcess = null;
     }
