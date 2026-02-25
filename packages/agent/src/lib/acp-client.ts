@@ -63,12 +63,18 @@ export class ACPClient implements Client {
   private capturedMessages: string = '';
   private isCapturing: boolean = false;
 
+  // Cost tracking: cumulative cost reported by the agent via usage_update events
+  private cumulativeCostAmount: number = 0;
+  private cumulativeCostCurrency: string = 'USD';
+  private costAtCaptureStart: number = 0;
+
   /**
    * Start capturing agent messages from session updates
    */
   startCapturing(): void {
     this.capturedMessages = '';
     this.isCapturing = true;
+    this.costAtCaptureStart = this.cumulativeCostAmount;
   }
 
   /**
@@ -79,6 +85,18 @@ export class ACPClient implements Client {
     const messages = this.capturedMessages;
     this.capturedMessages = '';
     return messages;
+  }
+
+  /**
+   * Get the cost incurred during the last capture window (between
+   * startCapturing and stopCapturing). Returns the delta in the
+   * cumulative cost reported by the agent via usage_update events.
+   */
+  getLastPromptCost(): { amount: number; currency: string } {
+    return {
+      amount: this.cumulativeCostAmount - this.costAtCaptureStart,
+      currency: this.cumulativeCostCurrency,
+    };
   }
 
   requestPermission(
@@ -182,6 +200,13 @@ export class ACPClient implements Client {
 
         if (this.isCapturing && update.content.type === 'text') {
           this.capturedMessages += `[THINKING] ${update.content.text}`;
+        }
+        break;
+      case 'usage_update':
+        // Track cumulative cost reported by the agent
+        if (update.cost) {
+          this.cumulativeCostAmount = update.cost.amount;
+          this.cumulativeCostCurrency = update.cost.currency;
         }
         break;
       case 'available_commands_update':
