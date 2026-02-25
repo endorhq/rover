@@ -10,6 +10,8 @@
  *   node --enable-source-maps dist/debug-step.mjs coordinate --event event.json
  *   node --enable-source-maps dist/debug-step.mjs coordinate --event event.json --prompt-only
  *   node --enable-source-maps dist/debug-step.mjs coordinate --event event.json --interactive
+ *   node --enable-source-maps dist/debug-step.mjs coordinate --event event.json --agent codex
+ *   node --enable-source-maps dist/debug-step.mjs coordinate --event event.json --agent gemini
  *
  * The --event file should contain the event meta JSON, same structure as
  * pending.meta in the autopilot (output of extractRelevantEvent). Example:
@@ -27,7 +29,7 @@
  */
 
 import { Command } from 'commander';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdtempSync, unlinkSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -39,6 +41,8 @@ import {
 } from './lib/autopilot/memory/reader.js';
 import { MemoryStore } from './lib/autopilot/memory/store.js';
 import { buildPilotPrompt } from './lib/autopilot/steps/coordinator.js';
+import { buildWorkflowCatalog } from './lib/autopilot/helpers.js';
+import { initWorkflowStore } from './lib/workflow.js';
 import { parseJsonResponse } from './utils/json-parser.js';
 import type { PilotDecision } from './lib/autopilot/types.js';
 import colors from 'ansi-colors';
@@ -59,6 +63,223 @@ function savePromptToFile(prompt: string, step: string): string {
   return filePath;
 }
 
+// ── Agent configuration ─────────────────────────────────────────────────────
+
+type AgentName = 'claude' | 'codex' | 'gemini';
+
+interface AgentConfig {
+  bin: string;
+  /** Default model when --model is not specified */
+  defaultModel: string;
+  /** Base args for piped (non-interactive) mode, without --model */
+  pipedArgs(): string[];
+  /** Base args for interactive mode, without --model */
+  interactiveArgs(): string[];
+  /** Build the model flag(s) — placed last before the prompt positional arg */
+  modelArgs(model: string): string[];
+  /** true = pass prompt as last positional arg; false = pipe via stdin */
+  promptAsArg: boolean;
+  /** Inject system prompt into the spawn — returns extra args and/or env overrides */
+  systemPromptSetup(systemPrompt: string): {
+    args: string[];
+    env?: Record<string, string>;
+    cleanup?: () => void;
+  };
+  /** Extra args for tool access (if supported) */
+  toolArgs(tools: string): string[];
+}
+
+const AGENT_CONFIGS: Record<AgentName, AgentConfig> = {
+  claude: {
+    bin: 'claude',
+    defaultModel: 'sonnet',
+    pipedArgs: () => ['-p'],
+    interactiveArgs: () => [],
+    modelArgs: model => ['--model', model],
+    promptAsArg: true,
+    systemPromptSetup: systemPrompt => ({
+      args: ['--system-prompt', systemPrompt],
+    }),
+    toolArgs: tools => ['--allowedTools', tools],
+  },
+
+  codex: {
+    bin: 'codex',
+    defaultModel: 'gpt-5.3-codex',
+    pipedArgs: () => ['exec'],
+    interactiveArgs: () => ['exec'],
+    modelArgs: model => ['--model', model],
+    promptAsArg: false,
+    systemPromptSetup: systemPrompt => {
+      // Write system prompt to a temp file to avoid shell quoting issues
+      const dir = mkdtempSync(join(tmpdir(), 'rover-codex-'));
+      const filePath = join(dir, 'system-prompt.md');
+      writeFileSync(filePath, systemPrompt, 'utf8');
+      return {
+        args: ['--config', `developer_instructions_file=${filePath}`],
+        cleanup: () => {
+          try {
+            unlinkSync(filePath);
+          } catch {}
+        },
+      };
+    },
+    toolArgs: () => [],
+  },
+
+  gemini: {
+    bin: 'gemini',
+    defaultModel: 'gemini-2.5-flash',
+    pipedArgs: () => [],
+    interactiveArgs: () => [],
+    modelArgs: model => ['--model', model],
+    promptAsArg: false,
+    systemPromptSetup: systemPrompt => {
+      const dir = mkdtempSync(join(tmpdir(), 'rover-gemini-'));
+      const filePath = join(dir, 'system-prompt.md');
+      writeFileSync(filePath, systemPrompt, 'utf8');
+      return {
+        args: [],
+        env: { GEMINI_SYSTEM_MD: filePath },
+        cleanup: () => {
+          try {
+            unlinkSync(filePath);
+          } catch {}
+        },
+      };
+    },
+    toolArgs: () => [],
+  },
+};
+
+const SUPPORTED_AGENTS: AgentName[] = ['claude', 'codex', 'gemini'];
+const DEFAULT_TOOLS = 'Read,Glob,Grep,Bash(gh:*),Bash(git:*)';
+
+// ── Generic agent invocation ────────────────────────────────────────────────
+
+async function invokePiped(
+  agentName: AgentName,
+  systemPrompt: string,
+  userMessage: string,
+  model: string,
+  tools: string
+): Promise<string> {
+  const config = AGENT_CONFIGS[agentName];
+  const setup = config.systemPromptSetup(systemPrompt);
+
+  // --model must come last (before any positional prompt arg) so the claude
+  // CLI doesn't swallow subsequent flags as part of the prompt text.
+  const args = [
+    ...config.pipedArgs(),
+    ...setup.args,
+    ...config.toolArgs(tools),
+    ...config.modelArgs(model),
+  ];
+
+  const spawnEnv = setup.env ? { ...process.env, ...setup.env } : process.env;
+
+  // Append the JSON enforcement suffix (same as AIAgentTool.invoke with json: true)
+  const invokePrompt =
+    userMessage +
+    '\n\nYou MUST output a valid JSON string as an output. Just output the JSON string and nothing else. If you had any error, still return a JSON string with an "error" property.';
+
+  try {
+    const rawOutput = await new Promise<string>((resolve, reject) => {
+      const child = spawn(config.bin, args, {
+        stdio: ['pipe', 'pipe', 'inherit'],
+        env: spawnEnv,
+      });
+
+      let output = '';
+      child.stdout.on('data', (chunk: Buffer) => {
+        const text = chunk.toString();
+        process.stdout.write(text);
+        output += text;
+      });
+
+      child.stdin.write(invokePrompt);
+      child.stdin.end();
+
+      child.on('close', code => {
+        if (code === 0) resolve(output);
+        else reject(new Error(`${config.bin} exited with code ${code}`));
+      });
+      child.on('error', reject);
+    });
+
+    return rawOutput;
+  } finally {
+    setup.cleanup?.();
+  }
+}
+
+async function invokeInteractive(
+  agentName: AgentName,
+  systemPrompt: string,
+  userMessage: string,
+  model: string,
+  tools: string
+): Promise<void> {
+  const config = AGENT_CONFIGS[agentName];
+  const setup = config.systemPromptSetup(systemPrompt);
+
+  // --model must come last (before the prompt positional arg) so the claude
+  // CLI doesn't swallow subsequent flags as part of the prompt text.
+  const args = [
+    ...config.interactiveArgs(),
+    ...setup.args,
+    ...config.toolArgs(tools),
+    ...config.modelArgs(model),
+  ];
+
+  const spawnEnv = setup.env ? { ...process.env, ...setup.env } : process.env;
+
+  try {
+    if (config.promptAsArg) {
+      // Pass user message as last positional arg (Claude-style)
+      args.push(userMessage);
+      await new Promise<void>((resolve, reject) => {
+        const child = spawn(config.bin, args, {
+          stdio: 'inherit',
+          env: spawnEnv,
+        });
+        child.on('close', () => resolve());
+        child.on('error', reject);
+      });
+    } else {
+      // Pipe user message via stdin, but keep stdout/stderr inherited
+      await new Promise<void>((resolve, reject) => {
+        const child = spawn(config.bin, args, {
+          stdio: ['pipe', 'inherit', 'inherit'],
+          env: spawnEnv,
+        });
+        child.stdin.write(userMessage);
+        child.stdin.end();
+        child.on('close', () => resolve());
+        child.on('error', reject);
+      });
+    }
+  } finally {
+    setup.cleanup?.();
+  }
+}
+
+function parseAgentOutput(rawOutput: string): string {
+  let textToParse = rawOutput.trim();
+
+  // claude -p may wrap output in {"result": "..."} envelope. Handle both cases.
+  try {
+    const envelope = JSON.parse(textToParse);
+    if (typeof envelope.result === 'string') {
+      textToParse = envelope.result;
+    }
+  } catch {
+    // Not an envelope — treat as raw text
+  }
+
+  return textToParse;
+}
+
 // ── Coordinate step ─────────────────────────────────────────────────────────
 
 interface CoordinateContext {
@@ -71,7 +292,8 @@ interface CoordinateContext {
 
 async function gatherCoordinateContext(
   meta: Record<string, any>,
-  projectId: string
+  projectId: string,
+  projectPath: string
 ): Promise<CoordinateContext> {
   // 1. Memory context
   header('Memory context');
@@ -88,8 +310,10 @@ async function gatherCoordinateContext(
 
   // 2. Build system prompt (identical to coordinator.ts)
   header('Assembling prompt');
-  const workflowCatalog =
-    '*(No workflows loaded in debug mode — provide via --workflows if needed)*';
+  const workflowStore = initWorkflowStore(projectPath);
+  const workflowCatalog = buildWorkflowCatalog(workflowStore);
+  const entries = workflowStore.getAllWorkflowEntries();
+  dim(`  Loaded ${entries.length} workflow(s)`);
   const systemPrompt = buildPilotPrompt(
     memory.content || undefined,
     workflowCatalog
@@ -112,10 +336,17 @@ async function gatherCoordinateContext(
 
 async function runCoordinate(
   meta: Record<string, any>,
-  options: { promptOnly?: boolean; interactive?: boolean; model?: string },
-  projectId: string
+  options: {
+    promptOnly?: boolean;
+    interactive?: boolean;
+    model?: string;
+    agent?: AgentName;
+  },
+  projectId: string,
+  projectPath: string
 ): Promise<void> {
-  const ctx = await gatherCoordinateContext(meta, projectId);
+  const ctx = await gatherCoordinateContext(meta, projectId, projectPath);
+  const agentName = options.agent || 'claude';
 
   const fullPrompt = `${ctx.systemPrompt}\n\n---\n\n${ctx.userMessage}`;
   const promptFile = savePromptToFile(fullPrompt, 'coordinate');
@@ -127,97 +358,56 @@ async function runCoordinate(
     console.log(ctx.systemPrompt);
     header('User Message');
     console.log(ctx.userMessage);
+    header('Agent Info');
+    dim(`  Agent: ${agentName}`);
+    dim(`  Binary: ${AGENT_CONFIGS[agentName].bin}`);
+    if (agentName === 'gemini') {
+      dim('  System prompt will be passed via GEMINI_SYSTEM_MD env var');
+    } else if (agentName === 'codex') {
+      dim(
+        '  System prompt will be passed via --config developer_instructions_file'
+      );
+    }
     return;
   }
 
-  const model = options.model || 'sonnet';
+  const model = options.model || AGENT_CONFIGS[agentName].defaultModel;
 
   // --- Interactive mode ---
   if (options.interactive) {
-    header(`Interactive Session (model: ${model})`);
+    header(`Interactive Session (agent: ${agentName}, model: ${model})`);
     dim(
-      'Claude will process the prompt with read-only tools and enter interactive mode.\n' +
+      `${agentName} will process the prompt with read-only tools and enter interactive mode.\n` +
         'You can ask follow-up questions like "why not plan?" or "what if the labels included bug?".\n'
     );
 
-    return new Promise<void>((resolve, reject) => {
-      const child = spawn(
-        'claude',
-        [
-          '--system-prompt',
-          ctx.systemPrompt,
-          '--allowedTools',
-          'Read,Glob,Grep,Bash(gh:*),Bash(git:*)',
-          '--model',
-          model,
-          ctx.userMessage,
-        ],
-        { stdio: 'inherit' }
-      );
-      child.on('close', () => resolve());
-      child.on('error', reject);
-    });
+    return invokeInteractive(
+      agentName,
+      ctx.systemPrompt,
+      ctx.userMessage,
+      model,
+      DEFAULT_TOOLS
+    );
   }
 
   // --- Default: piped mode with full output ---
-  header(`Invoking Agent (model: ${model})`);
+  header(`Invoking Agent (agent: ${agentName}, model: ${model})`);
   dim(
-    'Running claude in piped mode with read-only tools. Full response below:\n'
+    `Running ${agentName} in piped mode with read-only tools. Full response below:\n`
   );
 
-  // Append the JSON enforcement suffix (same as AIAgentTool.invoke with json: true)
-  const invokePrompt =
-    ctx.userMessage +
-    '\n\nYou MUST output a valid JSON string as an output. Just output the JSON string and nothing else. If you had any error, still return a JSON string with an "error" property.';
-
-  const rawOutput = await new Promise<string>((resolve, reject) => {
-    const child = spawn(
-      'claude',
-      [
-        '-p',
-        '--system-prompt',
-        ctx.systemPrompt,
-        '--allowedTools',
-        'Read,Glob,Grep,Bash(gh:*),Bash(git:*)',
-        '--model',
-        model,
-      ],
-      { stdio: ['pipe', 'pipe', 'inherit'] }
-    );
-
-    let output = '';
-    child.stdout.on('data', (chunk: Buffer) => {
-      const text = chunk.toString();
-      process.stdout.write(text);
-      output += text;
-    });
-
-    child.stdin.write(invokePrompt);
-    child.stdin.end();
-
-    child.on('close', code => {
-      if (code === 0) resolve(output);
-      else reject(new Error(`claude exited with code ${code}`));
-    });
-    child.on('error', reject);
-  });
+  const rawOutput = await invokePiped(
+    agentName,
+    ctx.systemPrompt,
+    ctx.userMessage,
+    model,
+    DEFAULT_TOOLS
+  );
 
   // Parse the decision
   header('Parsed Decision');
   try {
-    let textToParse = rawOutput.trim();
-
-    // claude -p without --output-format json returns raw text.
-    // With --output-format json it wraps in {"result": "..."}. Handle both.
-    try {
-      const envelope = JSON.parse(textToParse);
-      if (typeof envelope.result === 'string') {
-        textToParse = envelope.result;
-      }
-    } catch {
-      // Not an envelope — treat as raw text
-    }
-
+    const textToParse = parseAgentOutput(rawOutput);
     const decision = parseJsonResponse<PilotDecision>(textToParse);
     console.log(JSON.stringify(decision, null, 2));
   } catch (err) {
@@ -235,6 +425,7 @@ async function runPlan(
     interactive?: boolean;
     model?: string;
     spans?: string;
+    agent?: AgentName;
   },
   projectId: string,
   projectPath: string
@@ -243,6 +434,8 @@ async function runPlan(
   const { default: planPromptTemplate } = await import(
     './lib/autopilot/steps/prompts/plan-prompt.md'
   );
+
+  const agentName = options.agent || 'claude';
 
   header('Building plan context');
 
@@ -291,12 +484,14 @@ async function runPlan(
     dim('  (no results)');
   }
 
-  // Build system prompt (replace workflow catalog placeholder)
+  // Build system prompt with real workflow catalog
+  header('Workflows');
+  const workflowStore = initWorkflowStore(projectPath);
+  const workflowCatalog = buildWorkflowCatalog(workflowStore);
+  const entries = workflowStore.getAllWorkflowEntries();
+  dim(`  Loaded ${entries.length} workflow(s)`);
   let systemPrompt: string = planPromptTemplate;
-  systemPrompt = systemPrompt.replace(
-    '{{WORKFLOW_CATALOG}}',
-    '*(No workflows loaded in debug mode — provide via --workflows if needed)*'
-  );
+  systemPrompt = systemPrompt.replace('{{WORKFLOW_CATALOG}}', workflowCatalog);
 
   // For prompt-only, show both system and user messages
   const fullPrompt = `${systemPrompt}\n\n---\n\n${userMessage}`;
@@ -313,90 +508,53 @@ async function runPlan(
     console.log(systemPrompt);
     header('User Message');
     console.log(userMessage);
+    header('Agent Info');
+    dim(`  Agent: ${agentName}`);
+    dim(`  Binary: ${AGENT_CONFIGS[agentName].bin}`);
+    if (agentName === 'gemini') {
+      dim('  System prompt will be passed via GEMINI_SYSTEM_MD env var');
+    } else if (agentName === 'codex') {
+      dim(
+        '  System prompt will be passed via --config developer_instructions_file'
+      );
+    }
     return;
   }
 
-  const model = options.model || 'sonnet';
+  const model = options.model || AGENT_CONFIGS[agentName].defaultModel;
 
   if (options.interactive) {
-    header(`Interactive Session (model: ${model})`);
+    header(`Interactive Session (agent: ${agentName}, model: ${model})`);
     dim(
-      'Claude will process the prompt with read-only tools and enter interactive mode.\n'
+      `${agentName} will process the prompt with read-only tools and enter interactive mode.\n`
     );
 
-    // In interactive mode, pass system prompt and user message as the initial message
-    return new Promise<void>((resolve, reject) => {
-      const child = spawn(
-        'claude',
-        [
-          '--system-prompt',
-          systemPrompt,
-          '--allowedTools',
-          'Read,Glob,Grep,Bash(gh:*),Bash(git:*)',
-          '--model',
-          model,
-          userMessage,
-        ],
-        { stdio: 'inherit' }
-      );
-      console.log('Launching with: ', child.spawnargs);
-      child.on('close', () => resolve());
-      child.on('error', reject);
-    });
+    return invokeInteractive(
+      agentName,
+      systemPrompt,
+      userMessage,
+      model,
+      DEFAULT_TOOLS
+    );
   }
 
   // Default: piped mode
-  header(`Invoking Agent (model: ${model})`);
+  header(`Invoking Agent (agent: ${agentName}, model: ${model})`);
   dim(
-    'Running claude in piped mode with read-only tools. Full response below:\n'
+    `Running ${agentName} in piped mode with read-only tools. Full response below:\n`
   );
 
-  const invokePrompt =
-    userMessage +
-    '\n\nYou MUST output a valid JSON string as an output. Just output the JSON string and nothing else. If you had any error, still return a JSON string with an "error" property.';
-
-  const rawOutput = await new Promise<string>((resolve, reject) => {
-    const child = spawn(
-      'claude',
-      [
-        '-p',
-        '--system-prompt',
-        systemPrompt,
-        '--allowedTools',
-        'Read,Glob,Grep,Bash(gh:*),Bash(git:*)',
-        '--model',
-        model,
-      ],
-      { stdio: ['pipe', 'pipe', 'inherit'] }
-    );
-
-    console.log('Launching with: ', child.spawnargs);
-
-    let output = '';
-    child.stdout.on('data', (chunk: Buffer) => {
-      const text = chunk.toString();
-      process.stdout.write(text);
-      output += text;
-    });
-
-    child.stdin.write(invokePrompt);
-    child.stdin.end();
-
-    child.on('close', code => {
-      if (code === 0) resolve(output);
-      else reject(new Error(`claude exited with code ${code}`));
-    });
-    child.on('error', reject);
-  });
+  const rawOutput = await invokePiped(
+    agentName,
+    systemPrompt,
+    userMessage,
+    model,
+    DEFAULT_TOOLS
+  );
 
   header('Parsed Plan');
   try {
-    let textToParse = rawOutput.trim();
-    try {
-      const envelope = JSON.parse(textToParse);
-      if (typeof envelope.result === 'string') textToParse = envelope.result;
-    } catch {}
-
+    const textToParse = parseAgentOutput(rawOutput);
     const plan = parseJsonResponse<any>(textToParse);
     console.log(JSON.stringify(plan, null, 2));
   } catch (err) {
@@ -427,12 +585,13 @@ program
   )
   .option(
     '--interactive',
-    'Start an interactive claude session with the prompt pre-loaded'
+    'Start an interactive agent session with the prompt pre-loaded'
   )
   .option(
     '--model <model>',
-    'Override the AI model (default: sonnet for both coordinate and plan)'
+    'Override the AI model (defaults: claude=sonnet, codex=o4-mini, gemini=gemini-2.5-pro)'
   )
+  .option('--agent <name>', 'Agent to use: claude, codex, gemini', 'claude')
   .option(
     '--spans <path>',
     'Path to JSON file with span trace (array of Span objects, used by plan step)'
@@ -445,6 +604,7 @@ program
         promptOnly?: boolean;
         interactive?: boolean;
         model?: string;
+        agent?: string;
         spans?: string;
       }
     ) => {
@@ -452,6 +612,15 @@ program
       if (!supportedSteps.includes(step)) {
         console.error(
           `Unknown step "${step}". Supported: ${supportedSteps.join(', ')}`
+        );
+        process.exit(1);
+      }
+
+      // Validate --agent
+      const agentName = (options.agent || 'claude') as AgentName;
+      if (!SUPPORTED_AGENTS.includes(agentName)) {
+        console.error(
+          `Unknown agent "${options.agent}". Supported: ${SUPPORTED_AGENTS.join(', ')}`
         );
         process.exit(1);
       }
@@ -491,13 +660,24 @@ program
       dim(`Project: ${project.name} (${projectId})`);
       dim(`Event file: ${options.event}`);
       dim(`Event type: ${meta.type || '(unknown)'}`);
+      dim(`Agent: ${agentName}`);
 
       switch (step) {
         case 'coordinate':
-          await runCoordinate(meta, options, projectId);
+          await runCoordinate(
+            meta,
+            { ...options, agent: agentName },
+            projectId,
+            projectPath
+          );
           break;
         case 'plan':
-          await runPlan(meta, options, projectId, projectPath);
+          await runPlan(
+            meta,
+            { ...options, agent: agentName },
+            projectId,
+            projectPath
+          );
           break;
       }
     }

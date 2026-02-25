@@ -51,10 +51,11 @@ function writeWorkflowActions(
       ? (titleToActionId.get(task.context.depends_on) ?? null)
       : null;
 
+    const descriptionRaw = task.inputs?.description ?? task.title;
     const description =
-      task.description.length > 200
-        ? task.description.slice(0, 200) + '\u2026'
-        : task.description;
+      descriptionRaw.length > 200
+        ? descriptionRaw.slice(0, 200) + '\u2026'
+        : descriptionRaw;
 
     const action = new ActionWriter(projectId, {
       action: 'workflow',
@@ -63,11 +64,10 @@ function writeWorkflowActions(
       meta: {
         workflow: task.workflow,
         title: task.title,
-        description: task.description,
         acceptance_criteria: task.acceptance_criteria,
         context: task.context,
         depends_on_action_id: dependsOnActionId,
-        ...(task.inputs ? { inputs: task.inputs } : {}),
+        inputs: task.inputs ?? {},
         ...(task.context_uris?.length
           ? { context_uris: task.context_uris }
           : {}),

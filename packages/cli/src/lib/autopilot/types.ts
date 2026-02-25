@@ -123,6 +123,7 @@ export interface ResolverAIResult {
 
 export interface SummaryAIResult {
   summary: string;
+  saveToMemory: boolean;
 }
 
 export interface CommitterAIResult {
@@ -163,9 +164,8 @@ export interface TaskMapping {
 export interface PlanTask {
   title: string;
   workflow: string;
-  description: string;
   acceptance_criteria: string[];
-  inputs?: Record<string, string>;
+  inputs: Record<string, string>;
   context_uris?: string[];
   context: {
     files: string[];

@@ -25,7 +25,11 @@ export const noopStep: Step = {
     const spans = store.getSpanTrace(pending.spanId);
 
     // Summarize the chain
-    const chainSummary = await summarizeChain(spans, ctx.trace, projectPath);
+    const { summary: chainSummary, saveToMemory } = await summarizeChain(
+      spans,
+      ctx.trace,
+      projectPath
+    );
 
     // Create and complete the noop span
     const span = new SpanWriter(projectId, {
@@ -36,10 +40,13 @@ export const noopStep: Step = {
 
     span.complete(`noop: ${chainSummary}`);
 
-    // Record trace completion in memory
-    await recordTraceCompletion(ctx.memoryStore, ctx.trace, spans, store, {
-      decision: 'noop',
-    });
+    // Record trace completion in memory only when the summarizer
+    // determined the trace contains information useful for future decisions
+    if (saveToMemory) {
+      await recordTraceCompletion(ctx.memoryStore, ctx.trace, spans, store, {
+        summary: chainSummary,
+      });
+    }
 
     // Remove the processed action
     store.removePending(pending.actionId);

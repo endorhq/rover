@@ -118,13 +118,14 @@ Respond with a JSON object and nothing else:
     {
       "title": "<imperative, concise title — e.g., 'Implement retry logic for failed tasks'>",
       "workflow": "<workflow name from Available Workflows above>",
-      "description": "<detailed description of what this task must accomplish, including specific files to modify, functions to change, and patterns to follow>",
       "acceptance_criteria": [
         "<criterion 1: a concrete, verifiable condition>",
         "<criterion 2>",
         "..."
       ],
-      "inputs": {},
+      "inputs": {
+        "description": "<detailed description of what this task must accomplish, including specific files to modify, functions to change, and patterns to follow>"
+      },
       "context_uris": [],
       "context": {
         "files": ["<file paths the agent should start by reading>"],
@@ -144,9 +145,8 @@ Respond with a JSON object and nothing else:
 - **tasks**: One or more workflow actions. Each must be self-contained enough for an independent agent to execute.
 - **tasks[].title**: Imperative form. Start with a verb. Keep under 80 characters.
 - **tasks[].workflow**: Must be one of the workflow names listed in Available Workflows above.
-- **tasks[].description**: The core of the task. Be specific: name the files, the functions, the patterns. An agent reading only this description and the listed context files should be able to start working immediately.
 - **tasks[].acceptance_criteria**: Concrete, verifiable conditions. Avoid vague criteria like "works correctly" — say what specifically must be true.
-- **tasks[].inputs**: Optional map of workflow-specific input values. The `description` input is always passed automatically from the task description — do not include it here. Only include additional inputs that the workflow defines (check the workflow's inputs list).
+- **tasks[].inputs**: Map of workflow input values. Must include `description` — the detailed task description for the coding agent. Be specific: name the files, the functions, the patterns. An agent reading only this description and the listed context files should be able to start working immediately. Include any additional inputs the workflow defines (check the workflow's inputs list).
 - **tasks[].context_uris**: Optional array of context URIs to fetch and inject into the workflow sandbox. Uses the same URI formats as the `--context` CLI flag: `github:issue/N`, `github:pr/N`, `file:path`, `https://url`. For example, `"github:pr/42"` provides the PR description, reviews, comments, and full diff. Use this when the task needs external context like a PR diff for code review.
 - **tasks[].context.files**: File paths the agent should read first to orient itself. These are starting points, not an exhaustive list.
 - **tasks[].context.references**: URLs or identifiers from the source event in the traces (issue links, PR links). Include only what exists in the traces — do not fabricate.

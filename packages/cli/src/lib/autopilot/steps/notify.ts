@@ -296,7 +296,7 @@ export const notifyStep: Step = {
 
       // Record trace completion in memory
       await recordTraceCompletion(ctx.memoryStore, trace, spans, store, {
-        decision: 'notify-skipped',
+        summary: aiReasoning || 'Notification not needed',
       });
 
       store.removePending(pending.actionId);
@@ -394,9 +394,14 @@ export const notifyStep: Step = {
 
     // 8. Record trace completion in memory
     const prUrl = (meta.pullRequestUrl as string) ?? null;
+    const notifySummary = channel
+      ? posted
+        ? `Notified on ${channel.command} #${channel.number}`
+        : `Failed to notify on ${channel.command} #${channel.number}`
+      : 'No delivery target';
     await recordTraceCompletion(ctx.memoryStore, trace, spans, store, {
-      decision: 'notify',
       prUrl: prUrl ?? undefined,
+      summary: notifySummary,
     });
 
     // 9. Clean up and return terminal

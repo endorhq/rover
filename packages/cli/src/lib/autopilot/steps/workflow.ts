@@ -177,20 +177,23 @@ export const workflowStep: Step = {
 
     // 2. Create Rover task
     const selectedAgent = getUserAIAgent();
-    const inputsMap = new Map([
-      ['description', meta.description ?? pending.summary],
-    ]);
+    const inputsMap = new Map<string, string>();
     if (meta.inputs) {
       for (const [key, value] of Object.entries(meta.inputs)) {
-        if (typeof value === 'string' && key !== 'description') {
+        if (typeof value === 'string') {
           inputsMap.set(key, value);
         }
       }
     }
+    if (!inputsMap.has('description')) {
+      inputsMap.set('description', pending.summary);
+    }
+
+    const description = inputsMap.get('description')!;
 
     const task = project.createTask({
       title: meta.title ?? pending.summary,
-      description: meta.description ?? pending.summary,
+      description,
       inputs: inputsMap,
       workflowName: meta.workflow ?? 'swe',
       agent: selectedAgent,
@@ -234,7 +237,7 @@ export const workflowStep: Step = {
       iterationPath,
       task.id,
       meta.title ?? pending.summary,
-      meta.description ?? pending.summary
+      description
     );
 
     // 4b. Inject context from context_uris if provided
