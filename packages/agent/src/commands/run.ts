@@ -18,14 +18,13 @@ import {
   type WorkflowAgentStep,
 } from 'rover-schemas';
 import { parseCollectOptions } from '../lib/options.js';
-import { Runner } from '../lib/runner.js';
 import { ACPRunner } from '../lib/acp-runner.js';
 import { createAgent } from '../lib/agents/index.js';
 import { cpSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 /**
- * Helper function to display step results consistently for both ACP and standard runners
+ * Helper function to display step results consistently
  */
 function displayStepResults(
   stepName: string,
@@ -355,75 +354,37 @@ export const runCommand = async (
         }
       );
 
-      // Determine which tool to use
-      // Priority: workflow defaults > CLI flag > fallback to claude
-      // (per-step tool configuration takes precedence, handled in Runner/ACPRunner)
-      const tool =
-        options.agentTool || workflowManager.defaults?.tool || 'claude';
+      console.log(colors.cyan('\n🔗 ACP Mode enabled'));
 
-      // ACP usage decision: use ACP mode for agents that support it
-      const acpEnabledTools = [
-        'claude',
-        'gemini',
-        'copilot',
-        'opencode',
-        'qwen',
-      ];
-      const useACPMode = acpEnabledTools.includes(tool.toLowerCase());
+      const acpRunner = new ACPRunner({
+        workflow: workflowManager,
+        inputs,
+        defaultTool: options.agentTool,
+        defaultModel: options.agentModel,
+        statusManager,
+        outputDir: options.output,
+        logger,
+      });
 
-      // Build the agent step executor based on mode
-      let acpRunner: ACPRunner | undefined;
-
-      if (useACPMode) {
-        console.log(colors.cyan('\n🔗 ACP Mode enabled'));
-
-        acpRunner = new ACPRunner({
-          workflow: workflowManager,
-          inputs,
-          defaultTool: options.agentTool,
-          defaultModel: options.agentModel,
-          statusManager,
-          outputDir: options.output,
-          logger,
-        });
-
-        await acpRunner.initializeConnection();
-      }
+      await acpRunner.initializeConnection();
 
       const runner: WorkflowRunner = {
         runAgentStep: async (
           step: WorkflowAgentStep,
-          stepIndex: number,
+          _stepIndex: number,
           stepsOutput: Map<string, Map<string, string>>
         ): Promise<StepResult> => {
-          if (useACPMode && acpRunner) {
-            try {
-              await acpRunner.createSession();
+          try {
+            await acpRunner.createSession();
 
-              // Inject previous step outputs before running
-              for (const [prevStepId, prevOutputs] of stepsOutput.entries()) {
-                acpRunner.stepsOutput.set(prevStepId, prevOutputs);
-              }
-
-              return await acpRunner.runStep(step.id);
-            } finally {
-              acpRunner.closeSession();
+            // Inject previous step outputs before running
+            for (const [prevStepId, prevOutputs] of stepsOutput.entries()) {
+              acpRunner.stepsOutput.set(prevStepId, prevOutputs);
             }
-          } else {
-            const stepRunner = new Runner(
-              workflowManager,
-              step.id,
-              inputs,
-              stepsOutput,
-              options.agentTool,
-              options.agentModel,
-              statusManager,
-              totalSteps,
-              stepIndex,
-              logger
-            );
 
-            return await stepRunner.run(options.output);
+            return await acpRunner.runStep(step.id);
+          } finally {
+            acpRunner.closeSession();
           }
         },
       };
@@ -489,7 +450,7 @@ export const runCommand = async (
         }
       } finally {
         // Always close the ACP runner after all steps are complete
-        acpRunner?.close();
+        acpRunner.close();
       }
     }
   } catch (err) {
