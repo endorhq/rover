@@ -11,6 +11,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { existsSync } from 'node:fs';
 import type { WorkflowInput } from 'rover-schemas';
+import { acpInvoke } from './acp-invoke.js';
 
 // Environment variables for GitHub Copilot CLI
 const COPILOT_ENV_VARS = ['GITHUB_TOKEN', 'GH_TOKEN'];
@@ -36,21 +37,15 @@ class CopilotAI implements AIAgentTool {
 You MUST output a valid JSON string as an output. Just output the JSON string and nothing else. If you had any error, still return a JSON string with an "error" property.`;
     }
 
-    // Use -s (silent) to get clean output without stats
-    const copilotArgs = ['-s', '-p', prompt];
-
-    if (model) {
-      copilotArgs.push('--model', model);
-    }
-
     try {
-      const { stdout } = await launch(this.AGENT_BIN, copilotArgs, {
+      const result = await acpInvoke({
+        agentName: 'copilot',
+        prompt,
         cwd,
+        model,
       });
 
-      // Copilot does not have a --output-format json flag like Claude/Cursor,
-      // so we just return the raw result and let parseJsonResponse handle it
-      return stdout?.toString().trim() || '';
+      return result;
     } catch (error) {
       throw new InvokeAIAgentError(this.AGENT_BIN, error);
     }
