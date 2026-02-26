@@ -7,9 +7,10 @@ export class ComposerSandboxPackage extends SandboxPackage {
   installScript(): string {
     // Install Composer using official method (requires PHP which should be installed via php language package)
     // Download installer, verify SHA-384 hash, run installer, cleanup, and move to user-local bin
+    // Note: The installer checksum is at installer.sig, not the phar checksum
     return `php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
-EXPECTED_CHECKSUM="$(php -r 'copy("https://getcomposer.org/download/latest-stable/composer.phar.sha256", "php://stdout");')"
-ACTUAL_CHECKSUM="$(sha256sum composer-setup.php | awk '{print $1}')"
+EXPECTED_CHECKSUM="$(php -r 'copy("https://composer.github.io/installer.sig", "php://stdout");')"
+ACTUAL_CHECKSUM="$(php -r 'echo hash_file("sha384", "composer-setup.php");')"
 if [ "$EXPECTED_CHECKSUM" != "$ACTUAL_CHECKSUM" ]; then
     >&2 echo 'ERROR: Invalid installer checksum'
     rm composer-setup.php
