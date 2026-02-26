@@ -184,7 +184,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
         conflictedContent,
         regionCount
       );
-      const response = await this.invoke(prompt, false);
+      const response = await this.invoke(prompt);
 
       return response;
     } catch (err) {
