@@ -433,8 +433,8 @@ export const LogBook = React.memo(function LogBook({
 
 export const KeyLegend = React.memo(function KeyLegend() {
   return (
-    <Box justifyContent="flex-end">
-      <Text dimColor>{'i:inspector  q:quit '}</Text>
+    <Box>
+      <Text dimColor>{'Keys / i:inspector  q:quit'}</Text>
     </Box>
   );
 });

@@ -105,6 +105,7 @@ export function AutopilotApp({
           tracesRef={tracesRef}
           store={store}
           tasks={tasks}
+          projectName={projectName}
           width={columns}
           height={rows}
           onClose={() => setViewMode('main')}

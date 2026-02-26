@@ -26,7 +26,7 @@ import {
   TASK_STATUS_LABELS,
   SectionHeader,
 } from './components.js';
-import { timeAgo, progressBar } from './helpers.js';
+import { timeAgo, progressBar, formatDuration } from './helpers.js';
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -391,26 +391,70 @@ function filterTraces(
 
 // ── Sub-Components ──────────────────────────────────────────────────────────
 
-const InspectorTabs = React.memo(function InspectorTabs({
+const TEAL_600 = '#0d9488';
+const TEAL_400 = '#2dd4bf';
+
+const TAB_LABELS: Record<InspectorTab, string> = {
+  traces: 'Traces',
+  logs: 'Logs',
+  pending: 'Pending',
+  tasks: 'Tasks',
+};
+
+const InspectorHeader = React.memo(function InspectorHeader({
   activeTab,
+  projectName,
 }: {
   activeTab: InspectorTab;
+  projectName: string;
 }) {
   return (
-    <Box gap={1}>
-      <Text bold color="cyan">
-        INSPECTOR
-      </Text>
-      <Text dimColor>{'  '}</Text>
-      {TABS.map(tab => (
-        <Text
-          key={tab}
-          bold={tab === activeTab}
-          color={tab === activeTab ? 'cyan' : 'gray'}
-        >
-          {tab === activeTab ? `[${tab.toUpperCase()}]` : `  ${tab}  `}
-        </Text>
-      ))}
+    <Box>
+      {/* Left: mini helmet + info */}
+      <Box flexDirection="column">
+        <Box>
+          <Text color={TEAL_600}>{' \u256D'}</Text>
+          <Text color={TEAL_400}>{'=='}</Text>
+          <Text color={TEAL_600}>{'\u256E  '}</Text>
+          <Text bold>{'Inspector'}</Text>
+        </Box>
+        <Box>
+          <Text color={TEAL_600}>{' \u2570\u2550\u2550\u256F  '}</Text>
+          <Text color="cyan">{'\u25C8 '}</Text>
+          <Text color="cyan">{projectName}</Text>
+        </Box>
+      </Box>
+      {/* Right: tabs (names + carets) */}
+      <Box flexDirection="column" marginLeft={4}>
+        <Box>
+          {TABS.map((tab, i) => (
+            <Text key={tab}>
+              {i > 0 ? '  ' : ''}
+              <Text
+                bold={tab === activeTab}
+                color={tab === activeTab ? 'cyan' : 'gray'}
+              >
+                {TAB_LABELS[tab]}
+              </Text>
+            </Text>
+          ))}
+        </Box>
+        <Box>
+          {TABS.map((tab, i) => {
+            const label = TAB_LABELS[tab]!;
+            return (
+              <Text key={tab}>
+                {i > 0 ? '  ' : ''}
+                {tab === activeTab ? (
+                  <Text color="cyan">{'^'.repeat(label.length)}</Text>
+                ) : (
+                  <Text>{' '.repeat(label.length)}</Text>
+                )}
+              </Text>
+            );
+          })}
+        </Box>
+      </Box>
     </Box>
   );
 });
@@ -450,7 +494,7 @@ const InspectorFooter = React.memo(function InspectorFooter({
 
   return (
     <Box>
-      <Text dimColor>{parts.join('  ')}</Text>
+      <Text dimColor>{`Keys / ${parts.join('  ')}`}</Text>
     </Box>
   );
 });
@@ -487,15 +531,31 @@ const TracesListView = React.memo(function TracesListView({
 
   return (
     <Box flexDirection="column">
-      <Box gap={2}>
-        <Text dimColor>
-          {' '}
-          Filter: <Text color="yellow">{filter}</Text> (f)
-        </Text>
-        <Text dimColor>
-          {sorted.length} trace{sorted.length !== 1 ? 's' : ''}
-        </Text>
+      <Box>
+        <Box width="70%">
+          <Text dimColor>
+            {' Traces track each action through its lifecycle — from event'}
+          </Text>
+        </Box>
+        <Box width="30%" justifyContent="flex-end">
+          <Text dimColor>
+            {'Filter: '}<Text color="yellow">{filter}</Text>{' (f)'}
+          </Text>
+        </Box>
       </Box>
+      <Box>
+        <Box width="70%">
+          <Text dimColor>
+            {' detection, to planning, execution, and resolution.'}
+          </Text>
+        </Box>
+        <Box width="30%" justifyContent="flex-end">
+          <Text dimColor>
+            {sorted.length} trace{sorted.length !== 1 ? 's' : ''}
+          </Text>
+        </Box>
+      </Box>
+      <Text> </Text>
       {sorted.length === 0 ? (
         <Text dimColor> No traces match filter</Text>
       ) : (
@@ -503,6 +563,13 @@ const TracesListView = React.memo(function TracesListView({
           const realIndex = startIndex + i;
           const isSelected = realIndex === selectedIndex;
           const age = timeAgo(trace.createdAt);
+          const completedSteps = trace.steps.filter(s => s.status === 'completed').length;
+          const totalSteps = trace.steps.length;
+          const currentStep = trace.steps.find(s => s.status === 'running')
+            ?? trace.steps.findLast(s => s.status === 'completed')
+            ?? trace.steps[trace.steps.length - 1];
+          const stepLabel = currentStep?.action ?? '—';
+          const retries = trace.retryCount ?? 0;
           return (
             <Box key={trace.traceId}>
               <Text color={isSelected ? 'cyan' : undefined}>
@@ -532,7 +599,12 @@ const TracesListView = React.memo(function TracesListView({
                   {trace.summary}
                 </Text>
               </Box>
-              <Text dimColor>{` ${age.padStart(8)}`}</Text>
+              <Text color={isSelected ? 'white' : undefined} dimColor={!isSelected}>{` ${stepLabel.padStart(10)}`}</Text>
+              <Text color={isSelected ? 'white' : undefined} dimColor={!isSelected}>{` ${String(completedSteps)}/${String(totalSteps)}`}</Text>
+              {retries > 0 ? (
+                <Text color={isSelected ? 'yellow' : 'yellow'} dimColor={!isSelected}>{` \u21BB${retries}`}</Text>
+              ) : null}
+              <Text color={isSelected ? 'white' : undefined} dimColor={!isSelected}>{` ${age.padStart(8)}`}</Text>
             </Box>
           );
         })
@@ -624,74 +696,96 @@ function StepDetailView({
   width: number;
 }) {
   const lines: React.ReactNode[] = [];
-  const sep = '\u2500'.repeat(Math.max(1, width - 4));
+  const sectionLine = (title: string) => {
+    const len = Math.max(1, width - title.length - 3);
+    return (
+      <Box>
+        <Text dimColor>{` ${title} `}</Text>
+        <Text dimColor>{'\u2500'.repeat(len)}</Text>
+      </Box>
+    );
+  };
 
-  // Header — human-readable summary first
+  // ── Header: title + duration/completion on the right ──
+  const duration = formatDuration(span?.timestamp, span?.completed ?? undefined);
+  const completedAt = span?.completed
+    ? new Date(span.completed).toLocaleString()
+    : '';
+  const timeInfo = completedAt ? `${duration} \u00B7 ${completedAt} ` : `${duration} `;
   lines.push(
-    <Text key="h1" bold>
-      <Text>{` Step #${displayIndex + 1}: `}</Text>
-      <Text color={STEP_COLORS[stepStatus]}>{stepLabel}</Text>
-      <Text dimColor>{` (${stepStatus})`}</Text>
-    </Text>
+    <Box key="h1">
+      <Box width="65%">
+        <Text bold wrap="truncate">{` Step #${displayIndex + 1}: `}</Text>
+        <Text bold color={STEP_COLORS[stepStatus]}>{stepLabel}</Text>
+        <Text dimColor>{` (${stepStatus})`}</Text>
+      </Box>
+      <Box width="35%" justifyContent="flex-end">
+        <Text dimColor wrap="truncate">{timeInfo}</Text>
+      </Box>
+    </Box>
   );
 
-  // Summary (most useful info first)
+  // ── Summary ──
   if (span?.summary) {
     lines.push(
-      <Text key="summary" wrap="truncate">
+      <Text key="summary">
         <Text dimColor>{' Summary: '}</Text>
         <Text>{span.summary}</Text>
       </Text>
     );
   }
+
+  // ── Next Action ──
+  const nextAction = actionData?.action ?? 'None';
+  lines.push(
+    <Text key="next-action">
+      <Text dimColor>{' Next Action: '}</Text>
+      <Text>{nextAction}</Text>
+    </Text>
+  );
+
+  // ── Reasoning ──
   if (actionData?.reasoning) {
     lines.push(
-      <Text key="reasoning" wrap="truncate">
-        <Text dimColor>{' Reasoning: '}</Text>
+      <Text key="reasoning-label" dimColor>{' Reasoning:'}</Text>
+    );
+    lines.push(
+      <Text key="reasoning-content">
+        <Text>{' '}</Text>
         <Text>{actionData.reasoning}</Text>
       </Text>
     );
   }
 
+  // ── Span section ──
+  lines.push(<Text key="spacer-span-1"> </Text>);
+  lines.push(<Text key="spacer-span-2"> </Text>);
   lines.push(
-    <Text key="sep1" dimColor>
-      {` ${sep}`}
-    </Text>
+    React.cloneElement(sectionLine('SPAN'), { key: 'span-header' })
   );
-
-  // Span details
   if (span) {
     lines.push(
-      <Text key="span-title" bold>
-        {' SPAN'}
-      </Text>
-    );
-    lines.push(
-      <Text key="span-step">
-        <Text dimColor>{' Step: '}</Text>
+      <Text key="span-status">
+        <Text dimColor>{' Status: '}</Text>
+        <Text
+          color={
+            span.status === 'completed'
+              ? 'green'
+              : span.status === 'failed'
+                ? 'red'
+                : span.status === 'error'
+                  ? 'yellow'
+                  : 'cyan'
+          }
+        >
+          {span.status ?? 'unknown'}
+        </Text>
+        <Text dimColor>{'  Step: '}</Text>
         <Text>{span.step}</Text>
-        {span.status ? (
-          <Text>
-            <Text dimColor>{'  Status: '}</Text>
-            <Text
-              color={
-                span.status === 'completed'
-                  ? 'green'
-                  : span.status === 'failed'
-                    ? 'red'
-                    : span.status === 'error'
-                      ? 'yellow'
-                      : 'cyan'
-              }
-            >
-              {span.status}
-            </Text>
-          </Text>
-        ) : null}
       </Text>
     );
     lines.push(
-      <Text key="span-ts">
+      <Text key="span-time">
         <Text dimColor>{' Created: '}</Text>
         <Text>{span.timestamp}</Text>
         {span.completed ? (
@@ -714,12 +808,10 @@ function StepDetailView({
         ) : null}
       </Text>
     );
-
     if (span.meta && Object.keys(span.meta).length > 0) {
+      lines.push(<Text key="span-meta-spacer"> </Text>);
       lines.push(
-        <Text key="span-meta-title" bold>
-          {' SPAN META'}
-        </Text>
+        <Text key="span-meta-label" dimColor>{' Meta:'}</Text>
       );
       const metaStr = JSON.stringify(span.meta, null, 2);
       const metaLines = metaStr.split('\n');
@@ -735,29 +827,28 @@ function StepDetailView({
   } else {
     lines.push(
       <Text key="no-span" dimColor>
-        {' Span not yet available'}
+        {' Not yet available'}
       </Text>
     );
   }
 
-  // Output action
+  // ── Action section ──
+  lines.push(<Text key="spacer-action-1"> </Text>);
+  lines.push(<Text key="spacer-action-2"> </Text>);
   lines.push(
-    <Text key="sep2" dimColor>
-      {` ${sep}`}
-    </Text>
+    React.cloneElement(sectionLine('ACTION'), { key: 'action-header' })
   );
   if (actionData) {
     lines.push(
-      <Text key="action-title" bold>
-        {' OUTPUT ACTION'}
+      <Text key="action-name">
+        <Text dimColor>{' Action: '}</Text>
+        <Text>{actionData.action}</Text>
       </Text>
     );
     lines.push(
-      <Text key="action-action">
-        <Text dimColor>{' Action: '}</Text>
-        <Text>{actionData.action}</Text>
-        <Text dimColor>{'  '}</Text>
-        <Text dimColor>{actionData.timestamp}</Text>
+      <Text key="action-time">
+        <Text dimColor>{' Time: '}</Text>
+        <Text>{actionData.timestamp}</Text>
       </Text>
     );
     lines.push(
@@ -766,12 +857,10 @@ function StepDetailView({
         <Text dimColor>{actionData.id}</Text>
       </Text>
     );
-
     if (actionData.meta && Object.keys(actionData.meta).length > 0) {
+      lines.push(<Text key="action-meta-spacer"> </Text>);
       lines.push(
-        <Text key="action-meta-title" bold>
-          {' ACTION META'}
-        </Text>
+        <Text key="action-meta-label" dimColor>{' Meta:'}</Text>
       );
       const metaStr = JSON.stringify(actionData.meta, null, 2);
       const metaLines = metaStr.split('\n');
@@ -787,16 +876,18 @@ function StepDetailView({
   } else {
     lines.push(
       <Text key="no-action" dimColor>
-        {' Output action not yet available'}
+        {' Not yet available'}
       </Text>
     );
   }
 
-  const sliced = lines.slice(scroll, scroll + visibleHeight);
+  const maxScroll = Math.max(0, lines.length - visibleHeight + 3);
+  const clampedScroll = Math.min(scroll, maxScroll);
+  const sliced = lines.slice(clampedScroll, clampedScroll + visibleHeight);
   return (
     <Box flexDirection="column" height={visibleHeight}>
       {sliced.map((line, i) => (
-        <Box key={`row-${i}`}>{line}</Box>
+        <Box key={`row-${clampedScroll + i}`}>{line}</Box>
       ))}
     </Box>
   );
@@ -847,27 +938,50 @@ function TracesDetailView({
 
   const lines: React.ReactNode[] = [];
 
-  // Human-readable header
+  // Header: event source + time on the right (30%)
+  const age = timeAgo(trace.createdAt);
+  const retryInfo = trace.retryCount ? ` \u00B7 ${trace.retryCount} retries` : '';
   lines.push(
-    <Text key="h1" bold>
-      {' '}
-      {trace.summary}
-    </Text>
-  );
-  lines.push(
-    <Text key="h2" dimColor>
-      {' '}
-      {timeAgo(trace.createdAt)}
-      {trace.retryCount ? ` \u00B7 ${trace.retryCount} retries` : ''}
-    </Text>
-  );
-  lines.push(
-    <Text key="sep1" dimColor>
-      {` ${'\u2500'.repeat(Math.max(1, width - 4))}`}
-    </Text>
+    <Box key="h1">
+      <Box width="70%">
+        <Text dimColor>{' Event: '}</Text>
+        <Text>{trace.summary}</Text>
+      </Box>
+      <Box width="30%" justifyContent="flex-end">
+        <Text dimColor>{`${age}${retryInfo} `}</Text>
+      </Box>
+    </Box>
   );
 
-  // Steps
+  // If the trace is done (terminal step completed), show the final summary
+  const terminalStep = trace.steps.findLast(
+    s => s.terminal && s.status === 'completed'
+  );
+  if (terminalStep?.reasoning) {
+    lines.push(
+      <Text key="h3" dimColor>{' Summary:'}</Text>
+    );
+    lines.push(
+      <Text key="h4">
+        <Text>{' '}</Text>
+        <Text>{terminalStep.reasoning}</Text>
+      </Text>
+    );
+  }
+
+  // Space + Steps header
+  lines.push(
+    <Text key="spacer"> </Text>
+  );
+  const stepsLineLen = Math.max(1, width - 9);
+  lines.push(
+    <Box key="steps-header">
+      <Text dimColor>{` Steps `}</Text>
+      <Text dimColor>{'\u2500'.repeat(stepsLineLen)}</Text>
+    </Box>
+  );
+
+  // Steps list
   displaySteps.forEach((ds, i) => {
     const isSelected = i === selectedStepIndex;
     const color = STEP_COLORS[ds.status];
@@ -887,7 +1001,8 @@ function TracesDetailView({
     );
   });
 
-  const headerLines = 3;
+  // event(1) + optional summary(label + content = 2) + spacer(1) + steps header(1)
+  const headerLines = 1 + (terminalStep?.reasoning ? 2 : 0) + 1 + 1;
   const selectedLinePos = headerLines + selectedStepIndex;
   const idealStart = Math.max(
     0,
@@ -900,7 +1015,7 @@ function TracesDetailView({
   return (
     <Box flexDirection="column" height={visibleHeight}>
       {sliced.map((line, i) => (
-        <Box key={`row-${i}`}>{line}</Box>
+        <Box key={`row-${start + i}`}>{line}</Box>
       ))}
     </Box>
   );
@@ -1339,7 +1454,7 @@ function TaskDetailView({
   return (
     <Box flexDirection="column" height={visibleHeight}>
       {sliced.map((line, i) => (
-        <Box key={`row-${i}`}>{line}</Box>
+        <Box key={`row-${scroll + i}`}>{line}</Box>
       ))}
     </Box>
   );
@@ -1462,6 +1577,7 @@ export function InspectorView({
   tracesRef: _tracesRef,
   store,
   tasks,
+  projectName,
   width,
   height,
   onClose,
@@ -1470,6 +1586,7 @@ export function InspectorView({
   tracesRef: React.MutableRefObject<Map<string, ActionTrace>>;
   store: AutopilotStore;
   tasks: TaskInfo[];
+  projectName: string;
   width: number;
   height: number;
   onClose: () => void;
@@ -1602,12 +1719,12 @@ export function InspectorView({
     }
   });
 
-  // No borders: header(1) + separator(1) + footer(1) = 3 reserved lines
-  const panelHeight = Math.max(1, height - 3);
+  // header(2) + separator(1) + footer(1) = 4 reserved lines
+  const panelHeight = Math.max(1, height - 4);
 
   return (
     <Box flexDirection="column" width={width} height={height}>
-      <InspectorTabs activeTab={state.activeTab} />
+      <InspectorHeader activeTab={state.activeTab} projectName={projectName} />
       <SectionHeader title="" width={width} />
 
       <Box flexDirection="column" flexGrow={1}>
