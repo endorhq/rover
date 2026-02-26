@@ -86,16 +86,30 @@ export const WorkflowConfigSchema = z.object({
   timeout: z.number().optional(),
   /** Whether to continue on step failures */
   continueOnError: z.boolean().optional(),
+  /** Maximum iterations any loop step may run (ceiling for per-loop maxIterations) */
+  loopLimit: z.number().int().positive().optional(),
 });
 
 /**
- * Base step schema shared by all step types
+ * Regex for validating condition expressions used in `if` and `until` fields.
+ * Format: steps.<id>.outputs.<name> == <value>
+ *         steps.<id>.outputs.<name> != <value>
  */
+const CONDITION_REGEX = /^steps\.[\w-]+\.outputs\.[\w-]+\s*(==|!=)\s*.+$/;
+
 const WorkflowBaseStepSchema = z.object({
   /** Unique step identifier */
   id: z.string(),
   /** Human-readable step name */
   name: z.string(),
+  /** Optional condition; step is skipped when it evaluates to false */
+  if: z
+    .string()
+    .regex(
+      CONDITION_REGEX,
+      'Condition must match format: steps.<id>.outputs.<name> == <value>'
+    )
+    .optional(),
 });
 
 /**
@@ -140,47 +154,25 @@ export const WorkflowCommandStepSchema = WorkflowBaseStepSchema.extend({
 });
 
 /**
- * Conditional step schema (recursive)
- * Allows branching logic based on conditions
+ * Loop step schema (recursive)
+ * Repeats sub-steps until a condition is met or max iterations reached
  */
 // biome-ignore lint/suspicious/noExplicitAny: Required for recursive Zod schema type inference
-export const WorkflowConditionalStepSchema: z.ZodType<any> =
+export const WorkflowLoopStepSchema: z.ZodType<any> =
   WorkflowBaseStepSchema.extend({
-    /** Step type - 'conditional' */
-    type: z.literal('conditional'),
-    /** Condition expression to evaluate */
-    condition: z.string(),
-    /** Steps to execute if condition is true */
-    // biome-ignore lint/suspicious/noThenProperty: 'then' is a valid workflow concept for if-then-else branching
-    then: z.lazy(() => z.array(WorkflowStepSchema)).optional(),
-    /** Steps to execute if condition is false */
-    else: z.lazy(() => z.array(WorkflowStepSchema)).optional(),
-  });
-
-/**
- * Parallel step schema (recursive)
- * Executes multiple steps concurrently
- */
-// biome-ignore lint/suspicious/noExplicitAny: Required for recursive Zod schema type inference
-export const WorkflowParallelStepSchema: z.ZodType<any> =
-  WorkflowBaseStepSchema.extend({
-    /** Step type - 'parallel' */
-    type: z.literal('parallel'),
-    /** Steps to execute in parallel */
+    /** Step type - 'loop' */
+    type: z.literal('loop'),
+    /** Sub-steps to repeat each iteration */
     steps: z.lazy(() => z.array(WorkflowStepSchema)),
-  });
-
-/**
- * Sequential step schema (recursive)
- * Executes multiple steps in order
- */
-// biome-ignore lint/suspicious/noExplicitAny: Required for recursive Zod schema type inference
-export const WorkflowSequentialStepSchema: z.ZodType<any> =
-  WorkflowBaseStepSchema.extend({
-    /** Step type - 'sequential' */
-    type: z.literal('sequential'),
-    /** Ordered list of steps to execute */
-    steps: z.lazy(() => z.array(WorkflowStepSchema)),
+    /** Condition to check after each sub-step; loop exits when true */
+    until: z
+      .string()
+      .regex(
+        CONDITION_REGEX,
+        'Condition must match format: steps.<id>.outputs.<name> == <value>'
+      ),
+    /** Maximum iterations before giving up (default: 3) */
+    maxIterations: z.number().int().positive().optional(),
   });
 
 /**
@@ -188,10 +180,31 @@ export const WorkflowSequentialStepSchema: z.ZodType<any> =
  * Forward declared for recursive types
  */
 // biome-ignore lint/suspicious/noExplicitAny: Required for recursive Zod schema type inference
-export const WorkflowStepSchema: z.ZodType<any> = z.discriminatedUnion('type', [
+export const WorkflowStepSchema: z.ZodType<any> = z.union([
   WorkflowAgentStepSchema,
   WorkflowCommandStepSchema,
+  WorkflowLoopStepSchema,
 ]);
+
+/**
+ * Recursively collect all step IDs, including those nested inside loop steps.
+ */
+interface StepIdNode {
+  id: string;
+  type: string;
+  steps?: StepIdNode[];
+}
+
+function collectStepIds(steps: StepIdNode[]): string[] {
+  const ids: string[] = [];
+  for (const step of steps) {
+    ids.push(step.id);
+    if (step.type === 'loop' && Array.isArray(step.steps)) {
+      ids.push(...collectStepIds(step.steps));
+    }
+  }
+  return ids;
+}
 
 /**
  * Complete agent workflow schema
@@ -218,7 +231,7 @@ export const WorkflowSchema = z
   })
   .refine(
     data => {
-      const stepIds = data.steps.map(s => s.id);
+      const stepIds = collectStepIds(data.steps);
       return new Set(stepIds).size === stepIds.length;
     },
     {

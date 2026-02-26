@@ -15,12 +15,15 @@ import {
   ROVER_LOG_FILENAME,
   AGENT_LOGS_DIR,
   isAgentStep,
+  isLoopStep,
   type WorkflowAgentStep,
+  type WorkflowStep,
 } from 'rover-schemas';
 import { parseCollectOptions } from '../lib/options.js';
 import { Runner } from '../lib/runner.js';
 import { ACPRunner } from '../lib/acp-runner.js';
 import { createAgent } from '../lib/agents/index.js';
+import { executeStep, shouldSkipStep } from '../lib/step-executor.js';
 import { cpSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -147,6 +150,22 @@ function buildContextMessage(contextDir: string): string | null {
 }
 
 /**
+ * Recursively inject context into agent steps, including those nested inside loops.
+ */
+function injectContextIntoSteps(
+  steps: WorkflowStep[],
+  contextMessage: string
+): void {
+  for (const step of steps) {
+    if (isAgentStep(step)) {
+      step.prompt = contextMessage + step.prompt;
+    } else if (isLoopStep(step)) {
+      injectContextIntoSteps(step.steps, contextMessage);
+    }
+  }
+}
+
+/**
  * Inject context sources into workflow step prompts.
  * Reads from the context directory mounted at the path specified by --context-dir.
  *
@@ -167,11 +186,7 @@ const handleContextInjection = (
       colors.gray('✓ Context sources injected into workflow steps\n')
     );
 
-    for (const step of workflowManager.steps) {
-      if (isAgentStep(step)) {
-        step.prompt = contextMessage + step.prompt;
-      }
-    }
+    injectContextIntoSteps(workflowManager.steps, contextMessage);
   }
 };
 
@@ -442,6 +457,32 @@ export const runCommand = async (
             return await stepRunner.run(options.output);
           }
         },
+
+        /**
+         * Generic step executor for non-agent step types (command, loop).
+         * Uses the unified executeStep dispatcher from step-executor.ts.
+         * For agent sub-steps inside loops, passes acpRunner so they can
+         * reuse the warm ACP connection instead of spawning subprocesses.
+         */
+        runStep: async (
+          step: WorkflowStep,
+          stepIndex: number,
+          stepsOutput: Map<string, Map<string, string>>
+        ): Promise<StepResult> => {
+          return executeStep(step, {
+            workflow: workflowManager,
+            inputs,
+            stepsOutput,
+            defaultTool: options.agentTool,
+            defaultModel: options.agentModel,
+            statusManager,
+            totalSteps,
+            currentStepIndex: stepIndex,
+            logger,
+            output: options.output,
+            acpRunner,
+          });
+        },
       };
 
       const onStepComplete: OnStepComplete = (step, result, context) => {
@@ -468,6 +509,8 @@ export const runCommand = async (
         }
 
         showTitle('🎉 Workflow Execution Summary');
+        // Counts reflect top-level steps only; loop sub-step iterations
+        // are not included in these totals.
         showProperties({
           Duration: colors.cyan(runResult.totalDuration.toFixed(2) + 's'),
           'Total Steps': colors.cyan(workflowManager.steps.length.toString()),

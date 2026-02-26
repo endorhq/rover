@@ -55,6 +55,17 @@ describe('workflow utilities', () => {
       );
     });
 
+    it('should load the swe-tdd workflow', () => {
+      const store = initWorkflowStore();
+      const sweTddWorkflow = store.getWorkflow('swe-tdd');
+
+      expect(sweTddWorkflow).toBeDefined();
+      expect(sweTddWorkflow?.name).toBe('swe-tdd');
+      expect(sweTddWorkflow?.description).toBe(
+        'Test-driven development workflow that writes tests first, then implements and iterates until tests pass'
+      );
+    });
+
     it('should load all expected built-in workflows', () => {
       const store = initWorkflowStore();
       const allEntries = store.getAllWorkflowEntries();
@@ -68,10 +79,11 @@ describe('workflow utilities', () => {
 
       // Check that expected workflows are present
       expect(workflowNames).toContain('swe');
+      expect(workflowNames).toContain('swe-tdd');
       expect(workflowNames).toContain('tech-writer');
 
-      // Should have exactly 2 built-in workflows
-      expect(builtInWorkflows).toHaveLength(2);
+      // Should have exactly 3 built-in workflows
+      expect(builtInWorkflows).toHaveLength(3);
     });
 
     it('should return workflows with proper structure', () => {
@@ -160,15 +172,47 @@ describe('workflow utilities', () => {
       }
     });
 
+    it('should load swe-tdd workflow with loop and command steps', () => {
+      const store = initWorkflowStore();
+      const sweTddWorkflow = store.getWorkflow('swe-tdd');
+
+      expect(sweTddWorkflow).toBeDefined();
+      expect(sweTddWorkflow!.steps).toBeDefined();
+      expect(sweTddWorkflow!.steps.length).toBeGreaterThan(0);
+
+      // Find the loop step
+      const loopStep = sweTddWorkflow!.steps.find(s => s.type === 'loop');
+      expect(loopStep).toBeDefined();
+      expect(loopStep!.id).toBe('test_fix_loop');
+
+      // Loop should have sub-steps including a command step
+      const commandSubStep = loopStep!.steps.find(
+        (s: any) => s.type === 'command'
+      );
+      expect(commandSubStep).toBeDefined();
+      expect(commandSubStep!.id).toBe('run_tests');
+    });
+
     it('should load workflows with unique step IDs', () => {
       const store = initWorkflowStore();
       const workflows = store.getAllWorkflows();
 
+      function collectIds(steps: any[]): string[] {
+        const ids: string[] = [];
+        for (const step of steps) {
+          ids.push(step.id);
+          if (step.type === 'loop' && Array.isArray(step.steps)) {
+            ids.push(...collectIds(step.steps));
+          }
+        }
+        return ids;
+      }
+
       for (const workflow of workflows) {
-        const stepIds = workflow.steps.map(s => s.id);
+        const stepIds = collectIds(workflow.steps);
         const uniqueStepIds = new Set(stepIds);
 
-        // All step IDs should be unique
+        // All step IDs (including nested) should be unique
         expect(uniqueStepIds.size).toBe(stepIds.length);
       }
     });
@@ -415,6 +459,13 @@ describe('workflow utilities', () => {
 
       for (const workflow of workflows) {
         for (const step of workflow.steps) {
+          // Loop steps have sub-steps instead of top-level outputs
+          if (step.type === 'loop') {
+            expect(Array.isArray(step.steps)).toBe(true);
+            expect(step.steps.length).toBeGreaterThan(0);
+            continue;
+          }
+
           // Each step should have outputs defined
           expect(step.outputs).toBeDefined();
           expect(Array.isArray(step.outputs)).toBe(true);
