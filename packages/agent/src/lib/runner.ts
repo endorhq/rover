@@ -37,14 +37,7 @@ import {
 import { basename, join, resolve } from 'node:path';
 import { createAgent, Agent, AgentUsageStats } from './agents/index.js';
 
-export interface RunnerStepResult extends StepResult {
-  // Consumed tokens
-  tokens?: number;
-  // Cost in USD
-  cost?: number;
-  // Model used (e.g., "claude-haiku-4-5-20251001")
-  model?: string;
-}
+export interface RunnerStepResult extends StepResult {}
 
 export class Runner {
   // The step to run

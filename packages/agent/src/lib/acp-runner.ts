@@ -35,14 +35,7 @@ import { createAgent } from './agents/index.js';
 import type { Agent } from './agents/types.js';
 import { copyFileSync, rmSync } from 'node:fs';
 
-export interface ACPRunnerStepResult extends StepResult {
-  // Consumed tokens
-  tokens?: number;
-  // Cost in USD
-  cost?: number;
-  // Model used
-  model?: string;
-}
+export interface ACPRunnerStepResult extends StepResult {}
 
 export interface ACPRunnerConfig {
   workflow: WorkflowManager;
