@@ -306,7 +306,7 @@ ${installScripts.join('\n')}
       agentInstallSection = `# Agent-specific CLI installation and credential setup
 echo -e "\\n📦 Installing Agent CLI and setting up credentials"
 # Pass the environment variables to ensure it loads the right credentials
-sudo -E rover-agent install $AGENT --user-dir $HOME
+sudo -E rover-agent install $AGENT
 # Set the right permissions after installing and moving credentials
 sudo chown -R $(id -u):$(id -g) $HOME
 

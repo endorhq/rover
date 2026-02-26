@@ -6,15 +6,12 @@ import { createAgent } from '../lib/agents/index.js';
 interface InstallCommandOptions {
   // Specific version to install
   version: string;
-  // User directory
-  userDir: string;
 }
 
 interface InstallCommandOutput extends CommandOutput {}
 
 // Default agent version to install
 export const DEFAULT_INSTALL_VERSION = 'latest';
-export const DEFAULT_INSTALL_DIRECTORY = process.env.HOME || '/home/agent';
 
 /**
  * Install an AI Coding Tool and configure the required credentials to run it
@@ -23,7 +20,6 @@ export const installCommand = async (
   agentName: string,
   options: InstallCommandOptions = {
     version: DEFAULT_INSTALL_VERSION,
-    userDir: DEFAULT_INSTALL_DIRECTORY,
   }
 ) => {
   const output: InstallCommandOutput = {
@@ -64,9 +60,6 @@ export const installCommand = async (
 
       // Install the agent
       await agent.install();
-
-      // Copy credentials to home directory (for container usage)
-      await agent.copyCredentials(options.userDir);
 
       console.log(colors.green('\n✓ Installation completed successfully'));
       output.success = true;
