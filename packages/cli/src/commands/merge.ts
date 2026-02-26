@@ -425,7 +425,9 @@ const mergeCommand = async (taskId: string, options: MergeOptions = {}) => {
     try {
       // Get recent commit messages for AI context
       if (spinner) spinner.text = 'Gathering commit context...';
-      const recentCommits = git.getRecentCommits();
+      const recentCommits = git.getRecentCommits({
+        branch: git.getCurrentBranch(),
+      });
 
       let finalCommitMessage = '';
 
@@ -478,7 +480,6 @@ const mergeCommand = async (taskId: string, options: MergeOptions = {}) => {
       if (spinner) spinner.text = 'Merging task branch...';
 
       // Attempt to merge the task branch
-      const taskBranch = task.branchName;
       let mergeSuccessful = false;
 
       telemetry?.eventMergeTask();
