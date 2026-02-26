@@ -39,6 +39,8 @@ export interface StepContext {
   project?: ProjectManager;
   workflowStore?: WorkflowStore;
   memoryStore?: MemoryStore;
+  /** GitHub bot account name used by the autopilot. */
+  botName?: string;
 }
 
 // ── Step result (returned by process, applied by orchestrator) ──────────────
@@ -95,6 +97,8 @@ export interface MonitorContext {
   project?: ProjectManager;
   workflowStore?: WorkflowStore;
   memoryStore?: MemoryStore;
+  /** GitHub bot account name used by the autopilot. */
+  botName?: string;
 }
 
 export interface Step {

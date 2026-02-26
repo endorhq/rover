@@ -14,7 +14,8 @@ import pilotPromptTemplate from './prompts/pilot-prompt.md';
 
 export function buildPilotPrompt(
   workflowCatalog?: string,
-  memoryCollection?: string
+  memoryCollection?: string,
+  botName?: string
 ): string {
   let prompt = pilotPromptTemplate;
 
@@ -29,6 +30,9 @@ export function buildPilotPrompt(
     '{{MEMORY_COLLECTION}}',
     memoryCollection || 'rover-memory'
   );
+
+  // Inject bot account name
+  prompt = prompt.replaceAll('{{BOT_ACCOUNT}}', botName || 'the bot account');
 
   prompt +=
     '\n\n## Constraint\n\nThe `coordinate` action is NOT available for this decision. You must choose one of the other actions.\n';
@@ -62,7 +66,8 @@ export const coordinatorStep: Step = {
     // Build system prompt and user message
     const systemPrompt = buildPilotPrompt(
       catalog,
-      ctx.memoryStore?.collectionName
+      ctx.memoryStore?.collectionName,
+      ctx.botName
     );
 
     const userMessage =

@@ -38,9 +38,13 @@ const MIN_LOG_HEIGHT = 3;
 export function AutopilotApp({
   project,
   refreshInterval,
+  fromDate,
+  botName,
 }: {
   project: ProjectManager;
   refreshInterval: number;
+  fromDate?: Date;
+  botName?: string;
 }) {
   const { exit } = useApp();
   const tasks = useTasks(project, refreshInterval);
@@ -59,14 +63,16 @@ export function AutopilotApp({
     project,
     project.path,
     project.id,
-    store
+    store,
+    botName
   );
 
   const { log: githubLog } = useGitHubEvents(
     project.path,
     project.id,
     store,
-    requestDrain
+    requestDrain,
+    fromDate
   );
 
   const logs = useLogEntries(store, tasks, statuses, githubLog);

@@ -17,7 +17,8 @@ export function useGitHubEvents(
   projectPath: string,
   projectId: string,
   store: AutopilotStore,
-  onNewEvents?: () => void
+  onNewEvents?: () => void,
+  fromDate?: Date
 ): {
   status: FetchStatus;
   log: LogEntry | null;
@@ -38,7 +39,7 @@ export function useGitHubEvents(
     setStatus('fetching');
     try {
       const events = await fetchEvents(repo.owner, repo.repo);
-      const relevant = filterRelevantEvents(events);
+      const relevant = filterRelevantEvents(events, fromDate);
 
       // Deduplicate against cursor
       const newEvents = relevant.filter(e => !store.isEventProcessed(e.id));

@@ -29,7 +29,9 @@ function printLandingMessage() {
   console.log();
 }
 
-const autopilotCommand = async (options: { refresh?: string } = {}) => {
+const autopilotCommand = async (
+  options: { refresh?: string; from?: string; bot?: string } = {}
+) => {
   let project;
   try {
     project = await requireProjectContext();
@@ -44,6 +46,18 @@ const autopilotCommand = async (options: { refresh?: string } = {}) => {
   const refreshInterval = options.refresh
     ? Number.parseInt(options.refresh, 10)
     : 30;
+
+  let fromDate: Date | undefined;
+  if (options.from) {
+    fromDate = new Date(options.from);
+    if (Number.isNaN(fromDate.getTime())) {
+      exitWithError({
+        error: `Invalid --from value "${options.from}". Expected a date (e.g. 2025-01-15) or datetime (e.g. 2025-01-15T09:30:00).`,
+        success: false,
+      });
+      return;
+    }
+  }
 
   // Ensure spans/ and actions/ directories exist before any step runs
   ensureTraceDirs(project.id);
@@ -67,7 +81,12 @@ const autopilotCommand = async (options: { refresh?: string } = {}) => {
   });
 
   const { waitUntilExit } = render(
-    <AutopilotApp project={project} refreshInterval={refreshInterval} />
+    <AutopilotApp
+      project={project}
+      refreshInterval={refreshInterval}
+      fromDate={fromDate}
+      botName={options.bot}
+    />
   );
 
   await waitUntilExit();

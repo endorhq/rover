@@ -188,10 +188,15 @@ function extractRelevantEvent(event: GitHubEvent): RelevantEvent | null {
 }
 
 export function filterRelevantEvents(
-  events: GitHubEvent[]
+  events: GitHubEvent[],
+  fromDate?: Date
 ): Array<GitHubEvent & RelevantEvent> {
   const results: Array<GitHubEvent & RelevantEvent> = [];
   for (const event of events) {
+    // Skip events that occurred before the --from cutoff
+    if (fromDate && new Date(event.created_at) < fromDate) {
+      continue;
+    }
     const relevant = extractRelevantEvent(event);
     if (relevant) {
       results.push({ ...event, ...relevant });
@@ -232,4 +237,3 @@ export function writeSpanAndAction(
 
   return { spanId: span.id, actionId: action.id, traceId };
 }
-

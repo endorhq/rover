@@ -55,7 +55,8 @@ export function useStepOrchestrator(
   project: ProjectManager,
   projectPath: string,
   projectId: string,
-  store: AutopilotStore
+  store: AutopilotStore,
+  botName?: string
 ): {
   statuses: StepStatuses;
   traces: ActionTrace[];
@@ -135,6 +136,7 @@ export function useStepOrchestrator(
       workflowStore,
       memoryStore,
       callbacks,
+      botName,
     });
 
     orchestratorRef.current = orchestrator;
@@ -148,6 +150,7 @@ export function useStepOrchestrator(
     projectPath,
     projectId,
     store,
+    botName,
     onTracesUpdated,
     onStatusChanged,
   ]);

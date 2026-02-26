@@ -495,6 +495,14 @@ export function createProgram(
     .command('autopilot')
     .description('Launch an interactive dashboard to monitor task progress')
     .option('-r, --refresh <seconds>', 'Refresh interval in seconds', '3')
+    .option(
+      '--from <datetime>',
+      'Ignore GitHub events before this date or datetime (e.g. 2025-01-15 or 2025-01-15T09:30:00)'
+    )
+    .option(
+      '--bot <name>',
+      'GitHub bot account name used by the autopilot (used to identify self-generated events)'
+    )
     .action(autopilotCmd.action);
 
   program.commandsGroup(colors.cyan('Model Context Protocol:'));

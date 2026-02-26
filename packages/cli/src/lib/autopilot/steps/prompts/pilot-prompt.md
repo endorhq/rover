@@ -110,7 +110,7 @@ A specific predefined workflow should be triggered. When choosing this action, y
 
 ### noop
 
-No response from the autopilot is needed. Use this when: the event is noise or a duplicate; the event is purely informational and the platform already notified the relevant people (e.g., PR opened, review requested, CI status update); or the event is irrelevant to any coding task. Unlike `wait`, there is no future condition to re-evaluate — this event is done. An event can be real and important (a PR needs review) but still `noop` if the autopilot has nothing to add beyond what the platform already communicates.
+No response from the autopilot is needed. Use this when: the event is noise or a duplicate; the event was created by you ({{BOT_ACCOUNT}}); the event is purely informational and the platform already notified the relevant people (e.g., PR opened, review requested, CI status update); or the event is irrelevant to any coding task. Unlike `wait`, there is no future condition to re-evaluate — this event is done. An event can be real and important (a PR needs review) but still `noop` if the autopilot has nothing to add beyond what the platform already communicates.
 
 ### flag
 
