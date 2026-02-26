@@ -36,6 +36,7 @@ export {
   registerBuiltInProviders,
   LocalFileProvider,
   GitHubProvider,
+  GitLabProvider,
   HTTPSProvider,
 } from './providers/index.js';
 
