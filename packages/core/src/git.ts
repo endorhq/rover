@@ -341,6 +341,7 @@ export class Git {
           const fileLines = await this.countFileLines(
             join(effectiveCwd || '', file)
           );
+          totalInsertions += fileLines;
           files.push({ path: file, insertions: fileLines, deletions: 0 });
         }
       }
