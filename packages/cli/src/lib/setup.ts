@@ -240,8 +240,9 @@ sudo mkdir -p $HOME/.config
 sudo mkdir -p $HOME/.local/bin
 echo 'export PATH="$HOME/.local/bin:$HOME/.local/npm/bin:$PATH"' >> $HOME/.profile
 sudo chown -R $(id -u):$(id -g) $HOME
-sudo chown -R $(id -u):$(id -g) /workspace
+sudo chown -R $(id -u):$(id -g) /logs
 sudo chown -R $(id -u):$(id -g) /output
+sudo chown -R $(id -u):$(id -g) /workspace
 
 source $HOME/.profile`;
     }
