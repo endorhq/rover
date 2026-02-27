@@ -320,6 +320,15 @@ fi
 echo -e "\\n📦 Done installing agent"`;
     }
 
+    // --- credential install section ---
+    // Always copy credentials on every container start (including cached images)
+    // so that fresh credentials are available even when the image was cached.
+    const credentialInstallSection = `# Copy credentials (runs on every start, including cached images)
+echo -e "\\n📦 Copying agent credentials"
+sudo -E rover-agent-install $AGENT
+sudo chown -R $(id -u):$(id -g) $HOME
+echo "✅ Credentials copied successfully"`;
+
     // --- MCP config section ---
     let mcpConfigSection = '';
     if (!useCachedImage) {
@@ -482,6 +491,7 @@ echo "======================================="
       homeSetup,
       installAllPackages,
       agentInstallSection,
+      credentialInstallSection,
       mcpConfigSection,
       initScriptExecution,
       sudoersRemoval,

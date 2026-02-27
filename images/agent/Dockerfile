@@ -38,6 +38,8 @@ RUN npm install -g /rover-agent.tgz
 
 COPY ./images/agent/assets/1-sudoers-setup /etc/sudoers.d/1-agent-setup
 COPY ./images/agent/assets/2-sudoers-cleanup /etc/sudoers.d/2-agent-cleanup
+COPY ./images/agent/assets/rover-agent-install /usr/local/bin/rover-agent-install
+RUN chmod u+s,a+x /usr/local/bin/rover-agent-install
 
 # Install agents with special requirements
 COPY ./images/agent/assets/nix/nix.conf /etc/nix/nix.conf
