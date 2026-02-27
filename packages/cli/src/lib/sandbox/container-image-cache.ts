@@ -154,6 +154,24 @@ export async function waitForInitAndCommit(
 }
 
 /**
+ * Resolve a container image tag to its image ID.
+ * Falls back to the tag string if inspection fails (e.g. image not pulled yet).
+ */
+function resolveImageId(backend: ContainerBackend, imageTag: string): string {
+  try {
+    const result = launchSync(
+      backend,
+      ['image', 'inspect', '--format', '{{.Id}}', imageTag],
+      { reject: false }
+    );
+    const id = result.stdout?.toString().trim();
+    return id || imageTag;
+  } catch {
+    return imageTag;
+  }
+}
+
+/**
  * Convenience function: compute hash, build tag, check existence.
  * Returns the cache tag and whether a cached image already exists.
  */
@@ -192,8 +210,9 @@ export function checkImageCache(
     cacheFilesContent = parts.join('\0');
   }
 
+  const agentImageId = resolveImageId(backend, agentImage);
   const hash = computeSetupHash({
-    agentImage,
+    agentImage: agentImageId,
     languages: projectConfig.languages,
     packageManagers: projectConfig.packageManagers,
     taskManagers: projectConfig.taskManagers,

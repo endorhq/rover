@@ -366,6 +366,84 @@ describe('restart command', async () => {
       );
     });
 
+    it('should allow restarting ITERATING tasks when container is dead', async () => {
+      const { createSandbox } = await import('../../lib/sandbox/index.js');
+      const mockCreateSandbox = vi.mocked(createSandbox);
+
+      // Mock sandbox to report container as exited
+      mockCreateSandbox.mockResolvedValue({
+        createAndStart: vi.fn().mockResolvedValue('new-container-id'),
+        inspect: vi.fn().mockResolvedValue({ status: 'exited', exitCode: 1 }),
+      } as any);
+
+      const taskId = 793;
+      const taskDir = join(testDir, '.rover', 'tasks', taskId.toString());
+
+      const task = TaskDescriptionManager.create(taskDir, {
+        id: taskId,
+        title: 'Test Task',
+        description: 'A test task',
+        inputs: new Map(),
+        workflowName: 'swe',
+      });
+
+      // Set to ITERATING to simulate a stuck task from interrupted cache init
+      task.markInProgress();
+      task.markIterating();
+      expect(task.status).toBe('ITERATING');
+
+      // Restart should succeed because container is dead
+      await restartCommand(taskId.toString(), { json: true });
+
+      const reloadedTask = TaskDescriptionManager.load(taskDir, taskId);
+      expect(reloadedTask.status).toBe('IN_PROGRESS');
+      expect(reloadedTask.restartCount).toBe(1);
+    });
+
+    it('should reject restarting ITERATING tasks when container is still running', async () => {
+      const { exitWithError } = await import('../../utils/exit.js');
+      const mockExitWithError = vi.mocked(exitWithError);
+      const { createSandbox } = await import('../../lib/sandbox/index.js');
+      const mockCreateSandbox = vi.mocked(createSandbox);
+
+      // Mock sandbox to report container as running
+      mockCreateSandbox.mockResolvedValue({
+        createAndStart: vi.fn().mockResolvedValue('mock-container-id'),
+        inspect: vi.fn().mockResolvedValue({ status: 'running', exitCode: 0 }),
+      } as any);
+
+      const taskId = 794;
+      const taskDir = join(testDir, '.rover', 'tasks', taskId.toString());
+
+      const task = TaskDescriptionManager.create(taskDir, {
+        id: taskId,
+        title: 'Test Task',
+        description: 'A test task',
+        inputs: new Map(),
+        workflowName: 'swe',
+      });
+
+      // Set to ITERATING
+      task.markInProgress();
+      task.markIterating();
+      expect(task.status).toBe('ITERATING');
+
+      // Try to restart — should be rejected
+      await restartCommand(taskId.toString(), { json: true });
+
+      expect(mockExitWithError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          error: expect.stringContaining('still running'),
+        }),
+        expect.objectContaining({
+          tips: expect.arrayContaining([
+            'The container for this task is still running',
+          ]),
+          telemetry: expect.anything(),
+        })
+      );
+    });
+
     it('should reject restarting tasks in COMPLETED status', async () => {
       const { exitWithError } = await import('../../utils/exit.js');
       const mockExitWithError = vi.mocked(exitWithError);
@@ -396,7 +474,7 @@ describe('restart command', async () => {
         }),
         expect.objectContaining({
           tips: expect.arrayContaining([
-            'Only NEW, FAILED, and stuck IN_PROGRESS tasks can be restarted',
+            'Only NEW, FAILED, and stuck IN_PROGRESS/ITERATING tasks can be restarted',
           ]),
           telemetry: expect.anything(),
         })

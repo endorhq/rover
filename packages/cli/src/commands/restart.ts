@@ -80,8 +80,8 @@ const restartCommand = async (
 
     // Check if task is in a restartable status
     if (!task.isNew() && !task.isFailed()) {
-      if (task.isInProgress()) {
-        // Allow restarting IN_PROGRESS tasks if the container is dead
+      if (task.isInProgress() || task.isIterating()) {
+        // Allow restarting IN_PROGRESS/ITERATING tasks if the container is dead
         try {
           const sandbox = await createSandbox(task, undefined, {
             projectPath: project.path,
@@ -89,7 +89,7 @@ const restartCommand = async (
           const state = await sandbox.inspect();
           // Container is still running — reject the restart
           if (state && state.status === 'running') {
-            jsonOutput.error = `Task ${taskId} is IN_PROGRESS and its container is still running`;
+            jsonOutput.error = `Task ${taskId} is ${task.status} and its container is still running`;
             await exitWithError(jsonOutput, {
               tips: [
                 'The container for this task is still running',
@@ -109,7 +109,7 @@ const restartCommand = async (
         jsonOutput.error = `Task ${taskId} is not in NEW or FAILED status (current: ${task.status})`;
         await exitWithError(jsonOutput, {
           tips: [
-            'Only NEW, FAILED, and stuck IN_PROGRESS tasks can be restarted',
+            'Only NEW, FAILED, and stuck IN_PROGRESS/ITERATING tasks can be restarted',
             'Use ' +
               colors.cyan(`rover inspect ${taskId}`) +
               colors.gray(' to find out the current task status'),
@@ -293,7 +293,7 @@ export { restartCommand };
 
 export default {
   name: 'restart',
-  description: 'Restart a new, failed, or stuck in-progress task',
+  description: 'Restart a new, failed, or stuck in-progress/iterating task',
   requireProject: true,
   action: restartCommand,
 } satisfies CommandDefinition;

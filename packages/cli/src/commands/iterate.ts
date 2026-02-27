@@ -548,6 +548,14 @@ const iterateCommand = async (
         telemetry,
       });
     } catch (error) {
+      // If the task was marked ITERATING but sandbox creation failed,
+      // reset it to FAILED so it's immediately recoverable without needing `restart`
+      if (task && task.isIterating()) {
+        task.markFailed(
+          error instanceof Error ? error.message : 'Iteration failed to start'
+        );
+      }
+
       if (error instanceof TaskNotFoundError) {
         result.error = error.message;
       } else if (error instanceof Error) {

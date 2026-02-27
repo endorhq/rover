@@ -320,6 +320,7 @@ export class PodmanSandbox extends Sandbox {
           throw new Error('Init container did not exit successfully');
         }
       } catch (err) {
+        this.initMode = false;
         this.processManager?.failLastItem();
         this.processManager?.finish();
         throw err;
