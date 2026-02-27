@@ -34,6 +34,10 @@ export interface StepResult {
   error?: string;
   duration: number;
   outputs: Map<string, string>;
+  // Usage metrics (populated by agent runners)
+  tokens?: number;
+  cost?: number;
+  model?: string;
 }
 
 export type AgentStepExecutor = (

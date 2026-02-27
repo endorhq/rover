@@ -10,6 +10,8 @@
 if [[ -z "$\{HOME\}" ]]; then
   export HOME=/home/$(id -u)
 fi
+sudo mkdir -p $HOME
+sudo chown -R $(id -u):$(id -g) $HOME
 
 # Some tools might be installed under /root/local/.bin conditionally
 # depending on the chosen agent and requirements, make this directory

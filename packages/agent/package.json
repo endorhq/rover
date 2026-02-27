@@ -24,7 +24,7 @@
   },
   "author": "The Endor team",
   "dependencies": {
-    "@agentclientprotocol/sdk": "^0.13.0",
+    "@agentclientprotocol/sdk": "^0.14.1",
     "ansi-colors": "catalog:runtime",
     "commander": "catalog:runtime",
     "execa": "catalog:runtime",

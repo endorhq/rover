@@ -21,6 +21,7 @@ This end to end testing description focuses on the `rover` CLI.
 - [Workflows](#workflows)
 - [Global Information](#global-information)
 - [Hooks](#hooks)
+- [Cost Control](#cost-control)
 
 ---
 
@@ -765,3 +766,27 @@ triggered the hook.
 
 Each hook type accepts an array of commands. All commands in the array
 must be executed when the hook is triggered.
+
+---
+
+## Cost Control
+
+Rover reports workflows sessions token usage and cost control, if the
+agent supports reporting that information.
+
+### Preconditions
+
+The agent that runs the task supports reporting token usage and/or
+cost control.
+
+### Feature: Step token and/or cost usage
+
+After executing a step of type agent within a workflow, Rover should
+report the token consumption on that step, as well as the cost of that
+step (if available).
+
+### Feature: Workflow token and/or cost usage
+
+After executing a workflow, Rover should report the total usage of
+that workflow (sum of all token usage/cost of all steps within that
+workflow).

@@ -3,11 +3,7 @@
 import { Command, Argument } from 'commander';
 import { AI_AGENT, setVerbose } from 'rover-core';
 import { runCommand } from './commands/run.js';
-import {
-  DEFAULT_INSTALL_DIRECTORY,
-  DEFAULT_INSTALL_VERSION,
-  installCommand,
-} from './commands/install.js';
+import { DEFAULT_INSTALL_VERSION, installCommand } from './commands/install.js';
 import { addConfigCommands } from './commands/config/index.js';
 import { sessionCommand } from './commands/session.js';
 import { getAgentVersion } from './version.js';
@@ -107,11 +103,6 @@ program
     '--version <version>',
     'Install a specific agent version',
     DEFAULT_INSTALL_VERSION
-  )
-  .option(
-    '--user-dir <directory>',
-    'User directory to copy credentials',
-    DEFAULT_INSTALL_DIRECTORY
   )
   .action(installCommand);
 
