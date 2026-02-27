@@ -113,6 +113,7 @@ export abstract class BaseAgent implements Agent {
       const result = await launch(this.binary, ['--version']);
       return result.exitCode === 0;
     } catch {
+      // If launch throws (e.g., binary not found), return false
       return false;
     }
   }

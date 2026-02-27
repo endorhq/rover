@@ -5,7 +5,6 @@ This end to end testing description focuses on the `rover` CLI.
 ## Suite
 
 - [Initialization](#initialization)
-- [Worktree Context Detection](#worktree-context-detection)
 - [Task Creation](#task-creation)
 - [Task Listing](#task-listing)
 - [Task Inspection](#task-inspection)
@@ -56,13 +55,12 @@ default when running non-interactively with the `--yes` flag.
 
 Rover must inspect the repository to identify the programming languages,
 package managers, and task managers in use. For languages, it must
-detect TypeScript, JavaScript, Rust, Python, Go, PHP, Dart, and others
-based on the presence of characteristic files (e.g., `tsconfig.json` for
+detect TypeScript, JavaScript, Rust, Python, Go, PHP, and others based
+on the presence of characteristic files (e.g., `tsconfig.json` for
 TypeScript, `Cargo.toml` for Rust, `pyproject.toml` for Python,
-`go.mod` for Go, `composer.json` for PHP, `pubspec.yaml` for Dart). For
-package managers, it must detect npm, pnpm, yarn, cargo, uv, pip,
-poetry, gomod, composer, pub, and others based on lock files and
-configuration files. For task managers, it
+`go.mod` for Go, `composer.json` for PHP). For package managers, it must
+detect npm, pnpm, yarn, cargo, uv, pip, poetry, gomod, composer, and
+others based on lock files and configuration files. For task managers, it
 must detect Make, Just, and Task based on the presence of `Makefile`,
 `Justfile`, and `Taskfile.yml` respectively. Polyglot projects with
 multiple languages, package managers, and task managers must be detected
@@ -107,25 +105,6 @@ After successful initialization, the project must have a valid
 listed in `.gitignore`. The project must be registered in the global
 Rover store. Running any subsequent Rover command in this directory must
 recognize the project as initialized.
-
----
-
-## Worktree Context Detection
-
-When Rover commands are run from inside a git worktree (as opposed to
-the main checkout), Rover must detect this context and redirect
-operations to the main repository root. This ensures tasks, configs, and
-state are resolved consistently regardless of which worktree the user is
-in.
-
-### Feature: Worktree detection and notification
-
-When a user runs a Rover command from inside a git worktree and has not
-specified a `--project` option, Rover must detect that the current
-directory is a worktree, display a notification indicating the main
-project root being used, and resolve all operations against the main
-repository instead of the worktree. The notification must not appear when
-running in `--json` mode or when `--project` is explicitly set.
 
 ---
 
@@ -684,29 +663,6 @@ produce a JSON array with full workflow details.
 about a specific workflow, including its name, description, inputs, and
 a step-by-step diagram of the workflow flow. The `--raw` flag must show
 the raw YAML content of the workflow definition.
-
-### Feature: Workflow with command step execution
-
-Workflows can contain steps of type `command` in addition to the usual
-`agent` steps. A command step runs a shell command directly (without
-invoking an AI agent) and captures its stdout and stderr as step
-outputs.
-
-When a workflow is run and encounters a command step, Rover must execute
-the specified `command` (with optional `args`) synchronously and capture
-its output. If the command succeeds (exit code 0), the step must be
-marked as successful and its stdout and stderr must be available as step
-outputs for subsequent steps. If the command fails (non-zero exit code)
-and `allow_failure` is not set or is false, the step must be marked as
-failed and the workflow must stop (unless `continueOnError` is enabled
-at the workflow level). If the command fails and `allow_failure` is
-true, the step must be marked as successful and the workflow must
-continue to the next step.
-
-A workflow with mixed step types (both `agent` and `command` steps) must
-execute each step according to its type: command steps run the command
-directly, while agent steps are dispatched to the configured AI agent.
-The step ordering defined in the workflow must be respected.
 
 ---
 

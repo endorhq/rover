@@ -26,6 +26,7 @@ import {
 } from '../lib/context.js';
 import type { CommandDefinition } from '../types.js';
 import { parseAgentString } from '../utils/agent-parser.js';
+import { collapseTaskCommits } from '../lib/squash.js';
 import {
   truncateConflictContext,
   getBlameContext,
@@ -461,10 +462,19 @@ const rebaseCommand = async (taskId: string, options: RebaseOptions = {}) => {
     const currentBranch = git.getCurrentBranch();
     jsonOutput.currentBranch = currentBranch;
 
+    // Collapse all task commits into staged changes before evaluating state
+    const squashed = collapseTaskCommits(
+      git,
+      task.baseCommit,
+      task.worktreePath
+    );
+
     // Check if worktree has changes to commit
-    const hasWorktreeChanges = git.hasUncommittedChanges({
-      worktreePath: task.worktreePath,
-    });
+    const hasWorktreeChanges =
+      squashed ||
+      git.hasUncommittedChanges({
+        worktreePath: task.worktreePath,
+      });
 
     jsonOutput.hasWorktreeChanges = hasWorktreeChanges;
 

@@ -1018,6 +1018,15 @@ const taskCommand = async (initPrompt?: string, options: TaskOptions = {}) => {
           continue;
         }
 
+        // When running non-interactively (-y), skip optional inputs.
+        // They will use their default value or be auto-detected by the workflow.
+        if (yes && !input.required) {
+          if (input.default !== undefined) {
+            inputsData.set(input.name, String(input.default));
+          }
+          continue;
+        }
+
         let enquirerType;
         switch (input.type) {
           case 'string':

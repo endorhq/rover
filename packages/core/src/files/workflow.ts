@@ -10,6 +10,7 @@ import {
   WorkflowLoadError,
   WorkflowValidationError,
   isAgentStep,
+  isLoopStep,
   isCommandStep,
   type Workflow,
   type WorkflowInput,
@@ -46,8 +47,16 @@ export type AgentStepExecutor = (
   stepsOutput: Map<string, Map<string, string>>
 ) => Promise<StepResult>;
 
+export type GenericStepExecutor = (
+  step: WorkflowStep,
+  stepIndex: number,
+  stepsOutput: Map<string, Map<string, string>>
+) => Promise<StepResult>;
+
 export interface WorkflowRunner {
   runAgentStep: AgentStepExecutor;
+  /** Optional executor for non-agent step types (loop, command with placeholders). */
+  runStep?: GenericStepExecutor;
 }
 
 export type OnStepComplete = (
@@ -226,10 +235,7 @@ export class WorkflowManager {
    * Only works with WorkflowAgentStep - other step types don't have tool property
    */
   getStepTool(stepId: string, defaultTool?: string): string | undefined {
-    const step = this.steps.find(s => s.id === stepId);
-    if (!step) {
-      throw new Error(`Step not found: ${stepId}`);
-    }
+    const step = this.getStep(stepId);
 
     // Check if this is an agent step (only agent steps have tool/model)
     if (!isAgentStep(step)) {
@@ -246,10 +252,7 @@ export class WorkflowManager {
    * Only works with WorkflowAgentStep - other step types don't have model property
    */
   getStepModel(stepId: string, defaultModel?: string): string | undefined {
-    const step = this.steps.find(s => s.id === stepId);
-    if (!step) {
-      throw new Error(`Step not found: ${stepId}`);
-    }
+    const step = this.getStep(stepId);
 
     // Check if this is an agent step (only agent steps have tool/model)
     if (!isAgentStep(step)) {
@@ -262,15 +265,59 @@ export class WorkflowManager {
   }
 
   /**
-   * Get step by ID
-   * Returns the generic WorkflowStep union type
+   * Find step by ID, searching recursively into loop sub-steps.
+   * Returns undefined if not found.
+   */
+  findStep(stepId: string): WorkflowStep | undefined {
+    return this.findStepRecursive(stepId, this.steps);
+  }
+
+  /**
+   * Get step by ID, searching recursively into loop sub-steps.
+   * Throws if step is not found.
    */
   getStep(stepId: string): WorkflowStep {
-    const step = this.steps.find(s => s.id === stepId);
+    const step = this.findStep(stepId);
     if (!step) {
       throw new Error(`Step not found: ${stepId}`);
     }
     return step;
+  }
+
+  /**
+   * Recursively search for a step by ID across top-level and nested steps.
+   */
+  private findStepRecursive(
+    stepId: string,
+    steps: WorkflowStep[]
+  ): WorkflowStep | undefined {
+    for (const step of steps) {
+      if (step.id === stepId) return step;
+      if (isLoopStep(step)) {
+        const found = this.findStepRecursive(stepId, step.steps);
+        if (found) return found;
+      }
+    }
+    return undefined;
+  }
+
+  /**
+   * Find the parent array and index of a step by ID, searching recursively.
+   * Returns undefined if the step is not found.
+   */
+  private findStepLocation(
+    stepId: string,
+    steps: WorkflowStep[] = this._steps
+  ): { parent: WorkflowStep[]; index: number } | undefined {
+    for (let i = 0; i < steps.length; i++) {
+      const s = steps[i];
+      if (s.id === stepId) return { parent: steps, index: i };
+      if (isLoopStep(s)) {
+        const found = this.findStepLocation(stepId, s.steps);
+        if (found) return found;
+      }
+    }
+    return undefined;
   }
 
   /**
@@ -329,8 +376,8 @@ export class WorkflowManager {
     position: 'before' | 'after' = 'before',
     referenceStepId?: string
   ): void {
-    // Check if a step with this ID already exists
-    const existingStep = this._steps.find(s => s.id === step.id);
+    // Check if a step with this ID already exists (including nested loop sub-steps)
+    const existingStep = this.findStep(step.id);
     if (existingStep) {
       throw new Error(
         `Cannot inject step: a step with ID "${step.id}" already exists`
@@ -347,17 +394,17 @@ export class WorkflowManager {
       return;
     }
 
-    // Find the reference step index
-    const refIndex = this._steps.findIndex(s => s.id === referenceStepId);
-    if (refIndex === -1) {
+    // Find the reference step (supports nested loop sub-steps)
+    const location = this.findStepLocation(referenceStepId);
+    if (!location) {
       throw new Error(`Reference step "${referenceStepId}" not found`);
     }
 
-    // Insert at the appropriate position
+    // Insert at the appropriate position within the parent array
     if (position === 'before') {
-      this._steps.splice(refIndex, 0, step);
+      location.parent.splice(location.index, 0, step);
     } else {
-      this._steps.splice(refIndex + 1, 0, step);
+      location.parent.splice(location.index + 1, 0, step);
     }
   }
 
@@ -516,12 +563,36 @@ export class WorkflowManager {
 
     for (let stepIndex = 0; stepIndex < this._steps.length; stepIndex++) {
       const step = this._steps[stepIndex];
+
+      // Check `if` condition before running step
+      if (step.if) {
+        const conditionResult = this.evaluateSimpleCondition(
+          step.if,
+          stepsOutput
+        );
+        if (!conditionResult) {
+          console.log(
+            colors.gray(`  ⏭ Skipping step "${step.name}" (condition not met)`)
+          );
+          stepsOutput.set(step.id, new Map());
+          continue;
+        }
+      }
+
       runSteps++;
 
       let result: StepResult;
 
-      if (isCommandStep(step)) {
-        result = this.executeCommandStep(step);
+      if (isLoopStep(step) && runner.runStep) {
+        // Loop steps are handled by the agent package's step executor
+        result = await runner.runStep(step, stepIndex, stepsOutput);
+      } else if (isCommandStep(step)) {
+        if (runner.runStep) {
+          // Prefer the agent package's command runner (supports placeholders, shell-escaping)
+          result = await runner.runStep(step, stepIndex, stepsOutput);
+        } else {
+          result = this.executeCommandStep(step);
+        }
       } else if (isAgentStep(step)) {
         result = await runner.runAgentStep(step, stepIndex, stepsOutput);
       } else {
@@ -539,9 +610,11 @@ export class WorkflowManager {
         totalDuration,
       });
 
-      if (result.success) {
-        stepsOutput.set(step.id, result.outputs);
-      } else {
+      // Always store step outputs so subsequent steps and loop
+      // conditions can reference them (even from failed steps).
+      stepsOutput.set(step.id, result.outputs);
+
+      if (!result.success) {
         const continueOnError = this.data.config?.continueOnError || false;
         if (!continueOnError) {
           console.log(
@@ -558,7 +631,6 @@ export class WorkflowManager {
               `\n⚠ Step '${step.name}' failed but continueOnError is true. Continuing with next step.`
             )
           );
-          stepsOutput.set(step.id, new Map());
         }
       }
     }
@@ -572,6 +644,60 @@ export class WorkflowManager {
       runSteps,
       totalSteps,
     };
+  }
+
+  /**
+   * Evaluate a condition string for step `if` fields.
+   * Supports OR (`||`) to join multiple clauses.
+   * Each clause: steps.<id>.outputs.<name> == <value>
+   *              steps.<id>.outputs.<name> != <value>
+   */
+  private evaluateSimpleCondition(
+    condition: string,
+    stepsOutput: Map<string, Map<string, string>>
+  ): boolean {
+    const parts = condition.split(/\s*\|\|\s*/);
+    return parts.some(part =>
+      this.evaluateSingleCondition(part.trim(), stepsOutput)
+    );
+  }
+
+  /**
+   * Evaluate a single condition clause (no OR).
+   */
+  private evaluateSingleCondition(
+    condition: string,
+    stepsOutput: Map<string, Map<string, string>>
+  ): boolean {
+    const trimmed = condition.trim();
+    const match = trimmed.match(
+      /^steps\.([\w-]+)\.outputs\.([\w-]+)\s*(==|!=)\s*(.+)$/
+    );
+    if (!match) return false;
+
+    const [, stepId, outputName, operator, rawValue] = match;
+    const expectedValue = rawValue.trim();
+    const stepOutputs = stepsOutput.get(stepId);
+    const actualValue = stepOutputs?.get(outputName);
+
+    if (actualValue === undefined) {
+      return operator === '!=';
+    }
+
+    // Normalize booleans for comparison
+    const normalize = (v: string) => {
+      const l = v.toLowerCase();
+      if (l === 'true' || l === 'yes') return 'true';
+      if (l === 'false' || l === 'no') return 'false';
+      return v;
+    };
+
+    const normActual = normalize(actualValue);
+    const normExpected = normalize(expectedValue);
+
+    return operator === '=='
+      ? normActual === normExpected
+      : normActual !== normExpected;
   }
 
   /**

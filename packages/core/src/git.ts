@@ -442,6 +442,7 @@ export class Git {
     try {
       launchSync('git', ['rebase', onto], {
         cwd: options.worktreePath ?? this.cwd,
+        env: { ...process.env, GIT_EDITOR: 'true' },
       });
       return { success: true };
     } catch (err) {
@@ -900,6 +901,15 @@ export class Git {
       hash,
       summary,
     }));
+  }
+
+  /**
+   * Soft-reset the current branch to the given ref, keeping all changes staged.
+   */
+  resetSoft(ref: string, options: GitWorktreeOptions = {}): void {
+    launchSync('git', ['reset', '--soft', ref], {
+      cwd: options.worktreePath ?? this.cwd,
+    });
   }
 
   /**

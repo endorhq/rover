@@ -6,6 +6,7 @@ import {
   getConfigDir,
 } from 'rover-core';
 import sweWorkflow from './workflows/swe.yml';
+import sweTddWorkflow from './workflows/swe-tdd.yml';
 import techWriterWorkflow from './workflows/tech-writer.yml';
 import { dirname, isAbsolute, join } from 'path';
 import { fileURLToPath } from 'url';
@@ -72,6 +73,9 @@ export const initWorkflowStore = (projectPath?: string): WorkflowStore => {
   // Load built-in workflows
   const swe = loadBuiltInWorkflow(sweWorkflow);
   store.addWorkflow(swe, WorkflowSource.BuiltIn);
+
+  const sweTdd = loadBuiltInWorkflow(sweTddWorkflow);
+  store.addWorkflow(sweTdd, WorkflowSource.BuiltIn);
 
   const techWriter = loadBuiltInWorkflow(techWriterWorkflow);
   store.addWorkflow(techWriter, WorkflowSource.BuiltIn);

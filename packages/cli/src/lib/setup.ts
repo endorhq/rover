@@ -306,7 +306,7 @@ ${installScripts.join('\n')}
       agentInstallSection = `# Agent-specific CLI installation and credential setup
 echo -e "\\n📦 Installing Agent CLI and setting up credentials"
 # Pass the environment variables to ensure it loads the right credentials
-sudo rover-agent install $AGENT
+sudo -E rover-agent install $AGENT --user-dir $HOME
 # Set the right permissions after installing and moving credentials
 sudo chown -R $(id -u):$(id -g) $HOME
 
@@ -520,7 +520,10 @@ echo "======================================="
     // Use the current iteration's expanded title/description when available,
     // falling back to the original task-level values for the first iteration.
     const currentIteration = this.task.getLastIteration();
-    const inputs = {
+    const inputs: Record<string, string> = {
+      // Start with all user-provided workflow inputs stored in the task
+      ...this.task.inputs,
+      // Always override title/description with the expanded versions
       title: currentIteration?.title ?? this.task.title,
       description: currentIteration?.description ?? this.task.description,
     };

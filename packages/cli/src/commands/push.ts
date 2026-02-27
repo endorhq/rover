@@ -21,6 +21,7 @@ import { showRoverChat, TIP_TITLES } from '../utils/display.js';
 import { statusColor } from '../utils/task-status.js';
 import { executeHooks } from '../lib/hooks.js';
 import type { CommandDefinition } from '../types.js';
+import { collapseTaskCommits } from '../lib/squash.js';
 
 const { prompt } = enquirer;
 
@@ -170,11 +171,18 @@ const pushCommand = async (taskId: string, options: PushOptions) => {
       });
     }
 
+    // Collapse all task commits into staged changes before evaluating state
+    const squashed = collapseTaskCommits(
+      git,
+      task.baseCommit,
+      task.worktreePath
+    );
+
     // Check for changes
     const fileChanges = git.uncommittedChanges({
       worktreePath: task.worktreePath,
     });
-    const hasChanges = fileChanges.length > 0;
+    const hasChanges = squashed || fileChanges.length > 0;
     result.hasChanges = hasChanges;
 
     if (!hasChanges) {
