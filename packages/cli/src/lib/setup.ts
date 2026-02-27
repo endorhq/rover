@@ -240,8 +240,9 @@ sudo mkdir -p $HOME/.config
 sudo mkdir -p $HOME/.local/bin
 echo 'export PATH="$HOME/.local/bin:$HOME/.local/npm/bin:$PATH"' >> $HOME/.profile
 sudo chown -R $(id -u):$(id -g) $HOME
-sudo chown -R $(id -u):$(id -g) /workspace
+sudo chown -R $(id -u):$(id -g) /logs
 sudo chown -R $(id -u):$(id -g) /output
+sudo chown -R $(id -u):$(id -g) /workspace
 
 source $HOME/.profile`;
     }
@@ -306,7 +307,7 @@ ${installScripts.join('\n')}
       agentInstallSection = `# Agent-specific CLI installation and credential setup
 echo -e "\\n📦 Installing Agent CLI and setting up credentials"
 # Pass the environment variables to ensure it loads the right credentials
-sudo -E rover-agent install $AGENT
+sudo rover-agent install $AGENT
 # Set the right permissions after installing and moving credentials
 sudo chown -R $(id -u):$(id -g) $HOME
 
@@ -319,6 +320,15 @@ fi
 
 echo -e "\\n📦 Done installing agent"`;
     }
+
+    // --- credential install section ---
+    // Always copy credentials on every container start (including cached images)
+    // so that fresh credentials are available even when the image was cached.
+    const credentialInstallSection = `# Copy credentials (runs on every start, including cached images)
+echo -e "\\n📦 Copying agent credentials"
+sudo rover-agent-install $AGENT
+sudo chown -R $(id -u):$(id -g) $HOME
+echo "✅ Credentials copied successfully"`;
 
     // --- MCP config section ---
     let mcpConfigSection = '';
@@ -482,6 +492,7 @@ echo "======================================="
       homeSetup,
       installAllPackages,
       agentInstallSection,
+      credentialInstallSection,
       mcpConfigSection,
       initScriptExecution,
       sudoersRemoval,

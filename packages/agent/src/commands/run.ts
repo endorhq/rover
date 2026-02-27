@@ -361,22 +361,6 @@ export const runCommand = async (
       const tool =
         options.agentTool || workflowManager.defaults?.tool || 'claude';
 
-      // Copy credentials to home directory on every run so that fresh
-      // credentials are available even when the container image was cached
-      // via docker/podman commit during install.
-      const userDir = process.env.HOME || '/home/agent';
-      try {
-        const agent = createAgent(tool);
-        await agent.copyCredentials(userDir);
-        console.log(colors.green('✓ Credentials copied successfully\n'));
-      } catch (err) {
-        console.log(
-          colors.yellow(
-            `Warning: Failed to copy credentials: ${err instanceof Error ? err.message : String(err)}\n`
-          )
-        );
-      }
-
       // ACP usage decision: use ACP mode for agents that support it
       const acpEnabledTools = [
         'claude',
