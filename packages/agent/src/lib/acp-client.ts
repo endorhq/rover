@@ -22,7 +22,13 @@ import {
 } from '@agentclientprotocol/sdk';
 import colors from 'ansi-colors';
 import { execa, type ResultPromise } from 'execa';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { dirname } from 'node:path';
 import { generateRandomId, VERBOSE } from 'rover-core';
 
@@ -276,6 +282,24 @@ export class ACPClient implements Client {
     throw RequestError.resourceNotFound(path);
   }
 
+  /**
+   * Format a directory listing for when readTextFile is called on a directory.
+   * Returns a text listing with file/directory indicators so the agent can
+   * pick the right file to read next.
+   */
+  private formatDirectoryListing(dirPath: string): string {
+    const entries = readdirSync(dirPath).sort();
+    const lines = entries.map(name => {
+      try {
+        const stat = statSync(`${dirPath}/${name}`);
+        return stat.isDirectory() ? `${name}/` : name;
+      } catch {
+        return name;
+      }
+    });
+    return `Directory listing for ${dirPath}:\n\n${lines.join('\n')}`;
+  }
+
   readTextFile?(params: ReadTextFileRequest): Promise<ReadTextFileResponse> {
     if (VERBOSE) {
       console.log(
@@ -295,17 +319,27 @@ export class ACPClient implements Client {
         );
       }
     } catch (error) {
-      if (
-        error instanceof Error &&
-        'code' in error &&
-        error.code === 'ENOENT'
-      ) {
-        if (VERBOSE) {
-          console.log(
-            colors.yellow(`[ACP] readTextFile: File not found ${params.path}`)
-          );
+      if (error instanceof Error && 'code' in error) {
+        if (error.code === 'ENOENT') {
+          if (VERBOSE) {
+            console.log(
+              colors.yellow(`[ACP] readTextFile: File not found ${params.path}`)
+            );
+          }
+          return this.onFileNotFound(params.path);
         }
-        return this.onFileNotFound(params.path);
+        if (error.code === 'EISDIR') {
+          if (VERBOSE) {
+            console.log(
+              colors.yellow(
+                `[ACP] readTextFile: Path is a directory, returning listing for ${params.path}`
+              )
+            );
+          }
+          return Promise.resolve({
+            content: this.formatDirectoryListing(params.path),
+          });
+        }
       }
       console.log(
         colors.red(`[ACP] readTextFile error:`),

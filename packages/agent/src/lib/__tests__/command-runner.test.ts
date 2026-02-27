@@ -215,8 +215,11 @@ describe('runCommandStep', () => {
     await runCommandStep(step, new Map(), new Map(), 60);
 
     expect(mockedLaunch).toHaveBeenCalledWith(
-      'sh',
-      ['-c', 'sleep 1'],
+      'bash',
+      [
+        '-c',
+        '[ -f "$HOME/.profile" ] && . "$HOME/.profile" 2>/dev/null; sleep 1',
+      ],
       expect.objectContaining({ timeout: 60_000 })
     );
   });
@@ -244,8 +247,11 @@ describe('runCommandStep', () => {
 
     // Default is 300 seconds = 300_000 ms
     expect(mockedLaunch).toHaveBeenCalledWith(
-      'sh',
-      ['-c', 'echo hi'],
+      'bash',
+      [
+        '-c',
+        '[ -f "$HOME/.profile" ] && . "$HOME/.profile" 2>/dev/null; echo hi',
+      ],
       expect.objectContaining({ timeout: 300_000 })
     );
   });
@@ -278,8 +284,11 @@ describe('runCommandStep', () => {
 
     // Command runs through shell; args are shell-escaped
     expect(mockedLaunch).toHaveBeenCalledWith(
-      'sh',
-      ['-c', "npm test '--filter' 'unit'"],
+      'bash',
+      [
+        '-c',
+        '[ -f "$HOME/.profile" ] && . "$HOME/.profile" 2>/dev/null; npm test \'--filter\' \'unit\'',
+      ],
       expect.objectContaining({ reject: false })
     );
   });

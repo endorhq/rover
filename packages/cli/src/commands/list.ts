@@ -58,7 +58,10 @@ const formatProgress = (step?: string, progress?: number): string => {
   if (step === undefined || progress === undefined) return colors.gray('─────');
 
   const barLength = 8;
-  const filled = Math.round((progress / 100) * barLength);
+  const filled = Math.max(
+    0,
+    Math.min(barLength, Math.round((progress / 100) * barLength))
+  );
   const bar = '█'.repeat(filled) + '░'.repeat(barLength - filled);
 
   if (step === 'FAILED') {

@@ -79,7 +79,7 @@ export async function runCommandStep(
     resolvePlaceholders(arg, inputs, stepsOutput)
   );
 
-  // SECURITY NOTE: The `command` field is passed **unescaped** to `sh -c`
+  // SECURITY NOTE: The `command` field is passed **unescaped** to `bash -c`
   // so that workflow authors can use pipes, redirections, and other shell
   // features.  Only `args` are individually shell-escaped.  This means
   // placeholders resolved into the `command` string (e.g.
@@ -96,8 +96,14 @@ export async function runCommandStep(
 
   const timeout = (timeoutSeconds ?? DEFAULT_COMMAND_TIMEOUT) * 1000;
 
+  // Use bash instead of sh (dash on Debian) to handle inaccessible PATH
+  // entries gracefully. Source .profile so language-specific PATH additions
+  // (Go, Python, Rust, etc.) are available in the spawned shell.
+  const wrappedCommand =
+    '[ -f "$HOME/.profile" ] && . "$HOME/.profile" 2>/dev/null; ' + fullCommand;
+
   try {
-    const result = await launch('sh', ['-c', fullCommand], {
+    const result = await launch('bash', ['-c', wrappedCommand], {
       reject: false,
       timeout,
     });
