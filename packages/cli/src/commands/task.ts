@@ -463,6 +463,22 @@ const createTaskForAgent = async (
       uri: entry.uri,
       description: entry.description,
     }));
+
+    // Populate task.source from context if not already set
+    if (!source) {
+      const issueEntry = entries.find(entry => {
+        const type = entry.metadata?.type;
+        return type === 'github:issue' || type === 'gitlab:issue';
+      });
+      if (issueEntry?.metadata && 'number' in issueEntry.metadata) {
+        const isGitHub = issueEntry.metadata.type === 'github:issue';
+        task.setSource({
+          type: isGitHub ? 'github' : 'gitlab',
+          id: String(issueEntry.metadata.number),
+          title: issueEntry.name,
+        });
+      }
+    }
   } catch (error) {
     processManager?.failLastItem();
     if (error instanceof ContextFetchError) {

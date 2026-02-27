@@ -765,6 +765,14 @@ export class TaskDescriptionManager {
   // ============================================================
 
   /**
+   * Set task source
+   */
+  setSource(source: TaskDescription['source']): void {
+    this.data.source = source;
+    this.save();
+  }
+
+  /**
    * Update task title
    */
   updateTitle(title: string): void {

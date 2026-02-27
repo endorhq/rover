@@ -264,6 +264,14 @@ const inspectCommand = async (
         workflowName: task.workflowName,
         worktreePath: task.worktreePath,
         source: task.source,
+        context:
+          iteration.context.length > 0
+            ? iteration.context.map(entry => ({
+                name: entry.name,
+                uri: entry.uri,
+                description: entry.description,
+              }))
+            : undefined,
       };
 
       await exitWithSuccess(null, jsonOutput, { telemetry });
@@ -313,6 +321,17 @@ const inspectCommand = async (
       }
 
       showProperties(properties);
+
+      // Show context entries if available
+      if (iteration.context.length > 0) {
+        showTitle('Context');
+        showList(
+          iteration.context.map(
+            entry =>
+              `${colors.cyan(entry.uri)} ${colors.gray('→')} ${entry.name}`
+          )
+        );
+      }
 
       // Workspace information
       showTitle('Workspace');

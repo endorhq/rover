@@ -202,6 +202,11 @@ export interface TaskInspectionOutput {
     title?: string;
     ref?: Record<string, unknown>;
   };
+  context?: Array<{
+    name: string;
+    uri: string;
+    description: string;
+  }>;
 }
 
 export interface RawFileOutput {
