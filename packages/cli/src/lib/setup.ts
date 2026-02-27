@@ -307,7 +307,7 @@ ${installScripts.join('\n')}
       agentInstallSection = `# Agent-specific CLI installation and credential setup
 echo -e "\\n📦 Installing Agent CLI and setting up credentials"
 # Pass the environment variables to ensure it loads the right credentials
-sudo -E rover-agent install $AGENT
+sudo rover-agent install $AGENT
 # Set the right permissions after installing and moving credentials
 sudo chown -R $(id -u):$(id -g) $HOME
 
@@ -326,7 +326,7 @@ echo -e "\\n📦 Done installing agent"`;
     // so that fresh credentials are available even when the image was cached.
     const credentialInstallSection = `# Copy credentials (runs on every start, including cached images)
 echo -e "\\n📦 Copying agent credentials"
-sudo -E rover-agent-install $AGENT
+sudo rover-agent-install $AGENT
 sudo chown -R $(id -u):$(id -g) $HOME
 echo "✅ Credentials copied successfully"`;
 
