@@ -467,7 +467,7 @@ const listCommand = async (
       {
         header: 'Status',
         key: 'status',
-        width: 16,
+        width: 20,
         format: (value: string, row: TaskRow) => {
           const colorFunc = statusColor(value);
           return colorFunc(formatTaskStatus(value, row.provider));

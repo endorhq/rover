@@ -89,7 +89,7 @@ describe('evaluateCondition', () => {
     warnSpy.mockRestore();
   });
 
-  it('returns false and warns when using && operator', () => {
+  it('returns false and warns when using && operator with spaces', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const stepsOutput = new Map<string, Map<string, string>>();
     stepsOutput.set('a', new Map([['x', '1']]));
@@ -98,6 +98,24 @@ describe('evaluateCondition', () => {
     expect(
       evaluateCondition(
         'steps.a.outputs.x == 1 && steps.b.outputs.y == 2',
+        stepsOutput
+      )
+    ).toBe(false);
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('"&&" (AND) operator is not supported')
+    );
+    warnSpy.mockRestore();
+  });
+
+  it('returns false and warns when using && operator without spaces', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const stepsOutput = new Map<string, Map<string, string>>();
+    stepsOutput.set('a', new Map([['x', '1']]));
+    stepsOutput.set('b', new Map([['y', '2']]));
+
+    expect(
+      evaluateCondition(
+        'steps.a.outputs.x == 1&&steps.b.outputs.y == 2',
         stepsOutput
       )
     ).toBe(false);

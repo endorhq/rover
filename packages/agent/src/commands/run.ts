@@ -151,20 +151,6 @@ interface RunCommandOutput extends CommandOutput {
   paused?: boolean;
 }
 
-function upsertCompletedStep(
-  completedSteps: CheckpointData['completedSteps'],
-  id: string,
-  outputs: Record<string, string>
-): void {
-  const existingIndex = completedSteps.findIndex(step => step.id === id);
-  const nextCompletedStep = { id, outputs };
-  if (existingIndex >= 0) {
-    completedSteps[existingIndex] = nextCompletedStep;
-  } else {
-    completedSteps.push(nextCompletedStep);
-  }
-}
-
 /**
  * Build context injection message from the context directory.
  * The context directory contains an index.md file and individual context source files.
@@ -653,9 +639,9 @@ export const runCommand = async (
 
       const onStepComplete: OnStepComplete = (step, result, context) => {
         if (result.success && checkpointStore) {
-          const completedSteps = checkpointStore.getData().completedSteps;
-          upsertCompletedStep(
-            completedSteps,
+          // Use addCompletedStep for direct in-place upsert (avoids
+          // double-copy overhead of getData() + setCompletedSteps()).
+          checkpointStore.addCompletedStep(
             step.id,
             Object.fromEntries(result.outputs.entries())
           );
@@ -666,15 +652,12 @@ export const runCommand = async (
             )) {
               const subStepOutputs = context.stepsOutput.get(subStepId);
               if (!subStepOutputs) continue;
-              upsertCompletedStep(
-                completedSteps,
+              checkpointStore.addCompletedStep(
                 subStepId,
                 Object.fromEntries(subStepOutputs.entries())
               );
             }
           }
-
-          checkpointStore.setCompletedSteps(completedSteps);
         }
 
         displayStepResults(step.name, result);

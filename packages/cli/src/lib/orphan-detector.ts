@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import colors from 'ansi-colors';
 import type { ProjectManager, TaskDescriptionManager } from 'rover-core';
+import { VERBOSE } from 'rover-core';
 import { AGENT_EXIT_CODE } from 'rover-schemas';
 import { isResumeLockActive } from '../utils/resume-lock.js';
 import { createSandbox } from './sandbox/index.js';
@@ -62,7 +63,7 @@ export async function detectOrphanedTasks(
 
   if (candidates.length === 0) return;
 
-  await Promise.allSettled(
+  const results = await Promise.allSettled(
     candidates.map(async ({ task, project }) => {
       try {
         const sandbox = await createSandbox(task, undefined, {
@@ -145,4 +146,17 @@ export async function detectOrphanedTasks(
       }
     })
   );
+
+  // Log any unexpected rejections that escaped the per-task try/catch
+  if (VERBOSE) {
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        console.warn(
+          colors.yellow(
+            `⚠ Unexpected error during orphan detection: ${result.reason}`
+          )
+        );
+      }
+    }
+  }
 }

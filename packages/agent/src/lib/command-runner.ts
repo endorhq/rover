@@ -62,9 +62,14 @@ export function resolvePlaceholders(
  * Warn at runtime if the command field contains {{...}} placeholders.
  * Placeholders in args are shell-escaped, but those in the command string
  * are passed directly to `bash -c` and can execute arbitrary shell code.
+ *
+ * Each unique command string is warned about at most once per process to
+ * avoid flooding logs in loops that re-execute the same command step.
  */
+const warnedCommands = new Set<string>();
 export function warnIfCommandHasPlaceholders(command: string): void {
-  if (/\{\{.*?\}\}/.test(command)) {
+  if (/\{\{.*?\}\}/.test(command) && !warnedCommands.has(command)) {
+    warnedCommands.add(command);
     console.warn(
       '⚠ Security warning: command field contains {{...}} placeholders ' +
         'that will be interpreted by the shell without escaping. ' +

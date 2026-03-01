@@ -264,6 +264,9 @@ export class RetryScheduler {
             `  ⚠ Task ${taskId} could not be resumed (attempt ${attempt}/${MAX_AUTO_RETRIES}), re-scheduling...`
           )
         );
+        // Timer was already deleted (line 224) and retry count already
+        // incremented (line 240-241), so registerPausedTask will find no
+        // existing timer and will use the current retry count for backoff.
         this.registerPausedTask(provider, taskId, project);
       }
     } catch (error) {
@@ -279,6 +282,8 @@ export class RetryScheduler {
             `  ⚠ Task ${taskId} resume failed (attempt ${attempt}/${MAX_AUTO_RETRIES}): ${error instanceof Error ? error.message : String(error)}, re-scheduling...`
           )
         );
+        // Same invariant as the non-exception path above: timer cleared,
+        // retry count incremented, so registerPausedTask computes correct backoff.
         this.registerPausedTask(provider, taskId, project);
       }
     }

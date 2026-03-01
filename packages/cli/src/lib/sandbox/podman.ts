@@ -31,15 +31,17 @@ import colors from 'ansi-colors';
 
 /**
  * Normalize UID/GID for environments that return -1 (e.g. Windows).
- * Sets both to 1000 (unprivileged) when the OS cannot provide them.
+ * Returns a shallow copy with UID/GID set to 1000 (unprivileged) when
+ * the OS cannot provide them. Does not mutate the input.
  */
-function normalizeUserInfo(info: ReturnType<typeof userInfo>): void {
-  if (info.uid === -1) {
-    info.uid = 1000;
-  }
-  if (info.gid === -1) {
-    info.gid = 1000;
-  }
+function normalizeUserInfo(
+  info: ReturnType<typeof userInfo>
+): ReturnType<typeof userInfo> {
+  return {
+    ...info,
+    uid: info.uid === -1 ? 1000 : info.uid,
+    gid: info.gid === -1 ? 1000 : info.gid,
+  };
 }
 
 export class PodmanSandbox extends Sandbox {
@@ -142,8 +144,7 @@ export class PodmanSandbox extends Sandbox {
 
     const podmanArgs = ['create', '--name', this.sandboxName];
 
-    const userInfo_ = userInfo();
-    normalizeUserInfo(userInfo_);
+    const userInfo_ = normalizeUserInfo(userInfo());
 
     // Warn if using a custom agent image
     warnIfCustomImage(projectConfig);
@@ -439,8 +440,7 @@ export class PodmanSandbox extends Sandbox {
     const interactiveName = `${this.sandboxName}-i`;
     const podmanArgs = ['run', '--name', interactiveName, '-it', '--rm'];
 
-    const userInfo_ = userInfo();
-    normalizeUserInfo(userInfo_);
+    const userInfo_ = normalizeUserInfo(userInfo());
 
     // Warn if using a custom agent image
     warnIfCustomImage(projectConfig);

@@ -186,6 +186,9 @@ export interface CheckpointStore {
   setLoopProgress(loopId: string, progress: CheckpointLoopProgress): void;
   clearLoopProgress(loopId: string): void;
   setCompletedSteps(completedSteps: CheckpointCompletedStep[]): void;
+  /** Upsert a single completed step into the internal list and persist.
+   *  Avoids the double-copy overhead of getData() + setCompletedSteps(). */
+  addCompletedStep(stepId: string, outputs: Record<string, string>): void;
   saveFailureSnapshot(data: {
     completedSteps: CheckpointCompletedStep[];
     failedStepId: string;
@@ -308,6 +311,22 @@ export function createCheckpointStore(
         id: step.id,
         outputs: { ...step.outputs },
       }));
+      if (!persist()) {
+        console.warn(
+          colors.yellow(
+            'Warning: Failed to persist completed steps. In-memory state may diverge from disk.'
+          )
+        );
+      }
+    },
+    addCompletedStep(stepId: string, outputs: Record<string, string>) {
+      const existing = data.completedSteps.findIndex(s => s.id === stepId);
+      const entry = { id: stepId, outputs: { ...outputs } };
+      if (existing >= 0) {
+        data.completedSteps[existing] = entry;
+      } else {
+        data.completedSteps.push(entry);
+      }
       if (!persist()) {
         console.warn(
           colors.yellow(

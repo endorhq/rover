@@ -11,7 +11,7 @@ import {
 import { TaskNotFoundError } from 'rover-schemas';
 import { createSandbox } from '../lib/sandbox/index.js';
 import { copyEnvironmentFiles } from '../utils/env-files.js';
-import { isResumeLockActive } from '../utils/resume-lock.js';
+import { isResumeLockActive, formatLockContent } from '../utils/resume-lock.js';
 import colors from 'ansi-colors';
 
 /**
@@ -25,7 +25,7 @@ function acquireResumeLock(iterationPath: string): (() => void) | null {
   const tryAcquireLock = (): (() => void) | null => {
     try {
       // O_EXCL semantics: writeFileSync with flag 'wx' fails if file exists
-      writeFileSync(lockPath, String(process.pid), { flag: 'wx' });
+      writeFileSync(lockPath, formatLockContent(process.pid), { flag: 'wx' });
       return () => {
         try {
           unlinkSync(lockPath);
