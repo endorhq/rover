@@ -13,6 +13,7 @@ This end to end testing description focuses on the `rover` CLI.
 - [Task Iteration](#task-iteration)
 - [Task Stop](#task-stop)
 - [Task Restart](#task-restart)
+- [Task Resume](#task-resume)
 - [Task Deletion](#task-deletion)
 - [Task Merge](#task-merge)
 - [Task Push](#task-push)
@@ -473,6 +474,40 @@ Attempting to restart a task that is in any status other than `NEW` or
 
 If the new container fails to start, the task must be reset back to
 `NEW` status and the error must be reported.
+
+---
+
+## Task Resume
+
+The `rover resume` command resumes a task in `PAUSED` or `FAILED` state
+from its latest iteration. When a checkpoint exists, Rover must continue
+from checkpointed progress instead of replaying the full iteration.
+
+### Preconditions
+
+The specified task ID must exist. The task must be in `PAUSED` or
+`FAILED` status and have at least one iteration.
+
+### Feature: Pause → checkpoint → resume lifecycle
+
+Given a paused task with
+`.rover/tasks/<task-id>/iterations/<iteration>/checkpoint.json`,
+`rover resume <taskId>` must:
+
+- transition the task back to `IN_PROGRESS`
+- pass the checkpoint path into sandbox startup
+- relaunch the container for the latest iteration
+- preserve resumable state when relaunch fails
+
+### Feature: Resume eligibility validation
+
+Attempting to resume a task in any status other than `PAUSED` or
+`FAILED` must fail with a clear error.
+
+### Postconditions
+
+After a successful resume, the task must be in `IN_PROGRESS` and have
+active container metadata for the restarted iteration.
 
 ---
 
