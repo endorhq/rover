@@ -167,7 +167,7 @@ export function sanitizeAIOutput(
 
 /** Returns true if content still has conflict markers */
 export function hasConflictMarkers(content: string): boolean {
-  return /^<{7} |^={7}$|^>{7} /m.test(content);
+  return /^<{7}( |$)|^={7}$|^>{7}( |$)/m.test(content);
 }
 
 /**

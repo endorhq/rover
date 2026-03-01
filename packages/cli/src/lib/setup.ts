@@ -72,12 +72,16 @@ export class SetupBuilder {
 
     let isDockerRootless = false;
 
-    const dockerInfo = launchSync('docker', ['info', '-f', 'json']).stdout;
-    if (dockerInfo) {
-      const info = JSON.parse(dockerInfo.toString());
-      isDockerRootless = (info?.SecurityOptions || []).some((value: string) =>
-        value.includes('rootless')
-      );
+    try {
+      const dockerInfo = launchSync('docker', ['info', '-f', 'json']).stdout;
+      if (dockerInfo) {
+        const info = JSON.parse(dockerInfo.toString());
+        isDockerRootless = (info?.SecurityOptions || []).some((value: string) =>
+          value.includes('rootless')
+        );
+      }
+    } catch {
+      // Docker may not be available (e.g. Podman-only environment)
     }
 
     this.isDockerRootless = isDockerRootless;

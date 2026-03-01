@@ -166,7 +166,7 @@ const mcpCommand = async () => {
   const diffSchema = z.object({
     taskId: z.string(),
     filePath: z.string().optional(),
-    onlyFiles: z.array(z.string()).optional(),
+    onlyFiles: z.boolean().optional(),
     branch: z.string().optional(),
   });
 

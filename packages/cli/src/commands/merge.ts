@@ -360,7 +360,7 @@ const mergeCommand = async (taskId: string, options: MergeOptions = {}) => {
   const git = new Git({ cwd: project.path });
 
   if (!git.isGitRepo()) {
-    jsonOutput.error = 'No worktree found for this task';
+    jsonOutput.error = 'Not a git repository';
     await exitWithError(jsonOutput, { telemetry });
     return;
   }
@@ -488,26 +488,16 @@ const mergeCommand = async (taskId: string, options: MergeOptions = {}) => {
       return;
     }
 
-    // Collapse all task commits into staged changes before evaluating state
-    const squashed = collapseTaskCommits(
-      git,
-      task.baseCommit,
-      task.worktreePath
-    );
-
-    // Check if worktree has changes to commit or if there are unmerged commits
-    const hasWorktreeChanges =
-      squashed ||
-      git.hasUncommittedChanges({
-        worktreePath: task.worktreePath,
-      });
+    // Check for uncommitted changes and unmerged commits before collapsing
+    const hasUncommittedChanges = git.hasUncommittedChanges({
+      worktreePath: task.worktreePath,
+    });
     const taskBranch = task.branchName;
     const hasUnmerged = git.hasUnmergedCommits(taskBranch);
 
-    jsonOutput.hasWorktreeChanges = hasWorktreeChanges;
-    jsonOutput.hasUnmergedCommits = hasUnmerged;
-
-    if (!hasWorktreeChanges && !hasUnmerged) {
+    if (!hasUncommittedChanges && !hasUnmerged) {
+      jsonOutput.hasWorktreeChanges = false;
+      jsonOutput.hasUnmergedCommits = false;
       jsonOutput.success = true;
       await exitWithSuccess('No changes to merge', jsonOutput, {
         tips: [
@@ -522,7 +512,7 @@ const mergeCommand = async (taskId: string, options: MergeOptions = {}) => {
       // Show what will happen
       console.log('');
       const mergeSteps = [];
-      if (hasWorktreeChanges) {
+      if (hasUncommittedChanges) {
         mergeSteps.push(colors.cyan('Commit changes in the task worktree'));
       }
       mergeSteps.push(
@@ -561,6 +551,17 @@ const mergeCommand = async (taskId: string, options: MergeOptions = {}) => {
     if (!isJsonMode()) {
       console.log(''); // breakline
     }
+
+    // Collapse task commits AFTER user confirmation (this is destructive)
+    const squashed = collapseTaskCommits(
+      git,
+      task.baseCommit,
+      task.worktreePath
+    );
+
+    const hasWorktreeChanges = squashed || hasUncommittedChanges;
+    jsonOutput.hasWorktreeChanges = hasWorktreeChanges;
+    jsonOutput.hasUnmergedCommits = hasUnmerged;
 
     const spinner = !options.json
       ? yoctoSpinner({ text: 'Preparing merge...' }).start()
@@ -629,9 +630,9 @@ const mergeCommand = async (taskId: string, options: MergeOptions = {}) => {
 
       telemetry?.eventMergeTask();
 
-      const merge = git.mergeBranch(taskBranch, `merge: ${task.title}`);
+      const mergeResult = git.mergeBranch(taskBranch, `merge: ${task.title}`);
 
-      if (merge) {
+      if (mergeResult.success) {
         // Update status
         mergeSuccessful = true;
         jsonOutput.merged = true;
@@ -758,6 +759,10 @@ const mergeCommand = async (taskId: string, options: MergeOptions = {}) => {
         } else {
           // Other merge error, not conflicts
           if (spinner) spinner.error('Merge failed');
+          git.abortMerge();
+          jsonOutput.error = mergeResult.error || 'Merge failed';
+          await exitWithError(jsonOutput, { telemetry });
+          return;
         }
       }
 

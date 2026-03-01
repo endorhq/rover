@@ -35,9 +35,7 @@ const CLAUDE_CODE_ENV_VARS = [
 
   // Amazon Bedrock configuration
   'CLAUDE_CODE_USE_BEDROCK',
-  'AWS_BEARER_TOKEN_BEDROCK',
   'ANTHROPIC_SMALL_FAST_MODEL_AWS_REGION',
-  'CLAUDE_CODE_USE_BEDROCK',
   'CLAUDE_CODE_SKIP_BEDROCK_AUTH',
   'awsAuthRefresh',
   'awsCredentialExport',
@@ -218,18 +216,12 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
     diffContext: string,
     conflictedContent: string
   ): Promise<string | null> {
-    try {
-      const prompt = this.promptBuilder.resolveMergeConflictsPrompt(
-        filePath,
-        diffContext,
-        conflictedContent
-      );
-      const response = await this.invoke(prompt);
-
-      return response;
-    } catch (err) {
-      throw err;
-    }
+    const prompt = this.promptBuilder.resolveMergeConflictsPrompt(
+      filePath,
+      diffContext,
+      conflictedContent
+    );
+    return this.invoke(prompt);
   }
 
   async resolveMergeConflictsRegions(
@@ -238,19 +230,13 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
     conflictedContent: string,
     regionCount: number
   ): Promise<string | null> {
-    try {
-      const prompt = this.promptBuilder.resolveMergeConflictsRegionsPrompt(
-        filePath,
-        diffContext,
-        conflictedContent,
-        regionCount
-      );
-      const response = await this.invoke(prompt, false);
-
-      return response;
-    } catch (err) {
-      throw err;
-    }
+    const prompt = this.promptBuilder.resolveMergeConflictsRegionsPrompt(
+      filePath,
+      diffContext,
+      conflictedContent,
+      regionCount
+    );
+    return this.invoke(prompt);
   }
 
   async extractGithubInputs(

@@ -158,18 +158,12 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
     diffContext: string,
     conflictedContent: string
   ): Promise<string | null> {
-    try {
-      const prompt = this.promptBuilder.resolveMergeConflictsPrompt(
-        filePath,
-        diffContext,
-        conflictedContent
-      );
-      const response = await this.invoke(prompt);
-
-      return response;
-    } catch (err) {
-      throw err;
-    }
+    const prompt = this.promptBuilder.resolveMergeConflictsPrompt(
+      filePath,
+      diffContext,
+      conflictedContent
+    );
+    return this.invoke(prompt);
   }
 
   async resolveMergeConflictsRegions(
@@ -178,19 +172,13 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
     conflictedContent: string,
     regionCount: number
   ): Promise<string | null> {
-    try {
-      const prompt = this.promptBuilder.resolveMergeConflictsRegionsPrompt(
-        filePath,
-        diffContext,
-        conflictedContent,
-        regionCount
-      );
-      const response = await this.invoke(prompt, false);
-
-      return response;
-    } catch (err) {
-      throw err;
-    }
+    const prompt = this.promptBuilder.resolveMergeConflictsRegionsPrompt(
+      filePath,
+      diffContext,
+      conflictedContent,
+      regionCount
+    );
+    return this.invoke(prompt);
   }
 
   async extractGithubInputs(

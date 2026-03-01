@@ -121,11 +121,10 @@ export async function catFile(
         await launch(backend, [
           'run',
           '--entrypoint',
-          '/bin/sh',
+          '/bin/cat',
           '--rm',
           image,
-          '-c',
-          `/bin/cat ${file}`,
+          file,
         ])
       ).stdout
         ?.toString()
@@ -310,15 +309,32 @@ export function getWorktreeGitMounts(worktreePath: string): string[] {
 
     return [
       // Mount parent .git dir read-only (refs, config, hooks, etc.)
-      '-v', `${parentGitDir}:${parentGitDir}:Z,ro`,
+      '-v',
+      `${parentGitDir}:${parentGitDir}:Z,ro`,
       // Mount object store read-write (append-only, needed for creating commits)
-      '-v', `${join(parentGitDir, 'objects')}:${join(parentGitDir, 'objects')}:Z,rw`,
+      '-v',
+      `${join(parentGitDir, 'objects')}:${join(parentGitDir, 'objects')}:Z,rw`,
       // Mount worktree metadata subdir read-write (HEAD, index, etc.)
-      '-v', `${gitdirPath}:${gitdirPath}:Z,rw`,
+      '-v',
+      `${gitdirPath}:${gitdirPath}:Z,rw`,
     ];
   } catch {
     return [];
   }
+}
+
+/**
+ * Returns rover-agent CLI flags to pass a checkpoint file path.
+ * The checkpoint file lives inside the iteration directory (already
+ * mounted at /output), so we reference it via /output/checkpoint.json
+ * instead of adding a separate bind-mount. These args are appended
+ * after the image name in the container create command.
+ */
+export function getCheckpointArgs(checkpointPath?: string): string[] {
+  if (checkpointPath && existsSync(checkpointPath)) {
+    return ['--checkpoint', '/output/checkpoint.json'];
+  }
+  return [];
 }
 
 export function normalizeExtraArgs(

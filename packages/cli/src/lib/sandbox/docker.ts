@@ -12,6 +12,7 @@ import { existsSync, mkdirSync } from 'node:fs';
 import { userInfo } from 'node:os';
 import {
   ContainerBackend,
+  getCheckpointArgs,
   getWorktreeGitMounts,
   resolveAgentImage,
   warnIfCustomImage,
@@ -22,6 +23,7 @@ import {
   checkImageCache,
   waitForInitAndCommit,
 } from './container-image-cache.js';
+import { isContainerMissingInspectError } from './inspect-errors.js';
 import { mergeNetworkConfig } from '../network-config.js';
 import { isJsonMode } from '../context.js';
 import { isPathWithin } from '../../utils/path-utils.js';
@@ -261,6 +263,9 @@ export class DockerSandbox extends Sandbox {
       if (hasContext) {
         dockerArgs.push('--context-dir', '/context');
       }
+
+      // Mount checkpoint if resuming from a paused workflow
+      dockerArgs.push(...getCheckpointArgs(this.options?.checkpointPath));
 
       // Pass model if specified
       if (this.task.agentModel) {
@@ -556,17 +561,30 @@ export class DockerSandbox extends Sandbox {
     return process.env;
   }
 
-  async inspect(): Promise<{ status: string } | null> {
+  async inspect(): Promise<{ status: string; exitCode?: number } | null> {
     try {
       const result = await launch(
         'docker',
-        ['inspect', '--format', '{{.State.Status}}', this.sandboxName],
+        [
+          'inspect',
+          '--format',
+          '{{.State.Status}}|{{.State.ExitCode}}',
+          this.sandboxName,
+        ],
         { env: this.getDockerEnv() }
       );
-      const status = result.stdout?.toString().trim();
-      return status ? { status } : null;
-    } catch {
-      return null;
+      const output = result.stdout?.toString().trim();
+      if (!output) return null;
+      const [status, exitCodeStr] = output.split('|');
+      const exitCode = exitCodeStr ? parseInt(exitCodeStr, 10) : undefined;
+      return status
+        ? { status, exitCode: Number.isNaN(exitCode) ? undefined : exitCode }
+        : null;
+    } catch (error) {
+      if (isContainerMissingInspectError(error)) {
+        return null;
+      }
+      throw error;
     }
   }
 

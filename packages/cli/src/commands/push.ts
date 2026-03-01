@@ -442,7 +442,7 @@ const pushCommand = async (taskId: string, options: PushOptions) => {
       result.error = `The task with ID ${numericTaskId} was not found`;
       await exitWithError(result, { telemetry });
     } else {
-      result.error = `There was an error deleting the task: ${error}`;
+      result.error = `There was an error pushing the task: ${error}`;
       await exitWithError(result, { telemetry });
     }
   } finally {

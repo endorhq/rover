@@ -462,26 +462,15 @@ const rebaseCommand = async (taskId: string, options: RebaseOptions = {}) => {
     const currentBranch = git.getCurrentBranch();
     jsonOutput.currentBranch = currentBranch;
 
-    // Collapse all task commits into staged changes before evaluating state
-    const squashed = collapseTaskCommits(
-      git,
-      task.baseCommit,
-      task.worktreePath
-    );
-
-    // Check if worktree has changes to commit
-    const hasWorktreeChanges =
-      squashed ||
-      git.hasUncommittedChanges({
-        worktreePath: task.worktreePath,
-      });
-
-    jsonOutput.hasWorktreeChanges = hasWorktreeChanges;
+    // Check if worktree has uncommitted changes (before squashing)
+    const hasUncommittedChanges = git.hasUncommittedChanges({
+      worktreePath: task.worktreePath,
+    });
 
     if (!isJsonMode()) {
       console.log('');
       console.log(colors.cyan('The rebase process will'));
-      if (hasWorktreeChanges) {
+      if (hasUncommittedChanges) {
         console.log(colors.cyan('├── Commit changes in the task worktree'));
       }
       console.log(
@@ -519,6 +508,17 @@ const rebaseCommand = async (taskId: string, options: RebaseOptions = {}) => {
     if (!isJsonMode()) {
       console.log('');
     }
+
+    // Collapse task commits AFTER user confirmation (this is destructive)
+    const squashed = collapseTaskCommits(
+      git,
+      task.baseCommit,
+      task.worktreePath
+    );
+
+    const hasWorktreeChanges = squashed || hasUncommittedChanges;
+
+    jsonOutput.hasWorktreeChanges = hasWorktreeChanges;
 
     const spinner = !options.json
       ? yoctoSpinner({ text: 'Preparing rebase...' }).start()
