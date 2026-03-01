@@ -739,6 +739,10 @@ export const runCommand = async (
           output.success = false;
           output.error = err.message;
           output.paused = true;
+          logger?.info('workflow_pause', output.error, {
+            taskId: options.taskId,
+            metadata: { reason: 'retryable_error' },
+          });
         } else {
           throw err;
         }
