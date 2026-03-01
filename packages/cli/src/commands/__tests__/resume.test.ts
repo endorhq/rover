@@ -45,6 +45,7 @@ describe('resume command', () => {
     vi.clearAllMocks();
     mockGetTelemetry.mockReturnValue({
       eventResumeTask: vi.fn(),
+      eventResumeTaskFailed: vi.fn(),
       shutdown: vi.fn().mockResolvedValue(undefined),
     });
     mockResumeTask.mockResolvedValue(true);

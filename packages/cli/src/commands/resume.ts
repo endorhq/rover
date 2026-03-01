@@ -133,17 +133,18 @@ const resumeCommand = async (
       console.log('');
     }
 
-    // Track resume event
-    telemetry?.eventResumeTask();
-
     // Use the shared resume helper
     const success = await resumeTask(project, numericTaskId);
 
     if (!success) {
       jsonOutput.error = `Failed to resume task ${taskId}`;
+      telemetry?.eventResumeTaskFailed(jsonOutput.error);
       await exitWithError(jsonOutput, { telemetry });
       return;
     }
+
+    // Track resume event only after successful resume
+    telemetry?.eventResumeTask();
 
     // Reload task for updated status
     const updatedTask = project.getTask(numericTaskId);
