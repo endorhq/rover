@@ -173,7 +173,15 @@ const restartCommand = async (
         task.setWorkspace(worktreePath, branchName);
 
         if (spinner) spinner.success('Workspace setup complete');
-      } catch (error) {}
+      } catch (error) {
+        if (spinner) spinner.error('Workspace setup failed');
+        // task.restart() already moved status to IN_PROGRESS; roll it back so
+        // failed setup does not leave a non-running task in an active state.
+        task.resetToNew();
+        jsonOutput.error = `Failed to set up workspace: ${error instanceof Error ? error.message : String(error)}`;
+        await exitWithError(jsonOutput, { telemetry });
+        return;
+      }
     }
 
     // Ensure iterations directory exists
@@ -259,7 +267,7 @@ const restartCommand = async (
       restartedAt: restartedAt,
     };
 
-    await exitWithSuccess('Task restarted succesfully!', jsonOutput, {
+    await exitWithSuccess('Task restarted successfully!', jsonOutput, {
       tips: [
         'Use ' + colors.cyan('rover list') + ' to check the list of tasks',
         'Use ' +

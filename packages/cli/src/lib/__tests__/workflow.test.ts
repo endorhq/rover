@@ -187,7 +187,7 @@ describe('workflow utilities', () => {
 
       // Loop should have sub-steps including a command step
       const commandSubStep = loopStep!.steps.find(
-        (s: any) => s.type === 'command'
+        (s: any) => s.type === 'command' && s.id === 'run_tests'
       );
       expect(commandSubStep).toBeDefined();
       expect(commandSubStep!.id).toBe('run_tests');

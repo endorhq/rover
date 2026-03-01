@@ -8,9 +8,13 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { execSync } from 'node:child_process';
 import { restartCommand } from '../restart.js';
-import { TaskDescriptionManager, clearProjectRootCache } from 'rover-core';
+import {
+  TaskDescriptionManager,
+  clearProjectRootCache,
+  Git,
+  launchSync,
+} from 'rover-core';
 
 // Store testDir for context mock
 let testDir: string;
@@ -80,19 +84,19 @@ describe('restart command', async () => {
     process.chdir(testDir);
 
     // Initialize git repository
-    execSync('git init', { stdio: 'pipe' });
-    execSync('git config user.email "test@example.com"', { stdio: 'pipe' });
-    execSync('git config user.name "Test User"', { stdio: 'pipe' });
-    execSync('git config commit.gpgsign false');
+    launchSync('git', ['init']);
+    launchSync('git', ['config', 'user.email', 'test@example.com']);
+    launchSync('git', ['config', 'user.name', 'Test User']);
+    launchSync('git', ['config', 'commit.gpgsign', 'false']);
 
     // Create main branch and initial commit
     writeFileSync(join(testDir, 'README.md'), '# Test Project');
-    execSync('git add README.md', { stdio: 'pipe' });
-    execSync('git commit -m "Initial commit"', { stdio: 'pipe' });
+    launchSync('git', ['add', 'README.md']);
+    launchSync('git', ['commit', '-m', 'Initial commit']);
 
     // Switch to main branch (some Git versions default to 'master')
     try {
-      execSync('git checkout -b main', { stdio: 'pipe' });
+      launchSync('git', ['checkout', '-b', 'main']);
     } catch {
       // Branch might already exist or be called 'master'
     }
@@ -515,6 +519,46 @@ describe('restart command', async () => {
           telemetry: expect.anything(),
         })
       );
+    });
+
+    it('should reset task to NEW when workspace setup fails during restart', async () => {
+      const { exitWithError } = await import('../../utils/exit.js');
+      const mockExitWithError = vi.mocked(exitWithError);
+      const createWorktreeSpy = vi
+        .spyOn(Git.prototype, 'createWorktree')
+        .mockImplementation(() => {
+          throw new Error('worktree setup failed');
+        });
+
+      try {
+        const taskId = 901;
+        const taskDir = join(testDir, '.rover', 'tasks', taskId.toString());
+
+        const task = TaskDescriptionManager.create(taskDir, {
+          id: taskId,
+          title: 'Test Task',
+          description: 'A test task',
+          inputs: new Map(),
+          workflowName: 'swe',
+        });
+        task.markFailed('This task failed');
+
+        await restartCommand(taskId.toString(), { json: true });
+
+        const reloadedTask = TaskDescriptionManager.load(taskDir, taskId);
+        expect(reloadedTask.status).toBe('NEW');
+        expect(reloadedTask.restartCount).toBe(1);
+        expect(mockExitWithError).toHaveBeenCalledWith(
+          expect.objectContaining({
+            error: expect.stringContaining('Failed to set up workspace'),
+          }),
+          expect.objectContaining({
+            telemetry: expect.anything(),
+          })
+        );
+      } finally {
+        createWorktreeSpy.mockRestore();
+      }
     });
   });
 });

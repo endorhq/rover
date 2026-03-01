@@ -5,24 +5,12 @@ import {
   WorkflowSource,
   getConfigDir,
 } from 'rover-core';
+import { join } from 'path';
+import { existsSync, readdirSync, statSync } from 'fs';
+import { fileURLToPath } from 'url';
 import sweWorkflow from './workflows/swe.yml';
 import sweTddWorkflow from './workflows/swe-tdd.yml';
 import techWriterWorkflow from './workflows/tech-writer.yml';
-import { dirname, isAbsolute, join } from 'path';
-import { fileURLToPath } from 'url';
-import { existsSync, readdirSync, statSync } from 'fs';
-
-/**
- * Load a workflow from a built-in path.
- *
- * @param path the file path pointing to the workflow YAML file
- * @returns WorkflowManager instance
- */
-const loadBuiltInWorkflow = (path: string): WorkflowManager => {
-  const distDir = dirname(fileURLToPath(import.meta.url));
-  const workflowPath = isAbsolute(path) ? path : join(distDir, path);
-  return WorkflowManager.load(workflowPath);
-};
 
 /**
  * Scan a directory for workflow YAML files
@@ -59,6 +47,13 @@ const scanWorkflowDirectory = (dir: string): string[] => {
 };
 
 /**
+ * Resolve bundled workflow assets against this module location.
+ * tsdown may emit relative asset paths (e.g. ./swe-*.yml) at runtime.
+ */
+const resolveBuiltInWorkflowPath = (assetPath: string): string =>
+  fileURLToPath(new URL(assetPath, import.meta.url));
+
+/**
  * Load all the available workflows from multiple sources:
  * - Built-in workflows (swe, tech-writer)
  * - Global workflows (~/.rover/config/workflows/)
@@ -71,13 +66,17 @@ export const initWorkflowStore = (projectPath?: string): WorkflowStore => {
   const store = new WorkflowStore(projectPath);
 
   // Load built-in workflows
-  const swe = loadBuiltInWorkflow(sweWorkflow);
+  const swe = WorkflowManager.load(resolveBuiltInWorkflowPath(sweWorkflow));
   store.addWorkflow(swe, WorkflowSource.BuiltIn);
 
-  const sweTdd = loadBuiltInWorkflow(sweTddWorkflow);
+  const sweTdd = WorkflowManager.load(
+    resolveBuiltInWorkflowPath(sweTddWorkflow)
+  );
   store.addWorkflow(sweTdd, WorkflowSource.BuiltIn);
 
-  const techWriter = loadBuiltInWorkflow(techWriterWorkflow);
+  const techWriter = WorkflowManager.load(
+    resolveBuiltInWorkflowPath(techWriterWorkflow)
+  );
   store.addWorkflow(techWriter, WorkflowSource.BuiltIn);
 
   // Load global workflows from ~/.rover/config/workflows/
