@@ -296,6 +296,18 @@ export interface AddWorkflowOutput extends CLIJsonOutput {
 }
 
 // ---------------------------------------------------------------------------
+// resume command
+// ---------------------------------------------------------------------------
+
+export interface TaskResumeOutput extends CLIJsonOutput {
+  taskId?: number;
+  title?: string;
+  description?: string;
+  status?: string;
+  resumedAt?: string;
+}
+
+// ---------------------------------------------------------------------------
 // workflows inspect command
 // ---------------------------------------------------------------------------
 
