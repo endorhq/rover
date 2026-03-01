@@ -29,6 +29,7 @@ import {
   executeStep,
   shouldSkipStep,
   isTransientError,
+  PauseWorkflowError,
 } from '../step-executor.js';
 import type { WorkflowManager } from 'rover-core';
 import type { ACPRunner } from '../acp-runner.js';
@@ -866,6 +867,137 @@ describe('executeStep', () => {
       })
     ).rejects.toThrow('Unsupported step type');
   });
+
+  it('loop with maxIterations=0 never executes body', async () => {
+    const { launch } = await import('rover-core');
+    const { Runner } = await import('../runner.js');
+
+    const loopStep: WorkflowLoopStep = {
+      id: 'zero_loop',
+      name: 'Zero Iterations',
+      type: 'loop',
+      until: 'steps.run_cmd.outputs.exit_code == 0',
+      maxIterations: 0,
+      steps: [
+        {
+          id: 'run_cmd',
+          name: 'Run',
+          type: 'command',
+          command: 'echo hello',
+        } as WorkflowCommandStep,
+        {
+          id: 'agent_step',
+          name: 'Agent',
+          type: 'agent',
+          prompt: 'Do something',
+          outputs: [],
+        } as WorkflowAgentStep,
+      ],
+    };
+
+    const stepsOutput = new Map<string, Map<string, string>>();
+
+    const result = await executeStep(loopStep, {
+      workflow: createMockWorkflowManager(),
+      inputs: new Map(),
+      stepsOutput,
+      totalSteps: 1,
+      currentStepIndex: 0,
+    });
+
+    expect(result.id).toBe('zero_loop');
+    // Loop body never ran, condition was never checked, so success is false
+    expect(result.success).toBe(false);
+    expect(result.outputs.get('iterations')).toBe('0');
+    expect(result.outputs.get('condition_met')).toBe('false');
+    // No sub-steps should have been executed
+    expect(launch).not.toHaveBeenCalled();
+    expect(Runner).not.toHaveBeenCalled();
+    // No sub-step outputs should exist
+    expect(stepsOutput.has('run_cmd')).toBe(false);
+    expect(stepsOutput.has('agent_step')).toBe(false);
+  });
+
+  it('PauseWorkflowError propagates from loop sub-step without being caught', async () => {
+    const { launch } = await import('rover-core');
+    const { Runner } = await import('../runner.js');
+
+    // First sub-step (command) succeeds
+    vi.mocked(launch).mockResolvedValue({
+      exitCode: 0,
+      stdout: 'PASS',
+      stderr: '',
+    } as any);
+
+    // Second sub-step (agent) returns a retryable failure, which triggers PauseWorkflowError
+    vi.mocked(Runner).mockImplementation(
+      () =>
+        ({
+          run: vi.fn().mockResolvedValue({
+            id: 'failing_agent',
+            success: false,
+            duration: 1.0,
+            error: 'credit limit exceeded',
+            outputs: new Map([['error_retryable', 'true']]),
+          }),
+          tool: 'claude',
+        }) as any
+    );
+
+    const loopStep: WorkflowLoopStep = {
+      id: 'pause_loop',
+      name: 'Pause Loop',
+      type: 'loop',
+      until: 'steps.run_cmd.outputs.exit_code == 0',
+      maxIterations: 3,
+      steps: [
+        {
+          id: 'run_cmd',
+          name: 'Run Command',
+          type: 'command',
+          command: 'npm test',
+        } as WorkflowCommandStep,
+        {
+          id: 'failing_agent',
+          name: 'Failing Agent',
+          type: 'agent',
+          prompt: 'Fix something',
+          outputs: [],
+        } as WorkflowAgentStep,
+      ],
+    };
+
+    const stepsOutput = new Map<string, Map<string, string>>();
+
+    // The PauseWorkflowError should propagate up through the loop
+    await expect(
+      executeStep(loopStep, {
+        workflow: createMockWorkflowManager(),
+        inputs: new Map(),
+        stepsOutput,
+        totalSteps: 1,
+        currentStepIndex: 0,
+      })
+    ).rejects.toThrow(PauseWorkflowError);
+
+    // Verify the error is indeed a PauseWorkflowError instance
+    try {
+      await executeStep(loopStep, {
+        workflow: createMockWorkflowManager(),
+        inputs: new Map(),
+        stepsOutput: new Map(),
+        totalSteps: 1,
+        currentStepIndex: 0,
+      });
+    } catch (err) {
+      expect(err).toBeInstanceOf(PauseWorkflowError);
+      expect((err as PauseWorkflowError).message).toContain('retryable error');
+    }
+
+    // The command sub-step that completed before the error should have its outputs stored
+    expect(stepsOutput.get('run_cmd')?.get('exit_code')).toBe('0');
+    expect(stepsOutput.get('run_cmd')?.get('stdout')).toBe('PASS');
+  });
 });
 
 describe('shouldSkipStep', () => {
@@ -972,5 +1104,13 @@ describe('isTransientError', () => {
     expect(isTransientError('Network_Error')).toBe(true);
     expect(isTransientError('CONNECTION_REFUSED')).toBe(true);
     expect(isTransientError('Too Many Requests')).toBe(true);
+  });
+
+  it('does NOT match generic "timeout" (prevents infinite retry loops)', () => {
+    expect(isTransientError('timeout')).toBe(false);
+    expect(isTransientError('Request timeout')).toBe(false);
+    expect(isTransientError('Timeout waiting for response')).toBe(false);
+    expect(isTransientError('Step execution timeout after 300s')).toBe(false);
+    expect(isTransientError('Task timed out')).toBe(false);
   });
 });
