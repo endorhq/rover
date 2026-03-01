@@ -134,6 +134,8 @@ const buildTaskRow = (
   let endTime: string | undefined;
   if (taskStatus === 'FAILED') {
     endTime = task.failedAt;
+  } else if (taskStatus === 'PAUSED') {
+    endTime = task.pausedAt;
   } else if (['COMPLETED', 'MERGED', 'PUSHED'].includes(taskStatus)) {
     endTime = task.completedAt;
   }

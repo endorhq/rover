@@ -261,6 +261,55 @@ describe('list command', () => {
       expect(retryScheduler.getScheduledTime).not.toHaveBeenCalled();
     });
 
+    it('keeps paused task duration fixed at pausedAt time', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-01-01T12:00:00.000Z'));
+      try {
+        const task = {
+          id: 1,
+          title: 'Paused Task',
+          agent: 'claude',
+          status: 'PAUSED',
+          startedAt: '2026-01-01T09:00:00.000Z',
+          pausedAt: '2026-01-01T10:00:00.000Z',
+          error: undefined,
+          workflowName: 'swe',
+          updateStatusFromIteration: vi.fn(),
+          getIterations: vi.fn().mockReturnValue([]),
+          getLastIteration: vi.fn().mockReturnValue({
+            status: () => ({
+              provider: 'claude',
+              currentStep: 'PAUSED',
+              progress: 10,
+            }),
+          }),
+        } as any;
+
+        mockResolveProjectContext.mockResolvedValue({
+          id: 'test-project-id',
+          path: testDir,
+          repositoryName: 'test-repo',
+          languages: [],
+          packageManagers: [],
+          taskManagers: [],
+          listTasks: () => [task],
+        });
+
+        capturedOutput = [];
+        await listCommand();
+        const firstOutput = capturedOutput.join('\n');
+        expect(firstOutput).toContain('1h 0m');
+
+        vi.setSystemTime(new Date('2026-01-01T16:00:00.000Z'));
+        capturedOutput = [];
+        await listCommand();
+        const secondOutput = capturedOutput.join('\n');
+        expect(secondOutput).toContain('1h 0m');
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it('does not trigger onComplete hooks for paused tasks', async () => {
       mockJsonMode = true;
       vi.spyOn(ProjectConfigManager, 'load').mockReturnValue({
