@@ -329,6 +329,10 @@ export function getWorktreeGitMounts(worktreePath: string): string[] {
  * mounted at /output), so we reference it via /output/checkpoint.json
  * instead of adding a separate bind-mount. These args are appended
  * after the image name in the container create command.
+ *
+ * The container path is always `/output/checkpoint.json` regardless of the
+ * host filename because the iteration directory is bind-mounted at `/output`
+ * and the agent always writes checkpoints as `checkpoint.json` within it.
  */
 export function getCheckpointArgs(checkpointPath?: string): string[] {
   if (checkpointPath && existsSync(checkpointPath)) {

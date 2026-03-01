@@ -485,7 +485,7 @@ export const runCommand = async (
         if (!saved) {
           console.warn(
             colors.yellow(
-              '⚠ WARNING: Checkpoint could not be saved (no --output directory). Resume may replay completed steps.'
+              '⚠ WARNING: Checkpoint could not be saved (no --output directory). Exiting as failed.'
             )
           );
         }
@@ -512,7 +512,9 @@ export const runCommand = async (
         // If future cleanup is added to the finally block, ensure it is also
         // called here or converted to a process 'exit' event handler.
         acpRunner?.close();
-        process.exit(EXIT_PAUSED);
+        // Exit as PAUSED only if checkpoint was saved, otherwise exit as
+        // FAILED so the CLI layer doesn't schedule a resume with no checkpoint.
+        process.exit(saved ? EXIT_PAUSED : EXIT_FAILED);
       };
       sigtermHandler = () => gracefulShutdown('SIGTERM');
       sigintHandler = () => gracefulShutdown('SIGINT');
@@ -573,15 +575,12 @@ export const runCommand = async (
         await acpRunner.initializeConnection();
       }
 
-      let activeStepsOutput: Map<string, Map<string, string>> | undefined;
-
       const runner: WorkflowRunner = {
         runAgentStep: async (
           step: WorkflowAgentStep,
           stepIndex: number,
           stepsOutput: Map<string, Map<string, string>>
         ): Promise<StepResult> => {
-          activeStepsOutput = stepsOutput;
           const cached = getCachedStepResult(
             checkpointStore,
             step,
@@ -616,7 +615,6 @@ export const runCommand = async (
           stepIndex: number,
           stepsOutput: Map<string, Map<string, string>>
         ): Promise<StepResult> => {
-          activeStepsOutput = stepsOutput;
           // Checkpoint resume: skip completed steps
           const cached = getCachedStepResult(
             checkpointStore,
@@ -651,11 +649,11 @@ export const runCommand = async (
             Object.fromEntries(result.outputs.entries())
           );
 
-          if (isLoopStep(step) && activeStepsOutput) {
+          if (isLoopStep(step)) {
             for (const subStepId of step.steps.flatMap(
               (subStep: WorkflowStep) => collectNestedStepIds(subStep)
             )) {
-              const subStepOutputs = activeStepsOutput.get(subStepId);
+              const subStepOutputs = context.stepsOutput.get(subStepId);
               if (!subStepOutputs) continue;
               upsertCompletedStep(
                 completedSteps,

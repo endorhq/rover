@@ -340,13 +340,15 @@ export class TaskDescriptionManager {
         if (!this.data.startedAt) {
           this.data.startedAt = timestamp;
         }
-        // Clear stale error from a previous PAUSED or FAILED state on resume
+        // Clear stale error and pausedAt from a previous PAUSED or FAILED state on resume
         this.data.error = undefined;
+        this.data.pausedAt = undefined;
         break;
       case 'ITERATING':
         this.data.lastIterationAt = timestamp;
-        // Clear stale error from a previous PAUSED or FAILED state on resume
+        // Clear stale error and pausedAt from a previous PAUSED or FAILED state on resume
         this.data.error = undefined;
+        this.data.pausedAt = undefined;
         break;
       case 'COMPLETED':
         this.data.completedAt = timestamp;

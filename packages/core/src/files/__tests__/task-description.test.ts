@@ -414,6 +414,97 @@ describe('TaskDescriptionManager', () => {
     });
   });
 
+  describe('pause/resume lifecycle', () => {
+    it('should set PAUSED status with error and pausedAt', () => {
+      const taskPath = getTaskPath(14);
+      const task = TaskDescriptionManager.create(taskPath, {
+        id: 14,
+        title: 'Pause Test',
+        description: 'Test description',
+        inputs: new Map(),
+        workflowName: 'swe',
+      });
+
+      task.markInProgress();
+      task.markPaused('Credit limit exceeded');
+
+      expect(task.status).toBe('PAUSED');
+      expect(task.isPaused()).toBe(true);
+      expect(task.error).toBe('Credit limit exceeded');
+      expect(task.pausedAt).toBeDefined();
+
+      // Verify persistence
+      const reloaded = TaskDescriptionManager.load(taskPath, 14);
+      expect(reloaded.status).toBe('PAUSED');
+      expect(reloaded.isPaused()).toBe(true);
+      expect(reloaded.error).toBe('Credit limit exceeded');
+      expect(reloaded.pausedAt).toBeDefined();
+    });
+
+    it('should clear error and pausedAt when resuming to IN_PROGRESS', () => {
+      const taskPath = getTaskPath(15);
+      const task = TaskDescriptionManager.create(taskPath, {
+        id: 15,
+        title: 'Resume Test',
+        description: 'Test description',
+        inputs: new Map(),
+        workflowName: 'swe',
+      });
+
+      task.markInProgress();
+      task.markPaused('Rate limit');
+      expect(task.pausedAt).toBeDefined();
+      expect(task.error).toBe('Rate limit');
+
+      task.markInProgress();
+      expect(task.status).toBe('IN_PROGRESS');
+      expect(task.isPaused()).toBe(false);
+      expect(task.error).toBeUndefined();
+      expect(task.pausedAt).toBeUndefined();
+
+      // Verify persistence
+      const reloaded = TaskDescriptionManager.load(taskPath, 15);
+      expect(reloaded.error).toBeUndefined();
+      expect(reloaded.pausedAt).toBeUndefined();
+    });
+
+    it('should clear error and pausedAt when transitioning to ITERATING', () => {
+      const taskPath = getTaskPath(16);
+      const task = TaskDescriptionManager.create(taskPath, {
+        id: 16,
+        title: 'Iterate After Pause',
+        description: 'Test description',
+        inputs: new Map(),
+        workflowName: 'swe',
+      });
+
+      task.markInProgress();
+      task.markPaused('Credit exhausted');
+      task.markIterating();
+
+      expect(task.status).toBe('ITERATING');
+      expect(task.error).toBeUndefined();
+      expect(task.pausedAt).toBeUndefined();
+    });
+
+    it('should report isActive() as false for PAUSED', () => {
+      const taskPath = getTaskPath(17);
+      const task = TaskDescriptionManager.create(taskPath, {
+        id: 17,
+        title: 'Active Check',
+        description: 'Test description',
+        inputs: new Map(),
+        workflowName: 'swe',
+      });
+
+      task.markInProgress();
+      expect(task.isActive()).toBe(true);
+
+      task.markPaused('Paused');
+      expect(task.isActive()).toBe(false);
+    });
+  });
+
   describe('utility methods', () => {
     it('should provide correct utility methods for new statuses', () => {
       const taskPath = getTaskPath(9);

@@ -220,9 +220,6 @@ export class RetryScheduler {
       const success = await resumeTask(project, taskId);
       if (success) {
         console.log(colors.green(`  ✓ Task ${taskId} resumed successfully`));
-        // Only clear the timer, keep retryCounts so a rapid re-pause
-        // doesn't reset the retry budget and allow unlimited retries.
-        this.clearTimer(taskKey);
       } else if (attempt >= MAX_AUTO_RETRIES) {
         console.log(
           colors.red(

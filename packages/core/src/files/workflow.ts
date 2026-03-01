@@ -68,6 +68,7 @@ export type OnStepComplete = (
     totalSteps: number;
     runSteps: number;
     totalDuration: number;
+    stepsOutput: Map<string, Map<string, string>>;
   }
 ) => void;
 
@@ -609,6 +610,7 @@ export class WorkflowManager {
         totalSteps,
         runSteps,
         totalDuration,
+        stepsOutput,
       });
 
       // Always store step outputs so subsequent steps and loop

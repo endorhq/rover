@@ -179,8 +179,6 @@ const resumeCommand = async (
       ],
       telemetry,
     });
-
-    return;
   } catch (error) {
     if (error instanceof TaskNotFoundError) {
       jsonOutput.error = `The task with ID ${numericTaskId} was not found`;

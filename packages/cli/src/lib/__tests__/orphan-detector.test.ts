@@ -37,6 +37,7 @@ function mockTask(
     iterationsPath: () => `/projects/test/.rover/tasks/${id}`,
     markFailed: vi.fn(),
     markCompleted: vi.fn(),
+    markPaused: vi.fn(),
     lastRestartAt: undefined,
     runningAt: undefined,
   };
@@ -297,6 +298,43 @@ describe('detectOrphanedTasks', () => {
     expect(task.markFailed).toHaveBeenCalledWith(
       'Container exited unexpectedly (possible crash or system restart)'
     );
+  });
+
+  it('marks task as PAUSED when container exited with PAUSED exit code and status file not written', async () => {
+    const task = mockTask(24, 'IN_PROGRESS', 'container-24', {
+      updateStatusFromIteration: vi.fn(),
+    });
+    const sandbox = {
+      inspect: vi.fn().mockResolvedValue({ status: 'exited', exitCode: 2 }),
+    };
+    mockedCreateSandbox.mockResolvedValue(sandbox as any);
+
+    await detectOrphanedTasks([{ task, project: mockProject() }]);
+
+    expect(task.updateStatusFromIteration).toHaveBeenCalledTimes(1);
+    expect(task.markPaused).toHaveBeenCalledWith(
+      'Workflow paused due to retryable error (e.g. credit limit)'
+    );
+    expect(task.markFailed).not.toHaveBeenCalled();
+    expect(task.markCompleted).not.toHaveBeenCalled();
+  });
+
+  it('does not call markPaused when updateStatusFromIteration already set PAUSED', async () => {
+    const task = mockTask(25, 'IN_PROGRESS', 'container-25', {
+      updateStatusFromIteration: vi.fn(() => {
+        task.status = 'PAUSED';
+      }),
+    });
+    const sandbox = {
+      inspect: vi.fn().mockResolvedValue({ status: 'exited', exitCode: 2 }),
+    };
+    mockedCreateSandbox.mockResolvedValue(sandbox as any);
+
+    await detectOrphanedTasks([{ task, project: mockProject() }]);
+
+    expect(task.updateStatusFromIteration).toHaveBeenCalledTimes(1);
+    expect(task.markPaused).not.toHaveBeenCalled();
+    expect(task.markFailed).not.toHaveBeenCalled();
   });
 
   it('skips orphan detection while resume lock is active for known container', async () => {

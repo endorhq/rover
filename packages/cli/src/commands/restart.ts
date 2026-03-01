@@ -120,6 +120,16 @@ const restartCommand = async (
       }
     }
 
+    const previousStatus = task.status;
+    const previousError = task.error;
+    const restorePreRestartStatus = () => {
+      if (previousStatus === 'FAILED' && previousError) {
+        task.setStatus(previousStatus, { error: previousError });
+        return;
+      }
+      task.setStatus(previousStatus);
+    };
+
     // Restart the task (resets to NEW status and tracks restart attempt)
     const restartedAt = new Date().toISOString();
     task.restart(restartedAt);
@@ -175,9 +185,9 @@ const restartCommand = async (
         if (spinner) spinner.success('Workspace setup complete');
       } catch (error) {
         if (spinner) spinner.error('Workspace setup failed');
-        // task.restart() already moved status to IN_PROGRESS; roll it back so
-        // failed setup does not leave a non-running task in an active state.
-        task.resetToNew();
+        // task.restart() already moved status to IN_PROGRESS; roll it back to
+        // the pre-restart status so failed setup does not regress task state.
+        restorePreRestartStatus();
         jsonOutput.error = `Failed to set up workspace: ${error instanceof Error ? error.message : String(error)}`;
         await exitWithError(jsonOutput, { telemetry });
         return;
@@ -251,8 +261,8 @@ const restartCommand = async (
           : undefined
       );
     } catch (error) {
-      // If sandbox execution fails, reset task back to NEW status
-      task.resetToNew();
+      // If sandbox execution fails, restore the pre-restart task status.
+      restorePreRestartStatus();
       throw error;
     }
 

@@ -1755,6 +1755,7 @@ steps:
           totalSteps: number;
           runSteps: number;
           totalDuration: number;
+          stepsOutput: Map<string, Map<string, string>>;
         };
       }> = [];
 

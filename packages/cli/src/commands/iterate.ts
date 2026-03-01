@@ -168,10 +168,17 @@ const iterateCommand = async (
     return;
   }
 
-  // Ensure the task is not currently running
+  // Ensure the task is not currently running or paused
   if (task.isInProgress() || task.isIterating()) {
     result.error =
       'Cannot iterate over a running task. Please wait it to finish first.';
+    await exitWithError(result, { telemetry });
+    return;
+  }
+
+  if (task.isPaused()) {
+    result.error =
+      'Cannot iterate over a paused task. Use "rover resume" to resume it first.';
     await exitWithError(result, { telemetry });
     return;
   }

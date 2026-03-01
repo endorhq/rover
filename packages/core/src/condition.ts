@@ -29,8 +29,10 @@ export function evaluateCondition(
   condition: string,
   stepsOutput: Map<string, Map<string, string>>
 ): boolean {
-  // Detect unsupported && (AND) operator and warn explicitly
-  if (/&&/.test(condition)) {
+  // Detect unsupported && (AND) operator between condition clauses and warn.
+  // Only match && that appears between two `steps.` references or between
+  // comparison expressions, not inside comparison values.
+  if (/\s+&&\s+/.test(condition)) {
     console.warn(
       `Warning: "&&" (AND) operator is not supported in conditions. Use separate steps with "if" conditions instead. Condition: "${condition}"`
     );

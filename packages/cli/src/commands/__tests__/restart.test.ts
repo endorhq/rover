@@ -521,7 +521,7 @@ describe('restart command', async () => {
       );
     });
 
-    it('should reset task to NEW when workspace setup fails during restart', async () => {
+    it('should restore FAILED status when workspace setup fails during restart', async () => {
       const { exitWithError } = await import('../../utils/exit.js');
       const mockExitWithError = vi.mocked(exitWithError);
       const createWorktreeSpy = vi
@@ -546,7 +546,8 @@ describe('restart command', async () => {
         await restartCommand(taskId.toString(), { json: true });
 
         const reloadedTask = TaskDescriptionManager.load(taskDir, taskId);
-        expect(reloadedTask.status).toBe('NEW');
+        expect(reloadedTask.status).toBe('FAILED');
+        expect(reloadedTask.error).toBe('This task failed');
         expect(reloadedTask.restartCount).toBe(1);
         expect(mockExitWithError).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -559,6 +560,47 @@ describe('restart command', async () => {
       } finally {
         createWorktreeSpy.mockRestore();
       }
+    });
+
+    it('should preserve FAILED error when sandbox startup fails during restart', async () => {
+      const { exitWithError } = await import('../../utils/exit.js');
+      const mockExitWithError = vi.mocked(exitWithError);
+      const { createSandbox } = await import('../../lib/sandbox/index.js');
+      const mockCreateSandbox = vi.mocked(createSandbox);
+
+      mockCreateSandbox.mockResolvedValue({
+        createAndStart: vi
+          .fn()
+          .mockRejectedValue(new Error('container startup failed')),
+      } as any);
+
+      const taskId = 902;
+      const taskDir = join(testDir, '.rover', 'tasks', taskId.toString());
+
+      const task = TaskDescriptionManager.create(taskDir, {
+        id: taskId,
+        title: 'Test Task',
+        description: 'A test task',
+        inputs: new Map(),
+        workflowName: 'swe',
+      });
+      task.markFailed('Previous failure details');
+
+      await restartCommand(taskId.toString(), { json: true });
+
+      const reloadedTask = TaskDescriptionManager.load(taskDir, taskId);
+      expect(reloadedTask.status).toBe('FAILED');
+      expect(reloadedTask.error).toBe('Previous failure details');
+      expect(mockExitWithError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          error: expect.stringContaining(
+            'There was an error restarting the task'
+          ),
+        }),
+        expect.objectContaining({
+          telemetry: expect.anything(),
+        })
+      );
     });
   });
 });
