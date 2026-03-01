@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { NetworkConfigSchema } from '../project-config/schema.js';
 
 // Schema version for migrations
-export const CURRENT_TASK_DESCRIPTION_SCHEMA_VERSION = '1.5';
+export const CURRENT_TASK_DESCRIPTION_SCHEMA_VERSION = '1.6';
 
 // Task status schema
 export const TaskStatusSchema = z.enum([
@@ -17,6 +17,7 @@ export const TaskStatusSchema = z.enum([
   'FAILED',
   'MERGED',
   'PUSHED',
+  'PAUSED',
 ]);
 
 /**
@@ -55,6 +56,7 @@ export const TaskDescriptionSchema = z.object({
   startedAt: z.string().datetime().optional(),
   completedAt: z.string().datetime().optional(),
   failedAt: z.string().datetime().optional(),
+  pausedAt: z.string().datetime().optional(),
   lastIterationAt: z.string().datetime().optional(),
   lastStatusCheck: z.string().datetime().optional(),
 

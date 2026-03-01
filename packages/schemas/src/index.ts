@@ -1,5 +1,5 @@
 // Declare all schemas, types, and errors
-export { AI_AGENT } from './agent.js';
+export { AI_AGENT, AGENT_EXIT_CODE } from './agent.js';
 
 // Workflow library
 export {

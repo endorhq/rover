@@ -24,6 +24,7 @@ import {
   ZodError,
 } from 'rover-schemas';
 import { launchSync } from '../os.js';
+import { evaluateCondition } from '../condition.js';
 import colors from 'ansi-colors';
 
 // Default step timeout in seconds
@@ -524,7 +525,10 @@ export class WorkflowManager {
     }
 
     const duration = (Date.now() - startTime) / 1000;
+    const exitCode = result.exitCode ?? (result.failed ? 1 : 0);
     const outputs = new Map<string, string>();
+    outputs.set('exit_code', String(exitCode));
+    outputs.set('success', String(success));
     if (stdout) {
       outputs.set('stdout', stdout);
     }
@@ -566,10 +570,7 @@ export class WorkflowManager {
 
       // Check `if` condition before running step
       if (step.if) {
-        const conditionResult = this.evaluateSimpleCondition(
-          step.if,
-          stepsOutput
-        );
+        const conditionResult = evaluateCondition(step.if, stepsOutput);
         if (!conditionResult) {
           console.log(
             colors.gray(`  ⏭ Skipping step "${step.name}" (condition not met)`)
@@ -644,60 +645,6 @@ export class WorkflowManager {
       runSteps,
       totalSteps,
     };
-  }
-
-  /**
-   * Evaluate a condition string for step `if` fields.
-   * Supports OR (`||`) to join multiple clauses.
-   * Each clause: steps.<id>.outputs.<name> == <value>
-   *              steps.<id>.outputs.<name> != <value>
-   */
-  private evaluateSimpleCondition(
-    condition: string,
-    stepsOutput: Map<string, Map<string, string>>
-  ): boolean {
-    const parts = condition.split(/\s*\|\|\s*/);
-    return parts.some(part =>
-      this.evaluateSingleCondition(part.trim(), stepsOutput)
-    );
-  }
-
-  /**
-   * Evaluate a single condition clause (no OR).
-   */
-  private evaluateSingleCondition(
-    condition: string,
-    stepsOutput: Map<string, Map<string, string>>
-  ): boolean {
-    const trimmed = condition.trim();
-    const match = trimmed.match(
-      /^steps\.([\w-]+)\.outputs\.([\w-]+)\s*(==|!=)\s*(.+)$/
-    );
-    if (!match) return false;
-
-    const [, stepId, outputName, operator, rawValue] = match;
-    const expectedValue = rawValue.trim();
-    const stepOutputs = stepsOutput.get(stepId);
-    const actualValue = stepOutputs?.get(outputName);
-
-    if (actualValue === undefined) {
-      return operator === '!=';
-    }
-
-    // Normalize booleans for comparison
-    const normalize = (v: string) => {
-      const l = v.toLowerCase();
-      if (l === 'true' || l === 'yes') return 'true';
-      if (l === 'false' || l === 'no') return 'false';
-      return v;
-    };
-
-    const normActual = normalize(actualValue);
-    const normExpected = normalize(expectedValue);
-
-    return operator === '=='
-      ? normActual === normExpected
-      : normActual !== normExpected;
   }
 
   /**

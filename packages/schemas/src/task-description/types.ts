@@ -3,7 +3,11 @@
  * Defines the structure for task metadata and configuration.
  */
 import type { z } from 'zod';
-import type { TaskStatusSchema, TaskDescriptionSchema } from './schema.js';
+import type {
+  TaskStatusSchema,
+  TaskDescriptionSchema,
+  SourceTypeSchema,
+} from './schema.js';
 import type { NetworkConfig } from '../project-config/types.js';
 
 // Infer TaskStatus type from Zod schema
@@ -16,7 +20,7 @@ export type TaskDescription = z.infer<typeof TaskDescriptionSchema>;
  * Source types for task origin tracking.
  * @deprecated Use iteration context instead. Will be removed in a future version.
  */
-export type SourceType = 'github' | 'gitlab' | 'manual';
+export type SourceType = z.infer<typeof SourceTypeSchema>;
 
 /**
  * Task source - tracks where a task originated from.

@@ -113,10 +113,12 @@ export class IterationStatusManager {
     this.data.currentStep = currentStep;
     this.data.progress = progress;
     this.data.updatedAt = new Date().toISOString();
+    // Clear stale provider from a previous pause
+    this.data.provider = undefined;
 
-    if (error) {
-      this.data.error = error;
-    }
+    // Clear or update error — ensures stale errors from a previous pause
+    // don't persist after a successful resume.  Treat empty string as "no error".
+    this.data.error = error || undefined;
 
     this.save();
   }
@@ -131,6 +133,9 @@ export class IterationStatusManager {
     this.data.progress = 100;
     this.data.updatedAt = now;
     this.data.completedAt = now;
+    // Clear stale error and provider from a previous pause
+    this.data.error = undefined;
+    this.data.provider = undefined;
     this.save();
   }
 
@@ -145,6 +150,23 @@ export class IterationStatusManager {
     this.data.error = error;
     this.data.updatedAt = now;
     this.data.completedAt = now;
+    // Clear stale provider from a previous pause
+    this.data.provider = undefined;
+    this.save();
+  }
+
+  /**
+   * Mark status as paused (e.g., due to credit limit exhaustion)
+   * Unlike fail(), this does NOT set completedAt since the workflow is not terminal.
+   */
+  pause(currentStep: string, error: string, provider?: string): void {
+    this.data.status = 'paused';
+    this.data.currentStep = currentStep;
+    this.data.error = error;
+    // Explicitly set provider — clears stale value from a previous pause
+    // when no provider is given for this pause.
+    this.data.provider = provider || undefined;
+    this.data.updatedAt = new Date().toISOString();
     this.save();
   }
 
@@ -194,6 +216,10 @@ export class IterationStatusManager {
 
   get error(): string | undefined {
     return this.data.error;
+  }
+
+  get provider(): string | undefined {
+    return this.data.provider;
   }
 
   /**

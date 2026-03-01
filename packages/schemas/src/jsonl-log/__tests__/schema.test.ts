@@ -26,6 +26,7 @@ describe('LogEventSchema', () => {
       'workflow_start',
       'workflow_complete',
       'workflow_fail',
+      'workflow_pause',
       'step_start',
       'step_complete',
       'step_fail',

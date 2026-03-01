@@ -407,16 +407,20 @@ export class Git {
     branch: string,
     message: string,
     options: GitWorktreeOptions = {}
-  ): boolean {
+  ): { success: boolean; error?: string } {
     try {
       launchSync('git', ['merge', '--no-ff', branch, '-m', message], {
         cwd: options.worktreePath ?? this.cwd,
       });
 
-      return true;
-    } catch (_err) {
+      return { success: true };
+    } catch (err) {
+      const stderr = (err as any)?.stderr?.toString().trim() || '';
+      const errorMessage =
+        stderr || (err instanceof Error ? err.message : String(err));
+
       // There was an error with the merge
-      return false;
+      return { success: false, error: errorMessage };
     }
   }
 
@@ -448,9 +452,9 @@ export class Git {
       return { success: true };
     } catch (err) {
       const stderr = (err as any)?.stderr?.toString().trim() || '';
-      const message =
+      const errorMessage =
         stderr || (err instanceof Error ? err.message : String(err));
-      return { success: false, error: message };
+      return { success: false, error: errorMessage };
     }
   }
 

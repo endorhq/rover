@@ -213,6 +213,7 @@ export class TaskDescriptionManager {
     migrated.startedAt = data.startedAt || undefined;
     migrated.completedAt = data.completedAt || undefined;
     migrated.failedAt = data.failedAt || undefined;
+    migrated.pausedAt = data.pausedAt || undefined;
     migrated.lastIterationAt = data.lastIterationAt || undefined;
     migrated.lastStatusCheck = data.lastStatusCheck || undefined;
 
@@ -277,6 +278,8 @@ export class TaskDescriptionManager {
         return 'MERGED';
       case 'pushed':
         return 'PUSHED';
+      case 'paused':
+        return 'PAUSED';
       default:
         return 'NEW';
     }
@@ -337,15 +340,25 @@ export class TaskDescriptionManager {
         if (!this.data.startedAt) {
           this.data.startedAt = timestamp;
         }
+        // Clear stale error from a previous PAUSED or FAILED state on resume
+        this.data.error = undefined;
         break;
       case 'ITERATING':
         this.data.lastIterationAt = timestamp;
+        // Clear stale error from a previous PAUSED or FAILED state on resume
+        this.data.error = undefined;
         break;
       case 'COMPLETED':
         this.data.completedAt = timestamp;
         break;
       case 'FAILED':
         this.data.failedAt = timestamp;
+        if (metadata?.error) {
+          this.data.error = metadata.error;
+        }
+        break;
+      case 'PAUSED':
+        this.data.pausedAt = timestamp;
         if (metadata?.error) {
           this.data.error = metadata.error;
         }
@@ -403,6 +416,13 @@ export class TaskDescriptionManager {
    */
   markPushed(timestamp?: string): void {
     this.setStatus('PUSHED', { timestamp });
+  }
+
+  /**
+   * Mark task as paused (e.g., due to credit limit exhaustion)
+   */
+  markPaused(error?: string): void {
+    this.setStatus('PAUSED', { error });
   }
 
   /**
@@ -589,6 +609,11 @@ export class TaskDescriptionManager {
           timestamp = status.completedAt;
           error = status.error;
           break;
+        case 'paused':
+          statusName = 'PAUSED';
+          timestamp = status.updatedAt;
+          error = status.error;
+          break;
         case 'running':
           statusName = 'ITERATING';
           timestamp = status.updatedAt;
@@ -680,6 +705,9 @@ export class TaskDescriptionManager {
   }
   get failedAt(): string | undefined {
     return this.data.failedAt;
+  }
+  get pausedAt(): string | undefined {
+    return this.data.pausedAt;
   }
   get lastIterationAt(): string | undefined {
     return this.data.lastIterationAt;
@@ -928,7 +956,15 @@ export class TaskDescriptionManager {
   }
 
   /**
+   * Check if task is paused
+   */
+  isPaused(): boolean {
+    return this.data.status === 'PAUSED';
+  }
+
+  /**
    * Check if task is in an active state (NEW, IN_PROGRESS, or ITERATING)
+   * PAUSED is NOT active - it's idle, waiting for external resume.
    */
   isActive(): boolean {
     return this.isNew() || this.isInProgress() || this.isIterating();

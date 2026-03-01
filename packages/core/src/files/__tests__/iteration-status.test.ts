@@ -126,7 +126,8 @@ describe('IterationStatusManager', () => {
       expect(loaded.currentStep).toBe('Final step');
       expect(loaded.progress).toBe(100);
       expect(loaded.completedAt).toBeDefined();
-      expect(loaded.error).toBe('Minor issue');
+      // complete() clears stale errors from previous states
+      expect(loaded.error).toBeUndefined();
     });
   });
 
@@ -197,6 +198,26 @@ describe('IterationStatusManager', () => {
 
       expect(status.error).toBeUndefined();
     });
+
+    it('should clear a previous error when updating without one', () => {
+      const status = IterationStatusManager.createInitial(
+        statusFilePath,
+        'task-clear-error',
+        'Start'
+      );
+
+      // Set an error
+      status.update('running', 'Step 1', 30, 'Transient failure');
+      expect(status.error).toBe('Transient failure');
+
+      // Update without an error — previous error should be cleared
+      status.update('running', 'Step 2', 60);
+      expect(status.error).toBeUndefined();
+
+      // Verify persistence
+      const loaded = IterationStatusManager.load(statusFilePath);
+      expect(loaded.error).toBeUndefined();
+    });
   });
 
   describe('complete', () => {
@@ -233,6 +254,30 @@ describe('IterationStatusManager', () => {
       expect(new Date(status.completedAt!).getTime()).toBeLessThanOrEqual(
         new Date(afterComplete).getTime()
       );
+    });
+
+    it('should clear stale error and provider from a previous pause', () => {
+      const status = IterationStatusManager.createInitial(
+        statusFilePath,
+        'task-clear-on-complete',
+        'Start'
+      );
+
+      // Set a pause with error and provider
+      status.pause('Step 2', 'Credit limit reached', 'claude');
+      expect(status.error).toBe('Credit limit reached');
+      expect(status.provider).toBe('claude');
+
+      // Complete should clear both
+      status.complete('Done');
+      expect(status.status).toBe('completed');
+      expect(status.error).toBeUndefined();
+      expect(status.provider).toBeUndefined();
+
+      // Verify persistence
+      const loaded = IterationStatusManager.load(statusFilePath);
+      expect(loaded.error).toBeUndefined();
+      expect(loaded.provider).toBeUndefined();
     });
 
     it('should persist completion to disk', () => {
@@ -294,6 +339,134 @@ describe('IterationStatusManager', () => {
       expect(loaded.status).toBe('failed');
       expect(loaded.error).toBe('Connection refused');
       expect(loaded.completedAt).toBeDefined();
+    });
+  });
+
+  describe('pause', () => {
+    it('should mark status as paused with error message', () => {
+      const status = IterationStatusManager.createInitial(
+        statusFilePath,
+        'task-pause',
+        'Start'
+      );
+
+      status.pause('Running step 2', 'Credit limit reached');
+
+      expect(status.status).toBe('paused');
+      expect(status.currentStep).toBe('Running step 2');
+      expect(status.error).toBe('Credit limit reached');
+    });
+
+    it('should NOT set completedAt (paused is not terminal)', () => {
+      const status = IterationStatusManager.createInitial(
+        statusFilePath,
+        'task-pause-not-terminal',
+        'Start'
+      );
+
+      status.pause('Step 3', 'Usage limit');
+
+      expect(status.completedAt).toBeUndefined();
+    });
+
+    it('should NOT set progress to 100', () => {
+      const status = IterationStatusManager.createInitial(
+        statusFilePath,
+        'task-pause-progress',
+        'Start'
+      );
+      status.update('running', 'Step 2', 50);
+      status.pause('Step 2', 'Rate limit');
+
+      // Progress should NOT be changed to 100
+      expect(status.progress).toBe(50);
+    });
+
+    it('should update the timestamp', async () => {
+      const status = IterationStatusManager.createInitial(
+        statusFilePath,
+        'task-pause-time',
+        'Start'
+      );
+      const initialUpdatedAt = status.updatedAt;
+
+      await new Promise(resolve => setTimeout(resolve, 10));
+      status.pause('Step 1', 'Limit reached');
+
+      expect(new Date(status.updatedAt).getTime()).toBeGreaterThan(
+        new Date(initialUpdatedAt).getTime()
+      );
+    });
+
+    it('should persist paused state to disk', () => {
+      const status = IterationStatusManager.createInitial(
+        statusFilePath,
+        'task-pause-persist',
+        'Start'
+      );
+
+      status.pause('Running agent', 'Hit your limit');
+
+      const loaded = IterationStatusManager.load(statusFilePath);
+      expect(loaded.status).toBe('paused');
+      expect(loaded.error).toBe('Hit your limit');
+      expect(loaded.currentStep).toBe('Running agent');
+      expect(loaded.completedAt).toBeUndefined();
+    });
+
+    it('should record provider when given', () => {
+      const status = IterationStatusManager.createInitial(
+        statusFilePath,
+        'task-pause-provider',
+        'Start'
+      );
+
+      status.pause('Step 1', 'Credit limit', 'claude');
+
+      expect(status.provider).toBe('claude');
+      expect(status.status).toBe('paused');
+    });
+
+    it('should persist provider to disk', () => {
+      const status = IterationStatusManager.createInitial(
+        statusFilePath,
+        'task-pause-provider-persist',
+        'Start'
+      );
+
+      status.pause('Step 1', 'Credit limit', 'gemini');
+
+      const loaded = IterationStatusManager.load(statusFilePath);
+      expect(loaded.provider).toBe('gemini');
+    });
+
+    it('should clear error and provider when resuming via update()', () => {
+      const status = IterationStatusManager.createInitial(
+        statusFilePath,
+        'task-pause-then-resume',
+        'Start'
+      );
+
+      status.pause('Step 2', 'Credit limit', 'claude');
+      expect(status.error).toBe('Credit limit');
+      expect(status.provider).toBe('claude');
+
+      // Resuming: update without error clears stale pause data
+      status.update('running', 'Step 3', 60);
+      expect(status.error).toBeUndefined();
+      expect(status.provider).toBeUndefined();
+    });
+
+    it('should not set provider when not given (backward compat)', () => {
+      const status = IterationStatusManager.createInitial(
+        statusFilePath,
+        'task-pause-no-provider',
+        'Start'
+      );
+
+      status.pause('Step 1', 'Some error');
+
+      expect(status.provider).toBeUndefined();
     });
   });
 
