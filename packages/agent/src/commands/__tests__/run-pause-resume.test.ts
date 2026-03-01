@@ -17,7 +17,7 @@ import {
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { rmSync } from 'node:fs';
-import type { StepResult } from 'rover-core';
+import { JsonlLogger, type StepResult } from 'rover-core';
 
 // ── Track process.exit calls ────────────────────────────────────────────
 let capturedExitCode: number | undefined;
@@ -283,28 +283,40 @@ describe('run command: pause/resume integration', () => {
 
     it('Test 3: retryable error → exit 2, checkpoint isRetryable=true, status paused', async () => {
       writeWorkflow();
+      const loggerInfoSpy = vi.spyOn(JsonlLogger.prototype, 'info');
+      try {
+        setupRunnerResults([
+          makeResult('step1', true, {
+            outputs: new Map([['result1', 'hello']]),
+          }),
+          makeResult('step2', false, {
+            error: 'Rate limit exceeded',
+            outputs: new Map([['error_retryable', 'true']]),
+          }),
+        ]);
 
-      setupRunnerResults([
-        makeResult('step1', true, {
-          outputs: new Map([['result1', 'hello']]),
-        }),
-        makeResult('step2', false, {
-          error: 'Rate limit exceeded',
-          outputs: new Map([['error_retryable', 'true']]),
-        }),
-      ]);
+        const exitCode = await runAndCapture();
 
-      const exitCode = await runAndCapture();
+        expect(exitCode).toBe(2);
 
-      expect(exitCode).toBe(2);
+        const checkpoint = readCheckpointFile(outputDir);
+        expect(checkpoint).not.toBeNull();
+        expect(checkpoint!.isRetryable).toBe(true);
+        expect(checkpoint!.failedStepId).toBe('step2');
 
-      const checkpoint = readCheckpointFile(outputDir);
-      expect(checkpoint).not.toBeNull();
-      expect(checkpoint!.isRetryable).toBe(true);
-      expect(checkpoint!.failedStepId).toBe('step2');
-
-      const status = readStatusFile(statusPath);
-      expect(status.status).toBe('paused');
+        const status = readStatusFile(statusPath);
+        expect(status.status).toBe('paused');
+        expect(loggerInfoSpy).toHaveBeenCalledWith(
+          'workflow_pause',
+          expect.stringContaining('Workflow paused due to retryable error'),
+          expect.objectContaining({
+            taskId: 'test-task-1',
+            metadata: { reason: 'retryable_error' },
+          })
+        );
+      } finally {
+        loggerInfoSpy.mockRestore();
+      }
     });
 
     it('Test 3b: repeated HTTP 429 retries still pause the workflow', async () => {
@@ -719,6 +731,74 @@ describe('run command: pause/resume integration', () => {
 
       // Checkpoint should be cleaned up after successful completion
       expect(readCheckpointFile(outputDir)).toBeNull();
+    });
+  });
+
+  describe('signal handler cleanup', () => {
+    it('unregisters SIGTERM and SIGINT handlers after successful completion', async () => {
+      writeWorkflow();
+
+      const sigtermBefore = process.listenerCount('SIGTERM');
+      const sigintBefore = process.listenerCount('SIGINT');
+
+      let callIndex = 0;
+      (Runner as unknown as Mock).mockImplementation(() => {
+        const results = [
+          makeResult('step1', true, {
+            outputs: new Map([['result1', 'a']]),
+          }),
+          makeResult('step2', true, {
+            outputs: new Map([['result2', 'b']]),
+          }),
+          makeResult('step3', true, {
+            outputs: new Map([['result3', 'c']]),
+          }),
+        ];
+        const idx = callIndex++;
+        const instance = { run: vi.fn().mockResolvedValue(results[idx]) };
+        runnerInstances.push(instance);
+        return instance;
+      });
+
+      await runAndCapture();
+
+      // Signal handlers should be cleaned up — listener count should
+      // not exceed what was registered before the run.
+      expect(process.listenerCount('SIGTERM')).toBeLessThanOrEqual(
+        sigtermBefore
+      );
+      expect(process.listenerCount('SIGINT')).toBeLessThanOrEqual(sigintBefore);
+    });
+
+    it('unregisters SIGTERM and SIGINT handlers after paused exit', async () => {
+      writeWorkflow();
+
+      const sigtermBefore = process.listenerCount('SIGTERM');
+      const sigintBefore = process.listenerCount('SIGINT');
+
+      let callIndex = 0;
+      (Runner as unknown as Mock).mockImplementation(() => {
+        const results = [
+          makeResult('step1', true, {
+            outputs: new Map([['result1', 'a']]),
+          }),
+          makeResult('step2', false, {
+            error: 'credit limit reached',
+            outputs: new Map([['error_retryable', 'true']]),
+          }),
+        ];
+        const idx = callIndex++;
+        const instance = { run: vi.fn().mockResolvedValue(results[idx]) };
+        runnerInstances.push(instance);
+        return instance;
+      });
+
+      await runAndCapture();
+
+      expect(process.listenerCount('SIGTERM')).toBeLessThanOrEqual(
+        sigtermBefore
+      );
+      expect(process.listenerCount('SIGINT')).toBeLessThanOrEqual(sigintBefore);
     });
   });
 });
