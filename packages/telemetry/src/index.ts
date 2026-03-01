@@ -65,6 +65,8 @@ enum EVENT_IDS {
   RESTART_TASK = 'restart_task',
   // Resume a paused/failed task
   RESUME_TASK = 'resume_task',
+  // Resume attempt failed
+  RESUME_TASK_FAILED = 'resume_task_failed',
   // Open shell in container
   SHELL = 'shell',
   // Stop a task
@@ -229,6 +231,10 @@ class Telemetry {
 
   eventResumeTask() {
     this.capture(EVENT_IDS.RESUME_TASK);
+  }
+
+  eventResumeTaskFailed(error?: string) {
+    this.capture(EVENT_IDS.RESUME_TASK_FAILED, { error });
   }
 
   eventListWorkflows() {
