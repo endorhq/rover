@@ -468,6 +468,67 @@ describe('IterationStatusManager', () => {
 
       expect(status.provider).toBeUndefined();
     });
+
+    it('should clear provider on resume and track new provider on re-pause', () => {
+      const status = IterationStatusManager.createInitial(
+        statusFilePath,
+        'task-provider-switch',
+        'Start'
+      );
+
+      // Pause with provider='claude'
+      status.pause('Step 1', 'Credit limit', 'claude');
+      expect(status.provider).toBe('claude');
+      expect(status.status).toBe('paused');
+
+      // Resume via update() — provider should be cleared
+      status.update('running', 'Step 2', 60);
+      expect(status.provider).toBeUndefined();
+      expect(status.status).toBe('running');
+
+      // Verify persistence of cleared provider
+      const loaded = IterationStatusManager.load(statusFilePath);
+      expect(loaded.provider).toBeUndefined();
+
+      // Pause again with a different provider='gemini'
+      status.pause('Step 2', 'Rate limit', 'gemini');
+      expect(status.provider).toBe('gemini');
+      expect(status.status).toBe('paused');
+
+      // Verify persistence of new provider
+      const reloaded = IterationStatusManager.load(statusFilePath);
+      expect(reloaded.provider).toBe('gemini');
+    });
+
+    it('should handle pause without provider then re-pause with provider (backward compat)', () => {
+      const status = IterationStatusManager.createInitial(
+        statusFilePath,
+        'task-no-provider-then-provider',
+        'Start'
+      );
+
+      // Pause without a provider (backward compat)
+      status.pause('Step 1', 'Some limit');
+      expect(status.provider).toBeUndefined();
+      expect(status.status).toBe('paused');
+
+      // Verify persistence — provider should not appear in file
+      const loaded = IterationStatusManager.load(statusFilePath);
+      expect(loaded.provider).toBeUndefined();
+
+      // Resume via update()
+      status.update('running', 'Step 2', 50);
+      expect(status.provider).toBeUndefined();
+
+      // Pause again, this time with a provider
+      status.pause('Step 2', 'Credit limit', 'claude');
+      expect(status.provider).toBe('claude');
+      expect(status.status).toBe('paused');
+
+      // Verify persistence of newly set provider
+      const reloaded = IterationStatusManager.load(statusFilePath);
+      expect(reloaded.provider).toBe('claude');
+    });
   });
 
   describe('getter methods', () => {
