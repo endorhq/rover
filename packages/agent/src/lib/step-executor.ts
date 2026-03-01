@@ -23,6 +23,10 @@ import { Runner, type RunnerStepResult } from './runner.js';
 import { runCommandStep, type CommandStepResult } from './command-runner.js';
 import { evaluateCondition } from './condition.js';
 import type { ACPRunner, ACPRunnerStepResult } from './acp-runner.js';
+import type {
+  CheckpointLoopProgress,
+  CheckpointStore,
+} from './checkpoint-store.js';
 
 export interface StepExecutorConfig {
   workflow: WorkflowManager;
@@ -36,6 +40,7 @@ export interface StepExecutorConfig {
   logger?: JsonlLogger;
   output?: string;
   acpRunner?: ACPRunner;
+  checkpointStore?: CheckpointStore;
 }
 
 export type StepResult =
@@ -44,6 +49,116 @@ export type StepResult =
   | ACPRunnerStepResult;
 
 const DEFAULT_MAX_ITERATIONS = 3;
+const MAX_TRANSIENT_RETRIES = 2;
+const RETRY_BASE_DELAY_MS = 10_000;
+
+export class PauseWorkflowError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'PauseWorkflowError';
+  }
+}
+
+export function isTransientError(errorMsg: string): boolean {
+  return /ECONNREFUSED|ETIMEDOUT|ENETUNREACH|network[_\s-]error|connection[_\s-](failed|refused|reset)|too[_\s-]many[_\s-]requests|\b429\b/i.test(
+    errorMsg
+  );
+}
+
+/**
+ * Check whether a step failure is retryable (e.g. credit/rate limits).
+ * This is a superset of isTransientError — all transient errors are retryable,
+ * plus credit/billing/quota limits.
+ *
+ * @param errorMsg - The error message from the step result (NOT general stdout/stderr)
+ * @param errorRetryableFlag - Explicit `error_retryable` output from the agent, if set
+ */
+export function isRetryableError(
+  errorMsg: string,
+  errorRetryableFlag?: string
+): boolean {
+  if (errorRetryableFlag === 'true') return true;
+  if (isTransientError(errorMsg)) return true;
+  // Additional retryable patterns beyond transient errors:
+  // credit/billing/quota limits that may resolve after a waiting period.
+  // NOTE: Only match network/connection timeouts (ETIMEDOUT, connection.*timeout),
+  // NOT generic "timeout" which would match step execution timeouts and cause
+  // infinite pause-resume loops.
+  return /rate[_\s-]limit|credit[_\s-](limit|exhaust)|billing[_\s-](limit|error)|quota[_\s-](exhaust|exceeded|limit)|hit your limit|usage limit|plan limit|connection[_\s-]timeout/i.test(
+    errorMsg
+  );
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+export interface StepTreeNode {
+  id: string;
+  steps?: StepTreeNode[];
+}
+
+export function collectNestedStepIds(step: StepTreeNode): string[] {
+  return [step.id, ...(step.steps?.flatMap(collectNestedStepIds) ?? [])];
+}
+
+function snapshotLoopSubStepOutputs(
+  loopStep: WorkflowLoopStep,
+  stepsOutput: Map<string, Map<string, string>>
+): Record<string, Record<string, string>> {
+  const subStepOutputs: Record<string, Record<string, string>> = {};
+
+  for (const stepId of loopStep.steps.flatMap((step: WorkflowStep) =>
+    collectNestedStepIds(step)
+  )) {
+    const outputs = stepsOutput.get(stepId);
+    if (!outputs || outputs.size === 0) continue;
+    subStepOutputs[stepId] = Object.fromEntries(outputs);
+  }
+
+  return subStepOutputs;
+}
+
+function persistLoopProgress(
+  loopStep: WorkflowLoopStep,
+  config: StepExecutorConfig,
+  iteration: number,
+  nextSubStepIndex: number,
+  skippedSubSteps: Set<string>
+): void {
+  config.checkpointStore?.setLoopProgress(loopStep.id, {
+    iteration,
+    nextSubStepIndex,
+    subStepOutputs: snapshotLoopSubStepOutputs(loopStep, config.stepsOutput),
+    skippedSubSteps: Array.from(skippedSubSteps),
+  });
+}
+
+function restoreLoopProgress(
+  loopStep: WorkflowLoopStep,
+  config: StepExecutorConfig,
+  progress: CheckpointLoopProgress
+): boolean {
+  const knownStepIds = new Set(
+    loopStep.steps.flatMap((step: WorkflowStep) => collectNestedStepIds(step))
+  );
+
+  for (const [stepId, outputs] of Object.entries(progress.subStepOutputs)) {
+    if (!knownStepIds.has(stepId)) continue;
+    config.stepsOutput.set(stepId, new Map(Object.entries(outputs)));
+  }
+
+  for (const stepId of progress.skippedSubSteps) {
+    if (!knownStepIds.has(stepId)) continue;
+    config.stepsOutput.set(stepId, new Map());
+  }
+
+  return (
+    progress.iteration > 0 &&
+    progress.nextSubStepIndex >= 0 &&
+    progress.nextSubStepIndex <= loopStep.steps.length
+  );
+}
 
 /**
  * Check whether a step should be skipped based on its `if` condition.
@@ -68,36 +183,94 @@ export async function executeStep(
   config: StepExecutorConfig
 ): Promise<StepResult> {
   if (isAgentStep(step)) {
-    if (config.acpRunner) {
-      // Reuse the warm ACP connection for agent sub-steps inside loops
-      await config.acpRunner.createSession();
+    for (let attempt = 0; attempt <= MAX_TRANSIENT_RETRIES; attempt++) {
+      let result: StepResult;
 
-      // Sync current stepsOutput into the acpRunner so prompt placeholders resolve
-      for (const [stepId, outputs] of config.stepsOutput.entries()) {
-        config.acpRunner.stepsOutput.set(stepId, outputs);
+      if (config.acpRunner) {
+        // Reuse the warm ACP connection for agent sub-steps inside loops
+        await config.acpRunner.createSession();
+
+        // Sync current stepsOutput into the acpRunner so prompt placeholders resolve
+        for (const [stepId, outputs] of config.stepsOutput.entries()) {
+          config.acpRunner.stepsOutput.set(stepId, outputs);
+        }
+
+        try {
+          result = await config.acpRunner.runStep(step.id);
+        } finally {
+          config.acpRunner.closeSession();
+        }
+      } else {
+        const runner = new Runner(
+          config.workflow,
+          step.id,
+          config.inputs,
+          config.stepsOutput,
+          config.defaultTool,
+          config.defaultModel,
+          config.statusManager,
+          config.totalSteps,
+          config.currentStepIndex,
+          config.logger
+        );
+        result = await runner.run(config.output);
       }
 
-      try {
-        const result = await config.acpRunner.runStep(step.id);
+      if (result.success) {
         return result;
-      } finally {
-        config.acpRunner.closeSession();
       }
+
+      const errorMsg = result.error || '';
+      if (isTransientError(errorMsg) && attempt < MAX_TRANSIENT_RETRIES) {
+        const delayMs = RETRY_BASE_DELAY_MS * Math.pow(2, attempt);
+        console.log(
+          colors.yellow(
+            `\n⚠ Transient error detected. Retrying in ${delayMs / 1000}s (attempt ${attempt + 1}/${MAX_TRANSIENT_RETRIES})...`
+          )
+        );
+        await sleep(delayMs);
+        continue;
+      }
+
+      const retryable = isRetryableError(
+        errorMsg,
+        result.outputs?.get('error_retryable')
+      );
+      const provider =
+        step.tool ||
+        config.defaultTool ||
+        config.workflow.defaults?.tool ||
+        'claude';
+
+      // Use checkpoint store's existing completed steps (only top-level steps
+      // that have been fully completed), not the raw stepsOutput which may
+      // include partial sub-step outputs from in-progress loops.
+      const completedSteps =
+        config.checkpointStore?.getData().completedSteps ?? [];
+
+      config.checkpointStore?.saveFailureSnapshot({
+        completedSteps,
+        failedStepId: step.id,
+        error: result.error,
+        isRetryable: retryable,
+        provider,
+      });
+
+      if (retryable) {
+        config.statusManager?.pause(
+          step.name,
+          result.error || 'Usage limit reached',
+          provider
+        );
+        throw new PauseWorkflowError(
+          `Workflow paused due to retryable error: ${result.error}`
+        );
+      }
+
+      return result;
     }
 
-    const runner = new Runner(
-      config.workflow,
-      step.id,
-      config.inputs,
-      config.stepsOutput,
-      config.defaultTool,
-      config.defaultModel,
-      config.statusManager,
-      config.totalSteps,
-      config.currentStepIndex,
-      config.logger
-    );
-    return runner.run(config.output);
+    throw new Error('Unexpected: retry loop exited without returning');
   }
 
   if (isCommandStep(step)) {
@@ -128,6 +301,56 @@ async function executeLoopStep(
   let conditionMet = false;
   let lastIteration = 0;
   let lastError: string | undefined;
+  const checkpointProgress = config.checkpointStore?.getLoopProgress(
+    loopStep.id
+  );
+  let startIteration = 1;
+  let resumeSubStepIndex = 0;
+  let skippedSubSteps = new Set<string>();
+
+  if (checkpointProgress) {
+    const validProgress = restoreLoopProgress(
+      loopStep,
+      config,
+      checkpointProgress
+    );
+    if (validProgress) {
+      startIteration = checkpointProgress.iteration;
+      resumeSubStepIndex = checkpointProgress.nextSubStepIndex;
+      skippedSubSteps = new Set(checkpointProgress.skippedSubSteps);
+
+      // Invalidate checkpoint if the resumed iteration exceeds maxIterations
+      // (e.g. workflow was edited to lower maxIterations between pause and resume)
+      if (startIteration > maxIterations) {
+        console.log(
+          colors.yellow(
+            `  ⚠ Checkpoint iteration ${startIteration} exceeds maxIterations ${maxIterations} — restarting loop "${loopStep.name}"`
+          )
+        );
+        startIteration = 1;
+        resumeSubStepIndex = 0;
+        skippedSubSteps = new Set<string>();
+        config.checkpointStore?.clearLoopProgress(loopStep.id);
+      } else {
+        const resumePointLabel =
+          resumeSubStepIndex === loopStep.steps.length
+            ? 'pending until check'
+            : `sub-step ${resumeSubStepIndex + 1}`;
+        console.log(
+          colors.cyan(
+            `  ↺ Resuming loop "${loopStep.name}" at iteration ${startIteration}, ${resumePointLabel}`
+          )
+        );
+      }
+    } else {
+      console.log(
+        colors.yellow(
+          `  ⚠ Ignoring invalid checkpoint state for loop "${loopStep.name}"`
+        )
+      );
+      config.checkpointStore?.clearLoopProgress(loopStep.id);
+    }
+  }
 
   console.log(
     colors.blue(
@@ -135,19 +358,39 @@ async function executeLoopStep(
     )
   );
 
-  for (let iteration = 1; iteration <= maxIterations; iteration++) {
+  for (
+    let iteration = startIteration;
+    iteration <= maxIterations;
+    iteration++
+  ) {
     lastIteration = iteration;
     console.log(
       colors.cyan(`\n  ↻ Loop iteration ${iteration}/${maxIterations}`)
     );
 
-    for (const subStep of loopStep.steps) {
+    const subStepStartIndex =
+      iteration === startIteration ? resumeSubStepIndex : 0;
+
+    for (
+      let subStepIndex = subStepStartIndex;
+      subStepIndex < loopStep.steps.length;
+      subStepIndex++
+    ) {
+      const subStep = loopStep.steps[subStepIndex];
       // Check `if` condition on sub-steps (mirrors top-level skip in run.ts)
       if (shouldSkipStep(subStep, config.stepsOutput)) {
         console.log(
           colors.gray(`  ⏭ Skipping step "${subStep.name}" (condition not met)`)
         );
         config.stepsOutput.set(subStep.id, new Map());
+        skippedSubSteps.add(subStep.id);
+        persistLoopProgress(
+          loopStep,
+          config,
+          iteration,
+          subStepIndex + 1,
+          skippedSubSteps
+        );
         continue;
       }
 
@@ -159,6 +402,14 @@ async function executeLoopStep(
 
       // Store sub-step outputs
       config.stepsOutput.set(subStep.id, subResult.outputs);
+      skippedSubSteps.delete(subStep.id);
+      persistLoopProgress(
+        loopStep,
+        config,
+        iteration,
+        subStepIndex + 1,
+        skippedSubSteps
+      );
 
       if (!subResult.success) {
         lastError = subResult.error;
@@ -186,7 +437,14 @@ async function executeLoopStep(
       console.log(colors.green(`  ✓ Loop condition met, exiting loop`));
     }
 
-    if (conditionMet) break;
+    if (conditionMet) {
+      config.checkpointStore?.clearLoopProgress(loopStep.id);
+      break;
+    }
+
+    if (iteration < maxIterations) {
+      persistLoopProgress(loopStep, config, iteration + 1, 0, skippedSubSteps);
+    }
   }
 
   const duration = (performance.now() - start) / 1000;
@@ -195,6 +453,7 @@ async function executeLoopStep(
   outputs.set('condition_met', String(conditionMet));
 
   if (!conditionMet) {
+    config.checkpointStore?.clearLoopProgress(loopStep.id);
     console.log(
       colors.yellow(
         `  ⚠ Loop "${loopStep.name}" reached max iterations (${maxIterations}) without condition being met`

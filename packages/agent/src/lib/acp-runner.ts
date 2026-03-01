@@ -30,29 +30,13 @@ import {
   showList,
   type StepResult,
 } from 'rover-core';
-import { ACPClient } from './acp-client.js';
+import { ACPClient, clearAllTerminals } from './acp-client.js';
 import { GeminiOrQwenACPClient } from './gemini-or-qwen-acp-client.js';
 import { createAgent } from './agents/index.js';
 import type { Agent } from './agents/types.js';
 import { copyFileSync, rmSync } from 'node:fs';
 import { resolvePlaceholders } from './placeholders.js';
-
-/**
- * Format an unknown error for display.
- * ACP SDK may throw plain JSON-RPC error objects instead of Error instances.
- */
-function formatError(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  if (typeof error === 'string') return error;
-  if (error !== null && typeof error === 'object') {
-    try {
-      return JSON.stringify(error, null, 2);
-    } catch {
-      return String(error);
-    }
-  }
-  return String(error);
-}
+import { formatError } from './format-error.js';
 
 export interface ACPRunnerStepResult extends StepResult {}
 
@@ -397,6 +381,14 @@ export class ACPRunner {
       const promptCost = this.client.getLastPromptCost();
       const cost = promptCost.amount > 0 ? promptCost.amount : undefined;
 
+      if (VERBOSE && promptCost.amount <= 0) {
+        console.log(
+          colors.gray(
+            `[ACP] Prompt cost not reported (amount: ${promptCost.amount}, currency: ${promptCost.currency})`
+          )
+        );
+      }
+
       return { stopReason: promptResult.stopReason, response, tokens, cost };
     } catch (error) {
       console.log(
@@ -492,10 +484,11 @@ export class ACPRunner {
       );
     }
 
-    // Calculate current progress
-    const stepIndex = this.workflow.steps.findIndex(
+    // Calculate current progress (clamp to 0 for loop sub-steps not in top-level array)
+    const rawStepIndex = this.workflow.steps.findIndex(
       (s: WorkflowStep) => s.id === stepId
     );
+    const stepIndex = Math.max(0, rawStepIndex);
     const totalSteps = this.workflow.steps.length;
     const currentProgress = Math.floor((stepIndex / totalSteps) * 100);
     const nextProgress = Math.floor(((stepIndex + 1) / totalSteps) * 100);
@@ -734,7 +727,7 @@ export class ACPRunner {
       fileOutputs.forEach(output => {
         instructions += `- **${output.name}**: ${output.description}\n`;
 
-        if (this.tool == 'gemini' || this.tool == 'qwen') {
+        if (this.tool === 'gemini' || this.tool === 'qwen') {
           // Gemini refuses to write files using relative paths, so we must
           // provide an absolute path in the prompt.
           const absolutePath = resolve(output.filename!);
@@ -1039,6 +1032,8 @@ export class ACPRunner {
       this.agentProcess.kill('SIGTERM');
       this.agentProcess = null;
     }
+    // Clean up any tracked terminals to prevent resource leaks
+    clearAllTerminals();
     this.connection = null;
     this.sessionId = null;
     this.isConnectionInitialized = false;

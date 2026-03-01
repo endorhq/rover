@@ -3,6 +3,7 @@ import {
   resolvePlaceholders,
   truncateOutput,
   shellEscape,
+  warnIfCommandHasPlaceholders,
 } from '../command-runner.js';
 
 vi.mock('rover-core', async () => {
@@ -131,6 +132,39 @@ describe('shellEscape', () => {
 
   it('handles empty string', () => {
     expect(shellEscape('')).toBe("''");
+  });
+});
+
+describe('warnIfCommandHasPlaceholders', () => {
+  it('warns when command contains {{...}} placeholders', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    warnIfCommandHasPlaceholders('{{inputs.test_command}}');
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Security warning')
+    );
+    warnSpy.mockRestore();
+  });
+
+  it('does not warn for commands without placeholders', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    warnIfCommandHasPlaceholders('npm test');
+
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it('warns for commands with embedded placeholders', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    warnIfCommandHasPlaceholders('echo {{steps.context.outputs.test_pattern}}');
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Move dynamic values to the "args" field')
+    );
+    warnSpy.mockRestore();
   });
 });
 

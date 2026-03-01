@@ -31,20 +31,7 @@ import {
 } from 'node:fs';
 import { dirname } from 'node:path';
 import { generateRandomId, VERBOSE } from 'rover-core';
-
-/**
- * Format an error into a human-readable string.
- * Handles Error instances, plain objects (e.g. JSON-RPC errors), and primitives.
- */
-function formatError(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  if (error !== null && typeof error === 'object') {
-    return JSON.stringify(error, null, 2);
-  }
-  return String(error);
-}
+import { formatError } from './format-error.js';
 
 // Custom JSON replacer to handle BigInt values
 function jsonReplacer(_key: string, value: unknown): unknown {
@@ -63,13 +50,46 @@ interface TerminalState {
   exitPromise: Promise<void>;
 }
 
+interface LegacyUsageUpdate {
+  sessionUpdate: 'usage_update';
+  cost?: {
+    amount?: number;
+    currency?: string;
+  } | null;
+}
+
 const terminals = new Map<string, TerminalState>();
+
+/**
+ * Kill all tracked terminal processes and clear the map.
+ * Called by ACPRunner.close() to prevent resource leaks.
+ */
+export function clearAllTerminals(): void {
+  for (const state of terminals.values()) {
+    if (state.exitStatus === null) {
+      state.process.kill();
+    }
+  }
+  terminals.clear();
+}
+
+function isLegacyUsageUpdate(update: unknown): update is LegacyUsageUpdate {
+  if (update == null || typeof update !== 'object') {
+    return false;
+  }
+
+  return (
+    'sessionUpdate' in update &&
+    (update as { sessionUpdate?: unknown }).sessionUpdate === 'usage_update'
+  );
+}
 
 export class ACPClient implements Client {
   private capturedMessages: string = '';
   private isCapturing: boolean = false;
 
-  // Cost tracking: cumulative cost reported by the agent via usage_update events
+  // Cost tracking is best-effort. The installed SDK typings lag the runtime
+  // protocol and omit usage_update, so we consume that event defensively.
   private cumulativeCostAmount: number = 0;
   private cumulativeCostCurrency: string = 'USD';
   private costAtCaptureStart: number = 0;
@@ -96,7 +116,7 @@ export class ACPClient implements Client {
   /**
    * Get the cost incurred during the last capture window (between
    * startCapturing and stopCapturing). Returns the delta in the
-   * cumulative cost reported by the agent via usage_update events.
+   * cumulative cost reported by the agent when available.
    */
   getLastPromptCost(): { amount: number; currency: string } {
     return {
@@ -145,14 +165,40 @@ export class ACPClient implements Client {
   }
 
   async sessionUpdate(params: SessionNotification): Promise<void> {
-    const update = params.update;
+    const rawUpdate = params.update as unknown;
 
     if (VERBOSE) {
+      const sessionUpdate =
+        rawUpdate &&
+        typeof rawUpdate === 'object' &&
+        'sessionUpdate' in rawUpdate
+          ? String((rawUpdate as { sessionUpdate?: unknown }).sessionUpdate)
+          : 'unknown';
       console.log(
-        colors.gray(`[ACP] sessionUpdate: ${update.sessionUpdate}`),
-        colors.cyan(JSON.stringify(update, jsonReplacer, 2).substring(0, 500))
+        colors.gray(`[ACP] sessionUpdate: ${sessionUpdate}`),
+        colors.cyan(
+          JSON.stringify(rawUpdate, jsonReplacer, 2).substring(0, 500)
+        )
       );
     }
+
+    if (isLegacyUsageUpdate(rawUpdate)) {
+      const amount = rawUpdate.cost?.amount;
+      if (typeof amount === 'number' && Number.isFinite(amount)) {
+        this.cumulativeCostAmount = amount;
+      }
+
+      if (
+        typeof rawUpdate.cost?.currency === 'string' &&
+        rawUpdate.cost.currency
+      ) {
+        this.cumulativeCostCurrency = rawUpdate.cost.currency;
+      }
+
+      return;
+    }
+
+    const update = params.update;
 
     switch (update.sessionUpdate) {
       case 'agent_message_chunk':
@@ -212,13 +258,6 @@ export class ACPClient implements Client {
 
         if (this.isCapturing && update.content.type === 'text') {
           this.capturedMessages += `[THINKING] ${update.content.text}`;
-        }
-        break;
-      case 'usage_update':
-        // Track cumulative cost reported by the agent
-        if (update.cost) {
-          this.cumulativeCostAmount = update.cost.amount;
-          this.cumulativeCostCurrency = update.cost.currency;
         }
         break;
       case 'available_commands_update':
@@ -288,16 +327,28 @@ export class ACPClient implements Client {
    * pick the right file to read next.
    */
   private formatDirectoryListing(dirPath: string): string {
-    const entries = readdirSync(dirPath).sort();
-    const lines = entries.map(name => {
-      try {
-        const stat = statSync(`${dirPath}/${name}`);
-        return stat.isDirectory() ? `${name}/` : name;
-      } catch {
-        return name;
+    try {
+      const entries = readdirSync(dirPath).sort();
+      const lines = entries.map(name => {
+        try {
+          const stat = statSync(`${dirPath}/${name}`);
+          return stat.isDirectory() ? `${name}/` : name;
+        } catch {
+          return name;
+        }
+      });
+      return `Directory listing for ${dirPath}:\n\n${lines.join('\n')}`;
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      if (VERBOSE) {
+        console.log(
+          colors.yellow(
+            `[ACP] formatDirectoryListing failed for ${dirPath}: ${msg}`
+          )
+        );
       }
-    });
-    return `Directory listing for ${dirPath}:\n\n${lines.join('\n')}`;
+      return `Error listing directory ${dirPath}: ${msg}`;
+    }
   }
 
   readTextFile?(params: ReadTextFileRequest): Promise<ReadTextFileResponse> {
@@ -393,22 +444,26 @@ export class ACPClient implements Client {
       }
     }
 
-    // Split command into executable and arguments if args not provided
-    let command: string;
+    // When args are explicitly provided, pass them directly to execa
+    // to avoid shell injection. When only a command string is given,
+    // use bash -c so shell features (pipes, redirections) still work.
+    let childProcess;
 
     if (params.args && params.args.length > 0) {
-      // Args explicitly provided, use command as-is
-      command = `${params.command} ${params.args}`;
+      childProcess = execa(params.command, params.args, {
+        cwd: params.cwd ?? undefined,
+        env: envObj,
+        reject: false,
+        all: true,
+      });
     } else {
-      command = params.command;
+      childProcess = execa('bash', ['-c', params.command], {
+        cwd: params.cwd ?? undefined,
+        env: envObj,
+        reject: false,
+        all: true,
+      });
     }
-
-    const childProcess = execa('bash', ['-c', command], {
-      cwd: params.cwd ?? undefined,
-      env: envObj,
-      reject: false,
-      all: true,
-    });
 
     const state: TerminalState = {
       process: childProcess,
@@ -428,26 +483,25 @@ export class ACPClient implements Client {
         const text = chunk.toString();
         state.output += text;
 
-        // Apply byte limit with truncation from the beginning
+        // Apply byte limit with truncation from the beginning (O(n) approach)
         if (
           state.outputByteLimit !== null &&
           Buffer.byteLength(state.output, 'utf-8') > state.outputByteLimit
         ) {
           state.truncated = true;
-          // Truncate from the beginning to stay within limit
-          while (
-            Buffer.byteLength(state.output, 'utf-8') > state.outputByteLimit
-          ) {
-            // Remove characters from the beginning until we're under the limit
-            // Find a character boundary to avoid breaking multi-byte characters
-            const idx = state.output.indexOf('\n');
-            if (idx !== -1 && idx < state.output.length / 2) {
-              // Remove up to the first newline for cleaner truncation
-              state.output = state.output.slice(idx + 1);
-            } else {
-              // Remove one character at a time
-              state.output = state.output.slice(1);
-            }
+          // Convert to Buffer, keep the last outputByteLimit bytes, decode back.
+          const buf = Buffer.from(state.output, 'utf-8');
+          let start = buf.length - state.outputByteLimit;
+          // Skip past any UTF-8 continuation bytes (0x80-0xBF) at the cut
+          // point to avoid slicing in the middle of a multi-byte character.
+          while (start < buf.length && (buf[start] & 0xc0) === 0x80) {
+            start++;
+          }
+          state.output = buf.subarray(start).toString('utf-8');
+          // Skip past the first partial line for a clean boundary
+          const firstNewline = state.output.indexOf('\n');
+          if (firstNewline !== -1 && firstNewline < state.output.length / 2) {
+            state.output = state.output.slice(firstNewline + 1);
           }
         }
       });
@@ -521,12 +575,6 @@ export class ACPClient implements Client {
     }
 
     const state = terminals.get(params.terminalId);
-
-    if (VERBOSE) {
-      console.log('Terminal output:');
-      console.log(colors.gray(state?.output || 'No output'));
-    }
-
     if (!state) {
       console.log(
         colors.red(
@@ -534,6 +582,11 @@ export class ACPClient implements Client {
         )
       );
       throw new Error(`Terminal not found: ${params.terminalId}`);
+    }
+
+    if (VERBOSE) {
+      console.log('Terminal output:');
+      console.log(colors.gray(state.output || 'No output'));
     }
 
     // Kill the process if still running

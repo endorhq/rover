@@ -70,6 +70,10 @@ program
     '--context-dir <path>',
     'Path to the context directory containing index.md and context source files'
   )
+  .option(
+    '--checkpoint <path>',
+    'Path to checkpoint.json for resuming a paused workflow'
+  )
   .action(runCommand);
 
 program

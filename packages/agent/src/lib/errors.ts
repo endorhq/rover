@@ -56,7 +56,7 @@ export class ToolExecutionError extends AgentError {
   constructor(
     message: string,
     public readonly tool?: string,
-    public readonly details?: any
+    public readonly details?: unknown
   ) {
     super(message);
   }
@@ -145,13 +145,27 @@ interface ErrorPattern {
   pattern: RegExp;
   errorClass: new (message: string, ...args: any[]) => AgentError;
   extractMessage?: (match: RegExpMatchArray, fullText: string) => string;
-  extractArgs?: (match: RegExpMatchArray, fullText: string) => any[];
+  /** Build the correct error instance. Constructor signatures differ per class,
+   *  so each pattern must place `tool` in the right position. */
+  createError: (message: string, tool?: string) => AgentError;
 }
 
 /**
  * Common error patterns across different AI tools
  */
 const ERROR_PATTERNS: ErrorPattern[] = [
+  // Credit/usage limit errors (CLI-level messages)
+  {
+    pattern: /hit your limit|usage limit|plan limit/i,
+    errorClass: RateLimitError,
+    extractMessage: (match, fullText) => {
+      const lineMatch = fullText.match(/.*hit your limit.*/i);
+      return lineMatch ? lineMatch[0].trim() : 'Usage limit reached';
+    },
+    createError: (message, tool) =>
+      new RateLimitError(message, undefined, tool),
+  },
+
   // Authentication errors
   {
     pattern:
@@ -161,6 +175,7 @@ const ERROR_PATTERNS: ErrorPattern[] = [
       const jsonMatch = fullText.match(/"message":"([^"]+)"/);
       return jsonMatch ? jsonMatch[1] : 'Authentication failed';
     },
+    createError: (message, tool) => new AuthenticationError(message, tool),
   },
   {
     pattern:
@@ -168,16 +183,19 @@ const ERROR_PATTERNS: ErrorPattern[] = [
     errorClass: AuthenticationError,
     extractMessage: () =>
       'Authentication required - tool is waiting for authorization',
+    createError: (message, tool) => new AuthenticationError(message, tool),
   },
 
   // Rate limit errors
   {
-    pattern: /rate[_\s]limit|too[_\s]many[_\s]requests|429/i,
+    pattern: /rate[_\s]limit|too[_\s]many[_\s]requests|\b429\b/i,
     errorClass: RateLimitError,
     extractMessage: (match, fullText) => {
       const jsonMatch = fullText.match(/"message":"([^"]+)"/);
       return jsonMatch ? jsonMatch[1] : 'Rate limit exceeded';
     },
+    createError: (message, tool) =>
+      new RateLimitError(message, undefined, tool),
   },
 
   // Tool execution errors
@@ -189,6 +207,7 @@ const ERROR_PATTERNS: ErrorPattern[] = [
       const jsonMatch = fullText.match(/"message":"([^"]+)"/);
       return jsonMatch ? jsonMatch[1] : 'Tool execution failed';
     },
+    createError: (message, tool) => new ToolExecutionError(message, tool),
   },
 
   // Invalid model errors
@@ -199,6 +218,8 @@ const ERROR_PATTERNS: ErrorPattern[] = [
       const jsonMatch = fullText.match(/"message":"([^"]+)"/);
       return jsonMatch ? jsonMatch[1] : 'Invalid or unsupported model';
     },
+    createError: (message, tool) =>
+      new InvalidModelError(message, undefined, tool),
   },
 
   // Network errors
@@ -207,16 +228,18 @@ const ERROR_PATTERNS: ErrorPattern[] = [
       /ECONNREFUSED|ETIMEDOUT|ENETUNREACH|network[_\s]error|connection[_\s]failed/i,
     errorClass: NetworkError,
     extractMessage: () => 'Network connection failed',
+    createError: message => new NetworkError(message),
   },
 
   // Permission errors
   {
-    pattern: /permission[_\s]denied|access[_\s]denied|forbidden|403/i,
+    pattern: /permission[_\s]denied|access[_\s]denied|forbidden|\b403\b/i,
     errorClass: PermissionError,
     extractMessage: (match, fullText) => {
       const jsonMatch = fullText.match(/"message":"([^"]+)"/);
       return jsonMatch ? jsonMatch[1] : 'Permission denied';
     },
+    createError: message => new PermissionError(message),
   },
 ];
 
@@ -258,11 +281,7 @@ export function parseAgentError(
         ? errorPattern.extractMessage(match, combinedOutput)
         : match[0];
 
-      const args = errorPattern.extractArgs
-        ? errorPattern.extractArgs(match, combinedOutput)
-        : [];
-
-      return new errorPattern.errorClass(message, tool, ...args);
+      return errorPattern.createError(message, tool);
     }
   }
 
@@ -290,19 +309,32 @@ export function isWaitingForAuthentication(output: string): boolean {
  * Extract JSON error from output
  */
 function extractJsonError(output: string): any {
-  // Try to find JSON objects in the output
-  const jsonMatches = output.match(/\{[\s\S]*\}/g);
-  if (!jsonMatches) return null;
+  // Limit scan to last 8 KB to avoid slow scans on huge outputs
+  const scanLimit = 8192;
+  const text =
+    output.length > scanLimit
+      ? output.slice(output.length - scanLimit)
+      : output;
 
-  for (const jsonStr of jsonMatches) {
-    try {
-      const parsed = JSON.parse(jsonStr);
-      // Check if it looks like an error object
-      if (parsed.error || parsed.type === 'error' || parsed.is_error) {
-        return parsed;
+  // Scan for JSON objects by tracking brace depth, which correctly
+  // handles nested objects unlike a greedy/non-greedy regex approach.
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] !== '{') continue;
+    let depth = 0;
+    for (let j = i; j < text.length; j++) {
+      if (text[j] === '{') depth++;
+      if (text[j] === '}') depth--;
+      if (depth === 0) {
+        try {
+          const parsed = JSON.parse(text.substring(i, j + 1));
+          if (parsed.error || parsed.type === 'error' || parsed.is_error) {
+            return parsed;
+          }
+        } catch {
+          // Not valid JSON at this boundary
+        }
+        break;
       }
-    } catch {
-      // Not valid JSON, continue
     }
   }
 
@@ -324,6 +356,18 @@ function classifyJsonError(jsonError: any, tool?: string): AgentError {
     errorCode.includes('auth') ||
     message.toLowerCase().includes('invalid api key')
   ) {
+    // Check if this is actually a credit/billing error misclassified as auth.
+    // Require conjunction of keywords to avoid false positives (e.g. "billing
+    // is not configured" should stay as AuthenticationError).
+    if (
+      /credit.*(limit|exhaust|balance|insufficien)/i.test(message) ||
+      /billing.*(limit|error|issue|problem)/i.test(message) ||
+      /quota.*(exceed|exhaust|limit|reached)/i.test(message) ||
+      /balance.*(insufficien|low|zero|negative|empty)/i.test(message) ||
+      /limit.*(reach|exceed|exhaust)/i.test(message)
+    ) {
+      return new RateLimitError(message, undefined, tool);
+    }
     return new AuthenticationError(message, tool);
   }
 

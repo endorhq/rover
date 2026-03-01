@@ -45,6 +45,11 @@ export interface Agent {
   ): Promise<void>;
   copyCredentials(targetDir: string): Promise<void>;
   isInstalled(): Promise<boolean>;
+  /**
+   * Returns arguments for the ACP spawn command (`acpCommand`).
+   * For Claude this returns npx package args; for Gemini/Qwen it returns
+   * CLI flags that enable ACP mode.
+   */
   toolArguments(): string[];
   toolInteractiveArguments(
     precontext: string,
