@@ -316,6 +316,74 @@ describe('createCheckpointStore', () => {
     );
     warnSpy.mockRestore();
   });
+
+  it('retains in-memory failure data even when persist fails', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const store = createCheckpointStore('/nonexistent/dir/fails');
+
+    store.saveFailureSnapshot({
+      completedSteps: [{ id: 's1', outputs: { a: '1' } }],
+      failedStepId: 's2',
+      error: 'credit limit',
+      isRetryable: true,
+      provider: 'claude',
+    });
+
+    // Even though persist failed, in-memory data should be correct
+    const data = store.getData();
+    expect(data.failedStepId).toBe('s2');
+    expect(data.error).toBe('credit limit');
+    expect(data.isRetryable).toBe(true);
+    expect(data.provider).toBe('claude');
+    expect(data.completedSteps).toHaveLength(1);
+    expect(data.completedSteps[0].id).toBe('s1');
+
+    warnSpy.mockRestore();
+  });
+
+  it('warns when loop progress persistence fails', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const store = createCheckpointStore('/nonexistent/dir/fails');
+
+    store.setLoopProgress('loop1', {
+      iteration: 2,
+      nextSubStepIndex: 1,
+      subStepOutputs: { step_a: { exit_code: '0' } },
+      skippedSubSteps: [],
+    });
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Failed to persist loop progress')
+    );
+
+    // In-memory state should still be set
+    const progress = store.getLoopProgress('loop1');
+    expect(progress).not.toBeUndefined();
+    expect(progress!.iteration).toBe(2);
+    expect(progress!.nextSubStepIndex).toBe(1);
+
+    warnSpy.mockRestore();
+  });
+
+  it('warns when completed steps persistence fails', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const store = createCheckpointStore('/nonexistent/dir/fails');
+
+    store.setCompletedSteps([
+      { id: 's1', outputs: { result: 'done' } },
+      { id: 's2', outputs: { result: 'also done' } },
+    ]);
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Failed to persist completed steps')
+    );
+
+    // In-memory state should still be set
+    const data = store.getData();
+    expect(data.completedSteps).toHaveLength(2);
+
+    warnSpy.mockRestore();
+  });
 });
 
 describe('isTransientError', () => {
