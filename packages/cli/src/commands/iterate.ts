@@ -172,7 +172,7 @@ const iterateCommand = async (
   if (task.isInProgress() || task.isIterating()) {
     result.error =
       'Cannot iterate over a running task. Please wait it to finish first.';
-    exitWithError(result, { telemetry });
+    await exitWithError(result, { telemetry });
     return;
   }
 
