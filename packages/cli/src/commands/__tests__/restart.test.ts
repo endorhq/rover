@@ -448,6 +448,40 @@ describe('restart command', async () => {
       );
     });
 
+    it('should reject restarting PAUSED tasks with a resume tip', async () => {
+      const { exitWithError } = await import('../../utils/exit.js');
+      const mockExitWithError = vi.mocked(exitWithError);
+
+      const taskId = 795;
+      const taskDir = join(testDir, '.rover', 'tasks', taskId.toString());
+
+      const task = TaskDescriptionManager.create(taskDir, {
+        id: taskId,
+        title: 'Paused Task',
+        description: 'A paused task',
+        inputs: new Map(),
+        workflowName: 'swe',
+      });
+
+      task.markInProgress();
+      task.markPaused('Credit limit exceeded');
+      expect(task.status).toBe('PAUSED');
+
+      await restartCommand(taskId.toString(), { json: true });
+
+      expect(mockExitWithError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          error: expect.stringContaining('not in NEW or FAILED status'),
+        }),
+        expect.objectContaining({
+          tips: expect.arrayContaining([
+            expect.stringContaining('rover resume'),
+          ]),
+          telemetry: expect.anything(),
+        })
+      );
+    });
+
     it('should reject restarting tasks in COMPLETED status', async () => {
       const { exitWithError } = await import('../../utils/exit.js');
       const mockExitWithError = vi.mocked(exitWithError);

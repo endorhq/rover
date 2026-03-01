@@ -53,13 +53,13 @@ const restartCommand = async (
     success: false,
   };
 
-  // Convert string taskId to number
-  const numericTaskId = parseInt(taskId, 10);
-  if (isNaN(numericTaskId)) {
+  // Convert string taskId to number (strict: reject '123abc' etc.)
+  if (!/^\d+$/.test(taskId)) {
     jsonOutput.error = `Invalid task ID '${taskId}' - must be a number`;
     await exitWithError(jsonOutput, { telemetry });
     return;
   }
+  const numericTaskId = parseInt(taskId, 10);
 
   // Require project context
   let project;
@@ -87,8 +87,13 @@ const restartCommand = async (
             projectPath: project.path,
           });
           const state = await sandbox.inspect();
-          // Container is still running — reject the restart
-          if (state && state.status === 'running') {
+          // Container is still alive — reject the restart
+          const containerStatus = (state?.status ?? '').toLowerCase();
+          if (
+            containerStatus === 'running' ||
+            containerStatus === 'created' ||
+            containerStatus === 'restarting'
+          ) {
             jsonOutput.error = `Task ${taskId} is ${task.status} and its container is still running`;
             await exitWithError(jsonOutput, {
               tips: [
@@ -107,15 +112,20 @@ const restartCommand = async (
         }
       } else {
         jsonOutput.error = `Task ${taskId} is not in NEW or FAILED status (current: ${task.status})`;
-        await exitWithError(jsonOutput, {
-          tips: [
-            'Only NEW, FAILED, and stuck IN_PROGRESS/ITERATING tasks can be restarted',
+        const tips = [
+          'Only NEW, FAILED, and stuck IN_PROGRESS/ITERATING tasks can be restarted',
+          'Use ' +
+            colors.cyan(`rover inspect ${taskId}`) +
+            colors.gray(' to find out the current task status'),
+        ];
+        if (task.isPaused()) {
+          tips.unshift(
             'Use ' +
-              colors.cyan(`rover inspect ${taskId}`) +
-              colors.gray(' to find out the current task status'),
-          ],
-          telemetry,
-        });
+              colors.cyan(`rover resume ${taskId}`) +
+              colors.gray(' to resume a paused task from its last checkpoint')
+          );
+        }
+        await exitWithError(jsonOutput, { tips, telemetry });
         return;
       }
     }

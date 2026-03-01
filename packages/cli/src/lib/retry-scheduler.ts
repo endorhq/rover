@@ -5,8 +5,12 @@ import colors from 'ansi-colors';
 /**
  * Calculate the next hourly retry window with attempt-based backoff.
  * `attempt` is the number of previous failures (0 = first try).
- * Windows advance by 1h, 2h, 4h, 8h, 16h, capped at 24h from the current hour,
- * then add 2-10 minutes of jitter.
+ *
+ * The window is computed by snapping to the current hour boundary, then
+ * advancing by 1h, 2h, 4h, 8h, 16h (capped at 24h), plus 2-10 min jitter.
+ * This means the first retry may fire much sooner than 1 hour if the pause
+ * happened late in the hour (e.g., paused at 14:59 → retry at ~15:02).
+ *
  * Exported for testing.
  */
 export function calculateNextRetryWindow(
@@ -209,6 +213,14 @@ export class RetryScheduler {
 
     const { provider, taskId, project } = entry;
 
+    // Re-read task state before incrementing retry count to avoid inflating
+    // the counter when the task was already resumed by another process.
+    const task = project.getTask(taskId);
+    if (!task || (!task.isPaused() && !task.isFailed())) {
+      this.retryCounts.delete(taskKey);
+      return;
+    }
+
     console.log(
       colors.cyan(`\n🔄 Auto-retrying paused ${provider} task ${taskId}...`)
     );
@@ -217,9 +229,17 @@ export class RetryScheduler {
     this.retryCounts.set(taskKey, attempt);
 
     try {
-      const success = await resumeTask(project, taskId);
-      if (success) {
+      const result = await resumeTask(project, taskId);
+      if (result.status === 'ok') {
         console.log(colors.green(`  ✓ Task ${taskId} resumed successfully`));
+      } else if (result.status === 'already_resuming') {
+        // Another process is handling it — don't count as a failure
+        this.retryCounts.set(taskKey, attempt - 1);
+        console.log(
+          colors.gray(
+            `  ℹ Task ${taskId} is already being resumed by another process`
+          )
+        );
       } else if (attempt >= MAX_AUTO_RETRIES) {
         console.log(
           colors.red(

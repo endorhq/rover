@@ -97,6 +97,9 @@ function createMockProject(task?: any) {
     path: '/tmp/project',
     getTask: vi.fn().mockReturnValue(task || null),
     getWorkspacePath: vi.fn().mockReturnValue('/tmp/workspace-1'),
+    getTaskIterationLogsPath: vi
+      .fn()
+      .mockReturnValue('/tmp/project/logs/tasks/1/iterations/1'),
   } as any;
 }
 
@@ -131,7 +134,7 @@ describe('resumeTask', () => {
 
     const result = await resumeTask(project, 1);
 
-    expect(result).toBe(true);
+    expect(result.status).toBe('ok');
     expect(task.markInProgress).toHaveBeenCalled();
     expect(mockedIterationStatusManager.createInitial).toHaveBeenCalledWith(
       '/tmp/iterations/1/status.json',
@@ -168,10 +171,14 @@ describe('resumeTask', () => {
 
     const result = await resumeTask(project, 1);
 
-    expect(result).toBe(true);
+    expect(result.status).toBe('ok');
     expect(mockedCreateSandbox).toHaveBeenCalledWith(task, undefined, {
       projectPath: project.path,
       checkpointPath,
+      iterationLogsPath: project.getTaskIterationLogsPath(
+        task.id,
+        task.iterations
+      ),
     });
     expect(task.markInProgress).toHaveBeenCalled();
     expect(task.setContainerInfo).toHaveBeenCalledWith(
@@ -181,17 +188,28 @@ describe('resumeTask', () => {
     );
   });
 
-  it('returns false for non-PAUSED/FAILED tasks', async () => {
+  it('returns not_resumable for non-PAUSED/FAILED tasks', async () => {
     const task = createMockTask({ status: 'IN_PROGRESS' });
     const project = createMockProject(task);
 
     const result = await resumeTask(project, 1);
 
-    expect(result).toBe(false);
+    expect(result.status).toBe('not_resumable');
     expect(task.markInProgress).not.toHaveBeenCalled();
   });
 
-  it('returns false on sandbox creation failure', async () => {
+  it('returns not_resumable when task has zero iterations', async () => {
+    const task = createMockTask({ status: 'PAUSED', iterations: 0 });
+    const project = createMockProject(task);
+
+    const result = await resumeTask(project, 1);
+
+    expect(result.status).toBe('not_resumable');
+    expect(task.markInProgress).not.toHaveBeenCalled();
+    expect(mockedCreateSandbox).not.toHaveBeenCalled();
+  });
+
+  it('returns failed on sandbox creation failure', async () => {
     const task = createMockTask({ status: 'PAUSED' });
     const project = createMockProject(task);
 
@@ -203,7 +221,7 @@ describe('resumeTask', () => {
 
     const result = await resumeTask(project, 1);
 
-    expect(result).toBe(false);
+    expect(result.status).toBe('failed');
     expect(mockIterationStatus.pause).toHaveBeenCalledWith(
       'Resuming workflow',
       'Resume failed: container could not start'
@@ -231,7 +249,7 @@ describe('resumeTask', () => {
 
     const result = await resumeTask(project, 1);
 
-    expect(result).toBe(true);
+    expect(result.status).toBe('ok');
     expect(task.markInProgress).toHaveBeenCalled();
   });
 
@@ -250,7 +268,7 @@ describe('resumeTask', () => {
 
     const result = await resumeTask(project, 1);
 
-    expect(result).toBe(false);
+    expect(result.status).toBe('failed');
     expect(task.markFailed).toHaveBeenCalledWith('Previous failure');
     expect(task.markPaused).not.toHaveBeenCalled();
     expect(mockIterationStatus.fail).toHaveBeenCalledWith(
@@ -280,7 +298,7 @@ describe('resumeTask', () => {
 
     const result = await resumeTask(project, 1);
 
-    expect(result).toBe(true);
+    expect(result.status).toBe('ok');
     expect(task.markInProgress).toHaveBeenCalled();
     expect(task.setContainerInfo).toHaveBeenCalledWith(
       'container-stale-lock',
@@ -316,7 +334,7 @@ describe('resumeTask', () => {
 
     const result = await resumeTask(project, 1);
 
-    expect(result).toBe(false);
+    expect(result.status).toBe('already_resuming');
     expect(mockedCreateSandbox).not.toHaveBeenCalled();
     expect(task.markInProgress).not.toHaveBeenCalled();
     expect(existsSync(lockPath)).toBe(true);
@@ -339,7 +357,7 @@ describe('resumeTask', () => {
 
     const result = await resumeTask(project, 1);
 
-    expect(result).toBe(false);
+    expect(result.status).toBe('already_resuming');
     expect(mockedCreateSandbox).not.toHaveBeenCalled();
     expect(task.markInProgress).not.toHaveBeenCalled();
     expect(existsSync(lockPath)).toBe(true);
@@ -365,7 +383,7 @@ describe('resumeTask', () => {
       createWorktree: ReturnType<typeof vi.fn>;
     };
 
-    expect(result).toBe(true);
+    expect(result.status).toBe('ok');
     expect(project.getWorkspacePath).not.toHaveBeenCalled();
     expect(mockedGit).toHaveBeenCalledWith({ cwd: project.path });
     expect(gitInstance.createWorktree).toHaveBeenCalledWith(
@@ -399,7 +417,7 @@ describe('resumeTask', () => {
       createWorktree: ReturnType<typeof vi.fn>;
     };
 
-    expect(result).toBe(true);
+    expect(result.status).toBe('ok');
     expect(gitInstance.createWorktree).toHaveBeenCalledWith(
       missingWorktreePath,
       'rover/task-1',
@@ -429,7 +447,7 @@ describe('resumeTask', () => {
 
     const result = await resumeTask(project, 1);
 
-    expect(result).toBe(false);
+    expect(result.status).toBe('failed');
     expect(task.markPaused).toHaveBeenCalledWith('Paused earlier');
   });
 
@@ -446,7 +464,7 @@ describe('resumeTask', () => {
 
     const result = await resumeTask(project, 1);
 
-    expect(result).toBe(false);
+    expect(result.status).toBe('failed');
     expect(task.markInProgress).toHaveBeenCalled();
     expect(task.markPaused).toHaveBeenCalledWith('Paused by user');
     expect(task.markFailed).not.toHaveBeenCalled();
@@ -470,7 +488,7 @@ describe('resumeTask', () => {
 
     const result = await resumeTask(project, 1);
 
-    expect(result).toBe(false);
+    expect(result.status).toBe('failed');
     expect(task.markInProgress).toHaveBeenCalled();
     expect(task.markFailed).toHaveBeenCalledWith('Agent crashed');
     expect(task.markPaused).not.toHaveBeenCalled();
@@ -493,7 +511,7 @@ describe('resumeTask', () => {
 
     const result = await resumeTask(project, 1);
 
-    expect(result).toBe(false);
+    expect(result.status).toBe('failed');
     expect(task.markPaused).toHaveBeenCalledWith(
       'Resume failed: container could not start'
     );
@@ -512,7 +530,7 @@ describe('resumeTask', () => {
 
     const result = await resumeTask(project, 1);
 
-    expect(result).toBe(false);
+    expect(result.status).toBe('failed');
     expect(task.markFailed).toHaveBeenCalledWith(
       'Resume failed: container could not start'
     );
@@ -540,12 +558,12 @@ describe('resumeTask', () => {
 
     const result = await resumeTask(project, 1);
 
-    expect(result).toBe(true);
+    expect(result.status).toBe('ok');
     expect(callOrder).toEqual(['task', 'status', 'container']);
   });
 
   describe('concurrent resume lock contention', () => {
-    it('returns false when lock file exists with a live PID', async () => {
+    it('returns already_resuming when lock file exists with a live PID', async () => {
       const iterationPath = join(tempDir, 'iterations');
       const task = createMockTask({
         status: 'PAUSED',
@@ -568,7 +586,7 @@ describe('resumeTask', () => {
 
       const result = await resumeTask(project, 1);
 
-      expect(result).toBe(false);
+      expect(result.status).toBe('already_resuming');
       expect(mockedCreateSandbox).not.toHaveBeenCalled();
       expect(task.markInProgress).not.toHaveBeenCalled();
       // Lock file should remain untouched with original PID
@@ -604,7 +622,7 @@ describe('resumeTask', () => {
 
       const result = await resumeTask(project, 1);
 
-      expect(result).toBe(true);
+      expect(result.status).toBe('ok');
       expect(task.markInProgress).toHaveBeenCalled();
       expect(task.setContainerInfo).toHaveBeenCalledWith(
         'container-reclaimed',
@@ -664,14 +682,14 @@ describe('resumeTask', () => {
       const secondResult = await secondResume;
 
       // Second caller should fail gracefully
-      expect(secondResult).toBe(false);
+      expect(secondResult.status).toBe('already_resuming');
 
       // Now let the first caller finish
       resolveFirstSandbox('container-winner');
       const firstResult = await firstResume;
 
       // First caller should succeed
-      expect(firstResult).toBe(true);
+      expect(firstResult.status).toBe('ok');
 
       // The lock should be released after the successful caller finishes
       const lockPath = join(iterationPath, '1', '.resume.lock');

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { ACPClient } from '../acp-client.js';
-import { mkdtempSync, mkdirSync, writeFileSync, chmodSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { rmSync } from 'node:fs';
@@ -123,32 +123,25 @@ describe('ACPClient', () => {
   });
 
   describe('formatDirectoryListing error handling', () => {
-    it('returns error string when directory cannot be read', async () => {
-      // Access the private method indirectly by calling readTextFile on a
-      // path that is a directory but contains files that trigger stat errors.
-      // We test the error handling by verifying the format of the response.
+    it('lists broken symlinks gracefully without crashing', async () => {
       const client = new ACPClient();
-
-      // Create a spy to verify the error path returns an error message string
-      // instead of throwing.
-      // The formatDirectoryListing is private, but it's called from readTextFile
-      // when EISDIR is caught. We can test it by mocking readdirSync.
-      const readdirSync = await import('node:fs').then(m => m.readdirSync);
-
-      // We can't easily mock a private method, but we can verify the behavior
-      // through the public API by creating a directory that exists
       const tempDir = mkdtempSync(join(tmpdir(), 'acp-err-test-'));
       try {
-        mkdirSync(join(tempDir, 'sub'));
-        writeFileSync(join(tempDir, 'test.txt'), 'hello');
+        // Create a valid file and a broken symlink in the same directory.
+        // The broken symlink triggers a statSync error inside
+        // formatDirectoryListing, exercising the per-entry catch path.
+        writeFileSync(join(tempDir, 'good.txt'), 'content');
+        symlinkSync('/nonexistent/target', join(tempDir, 'broken-link'));
 
         const result = await client.readTextFile!({
           path: tempDir,
         } as any);
 
-        // Should succeed — listing returned
+        // Both entries appear in the listing (broken symlink is listed
+        // without a directory suffix since statSync failed).
+        expect(result.content).toContain('good.txt');
+        expect(result.content).toContain('broken-link');
         expect(result.content).toContain('Directory listing');
-        expect(result.content).toContain('test.txt');
       } finally {
         rmSync(tempDir, { recursive: true, force: true });
       }

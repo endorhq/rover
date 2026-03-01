@@ -143,7 +143,6 @@ export class GenericAgentError extends AgentError {
  */
 interface ErrorPattern {
   pattern: RegExp;
-  errorClass: new (message: string, ...args: any[]) => AgentError;
   extractMessage?: (match: RegExpMatchArray, fullText: string) => string;
   /** Build the correct error instance. Constructor signatures differ per class,
    *  so each pattern must place `tool` in the right position. */
@@ -157,7 +156,6 @@ const ERROR_PATTERNS: ErrorPattern[] = [
   // Credit/usage limit errors (CLI-level messages)
   {
     pattern: /hit your limit|usage limit|plan limit/i,
-    errorClass: RateLimitError,
     extractMessage: (match, fullText) => {
       const lineMatch = fullText.match(/.*hit your limit.*/i);
       return lineMatch ? lineMatch[0].trim() : 'Usage limit reached';
@@ -170,7 +168,7 @@ const ERROR_PATTERNS: ErrorPattern[] = [
   {
     pattern:
       /authentication[_\s]error|invalid[_\s]bearer[_\s]token|401|unauthorized/i,
-    errorClass: AuthenticationError,
+
     extractMessage: (match, fullText) => {
       const jsonMatch = fullText.match(/"message":"([^"]+)"/);
       return jsonMatch ? jsonMatch[1] : 'Authentication failed';
@@ -180,7 +178,7 @@ const ERROR_PATTERNS: ErrorPattern[] = [
   {
     pattern:
       /Please visit the following URL to authorize|Enter the authorization code/i,
-    errorClass: AuthenticationError,
+
     extractMessage: () =>
       'Authentication required - tool is waiting for authorization',
     createError: (message, tool) => new AuthenticationError(message, tool),
@@ -189,7 +187,7 @@ const ERROR_PATTERNS: ErrorPattern[] = [
   // Rate limit errors
   {
     pattern: /rate[_\s]limit|too[_\s]many[_\s]requests|\b429\b/i,
-    errorClass: RateLimitError,
+
     extractMessage: (match, fullText) => {
       const jsonMatch = fullText.match(/"message":"([^"]+)"/);
       return jsonMatch ? jsonMatch[1] : 'Rate limit exceeded';
@@ -202,7 +200,7 @@ const ERROR_PATTERNS: ErrorPattern[] = [
   {
     pattern:
       /FatalToolExecutionError|invalid_tool_params|File path must be absolute/i,
-    errorClass: ToolExecutionError,
+
     extractMessage: (match, fullText) => {
       const jsonMatch = fullText.match(/"message":"([^"]+)"/);
       return jsonMatch ? jsonMatch[1] : 'Tool execution failed';
@@ -213,7 +211,7 @@ const ERROR_PATTERNS: ErrorPattern[] = [
   // Invalid model errors
   {
     pattern: /model[_\s]not[_\s]found|invalid[_\s]model|unsupported[_\s]model/i,
-    errorClass: InvalidModelError,
+
     extractMessage: (match, fullText) => {
       const jsonMatch = fullText.match(/"message":"([^"]+)"/);
       return jsonMatch ? jsonMatch[1] : 'Invalid or unsupported model';
@@ -226,7 +224,7 @@ const ERROR_PATTERNS: ErrorPattern[] = [
   {
     pattern:
       /ECONNREFUSED|ETIMEDOUT|ENETUNREACH|network[_\s]error|connection[_\s]failed/i,
-    errorClass: NetworkError,
+
     extractMessage: () => 'Network connection failed',
     createError: message => new NetworkError(message),
   },
@@ -234,7 +232,7 @@ const ERROR_PATTERNS: ErrorPattern[] = [
   // Permission errors
   {
     pattern: /permission[_\s]denied|access[_\s]denied|forbidden|\b403\b/i,
-    errorClass: PermissionError,
+
     extractMessage: (match, fullText) => {
       const jsonMatch = fullText.match(/"message":"([^"]+)"/);
       return jsonMatch ? jsonMatch[1] : 'Permission denied';
@@ -318,6 +316,9 @@ function extractJsonError(output: string): any {
 
   // Scan for JSON objects by tracking brace depth, which correctly
   // handles nested objects unlike a greedy/non-greedy regex approach.
+  // Note: the scanner counts braces regardless of whether they appear
+  // inside JSON string values, so objects like {"msg": "use {braces}"}
+  // may be missed. The JSON.parse fallback ensures no false positives.
   for (let i = 0; i < text.length; i++) {
     if (text[i] !== '{') continue;
     let depth = 0;

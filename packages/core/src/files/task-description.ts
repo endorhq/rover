@@ -352,18 +352,20 @@ export class TaskDescriptionManager {
         break;
       case 'COMPLETED':
         this.data.completedAt = timestamp;
+        this.data.pausedAt = undefined;
         break;
       case 'FAILED':
         this.data.failedAt = timestamp;
-        if (metadata?.error) {
-          this.data.error = metadata.error;
-        }
+        this.data.pausedAt = undefined;
+        // Intentionally clears error when metadata.error is undefined so that
+        // stale errors from a previous status don't persist.
+        this.data.error = metadata?.error;
         break;
       case 'PAUSED':
         this.data.pausedAt = timestamp;
-        if (metadata?.error) {
-          this.data.error = metadata.error;
-        }
+        // Intentionally clears error when metadata.error is undefined so that
+        // stale errors from a previous status don't persist.
+        this.data.error = metadata?.error;
         break;
       case 'MERGED':
       case 'PUSHED':
@@ -371,6 +373,7 @@ export class TaskDescriptionManager {
         if (!this.data.completedAt) {
           this.data.completedAt = timestamp;
         }
+        this.data.pausedAt = undefined;
         break;
     }
 

@@ -48,7 +48,7 @@ describe('resume command', () => {
       eventResumeTaskFailed: vi.fn(),
       shutdown: vi.fn().mockResolvedValue(undefined),
     });
-    mockResumeTask.mockResolvedValue(true);
+    mockResumeTask.mockResolvedValue({ status: 'ok' });
     mockExitWithError.mockResolvedValue(undefined);
     mockExitWithSuccess.mockResolvedValue(undefined);
   });
@@ -196,7 +196,7 @@ describe('resume command', () => {
     expect(mockResumeTask).not.toHaveBeenCalled();
   });
 
-  it('handles resumeTask returning false', async () => {
+  it('handles resumeTask returning failed status', async () => {
     const task = {
       id: 11,
       title: 'Paused task',
@@ -219,7 +219,10 @@ describe('resume command', () => {
     };
 
     mockRequireProjectContext.mockResolvedValue(project);
-    mockResumeTask.mockResolvedValue(false);
+    mockResumeTask.mockResolvedValue({
+      status: 'failed',
+      error: 'Docker not available',
+    });
 
     await resumeCommand('11', { json: true });
 
@@ -228,7 +231,7 @@ describe('resume command', () => {
     expect(mockExitWithError).toHaveBeenCalledWith(
       expect.objectContaining({
         success: false,
-        error: 'Failed to resume task 11',
+        error: 'Failed to resume task 11: Docker not available',
       }),
       expect.objectContaining({ telemetry: expect.anything() })
     );

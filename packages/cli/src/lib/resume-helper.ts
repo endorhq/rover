@@ -18,6 +18,7 @@ import {
 import { TaskNotFoundError } from 'rover-schemas';
 import { createSandbox } from '../lib/sandbox/index.js';
 import { copyEnvironmentFiles } from '../utils/env-files.js';
+import { isProcessAlive } from '../utils/process.js';
 import colors from 'ansi-colors';
 
 /**
@@ -39,26 +40,6 @@ function acquireResumeLock(iterationPath: string): (() => void) | null {
       };
     } catch {
       return null;
-    }
-  };
-
-  const isProcessAlive = (pid: number): boolean => {
-    if (!Number.isInteger(pid) || pid <= 0) {
-      return false;
-    }
-    try {
-      process.kill(pid, 0);
-      return true;
-    } catch (error) {
-      const code = (error as NodeJS.ErrnoException).code;
-      // EPERM means the process exists but we are not allowed to signal it.
-      if (code === 'EPERM') {
-        return true;
-      }
-      if (code === 'ESRCH') {
-        return false;
-      }
-      return false;
     }
   };
 
@@ -98,16 +79,21 @@ function acquireResumeLock(iterationPath: string): (() => void) | null {
   return null;
 }
 
+/** Possible outcomes of a resume attempt. */
+export type ResumeResult =
+  | { status: 'ok' }
+  | { status: 'not_resumable' }
+  | { status: 'already_resuming' }
+  | { status: 'failed'; error: string };
+
 /**
  * Core resume logic extracted for reuse by both the `resume` command
  * and the automatic RetryScheduler.
- *
- * @returns true if the sandbox was started successfully, false otherwise.
  */
 export async function resumeTask(
   project: ProjectManager,
   taskId: number
-): Promise<boolean> {
+): Promise<ResumeResult> {
   const task = project.getTask(taskId);
   if (!task) {
     throw new TaskNotFoundError(taskId);
@@ -115,7 +101,7 @@ export async function resumeTask(
 
   // Only PAUSED or FAILED tasks can be resumed
   if (!task.isPaused() && !task.isFailed()) {
-    return false;
+    return { status: 'not_resumable' };
   }
 
   // Find checkpoint.json in the last iteration's output directory
@@ -125,7 +111,7 @@ export async function resumeTask(
         `  ⚠ Task ${taskId} has no iterations (iterations=${task.iterations}), cannot resume.`
       )
     );
-    return false;
+    return { status: 'not_resumable' };
   }
   const iterationPath = join(task.iterationsPath(), task.iterations.toString());
 
@@ -139,7 +125,7 @@ export async function resumeTask(
         `  ⚠ Task ${taskId} is already being resumed by another process, skipping.`
       )
     );
-    return false;
+    return { status: 'already_resuming' };
   }
 
   try {
@@ -156,12 +142,12 @@ async function resumeTaskLocked(
   project: ProjectManager,
   taskId: number,
   iterationPath: string
-): Promise<boolean> {
+): Promise<ResumeResult> {
   // Re-read task from disk under lock — another process may have already
   // resumed the task between our initial check and lock acquisition.
   const task = project.getTask(taskId);
   if (!task || (!task.isPaused() && !task.isFailed())) {
-    return false;
+    return { status: 'not_resumable' };
   }
 
   const statusBeforeResume = task.status;
@@ -219,12 +205,13 @@ async function resumeTaskLocked(
       worktreeCreated = true;
     } catch (error) {
       restoreResumableStatus('Resume failed: worktree could not be prepared');
+      const errorMsg = error instanceof Error ? error.message : String(error);
       console.log(
         colors.yellow(
-          `  ⚠ Failed to create worktree for task ${taskId}: ${error instanceof Error ? error.message : String(error)}`
+          `  ⚠ Failed to create worktree for task ${taskId}: ${errorMsg}`
         )
       );
-      return false;
+      return { status: 'failed', error: errorMsg };
     }
   }
 
@@ -265,6 +252,10 @@ async function resumeTaskLocked(
     const sandbox = await createSandbox(task, undefined, {
       projectPath: project.path,
       checkpointPath: hasCheckpoint ? checkpointPath : undefined,
+      iterationLogsPath: project.getTaskIterationLogsPath(
+        task.id,
+        task.iterations
+      ),
     });
     const containerId = await sandbox.createAndStart();
 
@@ -278,12 +269,11 @@ async function resumeTaskLocked(
     );
     // Task already marked IN_PROGRESS before container creation (under lock)
 
-    return true;
+    return { status: 'ok' };
   } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
     console.log(
-      colors.yellow(
-        `  ⚠ Sandbox start failed for task ${taskId}: ${error instanceof Error ? error.message : String(error)}`
-      )
+      colors.yellow(`  ⚠ Sandbox start failed for task ${taskId}: ${errorMsg}`)
     );
     if (statusBeforeResume === 'FAILED') {
       iterationStatus.fail(
@@ -297,6 +287,6 @@ async function resumeTaskLocked(
       );
     }
     restoreResumableStatus('Resume failed: container could not start');
-    return false;
+    return { status: 'failed', error: errorMsg };
   }
 }

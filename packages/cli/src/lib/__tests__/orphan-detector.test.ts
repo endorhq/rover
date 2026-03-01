@@ -6,6 +6,7 @@ vi.mock('node:fs', async importOriginal => {
   return {
     ...actual,
     existsSync: vi.fn(() => false),
+    readFileSync: vi.fn(() => String(process.pid)),
   };
 });
 
@@ -14,11 +15,15 @@ vi.mock('../sandbox/index.js', () => ({
   createSandbox: vi.fn(),
 }));
 
+// isResumeLockActive uses node:fs internally, so the fs mock above controls
+// its behavior. No separate mock needed — just import to verify calls.
+
 import { createSandbox } from '../sandbox/index.js';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 const mockedCreateSandbox = vi.mocked(createSandbox);
 const mockedExistsSync = vi.mocked(existsSync);
+const mockedReadFileSync = vi.mocked(readFileSync);
 
 /**
  * Helper to build a minimal mock task with the given status.
@@ -38,6 +43,7 @@ function mockTask(
     markFailed: vi.fn(),
     markCompleted: vi.fn(),
     markPaused: vi.fn(),
+    updateStatusFromIteration: vi.fn(),
     lastRestartAt: undefined,
     runningAt: undefined,
   };
@@ -56,9 +62,13 @@ function mockProject(path = '/projects/test') {
 
 describe('detectOrphanedTasks', () => {
   beforeEach(() => {
+    vi.restoreAllMocks();
     mockedCreateSandbox.mockReset();
     mockedExistsSync.mockReset();
+    mockedReadFileSync.mockReset();
     mockedExistsSync.mockReturnValue(false);
+    mockedReadFileSync.mockReturnValue(String(process.pid));
+    vi.spyOn(process, 'kill').mockImplementation(() => true);
     vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
@@ -273,9 +283,11 @@ describe('detectOrphanedTasks', () => {
   });
 
   it('skips orphan detection while restart startup is still in flight', async () => {
+    const now = Date.now();
     const task = mockTask(21, 'IN_PROGRESS', 'container-21', {
-      lastRestartAt: '2026-02-20T12:00:10.000Z',
-      runningAt: '2026-02-20T12:00:00.000Z',
+      // lastRestartAt is recent (10 seconds ago), runningAt is before it
+      lastRestartAt: new Date(now - 10_000).toISOString(),
+      runningAt: new Date(now - 20_000).toISOString(),
     });
 
     await detectOrphanedTasks([{ task, project: mockProject() }]);
@@ -285,9 +297,11 @@ describe('detectOrphanedTasks', () => {
   });
 
   it('inspects task after restart startup is confirmed running', async () => {
+    const now = Date.now();
     const task = mockTask(22, 'IN_PROGRESS', 'container-22', {
-      lastRestartAt: '2026-02-20T12:00:00.000Z',
-      runningAt: '2026-02-20T12:00:10.000Z',
+      // runningAt is AFTER lastRestartAt → startup completed, proceed with inspection
+      lastRestartAt: new Date(now - 20_000).toISOString(),
+      runningAt: new Date(now - 10_000).toISOString(),
     });
     const sandbox = { inspect: vi.fn().mockResolvedValue(null) };
     mockedCreateSandbox.mockResolvedValue(sandbox as any);
@@ -342,10 +356,104 @@ describe('detectOrphanedTasks', () => {
     mockedExistsSync.mockImplementation(path =>
       String(path).endsWith('.resume.lock')
     );
+    mockedReadFileSync.mockReturnValue('424242');
+    vi.spyOn(process, 'kill').mockImplementation((pid, signal) => {
+      if (pid === 424242 && signal === 0) {
+        return true;
+      }
+      throw Object.assign(new Error('No such process'), { code: 'ESRCH' });
+    });
 
     await detectOrphanedTasks([{ task, project: mockProject() }]);
 
     expect(mockedCreateSandbox).not.toHaveBeenCalled();
     expect(task.markFailed).not.toHaveBeenCalled();
+  });
+
+  it('reads iteration status before marking FAILED for exit code 1', async () => {
+    const task = mockTask(27, 'IN_PROGRESS', 'container-27', {
+      updateStatusFromIteration: vi.fn(() => {
+        // Simulate the agent having written a meaningful error to status.json
+        task.status = 'FAILED';
+      }),
+    });
+    const sandbox = {
+      inspect: vi.fn().mockResolvedValue({ status: 'exited', exitCode: 1 }),
+    };
+    mockedCreateSandbox.mockResolvedValue(sandbox as any);
+
+    await detectOrphanedTasks([{ task, project: mockProject() }]);
+
+    expect(task.updateStatusFromIteration).toHaveBeenCalledTimes(1);
+    // Should NOT call markFailed again since updateStatusFromIteration already set FAILED
+    expect(task.markFailed).not.toHaveBeenCalled();
+  });
+
+  it('falls back to generic message for exit code 1 when status file has no error', async () => {
+    const task = mockTask(28, 'IN_PROGRESS', 'container-28', {
+      updateStatusFromIteration: vi.fn(),
+    });
+    const sandbox = {
+      inspect: vi.fn().mockResolvedValue({ status: 'exited', exitCode: 1 }),
+    };
+    mockedCreateSandbox.mockResolvedValue(sandbox as any);
+
+    await detectOrphanedTasks([{ task, project: mockProject() }]);
+
+    expect(task.updateStatusFromIteration).toHaveBeenCalledTimes(1);
+    expect(task.markFailed).toHaveBeenCalledWith(
+      'Container exited unexpectedly (possible crash or system restart)'
+    );
+  });
+
+  it('detects orphan when restart startup has timed out (>5 minutes)', async () => {
+    const task = mockTask(29, 'IN_PROGRESS', 'container-29', {
+      // lastRestartAt was over 5 minutes ago but runningAt was never updated
+      lastRestartAt: new Date(Date.now() - 6 * 60 * 1000).toISOString(),
+      runningAt: undefined,
+    });
+    const sandbox = { inspect: vi.fn().mockResolvedValue(null) };
+    mockedCreateSandbox.mockResolvedValue(sandbox as any);
+
+    await detectOrphanedTasks([{ task, project: mockProject() }]);
+
+    // After the 5-minute timeout, the task should no longer be considered "in flight"
+    expect(mockedCreateSandbox).toHaveBeenCalledTimes(1);
+    expect(task.markFailed).toHaveBeenCalledWith(
+      'Container exited unexpectedly (possible crash or system restart)'
+    );
+  });
+
+  it('skips orphan detection when restart startup is recent (<5 minutes) without runningAt', async () => {
+    const task = mockTask(30, 'IN_PROGRESS', 'container-30', {
+      // lastRestartAt was 1 minute ago, runningAt never updated
+      lastRestartAt: new Date(Date.now() - 60 * 1000).toISOString(),
+      runningAt: undefined,
+    });
+
+    await detectOrphanedTasks([{ task, project: mockProject() }]);
+
+    expect(mockedCreateSandbox).not.toHaveBeenCalled();
+    expect(task.markFailed).not.toHaveBeenCalled();
+  });
+
+  it('does not treat stale resume lock as active and continues orphan detection', async () => {
+    const task = mockTask(26, 'IN_PROGRESS', 'container-26');
+    const sandbox = { inspect: vi.fn().mockResolvedValue(null) };
+    mockedCreateSandbox.mockResolvedValue(sandbox as any);
+    mockedExistsSync.mockImplementation(path =>
+      String(path).endsWith('.resume.lock')
+    );
+    mockedReadFileSync.mockReturnValue('99999999');
+    vi.spyOn(process, 'kill').mockImplementation(() => {
+      throw Object.assign(new Error('No such process'), { code: 'ESRCH' });
+    });
+
+    await detectOrphanedTasks([{ task, project: mockProject() }]);
+
+    expect(mockedCreateSandbox).toHaveBeenCalledTimes(1);
+    expect(task.markFailed).toHaveBeenCalledWith(
+      'Container exited unexpectedly (possible crash or system restart)'
+    );
   });
 });

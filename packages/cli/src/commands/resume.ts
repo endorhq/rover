@@ -134,10 +134,16 @@ const resumeCommand = async (
     }
 
     // Use the shared resume helper
-    const success = await resumeTask(project, numericTaskId);
+    const result = await resumeTask(project, numericTaskId);
 
-    if (!success) {
-      jsonOutput.error = `Failed to resume task ${taskId}`;
+    if (result.status !== 'ok') {
+      if (result.status === 'already_resuming') {
+        jsonOutput.error = `Task ${taskId} is already being resumed by another process`;
+      } else if (result.status === 'not_resumable') {
+        jsonOutput.error = `Task ${taskId} is not in a resumable state`;
+      } else {
+        jsonOutput.error = `Failed to resume task ${taskId}: ${result.error}`;
+      }
       telemetry?.eventResumeTaskFailed(jsonOutput.error);
       await exitWithError(jsonOutput, { telemetry });
       return;

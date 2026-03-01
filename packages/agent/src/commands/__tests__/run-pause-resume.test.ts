@@ -481,7 +481,7 @@ describe('run command: pause/resume integration', () => {
       expect(status.status).toBe('completed');
     });
 
-    it('marks signal-interrupted runs as paused before exiting', async () => {
+    it('marks SIGTERM-interrupted runs as paused before exiting', async () => {
       writeWorkflow();
 
       (Runner as unknown as Mock).mockImplementation(() => ({
@@ -508,6 +508,35 @@ describe('run command: pause/resume integration', () => {
       const status = readStatusFile(statusPath);
       expect(status.status).toBe('paused');
       expect(status.error).toBe('Workflow paused by SIGTERM signal');
+    });
+
+    it('marks SIGINT-interrupted runs as paused before exiting', async () => {
+      writeWorkflow();
+
+      (Runner as unknown as Mock).mockImplementation(() => ({
+        run: vi.fn().mockImplementation(async () => {
+          process.emit('SIGINT');
+          return makeResult('step1', false, {
+            error: 'interrupted after SIGINT',
+          });
+        }),
+      }));
+
+      await runCommand(workflowPath, {
+        input: [],
+        output: outputDir,
+        taskId: 'test-task-1',
+        statusFile: statusPath,
+      });
+
+      expect(vi.mocked(process.exit).mock.calls[0]?.[0]).toBe(2);
+
+      const checkpoint = readCheckpointFile(outputDir);
+      expect(checkpoint).not.toBeNull();
+
+      const status = readStatusFile(statusPath);
+      expect(status.status).toBe('paused');
+      expect(status.error).toBe('Workflow paused by SIGINT signal');
     });
   });
 

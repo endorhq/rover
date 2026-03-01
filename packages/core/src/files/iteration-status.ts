@@ -190,7 +190,7 @@ export class IterationStatusManager {
     return this.data.taskId;
   }
 
-  get status(): string {
+  get status(): IterationStatusName {
     return this.data.status;
   }
 

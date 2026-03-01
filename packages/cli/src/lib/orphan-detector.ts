@@ -1,22 +1,34 @@
-import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import colors from 'ansi-colors';
 import type { ProjectManager, TaskDescriptionManager } from 'rover-core';
-import { VERBOSE } from 'rover-core';
 import { AGENT_EXIT_CODE } from 'rover-schemas';
+import { isResumeLockActive } from '../utils/resume-lock.js';
 import { createSandbox } from './sandbox/index.js';
 
 function isResumeLockHeld(task: TaskDescriptionManager): boolean {
   const iterationPath = join(task.iterationsPath(), task.iterations.toString());
-  return existsSync(join(iterationPath, '.resume.lock'));
+  return isResumeLockActive(iterationPath);
 }
+
+/** Maximum time (ms) to consider a restart "in flight" before treating it as stale. */
+const STARTUP_TIMEOUT_MS = 5 * 60 * 1000;
 
 function isRestartStartupInFlight(task: TaskDescriptionManager): boolean {
   if (!task.lastRestartAt) return false;
-  if (!task.runningAt) return true;
 
+  // If runningAt was updated after the last restart, startup completed.
+  if (
+    task.runningAt &&
+    new Date(task.runningAt).getTime() >= new Date(task.lastRestartAt).getTime()
+  ) {
+    return false;
+  }
+
+  // No runningAt (or stale runningAt) — startup hasn't completed.
+  // Apply a timeout guard so a crashed restart doesn't permanently
+  // prevent orphan detection for this task.
   return (
-    new Date(task.runningAt).getTime() < new Date(task.lastRestartAt).getTime()
+    Date.now() - new Date(task.lastRestartAt).getTime() < STARTUP_TIMEOUT_MS
   );
 }
 
@@ -110,9 +122,14 @@ export async function detectOrphanedTasks(
           return;
         }
 
-        task.markFailed(
-          'Container exited unexpectedly (possible crash or system restart)'
-        );
+        // Try to read the agent's last error from the status file before
+        // falling back to a generic message.
+        task.updateStatusFromIteration();
+        if (!task.isFailed()) {
+          task.markFailed(
+            'Container exited unexpectedly (possible crash or system restart)'
+          );
+        }
         warn(
           colors.yellow(
             `⚠ Task ${task.id} marked as FAILED — container is no longer running. Use "rover resume ${task.id}" to continue.`

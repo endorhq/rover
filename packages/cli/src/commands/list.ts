@@ -208,6 +208,8 @@ const listCommand = async (
     watching?: boolean;
     /** Internal: retry scheduler passed through from watch mode */
     _retryScheduler?: RetryScheduler;
+    /** Internal: mutable ref for orphan detection throttle (shared across watch cycles) */
+    _orphanDetectRef?: { lastAt: number };
   } = {}
 ) => {
   if (options.json !== undefined) {
@@ -304,10 +306,24 @@ const listCommand = async (
       }
     }
 
-    // Detect orphaned IN_PROGRESS/ITERATING tasks whose container died
-    await detectOrphanedTasks(orphanCandidates, {
-      suppressWarnings: isJsonMode(),
-    });
+    // Detect orphaned IN_PROGRESS/ITERATING tasks whose container died.
+    // Throttle to every 30 seconds in watch mode since each detection round
+    // involves container inspect calls that can be slow with many tasks.
+    const ORPHAN_DETECT_INTERVAL_MS = 30_000;
+    const now = Date.now();
+    const orphanRef = options._orphanDetectRef;
+    if (
+      !options.watching ||
+      !orphanRef ||
+      now - orphanRef.lastAt >= ORPHAN_DETECT_INTERVAL_MS
+    ) {
+      await detectOrphanedTasks(orphanCandidates, {
+        suppressWarnings: isJsonMode(),
+      });
+      if (orphanRef) {
+        orphanRef.lastAt = now;
+      }
+    }
 
     // Use refreshed task state for scheduler updates and onComplete hooks.
     const retryScheduler = options._retryScheduler;
@@ -558,8 +574,13 @@ const listCommand = async (
       );
 
       const watchScheduler = options._retryScheduler;
+      // Mutable ref shared across watch cycles so the orphan detection
+      // throttle persists between recursive listCommand calls.
+      const orphanDetectRef = { lastAt: 0 };
       let watchTimeout: ReturnType<typeof setTimeout> | undefined;
       let stopping = false;
+      let consecutiveErrors = 0;
+      const MAX_CONSECUTIVE_ERRORS = 10;
 
       // Use setTimeout chain instead of setInterval to prevent overlapping
       // refresh cycles when a refresh takes longer than the interval.
@@ -573,18 +594,30 @@ const listCommand = async (
               watch: false,
               watching: true,
               _retryScheduler: watchScheduler,
+              _orphanDetectRef: orphanDetectRef,
             });
             console.log(
               colors.gray(
                 `\n⏱️  Refreshing every ${intervalSeconds}s (Ctrl+C to exit)...`
               )
             );
+            consecutiveErrors = 0;
           } catch (err) {
+            consecutiveErrors++;
             console.error(
               colors.red(
                 `Error during watch refresh: ${err instanceof Error ? err.message : String(err)}`
               )
             );
+            if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+              console.error(
+                colors.red(
+                  `\nToo many consecutive refresh errors (${MAX_CONSECUTIVE_ERRORS}), stopping watch mode.`
+                )
+              );
+              stopping = true;
+              return;
+            }
           }
           scheduleRefresh();
         }, intervalMs);

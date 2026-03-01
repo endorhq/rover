@@ -117,13 +117,14 @@ const normalizeSyncResult = <T extends ReturnType<typeof execaSync>>(
     );
   }
 
-  return Object.assign(result, {
+  return {
+    ...result,
     failed: false,
     code: undefined,
     shortMessage: '',
     originalMessage: '',
     message: '',
-  });
+  } as T;
 };
 
 const runExecaSync = (

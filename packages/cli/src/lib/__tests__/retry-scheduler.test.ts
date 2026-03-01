@@ -96,9 +96,21 @@ describe('RetryScheduler', () => {
     });
   });
 
+  /** Helper to create a mock project with getTask returning a resumable task. */
+  function makeMockProject(path = '/tmp/project', taskStatus = 'PAUSED'): any {
+    return {
+      path,
+      getTask: vi.fn().mockReturnValue({
+        status: taskStatus,
+        isPaused: () => taskStatus === 'PAUSED',
+        isFailed: () => taskStatus === 'FAILED',
+      }),
+    };
+  }
+
   describe('registerPausedTask', () => {
     it('creates a new timer for a new provider', () => {
-      const mockProject = {} as any;
+      const mockProject = makeMockProject();
       scheduler.registerPausedTask('claude', 1, mockProject);
 
       const scheduledTime = scheduler.getScheduledTime('claude');
@@ -107,7 +119,7 @@ describe('RetryScheduler', () => {
     });
 
     it('updates the provider retry time when a newly added task is scheduled earlier', () => {
-      const mockProject = { path: '/tmp/project' } as any;
+      const mockProject = makeMockProject();
       const randomSpy = vi
         .spyOn(Math, 'random')
         .mockReturnValueOnce(0.99)
@@ -131,7 +143,7 @@ describe('RetryScheduler', () => {
     });
 
     it('creates separate timers for different providers', () => {
-      const mockProject = {} as any;
+      const mockProject = makeMockProject();
       scheduler.registerPausedTask('claude', 1, mockProject);
       scheduler.registerPausedTask('gemini', 2, mockProject);
 
@@ -140,7 +152,7 @@ describe('RetryScheduler', () => {
     });
 
     it('returns task-specific scheduled times for paused tasks', () => {
-      const mockProject = { path: '/tmp/project' } as any;
+      const mockProject = makeMockProject();
       scheduler.registerPausedTask('claude', 1, mockProject);
       scheduler.registerPausedTask('claude', 2, mockProject);
 
@@ -152,8 +164,8 @@ describe('RetryScheduler', () => {
     });
 
     it('correctly tracks tasks from projects with colons in path', () => {
-      const projectA = { path: '/tmp/C:/Users/projectA' } as any;
-      const projectB = { path: '/home/user:name/project:B' } as any;
+      const projectA = makeMockProject('/tmp/C:/Users/projectA');
+      const projectB = makeMockProject('/home/user:name/project:B');
 
       scheduler.registerPausedTask('claude', 1, projectA);
       scheduler.registerPausedTask('claude', 2, projectB);
@@ -164,8 +176,11 @@ describe('RetryScheduler', () => {
     });
 
     it('resets retry backoff immediately when provider changes', async () => {
-      const mockProject = { path: '/tmp/project' } as any;
-      mockedResumeTask.mockResolvedValue(false);
+      const mockProject = makeMockProject();
+      mockedResumeTask.mockResolvedValue({
+        status: 'failed',
+        error: 'still paused',
+      });
 
       scheduler.registerPausedTask('claude', 1, mockProject);
       await vi.advanceTimersToNextTimerAsync();
@@ -184,7 +199,7 @@ describe('RetryScheduler', () => {
 
   describe('unregisterTask', () => {
     it('removes a task from the provider group', () => {
-      const mockProject = {} as any;
+      const mockProject = makeMockProject();
       scheduler.registerPausedTask('claude', 1, mockProject);
       scheduler.registerPausedTask('claude', 2, mockProject);
 
@@ -195,7 +210,7 @@ describe('RetryScheduler', () => {
     });
 
     it('clears timer when last task for provider is removed', () => {
-      const mockProject = {} as any;
+      const mockProject = makeMockProject();
       scheduler.registerPausedTask('claude', 1, mockProject);
 
       scheduler.unregisterTask('claude', 1, mockProject);
@@ -208,8 +223,11 @@ describe('RetryScheduler', () => {
     });
 
     it('clears retry count when a task leaves the paused state', async () => {
-      const mockProject = { path: '/tmp/project' } as any;
-      mockedResumeTask.mockResolvedValue(false);
+      const mockProject = makeMockProject();
+      mockedResumeTask.mockResolvedValue({
+        status: 'failed',
+        error: 'still paused',
+      });
 
       scheduler.registerPausedTask('claude', 1, mockProject);
       await vi.advanceTimersToNextTimerAsync();
@@ -223,9 +241,9 @@ describe('RetryScheduler', () => {
     });
 
     it('removes only the matching project task when task ids collide', async () => {
-      const projectA = { path: '/tmp/project-a' } as any;
-      const projectB = { path: '/tmp/project-b' } as any;
-      mockedResumeTask.mockResolvedValue(true);
+      const projectA = makeMockProject('/tmp/project-a');
+      const projectB = makeMockProject('/tmp/project-b');
+      mockedResumeTask.mockResolvedValue({ status: 'ok' });
 
       scheduler.registerPausedTask('claude', 1, projectA);
       scheduler.registerPausedTask('claude', 1, projectB);
@@ -239,8 +257,11 @@ describe('RetryScheduler', () => {
     });
 
     it('handles project paths containing colons', async () => {
-      const colonProject = { path: '/tmp/C:/Users/test' } as any;
-      mockedResumeTask.mockResolvedValue(false);
+      const colonProject = makeMockProject('/tmp/C:/Users/test');
+      mockedResumeTask.mockResolvedValue({
+        status: 'failed',
+        error: 'still paused',
+      });
 
       scheduler.registerPausedTask('claude', 1, colonProject);
       await vi.advanceTimersToNextTimerAsync();
@@ -256,8 +277,11 @@ describe('RetryScheduler', () => {
     });
 
     it('does not clear retry counts without project to prevent cross-project collisions', async () => {
-      const colonProject = { path: '/tmp/C:/Users/test' } as any;
-      mockedResumeTask.mockResolvedValue(false);
+      const colonProject = makeMockProject('/tmp/C:/Users/test');
+      mockedResumeTask.mockResolvedValue({
+        status: 'failed',
+        error: 'still paused',
+      });
 
       scheduler.registerPausedTask('claude', 1, colonProject);
 
@@ -277,7 +301,7 @@ describe('RetryScheduler', () => {
     });
 
     it('handles project paths with multiple colons', () => {
-      const multiColonProject = { path: '/path:with:many:colons' } as any;
+      const multiColonProject = makeMockProject('/path:with:many:colons');
 
       scheduler.registerPausedTask('claude', 1, multiColonProject);
 
@@ -289,8 +313,11 @@ describe('RetryScheduler', () => {
     });
 
     it('resets a later pause episode back to retry count zero', async () => {
-      const mockProject = { path: '/tmp/project' } as any;
-      mockedResumeTask.mockResolvedValue(false);
+      const mockProject = makeMockProject();
+      mockedResumeTask.mockResolvedValue({
+        status: 'failed',
+        error: 'still paused',
+      });
 
       scheduler.registerPausedTask('claude', 1, mockProject);
       await vi.advanceTimersToNextTimerAsync();
@@ -312,7 +339,7 @@ describe('RetryScheduler', () => {
 
   describe('destroy', () => {
     it('clears all timers', () => {
-      const mockProject = {} as any;
+      const mockProject = makeMockProject();
       scheduler.registerPausedTask('claude', 1, mockProject);
       scheduler.registerPausedTask('gemini', 2, mockProject);
 
@@ -325,8 +352,8 @@ describe('RetryScheduler', () => {
 
   describe('timer firing', () => {
     it('calls resumeTask for all registered tasks when timer fires', async () => {
-      const mockProject = {} as any;
-      mockedResumeTask.mockResolvedValue(true);
+      const mockProject = makeMockProject();
+      mockedResumeTask.mockResolvedValue({ status: 'ok' });
 
       scheduler.registerPausedTask('claude', 1, mockProject);
       scheduler.registerPausedTask('claude', 2, mockProject);
@@ -343,8 +370,11 @@ describe('RetryScheduler', () => {
     });
 
     it('re-registers tasks that fail to resume', async () => {
-      const mockProject = {} as any;
-      mockedResumeTask.mockResolvedValue(false);
+      const mockProject = makeMockProject();
+      mockedResumeTask.mockResolvedValue({
+        status: 'failed',
+        error: 'still paused',
+      });
 
       scheduler.registerPausedTask('claude', 1, mockProject);
 
@@ -358,7 +388,7 @@ describe('RetryScheduler', () => {
     });
 
     it('re-registers tasks that throw errors during resume', async () => {
-      const mockProject = {} as any;
+      const mockProject = makeMockProject();
       mockedResumeTask.mockRejectedValue(new Error('Container failed'));
 
       scheduler.registerPausedTask('claude', 1, mockProject);
@@ -373,8 +403,11 @@ describe('RetryScheduler', () => {
     });
 
     it('stops retrying after max attempts (5) on persistent failure', async () => {
-      const mockProject = { path: '/tmp/project' } as any;
-      mockedResumeTask.mockResolvedValue(false);
+      const mockProject = makeMockProject();
+      mockedResumeTask.mockResolvedValue({
+        status: 'failed',
+        error: 'still paused',
+      });
 
       scheduler.registerPausedTask('claude', 1, mockProject);
 
@@ -390,7 +423,7 @@ describe('RetryScheduler', () => {
     });
 
     it('stops retrying after max attempts on persistent errors', async () => {
-      const mockProject = { path: '/tmp/project' } as any;
+      const mockProject = makeMockProject();
       mockedResumeTask.mockRejectedValue(new Error('Docker broken'));
 
       scheduler.registerPausedTask('claude', 1, mockProject);
@@ -404,8 +437,11 @@ describe('RetryScheduler', () => {
     });
 
     it('does not re-register a task after it has reached the retry cap', async () => {
-      const mockProject = { path: '/tmp/project' } as any;
-      mockedResumeTask.mockResolvedValue(false);
+      const mockProject = makeMockProject();
+      mockedResumeTask.mockResolvedValue({
+        status: 'failed',
+        error: 'still paused',
+      });
 
       scheduler.registerPausedTask('claude', 1, mockProject);
 
@@ -420,8 +456,11 @@ describe('RetryScheduler', () => {
     });
 
     it('logs a message when registration is skipped due to max retries', async () => {
-      const mockProject = { path: '/tmp/project' } as any;
-      mockedResumeTask.mockResolvedValue(false);
+      const mockProject = makeMockProject();
+      mockedResumeTask.mockResolvedValue({
+        status: 'failed',
+        error: 'still paused',
+      });
 
       scheduler.registerPausedTask('claude', 1, mockProject);
 
@@ -439,13 +478,13 @@ describe('RetryScheduler', () => {
     });
 
     it('preserves retry count on successful resume to prevent rapid re-pause bypass', async () => {
-      const mockProject = { path: '/tmp/project' } as any;
+      const mockProject = makeMockProject();
 
       // Fail twice, then succeed
       mockedResumeTask
-        .mockResolvedValueOnce(false)
-        .mockResolvedValueOnce(false)
-        .mockResolvedValueOnce(true);
+        .mockResolvedValueOnce({ status: 'failed', error: 'still paused' })
+        .mockResolvedValueOnce({ status: 'failed', error: 'still paused' })
+        .mockResolvedValueOnce({ status: 'ok' });
 
       scheduler.registerPausedTask('claude', 1, mockProject);
 
@@ -461,9 +500,11 @@ describe('RetryScheduler', () => {
     });
 
     it('keeps backoff independent for tasks from the same provider', async () => {
-      const mockProject = { path: '/tmp/project' } as any;
+      const mockProject = makeMockProject();
 
-      mockedResumeTask.mockResolvedValueOnce(false).mockResolvedValue(true);
+      mockedResumeTask
+        .mockResolvedValueOnce({ status: 'failed', error: 'still paused' })
+        .mockResolvedValue({ status: 'ok' });
 
       scheduler.registerPausedTask('claude', 1, mockProject);
       await vi.advanceTimersToNextTimerAsync();

@@ -737,6 +737,9 @@ export const runCommand = async (
           output.success = false;
           output.error = err.message;
           output.paused = true;
+          // Ensure checkpoint is persisted even if saveFailureSnapshot's
+          // internal persist() failed earlier (it warns but continues).
+          saveCheckpoint(options.output, checkpointStore.getData());
           logger?.info('workflow_pause', output.error, {
             taskId: options.taskId,
             metadata: { reason: 'retryable_error' },
