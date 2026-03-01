@@ -100,6 +100,11 @@ export class RetryScheduler {
 
     const retryCount = this.retryCounts.get(key) ?? 0;
     if (retryCount >= MAX_AUTO_RETRIES) {
+      console.log(
+        colors.yellow(
+          `  ⚠ Task ${taskId} reached max auto-retries (${MAX_AUTO_RETRIES}), use ${colors.cyan(`rover resume ${taskId}`)} to retry manually.`
+        )
+      );
       return;
     }
 

@@ -419,6 +419,25 @@ describe('RetryScheduler', () => {
       expect(scheduler.getScheduledTime('claude')).toBeUndefined();
     });
 
+    it('logs a message when registration is skipped due to max retries', async () => {
+      const mockProject = { path: '/tmp/project' } as any;
+      mockedResumeTask.mockResolvedValue(false);
+
+      scheduler.registerPausedTask('claude', 1, mockProject);
+
+      for (let i = 0; i < 5; i++) {
+        await vi.advanceTimersToNextTimerAsync();
+      }
+
+      const logSpy = vi.spyOn(console, 'log');
+      scheduler.registerPausedTask('claude', 1, mockProject);
+
+      expect(logSpy).toHaveBeenCalledWith(
+        expect.stringContaining('max auto-retries')
+      );
+      logSpy.mockRestore();
+    });
+
     it('preserves retry count on successful resume to prevent rapid re-pause bypass', async () => {
       const mockProject = { path: '/tmp/project' } as any;
 
