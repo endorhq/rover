@@ -6,6 +6,7 @@ import {
   writeFileSync,
   existsSync,
   utimesSync,
+  readFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -432,6 +433,92 @@ describe('resumeTask', () => {
     expect(task.markPaused).toHaveBeenCalledWith('Paused earlier');
   });
 
+  it('restores PAUSED status when createSandbox itself throws', async () => {
+    const task = createMockTask({
+      status: 'PAUSED',
+      error: 'Paused by user',
+    });
+    const project = createMockProject(task);
+
+    mockedCreateSandbox.mockRejectedValue(
+      new Error('Failed to pull agent image')
+    );
+
+    const result = await resumeTask(project, 1);
+
+    expect(result).toBe(false);
+    expect(task.markInProgress).toHaveBeenCalled();
+    expect(task.markPaused).toHaveBeenCalledWith('Paused by user');
+    expect(task.markFailed).not.toHaveBeenCalled();
+    expect(mockIterationStatus.pause).toHaveBeenCalledWith(
+      'Resuming workflow',
+      'Resume failed: container could not start'
+    );
+    expect(mockIterationStatus.fail).not.toHaveBeenCalled();
+  });
+
+  it('restores FAILED status when createSandbox itself throws', async () => {
+    const task = createMockTask({
+      status: 'FAILED',
+      error: 'Agent crashed',
+    });
+    const project = createMockProject(task);
+
+    mockedCreateSandbox.mockRejectedValue(
+      new Error('Failed to pull agent image')
+    );
+
+    const result = await resumeTask(project, 1);
+
+    expect(result).toBe(false);
+    expect(task.markInProgress).toHaveBeenCalled();
+    expect(task.markFailed).toHaveBeenCalledWith('Agent crashed');
+    expect(task.markPaused).not.toHaveBeenCalled();
+    expect(mockIterationStatus.fail).toHaveBeenCalledWith(
+      'Resuming workflow',
+      'Resume failed: container could not start'
+    );
+    expect(mockIterationStatus.pause).not.toHaveBeenCalled();
+  });
+
+  it('restores PAUSED status with fallback message when createAndStart throws and no prior error exists', async () => {
+    const task = createMockTask({ status: 'PAUSED' });
+    const project = createMockProject(task);
+
+    mockedCreateSandbox.mockResolvedValue({
+      createAndStart: vi
+        .fn()
+        .mockRejectedValue(new Error('container runtime unavailable')),
+    } as any);
+
+    const result = await resumeTask(project, 1);
+
+    expect(result).toBe(false);
+    expect(task.markPaused).toHaveBeenCalledWith(
+      'Resume failed: container could not start'
+    );
+    expect(task.markFailed).not.toHaveBeenCalled();
+  });
+
+  it('restores FAILED status with fallback message when createAndStart throws and no prior error exists', async () => {
+    const task = createMockTask({ status: 'FAILED' });
+    const project = createMockProject(task);
+
+    mockedCreateSandbox.mockResolvedValue({
+      createAndStart: vi
+        .fn()
+        .mockRejectedValue(new Error('container runtime unavailable')),
+    } as any);
+
+    const result = await resumeTask(project, 1);
+
+    expect(result).toBe(false);
+    expect(task.markFailed).toHaveBeenCalledWith(
+      'Resume failed: container could not start'
+    );
+    expect(task.markPaused).not.toHaveBeenCalled();
+  });
+
   it('marks task in progress before resetting status and storing container info', async () => {
     const callOrder: string[] = [];
     mockedIterationStatusManager.createInitial.mockImplementation(() => {
@@ -455,5 +542,140 @@ describe('resumeTask', () => {
 
     expect(result).toBe(true);
     expect(callOrder).toEqual(['task', 'status', 'container']);
+  });
+
+  describe('concurrent resume lock contention', () => {
+    it('returns false when lock file exists with a live PID', async () => {
+      const iterationPath = join(tempDir, 'iterations');
+      const task = createMockTask({
+        status: 'PAUSED',
+        iterationsPath: () => iterationPath,
+      });
+      const project = createMockProject(task);
+
+      const lockDir = join(iterationPath, '1');
+      mkdirSync(lockDir, { recursive: true });
+      const lockPath = join(lockDir, '.resume.lock');
+      writeFileSync(lockPath, '112233', 'utf8');
+
+      // Simulate the owning PID being alive: process.kill(pid, 0) succeeds
+      const killSpy = vi
+        .spyOn(process, 'kill')
+        .mockImplementation((pid: number | bigint) => {
+          if (pid === 112233) return true as any;
+          throw Object.assign(new Error('No such process'), { code: 'ESRCH' });
+        });
+
+      const result = await resumeTask(project, 1);
+
+      expect(result).toBe(false);
+      expect(mockedCreateSandbox).not.toHaveBeenCalled();
+      expect(task.markInProgress).not.toHaveBeenCalled();
+      // Lock file should remain untouched with original PID
+      expect(existsSync(lockPath)).toBe(true);
+      expect(readFileSync(lockPath, 'utf8')).toBe('112233');
+
+      killSpy.mockRestore();
+    });
+
+    it('reclaims a stale lock from a dead PID and resumes successfully', async () => {
+      const iterationPath = join(tempDir, 'iterations');
+      const task = createMockTask({
+        status: 'PAUSED',
+        iterationsPath: () => iterationPath,
+      });
+      const project = createMockProject(task);
+
+      const lockDir = join(iterationPath, '1');
+      mkdirSync(lockDir, { recursive: true });
+      const lockPath = join(lockDir, '.resume.lock');
+      writeFileSync(lockPath, '554433', 'utf8');
+
+      // Simulate the owning PID being dead: process.kill(pid, 0) throws ESRCH
+      const killSpy = vi
+        .spyOn(process, 'kill')
+        .mockImplementation((_pid: number | bigint) => {
+          throw Object.assign(new Error('No such process'), { code: 'ESRCH' });
+        });
+
+      mockedCreateSandbox.mockResolvedValue({
+        createAndStart: vi.fn().mockResolvedValue('container-reclaimed'),
+      } as any);
+
+      const result = await resumeTask(project, 1);
+
+      expect(result).toBe(true);
+      expect(task.markInProgress).toHaveBeenCalled();
+      expect(task.setContainerInfo).toHaveBeenCalledWith(
+        'container-reclaimed',
+        'running',
+        undefined
+      );
+      // After successful resume, the lock should be released (cleaned up)
+      expect(existsSync(lockPath)).toBe(false);
+
+      killSpy.mockRestore();
+    });
+
+    it('second caller fails gracefully when two callers race to acquire the lock', async () => {
+      const iterationPath = join(tempDir, 'iterations');
+      const task = createMockTask({
+        status: 'PAUSED',
+        iterationsPath: () => iterationPath,
+      });
+      const project = createMockProject(task);
+
+      // Use a deferred promise so the first caller's sandbox blocks until we
+      // explicitly resolve it, guaranteeing the lock is held when the second
+      // caller attempts to acquire it.
+      let resolveFirstSandbox!: (value: string) => void;
+      const firstSandboxPromise = new Promise<string>(resolve => {
+        resolveFirstSandbox = resolve;
+      });
+
+      let sandboxCallCount = 0;
+      mockedCreateSandbox.mockImplementation(async () => {
+        sandboxCallCount++;
+        if (sandboxCallCount === 1) {
+          return {
+            createAndStart: vi
+              .fn()
+              .mockImplementation(() => firstSandboxPromise),
+          } as any;
+        }
+        // Second caller should never reach sandbox creation
+        return {
+          createAndStart: vi.fn().mockResolvedValue('container-second'),
+        } as any;
+      });
+
+      // Start the first resume -- it acquires the lock synchronously, then
+      // awaits createAndStart which blocks on our deferred promise.
+      const firstResume = resumeTask(project, 1);
+
+      // Yield to let the first caller reach the await inside createAndStart,
+      // which means the lock file already exists with process.pid.
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      // Start the second resume while the first still holds the lock.
+      // The lock file contains our own PID (process.pid), which is alive,
+      // so the second caller cannot reclaim it.
+      const secondResume = resumeTask(project, 1);
+      const secondResult = await secondResume;
+
+      // Second caller should fail gracefully
+      expect(secondResult).toBe(false);
+
+      // Now let the first caller finish
+      resolveFirstSandbox('container-winner');
+      const firstResult = await firstResume;
+
+      // First caller should succeed
+      expect(firstResult).toBe(true);
+
+      // The lock should be released after the successful caller finishes
+      const lockPath = join(iterationPath, '1', '.resume.lock');
+      expect(existsSync(lockPath)).toBe(false);
+    });
   });
 });

@@ -12,6 +12,7 @@ import {
   IterationStatusManager,
   Git,
   ProjectConfigManager,
+  VERBOSE,
   type ProjectManager,
 } from 'rover-core';
 import { TaskNotFoundError } from 'rover-schemas';
@@ -88,7 +89,12 @@ function acquireResumeLock(iterationPath: string): (() => void) | null {
       // acquired first, this will correctly fail and we return null.
       return tryAcquireLock();
     }
-  } catch {}
+  } catch (err) {
+    // Log unreadable lock files (e.g. permission denied) instead of silently ignoring
+    if (VERBOSE) {
+      console.warn(`Warning: could not read lock file ${lockPath}:`, err);
+    }
+  }
   return null;
 }
 
