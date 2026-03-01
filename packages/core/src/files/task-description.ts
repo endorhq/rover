@@ -336,6 +336,11 @@ export class TaskDescriptionManager {
     const timestamp = metadata?.timestamp || new Date().toISOString();
 
     switch (status) {
+      case 'NEW':
+        // Clear stale metadata from a previous PAUSED, FAILED, or IN_PROGRESS state
+        this.data.error = undefined;
+        this.data.pausedAt = undefined;
+        break;
       case 'IN_PROGRESS':
         if (!this.data.startedAt) {
           this.data.startedAt = timestamp;
@@ -895,6 +900,8 @@ export class TaskDescriptionManager {
       this.data.completedAt = new Date().toISOString();
     } else if (status === 'failed') {
       this.data.failedAt = new Date().toISOString();
+    } else if (status === 'paused') {
+      this.data.pausedAt = new Date().toISOString();
     }
 
     this.save();

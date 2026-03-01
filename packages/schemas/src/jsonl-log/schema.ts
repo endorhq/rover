@@ -21,6 +21,7 @@ export const LogEventSchema = z.enum([
   'workflow_complete',
   'workflow_fail',
   'workflow_pause',
+  'workflow_resume',
   'step_start',
   'step_complete',
   'step_fail',

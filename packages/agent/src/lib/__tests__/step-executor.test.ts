@@ -998,6 +998,165 @@ describe('executeStep', () => {
     expect(stepsOutput.get('run_cmd')?.get('exit_code')).toBe('0');
     expect(stepsOutput.get('run_cmd')?.get('stdout')).toBe('PASS');
   });
+  it('retries ACP transient errors (thrown exceptions) before propagating', async () => {
+    vi.useFakeTimers();
+
+    const agentStep: WorkflowAgentStep = {
+      id: 'acp_transient',
+      name: 'ACP Transient',
+      type: 'agent',
+      prompt: 'Do something',
+      outputs: [],
+    };
+
+    let callCount = 0;
+    const mockAcpRunner = {
+      createSession: vi.fn().mockResolvedValue('session-789'),
+      runStep: vi.fn().mockImplementation(async () => {
+        callCount++;
+        if (callCount <= 2) {
+          throw new Error('ECONNREFUSED: connection refused');
+        }
+        return {
+          id: 'acp_transient',
+          success: true,
+          duration: 0.5,
+          outputs: new Map([['result', 'ok']]),
+        };
+      }),
+      closeSession: vi.fn(),
+      stepsOutput: new Map<string, Map<string, string>>(),
+    } as unknown as ACPRunner;
+
+    const resultPromise = executeStep(agentStep, {
+      workflow: createMockWorkflowManager(),
+      inputs: new Map(),
+      stepsOutput: new Map(),
+      totalSteps: 1,
+      currentStepIndex: 0,
+      acpRunner: mockAcpRunner,
+    });
+
+    // Advance past the first retry delay (10s)
+    await vi.advanceTimersByTimeAsync(10_000);
+    // Advance past the second retry delay (20s)
+    await vi.advanceTimersByTimeAsync(20_000);
+
+    const result = await resultPromise;
+
+    expect(result.success).toBe(true);
+    // Should have retried twice then succeeded on the 3rd attempt
+    expect(mockAcpRunner.runStep).toHaveBeenCalledTimes(3);
+    // closeSession should be called each time (once per retry + once for success)
+    expect(mockAcpRunner.closeSession).toHaveBeenCalledTimes(3);
+
+    vi.useRealTimers();
+  });
+
+  it('propagates non-transient ACP thrown exceptions immediately', async () => {
+    const agentStep: WorkflowAgentStep = {
+      id: 'acp_fatal',
+      name: 'ACP Fatal',
+      type: 'agent',
+      prompt: 'Do something',
+      outputs: [],
+    };
+
+    const mockAcpRunner = {
+      createSession: vi.fn().mockResolvedValue('session-000'),
+      runStep: vi.fn().mockRejectedValue(new Error('Invalid API key')),
+      closeSession: vi.fn(),
+      stepsOutput: new Map<string, Map<string, string>>(),
+    } as unknown as ACPRunner;
+
+    await expect(
+      executeStep(agentStep, {
+        workflow: createMockWorkflowManager(),
+        inputs: new Map(),
+        stepsOutput: new Map(),
+        totalSteps: 1,
+        currentStepIndex: 0,
+        acpRunner: mockAcpRunner,
+      })
+    ).rejects.toThrow('Invalid API key');
+
+    // Should NOT retry — non-transient error
+    expect(mockAcpRunner.runStep).toHaveBeenCalledTimes(1);
+  });
+
+  it('PauseWorkflowError in loop persists checkpoint before propagating', async () => {
+    const { launch } = await import('rover-core');
+    const { Runner } = await import('../runner.js');
+
+    vi.mocked(launch).mockResolvedValue({
+      exitCode: 0,
+      stdout: 'PASS',
+      stderr: '',
+    } as any);
+
+    vi.mocked(Runner).mockImplementation(
+      () =>
+        ({
+          run: vi.fn().mockResolvedValue({
+            id: 'failing_agent',
+            success: false,
+            duration: 1.0,
+            error: 'credit limit exceeded',
+            outputs: new Map([['error_retryable', 'true']]),
+          }),
+          tool: 'claude',
+        }) as any
+    );
+
+    const loopStep: WorkflowLoopStep = {
+      id: 'checkpoint_loop',
+      name: 'Checkpoint Loop',
+      type: 'loop',
+      until: 'steps.run_cmd.outputs.exit_code == 0',
+      maxIterations: 3,
+      steps: [
+        {
+          id: 'run_cmd',
+          name: 'Run Command',
+          type: 'command',
+          command: 'npm test',
+        } as WorkflowCommandStep,
+        {
+          id: 'failing_agent',
+          name: 'Failing Agent',
+          type: 'agent',
+          prompt: 'Fix something',
+          outputs: [],
+        } as WorkflowAgentStep,
+      ],
+    };
+
+    const mockCheckpointStore = {
+      getData: vi.fn().mockReturnValue({ completedSteps: [] }),
+      getCompletedStep: vi.fn(),
+      getLoopProgress: vi.fn().mockReturnValue(undefined),
+      setLoopProgress: vi.fn(),
+      clearLoopProgress: vi.fn(),
+      setCompletedSteps: vi.fn(),
+      saveFailureSnapshot: vi.fn(),
+    };
+
+    await expect(
+      executeStep(loopStep, {
+        workflow: createMockWorkflowManager(),
+        inputs: new Map(),
+        stepsOutput: new Map(),
+        totalSteps: 1,
+        currentStepIndex: 0,
+        checkpointStore: mockCheckpointStore as any,
+      })
+    ).rejects.toThrow(PauseWorkflowError);
+
+    // Loop progress should have been persisted for the command sub-step before the error
+    expect(mockCheckpointStore.setLoopProgress).toHaveBeenCalled();
+    // Failure snapshot should have been saved for the failing agent step
+    expect(mockCheckpointStore.saveFailureSnapshot).toHaveBeenCalled();
+  });
 });
 
 describe('shouldSkipStep', () => {

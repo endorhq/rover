@@ -253,7 +253,9 @@ describe('RetryScheduler', () => {
       await vi.advanceTimersByTimeAsync(2 * 60 * 60 * 1000);
 
       expect(mockedResumeTask).toHaveBeenCalledTimes(1);
-      expect(mockedResumeTask).toHaveBeenCalledWith(projectB, 1);
+      expect(mockedResumeTask).toHaveBeenCalledWith(projectB, 1, {
+        quiet: false,
+      });
     });
 
     it('handles project paths containing colons', async () => {
@@ -362,8 +364,12 @@ describe('RetryScheduler', () => {
       await vi.advanceTimersByTimeAsync(2 * 60 * 60 * 1000); // 2 hours
 
       expect(mockedResumeTask).toHaveBeenCalledTimes(2);
-      expect(mockedResumeTask).toHaveBeenCalledWith(mockProject, 1);
-      expect(mockedResumeTask).toHaveBeenCalledWith(mockProject, 2);
+      expect(mockedResumeTask).toHaveBeenCalledWith(mockProject, 1, {
+        quiet: false,
+      });
+      expect(mockedResumeTask).toHaveBeenCalledWith(mockProject, 2, {
+        quiet: false,
+      });
 
       // Timer should be cleared after firing
       expect(scheduler.getScheduledTime('claude')).toBeUndefined();
@@ -522,7 +528,9 @@ describe('RetryScheduler', () => {
 
       await vi.advanceTimersToNextTimerAsync();
 
-      expect(mockedResumeTask).toHaveBeenNthCalledWith(2, mockProject, 2);
+      expect(mockedResumeTask).toHaveBeenNthCalledWith(2, mockProject, 2, {
+        quiet: false,
+      });
       expect(scheduler.getRetryCount(mockProject, 1)).toBe(1);
       // Retry count preserved after success (count = 1 from the single fire)
       expect(scheduler.getRetryCount(mockProject, 2)).toBe(1);

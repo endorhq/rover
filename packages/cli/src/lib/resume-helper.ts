@@ -1,24 +1,17 @@
 import { join } from 'node:path';
-import {
-  existsSync,
-  mkdirSync,
-  writeFileSync,
-  unlinkSync,
-  readFileSync,
-} from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync, unlinkSync } from 'node:fs';
 import { generateBranchName } from '../utils/branch-name.js';
 import {
   IterationManager,
   IterationStatusManager,
   Git,
   ProjectConfigManager,
-  VERBOSE,
   type ProjectManager,
 } from 'rover-core';
 import { TaskNotFoundError } from 'rover-schemas';
 import { createSandbox } from '../lib/sandbox/index.js';
 import { copyEnvironmentFiles } from '../utils/env-files.js';
-import { isProcessAlive } from '../utils/process.js';
+import { isResumeLockActive } from '../utils/resume-lock.js';
 import colors from 'ansi-colors';
 
 /**
@@ -48,35 +41,23 @@ function acquireResumeLock(iterationPath: string): (() => void) | null {
     return release;
   }
 
-  try {
-    // Lock file already exists — only reclaim if the owning PID is invalid/dead.
-    const content = readFileSync(lockPath, 'utf8');
-    const lockPid = parseInt(content, 10);
-
-    const processAlive = isProcessAlive(lockPid);
-    // Never steal a lock from a live owner, even if it's old.
-    if (!processAlive) {
-      // Reclaim the stale lock: unlink the dead process's lock file, then
-      // re-acquire with O_EXCL.  This avoids the TOCTOU window in the old
-      // rename-based approach where a concurrent O_EXCL acquirer could be
-      // overwritten by the rename.
-      try {
-        unlinkSync(lockPath);
-      } catch {
-        // Another process may have already reclaimed or removed the lock
-        return null;
-      }
-      // Re-attempt O_EXCL acquisition — if another process raced us and
-      // acquired first, this will correctly fail and we return null.
-      return tryAcquireLock();
-    }
-  } catch (err) {
-    // Log unreadable lock files (e.g. permission denied) instead of silently ignoring
-    if (VERBOSE) {
-      console.warn(`Warning: could not read lock file ${lockPath}:`, err);
-    }
+  // Lock file already exists — only reclaim if the owning PID is dead.
+  // Reuse isResumeLockActive to avoid duplicating PID-checking logic.
+  if (isResumeLockActive(iterationPath)) {
+    // Lock is held by a live process — do not steal it.
+    return null;
   }
-  return null;
+
+  // The owning process is dead — reclaim the stale lock.
+  try {
+    unlinkSync(lockPath);
+  } catch {
+    // Another process may have already reclaimed or removed the lock
+    return null;
+  }
+  // Re-attempt O_EXCL acquisition — if another process raced us and
+  // acquired first, this will correctly fail and we return null.
+  return tryAcquireLock();
 }
 
 /** Possible outcomes of a resume attempt. */
@@ -90,10 +71,18 @@ export type ResumeResult =
  * Core resume logic extracted for reuse by both the `resume` command
  * and the automatic RetryScheduler.
  */
+export interface ResumeOptions {
+  /** Suppress informational console.log messages (e.g. in JSON mode). */
+  quiet?: boolean;
+}
+
 export async function resumeTask(
   project: ProjectManager,
-  taskId: number
+  taskId: number,
+  options: ResumeOptions = {}
 ): Promise<ResumeResult> {
+  const log = options.quiet ? () => {} : console.log;
+
   const task = project.getTask(taskId);
   if (!task) {
     throw new TaskNotFoundError(taskId);
@@ -106,7 +95,7 @@ export async function resumeTask(
 
   // Find checkpoint.json in the last iteration's output directory
   if (!task.iterations || task.iterations < 1) {
-    console.log(
+    log(
       colors.yellow(
         `  ⚠ Task ${taskId} has no iterations (iterations=${task.iterations}), cannot resume.`
       )
@@ -120,7 +109,7 @@ export async function resumeTask(
   mkdirSync(iterationPath, { recursive: true });
   const releaseLock = acquireResumeLock(iterationPath);
   if (!releaseLock) {
-    console.log(
+    log(
       colors.yellow(
         `  ⚠ Task ${taskId} is already being resumed by another process, skipping.`
       )
@@ -129,7 +118,7 @@ export async function resumeTask(
   }
 
   try {
-    return await resumeTaskLocked(project, taskId, iterationPath);
+    return await resumeTaskLocked(project, taskId, iterationPath, log);
   } finally {
     releaseLock();
   }
@@ -141,7 +130,8 @@ export async function resumeTask(
 async function resumeTaskLocked(
   project: ProjectManager,
   taskId: number,
-  iterationPath: string
+  iterationPath: string,
+  log: (...args: unknown[]) => void = console.log
 ): Promise<ResumeResult> {
   // Re-read task from disk under lock — another process may have already
   // resumed the task between our initial check and lock acquisition.
@@ -206,7 +196,7 @@ async function resumeTaskLocked(
     } catch (error) {
       restoreResumableStatus('Resume failed: worktree could not be prepared');
       const errorMsg = error instanceof Error ? error.message : String(error);
-      console.log(
+      log(
         colors.yellow(
           `  ⚠ Failed to create worktree for task ${taskId}: ${errorMsg}`
         )
@@ -221,26 +211,39 @@ async function resumeTaskLocked(
     task.setWorkspace(worktreePath, branchName);
   }
 
-  // Create initial iteration.json if it doesn't exist
-  // (iterationPath was already created before lock acquisition)
-  const iterationJsonPath = join(iterationPath, 'iteration.json');
-  if (!existsSync(iterationJsonPath)) {
-    IterationManager.createInitial(
-      iterationPath,
-      task.id,
-      task.title,
-      task.description
-    );
-  }
+  // Create initial iteration.json and reset status.json.
+  // If either fails (e.g. disk full, permissions), restore the task to its
+  // pre-resume status so it remains resumable rather than stuck IN_PROGRESS.
+  let iterationStatus: IterationStatusManager;
+  try {
+    const iterationJsonPath = join(iterationPath, 'iteration.json');
+    if (!existsSync(iterationJsonPath)) {
+      IterationManager.createInitial(
+        iterationPath,
+        task.id,
+        task.title,
+        task.description
+      );
+    }
 
-  // Reset the iteration status so stale paused/failed state is not
-  // re-read before the resumed agent writes its first status update.
-  const statusJsonPath = join(iterationPath, 'status.json');
-  const iterationStatus = IterationStatusManager.createInitial(
-    statusJsonPath,
-    String(task.id),
-    'Resuming workflow'
-  );
+    // Reset the iteration status so stale paused/failed state is not
+    // re-read before the resumed agent writes its first status update.
+    const statusJsonPath = join(iterationPath, 'status.json');
+    iterationStatus = IterationStatusManager.createInitial(
+      statusJsonPath,
+      String(task.id),
+      'Resuming workflow'
+    );
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    log(
+      colors.yellow(
+        `  ⚠ Failed to initialize iteration for task ${taskId}: ${errorMsg}`
+      )
+    );
+    restoreResumableStatus('Resume failed: iteration initialization error');
+    return { status: 'failed', error: errorMsg };
+  }
 
   // Check if user provided a custom agent image via environment variable
   if (process.env.ROVER_AGENT_IMAGE) {
@@ -272,7 +275,7 @@ async function resumeTaskLocked(
     return { status: 'ok' };
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
-    console.log(
+    log(
       colors.yellow(`  ⚠ Sandbox start failed for task ${taskId}: ${errorMsg}`)
     );
     if (statusBeforeResume === 'FAILED') {

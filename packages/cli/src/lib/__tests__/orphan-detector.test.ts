@@ -167,6 +167,18 @@ describe('detectOrphanedTasks', () => {
     expect(task.markFailed).not.toHaveBeenCalled();
   });
 
+  it('does not mark IN_PROGRESS task when container is restarting', async () => {
+    const task = mockTask(30, 'IN_PROGRESS', 'container-30');
+    const sandbox = {
+      inspect: vi.fn().mockResolvedValue({ status: 'restarting' }),
+    };
+    mockedCreateSandbox.mockResolvedValue(sandbox as any);
+
+    await detectOrphanedTasks([{ task, project: mockProject() }]);
+
+    expect(task.markFailed).not.toHaveBeenCalled();
+  });
+
   it('marks ITERATING task as FAILED when container is dead', async () => {
     const task = mockTask(4, 'ITERATING', 'container-4');
     const sandbox = {

@@ -450,6 +450,17 @@ export const runCommand = async (
               `\n🔄 Resuming from checkpoint: ${checkpoint.completedSteps.length} step(s) will be skipped`
             )
           );
+          logger?.info(
+            'workflow_resume',
+            `Resuming from checkpoint with ${checkpoint.completedSteps.length} completed step(s)`,
+            {
+              taskId: options.taskId,
+              metadata: {
+                completedSteps: checkpoint.completedSteps.length,
+                failedStepId: checkpoint.failedStepId,
+              },
+            }
+          );
         } else {
           console.log(
             colors.yellow(

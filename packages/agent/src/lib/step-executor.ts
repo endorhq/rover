@@ -197,9 +197,27 @@ export async function executeStep(
 
         try {
           result = await config.acpRunner.runStep(step.id);
-        } finally {
+        } catch (err) {
+          // Close the session before retrying or propagating.
           config.acpRunner.closeSession();
+          // Treat thrown ACP errors like failed results for transient retry.
+          // Without this, thrown exceptions (e.g. JSON-RPC connection errors)
+          // would bypass the retry loop entirely.
+          const errorMsg = err instanceof Error ? err.message : String(err);
+          if (isTransientError(errorMsg) && attempt < MAX_TRANSIENT_RETRIES) {
+            const delayMs = RETRY_BASE_DELAY_MS * Math.pow(2, attempt);
+            console.log(
+              colors.yellow(
+                `\n⚠ Transient ACP error detected. Retrying in ${delayMs / 1000}s (attempt ${attempt + 1}/${MAX_TRANSIENT_RETRIES})...`
+              )
+            );
+            await sleep(delayMs);
+            continue;
+          }
+          throw err;
         }
+        // Close session on success path (not in finally, to avoid double-close on catch path)
+        config.acpRunner.closeSession();
       } else {
         const runner = new Runner(
           config.workflow,

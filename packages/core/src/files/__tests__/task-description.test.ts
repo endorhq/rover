@@ -647,6 +647,75 @@ describe('TaskDescriptionManager', () => {
       expect(task.pausedAt).toBeUndefined();
     });
 
+    it('should clear pausedAt and error when resetting from PAUSED to NEW', () => {
+      const taskPath = getTaskPath(25);
+      const task = TaskDescriptionManager.create(taskPath, {
+        id: 25,
+        title: 'Reset From Paused',
+        description: 'Test description',
+        inputs: new Map(),
+        workflowName: 'swe',
+      });
+
+      task.markInProgress();
+      task.markPaused('Credit limit reached');
+      expect(task.pausedAt).toBeDefined();
+      expect(task.error).toBe('Credit limit reached');
+
+      task.resetToNew();
+      expect(task.status).toBe('NEW');
+      expect(task.pausedAt).toBeUndefined();
+      expect(task.error).toBeUndefined();
+
+      // Verify persistence
+      const reloaded = TaskDescriptionManager.load(taskPath, 25);
+      expect(reloaded.status).toBe('NEW');
+      expect(reloaded.pausedAt).toBeUndefined();
+      expect(reloaded.error).toBeUndefined();
+    });
+
+    it('should clear error when resetting from FAILED to NEW', () => {
+      const taskPath = getTaskPath(26);
+      const task = TaskDescriptionManager.create(taskPath, {
+        id: 26,
+        title: 'Reset From Failed',
+        description: 'Test description',
+        inputs: new Map(),
+        workflowName: 'swe',
+      });
+
+      task.markInProgress();
+      task.markFailed('Container crashed');
+      expect(task.error).toBe('Container crashed');
+
+      task.resetToNew();
+      expect(task.status).toBe('NEW');
+      expect(task.error).toBeUndefined();
+    });
+
+    it('should support restart() from PAUSED status', () => {
+      const taskPath = getTaskPath(27);
+      const task = TaskDescriptionManager.create(taskPath, {
+        id: 27,
+        title: 'Restart From Paused',
+        description: 'Test description',
+        inputs: new Map(),
+        workflowName: 'swe',
+      });
+
+      task.markInProgress();
+      task.markPaused('Rate limit');
+      expect(task.pausedAt).toBeDefined();
+      expect(task.error).toBe('Rate limit');
+
+      task.restart();
+      expect(task.status).toBe('IN_PROGRESS');
+      expect(task.pausedAt).toBeUndefined();
+      expect(task.error).toBeUndefined();
+      expect(task.restartCount).toBe(1);
+      expect(task.lastRestartAt).toBeDefined();
+    });
+
     it('should return null from getDuration() when task is PAUSED', () => {
       const taskPath = getTaskPath(20);
       const task = TaskDescriptionManager.create(taskPath, {

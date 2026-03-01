@@ -209,10 +209,16 @@ export function createCheckpointStore(
           loopProgress: structuredClone(initialData.loopProgress),
         }
       : {}),
-    failedStepId: initialData?.failedStepId,
-    error: initialData?.error,
-    isRetryable: initialData?.isRetryable,
-    provider: initialData?.provider,
+    // Intentionally clear failure metadata from the previous run.
+    // These fields are only meaningful for the run that wrote them;
+    // a resumed run will set its own failure fields if it fails again.
+    // Carrying them forward would cause intermediate persists (from
+    // setCompletedSteps/setLoopProgress) to write stale failure data
+    // to disk, which could be misleading if the process is killed.
+    failedStepId: undefined,
+    error: undefined,
+    isRetryable: undefined,
+    provider: undefined,
   };
 
   const persist = (): boolean => {

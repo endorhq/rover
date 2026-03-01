@@ -384,6 +384,57 @@ describe('createCheckpointStore', () => {
 
     warnSpy.mockRestore();
   });
+  it('clears stale failure metadata when initializing from a prior checkpoint', () => {
+    const initialData: CheckpointData = {
+      completedSteps: [{ id: 'step1', outputs: { result: 'hello' } }],
+      failedStepId: 'step2',
+      error: 'Credit limit reached',
+      isRetryable: true,
+      provider: 'claude',
+    };
+
+    const store = createCheckpointStore(tempDir, initialData);
+    const data = store.getData();
+
+    // Completed steps should be preserved
+    expect(data.completedSteps).toHaveLength(1);
+    expect(data.completedSteps[0].id).toBe('step1');
+
+    // Stale failure metadata should be cleared so intermediate persists
+    // (from setCompletedSteps/setLoopProgress) don't write misleading data.
+    expect(data.failedStepId).toBeUndefined();
+    expect(data.error).toBeUndefined();
+    expect(data.isRetryable).toBeUndefined();
+    expect(data.provider).toBeUndefined();
+  });
+
+  it('preserves loop progress when initializing from a prior checkpoint', () => {
+    const initialData: CheckpointData = {
+      completedSteps: [],
+      loopProgress: {
+        loop1: {
+          iteration: 2,
+          nextSubStepIndex: 1,
+          subStepOutputs: { step1: { exit_code: '0' } },
+          skippedSubSteps: [],
+        },
+      },
+      failedStepId: 'agent_step',
+      error: 'Rate limit',
+      isRetryable: true,
+    };
+
+    const store = createCheckpointStore(tempDir, initialData);
+    const data = store.getData();
+
+    // Loop progress should be preserved for resume
+    expect(data.loopProgress).toBeDefined();
+    expect(data.loopProgress!['loop1'].iteration).toBe(2);
+
+    // But failure metadata should be cleared
+    expect(data.failedStepId).toBeUndefined();
+    expect(data.error).toBeUndefined();
+  });
 });
 
 describe('isTransientError', () => {

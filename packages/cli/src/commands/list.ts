@@ -532,7 +532,7 @@ const listCommand = async (
     // Watch mode (configurable refresh interval, default 3 seconds)
     if (options.watch && !options._retryScheduler) {
       // Create a retry scheduler for auto-resuming paused tasks (only once, on the initial watch call)
-      options._retryScheduler = new RetryScheduler();
+      options._retryScheduler = new RetryScheduler({ quiet: isJsonMode() });
     }
 
     if (options.watch) {

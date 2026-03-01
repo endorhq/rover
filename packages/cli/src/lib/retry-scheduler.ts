@@ -59,6 +59,18 @@ export class RetryScheduler {
   private taskTimers: Map<string, TaskTimerEntry> = new Map();
   /** Tracks how many retry cycles each task has gone through. */
   private retryCounts: Map<string, number> = new Map();
+  /** When true, suppress informational console.log messages (e.g. JSON mode). */
+  private quiet: boolean;
+
+  constructor(options: { quiet?: boolean } = {}) {
+    this.quiet = options.quiet ?? false;
+  }
+
+  private log(...args: unknown[]): void {
+    if (!this.quiet) {
+      console.log(...args);
+    }
+  }
 
   /** Separator that won't appear in file paths or numeric task IDs. */
   private static readonly KEY_SEP = '\0';
@@ -104,7 +116,7 @@ export class RetryScheduler {
 
     const retryCount = this.retryCounts.get(key) ?? 0;
     if (retryCount >= MAX_AUTO_RETRIES) {
-      console.log(
+      this.log(
         colors.yellow(
           `  ⚠ Task ${taskId} reached max auto-retries (${MAX_AUTO_RETRIES}), use ${colors.cyan(`rover resume ${taskId}`)} to retry manually.`
         )
@@ -127,7 +139,7 @@ export class RetryScheduler {
       scheduledAt,
     });
 
-    console.log(
+    this.log(
       colors.gray(
         `  ⏱ Auto-retry scheduled for ${provider} task ${taskId} at ${scheduledAt.toLocaleTimeString()}`
       )
@@ -221,7 +233,7 @@ export class RetryScheduler {
       return;
     }
 
-    console.log(
+    this.log(
       colors.cyan(`\n🔄 Auto-retrying paused ${provider} task ${taskId}...`)
     );
 
@@ -229,25 +241,25 @@ export class RetryScheduler {
     this.retryCounts.set(taskKey, attempt);
 
     try {
-      const result = await resumeTask(project, taskId);
+      const result = await resumeTask(project, taskId, { quiet: this.quiet });
       if (result.status === 'ok') {
-        console.log(colors.green(`  ✓ Task ${taskId} resumed successfully`));
+        this.log(colors.green(`  ✓ Task ${taskId} resumed successfully`));
       } else if (result.status === 'already_resuming') {
         // Another process is handling it — don't count as a failure
         this.retryCounts.set(taskKey, attempt - 1);
-        console.log(
+        this.log(
           colors.gray(
             `  ℹ Task ${taskId} is already being resumed by another process`
           )
         );
       } else if (attempt >= MAX_AUTO_RETRIES) {
-        console.log(
+        this.log(
           colors.red(
             `  ✗ Task ${taskId} failed to resume after ${attempt} attempts, giving up. Use ${colors.cyan(`rover resume ${taskId}`)} to retry manually.`
           )
         );
       } else {
-        console.log(
+        this.log(
           colors.yellow(
             `  ⚠ Task ${taskId} could not be resumed (attempt ${attempt}/${MAX_AUTO_RETRIES}), re-scheduling...`
           )
@@ -256,13 +268,13 @@ export class RetryScheduler {
       }
     } catch (error) {
       if (attempt >= MAX_AUTO_RETRIES) {
-        console.log(
+        this.log(
           colors.red(
             `  ✗ Task ${taskId} resume failed after ${attempt} attempts: ${error instanceof Error ? error.message : String(error)}. Use ${colors.cyan(`rover resume ${taskId}`)} to retry manually.`
           )
         );
       } else {
-        console.log(
+        this.log(
           colors.yellow(
             `  ⚠ Task ${taskId} resume failed (attempt ${attempt}/${MAX_AUTO_RETRIES}): ${error instanceof Error ? error.message : String(error)}, re-scheduling...`
           )
