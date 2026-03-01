@@ -1,10 +1,22 @@
 import { defineConfig } from 'vitest/config';
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      'rover-core': fileURLToPath(
+        new URL('../core/src/index.ts', import.meta.url)
+      ),
+      'rover-schemas': fileURLToPath(
+        new URL('../schemas/src/index.ts', import.meta.url)
+      ),
+    },
+  },
   plugins: [
     {
       name: 'text-loader',
+      enforce: 'pre',
       transform(_src, id) {
         if (id.endsWith('.md') || id.endsWith('.sh')) {
           const content = readFileSync(id, 'utf-8');
@@ -16,6 +28,7 @@ export default defineConfig({
     },
     {
       name: 'asset-loader',
+      enforce: 'pre',
       transform(_src, id) {
         if (id.endsWith('.yaml') || id.endsWith('.yml')) {
           return {

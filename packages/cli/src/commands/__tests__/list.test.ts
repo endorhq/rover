@@ -5,10 +5,17 @@ import { join } from 'node:path';
 import {
   clearProjectRootCache,
   launchSync,
+  ProjectConfigManager,
   TaskDescriptionManager,
 } from 'rover-core';
 import type { GlobalProject } from 'rover-schemas';
 import { listCommand } from '../list.js';
+import { executeHooks } from '../../lib/hooks.js';
+import { detectOrphanedTasks } from '../../lib/orphan-detector.js';
+
+vi.mock('../../lib/orphan-detector.js', () => ({
+  detectOrphanedTasks: vi.fn().mockResolvedValue(undefined),
+}));
 
 // Store testDir for context mock
 let testDir: string;
@@ -57,6 +64,8 @@ vi.mock('../../lib/telemetry.js', () => ({
 vi.mock('../../lib/hooks.js', () => ({
   executeHooks: vi.fn(),
 }));
+
+const mockedDetectOrphanedTasks = vi.mocked(detectOrphanedTasks);
 
 describe('list command', () => {
   let originalCwd: string;
@@ -110,6 +119,8 @@ describe('list command', () => {
       .mockImplementation((msg: string) => {
         capturedOutput.push(String(msg));
       });
+    mockedDetectOrphanedTasks.mockReset();
+    mockedDetectOrphanedTasks.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -200,6 +211,164 @@ describe('list command', () => {
 
       const output = capturedOutput.join('\n');
       expect(output).toContain('No tasks found');
+    });
+
+    it('shows retry time using the paused task schedule (not provider-wide schedule)', async () => {
+      const retryScheduler = {
+        registerPausedTask: vi.fn(),
+        unregisterTask: vi.fn(),
+        getScheduledTimeForTask: vi
+          .fn()
+          .mockReturnValue(new Date('2026-01-01T10:30:00.000Z')),
+        getScheduledTime: vi.fn(),
+      } as any;
+      const task = {
+        id: 1,
+        title: 'Paused Task',
+        agent: 'claude',
+        status: 'PAUSED',
+        startedAt: '2026-01-01T09:00:00.000Z',
+        error: undefined,
+        workflowName: 'swe',
+        updateStatusFromIteration: vi.fn(),
+        getIterations: vi.fn().mockReturnValue([]),
+        getLastIteration: vi.fn().mockReturnValue({
+          status: () => ({
+            provider: 'claude',
+            currentStep: 'PAUSED',
+            progress: 10,
+          }),
+        }),
+      } as any;
+
+      const projectManager = {
+        id: 'test-project-id',
+        path: testDir,
+        repositoryName: 'test-repo',
+        languages: [],
+        packageManagers: [],
+        taskManagers: [],
+        listTasks: () => [task],
+      };
+      mockResolveProjectContext.mockResolvedValue(projectManager);
+
+      await listCommand({ _retryScheduler: retryScheduler });
+
+      expect(retryScheduler.getScheduledTimeForTask).toHaveBeenCalledWith(
+        projectManager,
+        1
+      );
+      expect(retryScheduler.getScheduledTime).not.toHaveBeenCalled();
+    });
+
+    it('does not trigger onComplete hooks for paused tasks', async () => {
+      mockJsonMode = true;
+      vi.spyOn(ProjectConfigManager, 'load').mockReturnValue({
+        hooks: { onComplete: ['echo should-not-run'] },
+      } as any);
+
+      const pausedTask = {
+        id: 1,
+        title: 'Paused Task',
+        branchName: 'rover-task-1',
+        status: 'PAUSED',
+        lastStatusCheck: '2026-01-01T00:00:00.000Z',
+        onCompleteHookFiredAt: undefined,
+        rawData: {},
+        updateStatusFromIteration: vi.fn(),
+        getIterations: vi.fn().mockReturnValue([]),
+        getLastIteration: vi.fn().mockReturnValue(null),
+      };
+
+      mockResolveProjectContext.mockResolvedValue({
+        id: 'test-project-id',
+        path: testDir,
+        repositoryName: 'test-repo',
+        languages: [],
+        packageManagers: [],
+        taskManagers: [],
+        listTasks: () => [pausedTask],
+      });
+
+      await listCommand({ json: true });
+
+      expect(executeHooks).not.toHaveBeenCalled();
+    });
+
+    it('refreshes task status before orphan detection runs', async () => {
+      mockJsonMode = true;
+      const task = {
+        id: 1,
+        title: 'Completed Task',
+        status: 'IN_PROGRESS',
+        branchName: 'rover-task-1',
+        rawData: {},
+        updateStatusFromIteration: vi.fn(function (this: any) {
+          this.status = 'COMPLETED';
+        }),
+        getIterations: vi.fn().mockReturnValue([]),
+        getLastIteration: vi.fn().mockReturnValue(null),
+      };
+
+      mockResolveProjectContext.mockResolvedValue({
+        id: 'test-project-id',
+        path: testDir,
+        repositoryName: 'test-repo',
+        languages: [],
+        packageManagers: [],
+        taskManagers: [],
+        listTasks: () => [task],
+      });
+
+      await listCommand({ json: true });
+
+      expect(task.updateStatusFromIteration).toHaveBeenCalledTimes(1);
+      expect(mockedDetectOrphanedTasks).toHaveBeenCalledTimes(1);
+      const detectArgs = mockedDetectOrphanedTasks.mock.calls[0]?.[0];
+      expect(detectArgs?.[0]?.task.status).toBe('COMPLETED');
+      const detectOptions = mockedDetectOrphanedTasks.mock.calls[0]?.[1];
+      expect(detectOptions).toEqual({ suppressWarnings: true });
+    });
+
+    it('clears scheduler state when a refreshed task is no longer paused', async () => {
+      mockJsonMode = true;
+      const unregisterTask = vi.fn();
+      const retryScheduler = {
+        registerPausedTask: vi.fn(),
+        unregisterTask,
+      } as any;
+      const task = {
+        id: 1,
+        title: 'Recovered Task',
+        agent: 'claude',
+        status: 'PAUSED',
+        branchName: 'rover-task-1',
+        rawData: {},
+        updateStatusFromIteration: vi.fn(function (this: any) {
+          this.status = 'COMPLETED';
+        }),
+        getIterations: vi.fn().mockReturnValue([]),
+        getLastIteration: vi.fn().mockReturnValue(null),
+      };
+
+      mockResolveProjectContext.mockResolvedValue({
+        id: 'test-project-id',
+        path: testDir,
+        repositoryName: 'test-repo',
+        languages: [],
+        packageManagers: [],
+        taskManagers: [],
+        listTasks: () => [task],
+      });
+
+      await listCommand({ json: true, _retryScheduler: retryScheduler });
+
+      expect(retryScheduler.registerPausedTask).not.toHaveBeenCalled();
+      expect(unregisterTask).toHaveBeenCalledWith(
+        'claude',
+        1,
+        expect.any(Object)
+      );
     });
   });
 
