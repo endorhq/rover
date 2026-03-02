@@ -167,9 +167,9 @@ export class DockerSandbox extends Sandbox {
 
     dockerArgs.push(
       '-v',
-      `${etcPasswd}:/etc/passwd:Z,ro`,
+      `${etcPasswd}:/etc/passwd:Z,rw`,
       '-v',
-      `${etcGroup}:/etc/group:Z,ro`,
+      `${etcGroup}:/etc/group:Z,rw`,
       '--user',
       `${userInfo_.uid}:${userInfo_.gid}`,
       '-v',
@@ -475,9 +475,9 @@ export class DockerSandbox extends Sandbox {
 
     dockerArgs.push(
       '-v',
-      `${etcPasswd}:/etc/passwd:Z,ro`,
+      `${etcPasswd}:/etc/passwd:Z,rw`,
       '-v',
-      `${etcGroup}:/etc/group:Z,ro`,
+      `${etcGroup}:/etc/group:Z,rw`,
       '--user',
       `${userInfo_.uid}:${userInfo_.gid}`,
       '-v',

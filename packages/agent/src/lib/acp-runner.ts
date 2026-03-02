@@ -95,6 +95,16 @@ export class ACPRunner {
     this.logger = config.logger;
     this.mcpServers = config.mcpServers ?? [];
 
+    // Always include the built-in package-manager MCP server
+    if (!this.mcpServers.some(s => s.name === 'package-manager')) {
+      this.mcpServers.push({
+        type: 'http' as const,
+        name: 'package-manager',
+        url: 'http://127.0.0.1:8090/mcp',
+        headers: [],
+      });
+    }
+
     // Determine which tool to use
     // Priority: CLI flag > workflow defaults > fallback to claude
     this.tool = config.defaultTool || this.workflow.defaults?.tool || 'claude';
