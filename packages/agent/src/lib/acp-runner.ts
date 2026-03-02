@@ -12,6 +12,7 @@ import {
   ndJsonStream,
   PROTOCOL_VERSION,
   type ContentBlock,
+  type McpServer,
 } from '@agentclientprotocol/sdk';
 import colors from 'ansi-colors';
 import { existsSync, readFileSync } from 'node:fs';
@@ -45,6 +46,8 @@ export interface ACPRunnerConfig {
   statusManager?: IterationStatusManager;
   outputDir?: string;
   logger?: JsonlLogger;
+  /** MCP servers to pass to each ACP session. */
+  mcpServers?: McpServer[];
 }
 
 /**
@@ -70,6 +73,7 @@ export class ACPRunner {
   private statusManager?: IterationStatusManager;
   private outputDir?: string;
   private logger?: JsonlLogger;
+  private mcpServers: McpServer[];
 
   // ACP connection state
   private agent: Agent | null = null;
@@ -89,6 +93,7 @@ export class ACPRunner {
     this.statusManager = config.statusManager;
     this.outputDir = config.outputDir;
     this.logger = config.logger;
+    this.mcpServers = config.mcpServers ?? [];
 
     // Determine which tool to use
     // Priority: CLI flag > workflow defaults > fallback to claude
@@ -211,7 +216,6 @@ export class ACPRunner {
    */
   async createSession(
     cwd?: string,
-    mcpServers: Array<unknown> = []
   ): Promise<string> {
     if (!this.isConnectionInitialized || !this.connection) {
       throw new Error(
@@ -229,7 +233,7 @@ export class ACPRunner {
       // Create a new session
       const sessionRequest = {
         cwd: cwd || process.cwd(),
-        mcpServers,
+        mcpServers: this.mcpServers,
       };
 
       if (VERBOSE) {

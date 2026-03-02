@@ -4,6 +4,7 @@ import {
   WorkflowManager,
   IterationStatusManager,
   JsonlLogger,
+  ProjectConfigManager,
   showTitle,
   showProperties,
   showList,
@@ -15,8 +16,10 @@ import {
   ROVER_LOG_FILENAME,
   AGENT_LOGS_DIR,
   isAgentStep,
+  type MCP,
   type WorkflowAgentStep,
 } from 'rover-schemas';
+import type { McpServer } from '@agentclientprotocol/sdk';
 import { parseCollectOptions } from '../lib/options.js';
 import { ACPRunner } from '../lib/acp-runner.js';
 import { createAgent } from '../lib/agents/index.js';
@@ -98,6 +101,49 @@ function collectAgentLogs(logsDir: string, agentTool?: string): void {
     } catch {
       // Best-effort: don't fail the workflow for log collection errors
     }
+  }
+}
+
+/**
+ * Convert a rover.json MCP entry to an ACP McpServer object.
+ */
+function roverMcpToAcpServer(mcp: MCP): McpServer {
+  const headerEntries = (mcp.headers || []).map(h => {
+    const colonIdx = h.indexOf(':');
+    if (colonIdx === -1) return { name: h.trim(), value: '' };
+    return { name: h.slice(0, colonIdx).trim(), value: h.slice(colonIdx + 1).trim() };
+  });
+
+  const envEntries = (mcp.envs || []).map(e => {
+    const eqIdx = e.indexOf('=');
+    if (eqIdx === -1) return { name: e, value: '' };
+    return { name: e.slice(0, eqIdx), value: e.slice(eqIdx + 1) };
+  });
+
+  switch (mcp.transport) {
+    case 'http':
+      return { type: 'http' as const, name: mcp.name, url: mcp.commandOrUrl, headers: headerEntries };
+    case 'sse':
+      return { type: 'sse' as const, name: mcp.name, url: mcp.commandOrUrl, headers: headerEntries };
+    case 'stdio':
+    default: {
+      const parts = mcp.commandOrUrl.split(' ');
+      return { name: mcp.name, command: parts[0], args: parts.slice(1), env: envEntries };
+    }
+  }
+}
+
+/**
+ * Read MCP servers from rover.json at the given project path and convert them
+ * to the ACP McpServer[] format.  Returns an empty array when no config exists.
+ */
+function loadMcpServersFromProject(projectPath: string): McpServer[] {
+  try {
+    if (!ProjectConfigManager.exists(projectPath)) return [];
+    const config = ProjectConfigManager.load(projectPath);
+    return config.mcps.map(roverMcpToAcpServer);
+  } catch {
+    return [];
   }
 }
 
@@ -356,6 +402,8 @@ export const runCommand = async (
 
       console.log(colors.cyan('\n🔗 ACP Mode enabled'));
 
+      const mcpServers = loadMcpServersFromProject(process.cwd());
+
       const acpRunner = new ACPRunner({
         workflow: workflowManager,
         inputs,
@@ -364,6 +412,7 @@ export const runCommand = async (
         statusManager,
         outputDir: options.output,
         logger,
+        mcpServers,
       });
 
       await acpRunner.initializeConnection();

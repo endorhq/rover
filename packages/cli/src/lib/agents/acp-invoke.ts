@@ -11,9 +11,11 @@ import {
   ClientSideConnection,
   ndJsonStream,
   PROTOCOL_VERSION,
+  type McpServer,
 } from '@agentclientprotocol/sdk';
 import colors from 'ansi-colors';
-import { VERBOSE } from 'rover-core';
+import { VERBOSE, ProjectConfigManager } from 'rover-core';
+import type { MCP } from 'rover-schemas';
 import { ACPClient } from './acp-client.js';
 import { GeminiOrQwenACPClient } from './gemini-or-qwen-acp-client.js';
 
@@ -119,6 +121,49 @@ function getAgentACPConfig(agentName: string, model?: string): AgentACPConfig {
   }
 }
 
+/**
+ * Convert a rover.json MCP entry to an ACP McpServer object.
+ */
+function roverMcpToAcpServer(mcp: MCP): McpServer {
+  const headerEntries = (mcp.headers || []).map(h => {
+    const colonIdx = h.indexOf(':');
+    if (colonIdx === -1) return { name: h.trim(), value: '' };
+    return { name: h.slice(0, colonIdx).trim(), value: h.slice(colonIdx + 1).trim() };
+  });
+
+  const envEntries = (mcp.envs || []).map(e => {
+    const eqIdx = e.indexOf('=');
+    if (eqIdx === -1) return { name: e, value: '' };
+    return { name: e.slice(0, eqIdx), value: e.slice(eqIdx + 1) };
+  });
+
+  switch (mcp.transport) {
+    case 'http':
+      return { type: 'http' as const, name: mcp.name, url: mcp.commandOrUrl, headers: headerEntries };
+    case 'sse':
+      return { type: 'sse' as const, name: mcp.name, url: mcp.commandOrUrl, headers: headerEntries };
+    case 'stdio':
+    default: {
+      const parts = mcp.commandOrUrl.split(' ');
+      return { name: mcp.name, command: parts[0], args: parts.slice(1), env: envEntries };
+    }
+  }
+}
+
+/**
+ * Read MCP servers from rover.json at the given project path and convert them
+ * to the ACP McpServer[] format.  Returns an empty array when no config exists.
+ */
+function loadMcpServersFromProject(projectPath: string): McpServer[] {
+  try {
+    if (!ProjectConfigManager.exists(projectPath)) return [];
+    const config = ProjectConfigManager.load(projectPath);
+    return config.mcps.map(roverMcpToAcpServer);
+  } catch {
+    return [];
+  }
+}
+
 export interface ACPInvokeConfig {
   /** Agent name (claude, codex, cursor, gemini, qwen, copilot, opencode). */
   agentName: string;
@@ -128,6 +173,8 @@ export interface ACPInvokeConfig {
   cwd?: string;
   /** Model override (bridge agents use unstable_setSessionModel, native agents use CLI --model). */
   model?: string;
+  /** MCP servers to pass to the ACP session.  When omitted, servers are auto-discovered from rover.json at `cwd`. */
+  mcpServers?: McpServer[];
 }
 
 /**
@@ -137,6 +184,7 @@ export interface ACPInvokeConfig {
  */
 export async function acpInvoke(config: ACPInvokeConfig): Promise<string> {
   const { agentName, prompt, cwd, model } = config;
+  const mcpServers = config.mcpServers ?? loadMcpServersFromProject(cwd || process.cwd());
   const agentConfig = getAgentACPConfig(agentName, model);
 
   console.log(
@@ -217,6 +265,7 @@ export async function acpInvoke(config: ACPInvokeConfig): Promise<string> {
     // 5. Create session
     const sessionRequest = {
       cwd: cwd || process.cwd(),
+      mcpServers,
     };
 
     console.log(
