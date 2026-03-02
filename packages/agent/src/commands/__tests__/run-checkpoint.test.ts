@@ -408,6 +408,93 @@ describe('createCheckpointStore', () => {
     expect(data.provider).toBeUndefined();
   });
 
+  it('addCompletedStep appends a new step and persists', () => {
+    const store = createCheckpointStore(tempDir);
+
+    store.addCompletedStep('step1', { result: 'hello' });
+
+    const data = store.getData();
+    expect(data.completedSteps).toHaveLength(1);
+    expect(data.completedSteps[0]).toEqual({
+      id: 'step1',
+      outputs: { result: 'hello' },
+    });
+
+    // Verify persistence
+    const loaded = loadCheckpoint(join(tempDir, 'checkpoint.json'));
+    expect(loaded!.completedSteps).toHaveLength(1);
+    expect(loaded!.completedSteps[0].id).toBe('step1');
+  });
+
+  it('addCompletedStep replaces existing step with same id (upsert)', () => {
+    const store = createCheckpointStore(tempDir);
+
+    store.addCompletedStep('step1', { result: 'v1' });
+    store.addCompletedStep('step2', { result: 'v1' });
+    store.addCompletedStep('step1', { result: 'v2' });
+
+    const data = store.getData();
+    expect(data.completedSteps).toHaveLength(2);
+    // step1 should be updated in place (not appended)
+    expect(data.completedSteps[0]).toEqual({
+      id: 'step1',
+      outputs: { result: 'v2' },
+    });
+    expect(data.completedSteps[1]).toEqual({
+      id: 'step2',
+      outputs: { result: 'v1' },
+    });
+  });
+
+  it('addCompletedStep deep copies outputs to prevent aliasing', () => {
+    const store = createCheckpointStore(tempDir);
+    const outputs = { result: 'original' };
+
+    store.addCompletedStep('step1', outputs);
+
+    // Mutate the original object
+    outputs.result = 'mutated';
+
+    // Store should have the original value
+    const data = store.getData();
+    expect(data.completedSteps[0].outputs.result).toBe('original');
+  });
+
+  it('addCompletedStep warns when persist fails', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const store = createCheckpointStore('/nonexistent/dir/fails');
+
+    store.addCompletedStep('step1', { result: 'done' });
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Failed to persist completed steps')
+    );
+
+    // In-memory state should still be updated
+    const data = store.getData();
+    expect(data.completedSteps).toHaveLength(1);
+    expect(data.completedSteps[0].id).toBe('step1');
+
+    warnSpy.mockRestore();
+  });
+
+  it('getCompletedStep returns a copy that does not affect internal state', () => {
+    const store = createCheckpointStore(tempDir);
+    store.addCompletedStep('step1', { result: 'original' });
+
+    const retrieved = store.getCompletedStep('step1');
+    expect(retrieved).toBeDefined();
+    retrieved!.outputs.result = 'mutated';
+
+    // Internal state should be unchanged
+    expect(store.getCompletedStep('step1')!.outputs.result).toBe('original');
+  });
+
+  it('getCompletedStep returns undefined for unknown step', () => {
+    const store = createCheckpointStore(tempDir);
+    expect(store.getCompletedStep('nonexistent')).toBeUndefined();
+  });
+
   it('preserves loop progress when initializing from a prior checkpoint', () => {
     const initialData: CheckpointData = {
       completedSteps: [],

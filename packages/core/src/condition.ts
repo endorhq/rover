@@ -18,6 +18,38 @@ function normalizeBoolean(value: string): string {
 }
 
 /**
+ * Split a condition string on `||` operators that appear *between* clauses,
+ * not inside values. A `||` is considered an operator only when both sides
+ * look like they belong to separate clauses (the left side must end with a
+ * value token after `==`/`!=`, and the right side must start with `steps.`).
+ */
+function splitOnLogicalOr(condition: string): string[] {
+  const parts: string[] = [];
+  // Match `||` that is surrounded by whitespace and followed by `steps.`
+  // This avoids splitting values that contain `||`.
+  const regex = /\s+\|\|\s+(?=steps\.)/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = regex.exec(condition)) !== null) {
+    parts.push(condition.slice(lastIndex, match.index));
+    lastIndex = match.index + match[0].length;
+  }
+  parts.push(condition.slice(lastIndex));
+
+  return parts;
+}
+
+/**
+ * Detect `&&` used as a logical operator between clauses (not inside values).
+ * A `&&` is considered an operator when it is surrounded by whitespace and
+ * followed by `steps.` (indicating a new clause).
+ */
+function hasLogicalAnd(condition: string): boolean {
+  return /\s+&&\s+(?=steps\.)/.test(condition);
+}
+
+/**
  * Evaluate a condition string against the current step outputs.
  * Supports OR (`||`) to join multiple clauses — returns true if any clause is true.
  *
@@ -29,16 +61,15 @@ export function evaluateCondition(
   condition: string,
   stepsOutput: Map<string, Map<string, string>>
 ): boolean {
-  // Detect unsupported && (AND) operator and warn.
-  // Matches `&&` with or without surrounding whitespace.
-  if (/&&/.test(condition)) {
+  // Detect unsupported && (AND) operator between clauses and warn.
+  if (hasLogicalAnd(condition)) {
     console.warn(
       `Warning: "&&" (AND) operator is not supported in conditions. Use separate steps with "if" conditions instead. Condition: "${condition}"`
     );
     return false;
   }
 
-  const parts = condition.split(/\s*\|\|\s*/);
+  const parts = splitOnLogicalOr(condition);
   return parts.some(part => evaluateSingleCondition(part.trim(), stepsOutput));
 }
 

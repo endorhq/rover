@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -15,6 +15,7 @@ describe('IterationStatusManager', () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     // Clean up temp directory
     rmSync(testDir, { recursive: true, force: true });
   });
@@ -151,7 +152,7 @@ describe('IterationStatusManager', () => {
       expect(loaded.progress).toBe(50);
     });
 
-    it('should update timestamp on each update', async () => {
+    it('should update timestamp on each update', () => {
       const status = IterationStatusManager.createInitial(
         statusFilePath,
         'task-time',
@@ -159,9 +160,13 @@ describe('IterationStatusManager', () => {
       );
       const initialUpdatedAt = status.updatedAt;
 
-      // Small delay to ensure timestamp difference
-      const delay = () => new Promise(resolve => setTimeout(resolve, 10));
-      await delay();
+      // Advance the clock by constructing a new Date slightly in the future.
+      // Use Date.now() override via vi to guarantee timestamp difference.
+      const originalNow = Date.now();
+      vi.spyOn(Date, 'now').mockReturnValue(originalNow + 50);
+      vi.spyOn(Date.prototype, 'toISOString').mockReturnValueOnce(
+        new Date(originalNow + 50).toISOString()
+      );
 
       status.update('running', 'Next step', 25);
 
@@ -382,7 +387,7 @@ describe('IterationStatusManager', () => {
       expect(status.progress).toBe(50);
     });
 
-    it('should update the timestamp', async () => {
+    it('should update the timestamp', () => {
       const status = IterationStatusManager.createInitial(
         statusFilePath,
         'task-pause-time',
@@ -390,7 +395,13 @@ describe('IterationStatusManager', () => {
       );
       const initialUpdatedAt = status.updatedAt;
 
-      await new Promise(resolve => setTimeout(resolve, 10));
+      // Advance the clock deterministically
+      const originalNow = Date.now();
+      vi.spyOn(Date, 'now').mockReturnValue(originalNow + 50);
+      vi.spyOn(Date.prototype, 'toISOString').mockReturnValueOnce(
+        new Date(originalNow + 50).toISOString()
+      );
+
       status.pause('Step 1', 'Limit reached');
 
       expect(new Date(status.updatedAt).getTime()).toBeGreaterThan(

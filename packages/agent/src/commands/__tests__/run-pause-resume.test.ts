@@ -676,6 +676,87 @@ describe('run command: pause/resume integration', () => {
   });
 
   // ────────────────────────────────────────────────────────────────────
+  // ACP Mode Signal Handling
+  // ────────────────────────────────────────────────────────────────────
+
+  describe('ACP mode signal handling', () => {
+    it('marks SIGTERM-interrupted ACP runs as paused before exiting', async () => {
+      writeWorkflow('claude');
+
+      mockACPRunStep.mockImplementation(async () => {
+        process.emit('SIGTERM');
+        return makeResult('step1', false, {
+          error: 'interrupted after SIGTERM',
+        });
+      });
+
+      await runAndCapture();
+
+      expect(vi.mocked(process.exit).mock.calls[0]?.[0]).toBe(2);
+
+      const checkpoint = readCheckpointFile(outputDir);
+      expect(checkpoint).not.toBeNull();
+
+      const status = readStatusFile(statusPath);
+      expect(status.status).toBe('paused');
+      expect(status.error).toBe('Workflow paused by SIGTERM signal');
+    });
+
+    it('marks SIGINT-interrupted ACP runs as paused before exiting', async () => {
+      writeWorkflow('claude');
+
+      mockACPRunStep.mockImplementation(async () => {
+        process.emit('SIGINT');
+        return makeResult('step1', false, {
+          error: 'interrupted after SIGINT',
+        });
+      });
+
+      await runAndCapture();
+
+      expect(vi.mocked(process.exit).mock.calls[0]?.[0]).toBe(2);
+
+      const checkpoint = readCheckpointFile(outputDir);
+      expect(checkpoint).not.toBeNull();
+
+      const status = readStatusFile(statusPath);
+      expect(status.status).toBe('paused');
+      expect(status.error).toBe('Workflow paused by SIGINT signal');
+    });
+
+    it('cleans up signal handlers after successful ACP completion', async () => {
+      writeWorkflow('claude');
+
+      const sigtermBefore = process.listenerCount('SIGTERM');
+      const sigintBefore = process.listenerCount('SIGINT');
+
+      mockACPRunStep
+        .mockResolvedValueOnce(
+          makeResult('step1', true, {
+            outputs: new Map([['result1', 'a']]),
+          })
+        )
+        .mockResolvedValueOnce(
+          makeResult('step2', true, {
+            outputs: new Map([['result2', 'b']]),
+          })
+        )
+        .mockResolvedValueOnce(
+          makeResult('step3', true, {
+            outputs: new Map([['result3', 'c']]),
+          })
+        );
+
+      await runAndCapture();
+
+      expect(process.listenerCount('SIGTERM')).toBeLessThanOrEqual(
+        sigtermBefore
+      );
+      expect(process.listenerCount('SIGINT')).toBeLessThanOrEqual(sigintBefore);
+    });
+  });
+
+  // ────────────────────────────────────────────────────────────────────
   // Full Lifecycle: pause → checkpoint → resume → complete
   // ────────────────────────────────────────────────────────────────────
 

@@ -238,6 +238,45 @@ describe('resume command', () => {
     expect(mockExitWithSuccess).not.toHaveBeenCalled();
   });
 
+  it('handles resumeTask returning already_resuming status', async () => {
+    const task = {
+      id: 13,
+      title: 'Paused task',
+      description: 'desc',
+      status: 'PAUSED',
+      iterations: 1,
+      branchName: 'rover/task-13',
+      worktreePath: '/tmp/worktree-13',
+      iterationsPath: () => '/tmp/task-13/iterations',
+      updateStatusFromIteration: vi.fn(),
+      isPaused: vi.fn(function (this: any) {
+        return this.status === 'PAUSED';
+      }),
+      isFailed: vi.fn(function (this: any) {
+        return this.status === 'FAILED';
+      }),
+    };
+    const project = {
+      getTask: vi.fn().mockReturnValue(task),
+    };
+
+    mockRequireProjectContext.mockResolvedValue(project);
+    mockResumeTask.mockResolvedValue({ status: 'already_resuming' });
+
+    await resumeCommand('13', { json: true });
+
+    expect(mockResumeTask).toHaveBeenCalledWith(project, 13);
+    expect(mockExitWithError).toHaveBeenCalledTimes(1);
+    expect(mockExitWithError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        success: false,
+        error: expect.stringContaining('already being resumed'),
+      }),
+      expect.objectContaining({ telemetry: expect.anything() })
+    );
+    expect(mockExitWithSuccess).not.toHaveBeenCalled();
+  });
+
   it('handles project context failure', async () => {
     mockRequireProjectContext.mockRejectedValue(
       new Error('Not in a rover project')

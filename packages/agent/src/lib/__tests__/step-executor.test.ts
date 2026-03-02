@@ -30,6 +30,7 @@ import {
   shouldSkipStep,
   isTransientError,
   PauseWorkflowError,
+  collectNestedStepIds,
 } from '../step-executor.js';
 import type { WorkflowManager } from 'rover-core';
 import type { ACPRunner } from '../acp-runner.js';
@@ -1001,56 +1002,58 @@ describe('executeStep', () => {
   it('retries ACP transient errors (thrown exceptions) before propagating', async () => {
     vi.useFakeTimers();
 
-    const agentStep: WorkflowAgentStep = {
-      id: 'acp_transient',
-      name: 'ACP Transient',
-      type: 'agent',
-      prompt: 'Do something',
-      outputs: [],
-    };
+    try {
+      const agentStep: WorkflowAgentStep = {
+        id: 'acp_transient',
+        name: 'ACP Transient',
+        type: 'agent',
+        prompt: 'Do something',
+        outputs: [],
+      };
 
-    let callCount = 0;
-    const mockAcpRunner = {
-      createSession: vi.fn().mockResolvedValue('session-789'),
-      runStep: vi.fn().mockImplementation(async () => {
-        callCount++;
-        if (callCount <= 2) {
-          throw new Error('ECONNREFUSED: connection refused');
-        }
-        return {
-          id: 'acp_transient',
-          success: true,
-          duration: 0.5,
-          outputs: new Map([['result', 'ok']]),
-        };
-      }),
-      closeSession: vi.fn(),
-      stepsOutput: new Map<string, Map<string, string>>(),
-    } as unknown as ACPRunner;
+      let callCount = 0;
+      const mockAcpRunner = {
+        createSession: vi.fn().mockResolvedValue('session-789'),
+        runStep: vi.fn().mockImplementation(async () => {
+          callCount++;
+          if (callCount <= 2) {
+            throw new Error('ECONNREFUSED: connection refused');
+          }
+          return {
+            id: 'acp_transient',
+            success: true,
+            duration: 0.5,
+            outputs: new Map([['result', 'ok']]),
+          };
+        }),
+        closeSession: vi.fn(),
+        stepsOutput: new Map<string, Map<string, string>>(),
+      } as unknown as ACPRunner;
 
-    const resultPromise = executeStep(agentStep, {
-      workflow: createMockWorkflowManager(),
-      inputs: new Map(),
-      stepsOutput: new Map(),
-      totalSteps: 1,
-      currentStepIndex: 0,
-      acpRunner: mockAcpRunner,
-    });
+      const resultPromise = executeStep(agentStep, {
+        workflow: createMockWorkflowManager(),
+        inputs: new Map(),
+        stepsOutput: new Map(),
+        totalSteps: 1,
+        currentStepIndex: 0,
+        acpRunner: mockAcpRunner,
+      });
 
-    // Advance past the first retry delay (10s)
-    await vi.advanceTimersByTimeAsync(10_000);
-    // Advance past the second retry delay (20s)
-    await vi.advanceTimersByTimeAsync(20_000);
+      // Advance past the first retry delay (10s)
+      await vi.advanceTimersByTimeAsync(10_000);
+      // Advance past the second retry delay (20s)
+      await vi.advanceTimersByTimeAsync(20_000);
 
-    const result = await resultPromise;
+      const result = await resultPromise;
 
-    expect(result.success).toBe(true);
-    // Should have retried twice then succeeded on the 3rd attempt
-    expect(mockAcpRunner.runStep).toHaveBeenCalledTimes(3);
-    // closeSession should be called each time (once per retry + once for success)
-    expect(mockAcpRunner.closeSession).toHaveBeenCalledTimes(3);
-
-    vi.useRealTimers();
+      expect(result.success).toBe(true);
+      // Should have retried twice then succeeded on the 3rd attempt
+      expect(mockAcpRunner.runStep).toHaveBeenCalledTimes(3);
+      // closeSession should be called each time (once per retry + once for success)
+      expect(mockAcpRunner.closeSession).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('propagates non-transient ACP thrown exceptions immediately', async () => {
@@ -1236,6 +1239,56 @@ describe('shouldSkipStep', () => {
     const failing = new Map<string, Map<string, string>>();
     failing.set('test', new Map([['exit_code', '1']]));
     expect(shouldSkipStep(step, failing)).toBe(false);
+  });
+});
+
+describe('collectNestedStepIds', () => {
+  it('returns the id of a leaf node with no sub-steps', () => {
+    expect(collectNestedStepIds({ id: 'step1' })).toEqual(['step1']);
+  });
+
+  it('returns the id of a leaf node with empty steps array', () => {
+    expect(collectNestedStepIds({ id: 'step1', steps: [] })).toEqual(['step1']);
+  });
+
+  it('collects ids from a flat list of sub-steps', () => {
+    const node = {
+      id: 'loop1',
+      steps: [{ id: 'sub1' }, { id: 'sub2' }, { id: 'sub3' }],
+    };
+    expect(collectNestedStepIds(node)).toEqual([
+      'loop1',
+      'sub1',
+      'sub2',
+      'sub3',
+    ]);
+  });
+
+  it('collects ids from deeply nested structures', () => {
+    const node = {
+      id: 'outer_loop',
+      steps: [
+        {
+          id: 'inner_loop',
+          steps: [
+            { id: 'deep_step_a' },
+            {
+              id: 'deepest_loop',
+              steps: [{ id: 'leaf' }],
+            },
+          ],
+        },
+        { id: 'sibling_step' },
+      ],
+    };
+    expect(collectNestedStepIds(node)).toEqual([
+      'outer_loop',
+      'inner_loop',
+      'deep_step_a',
+      'deepest_loop',
+      'leaf',
+      'sibling_step',
+    ]);
   });
 });
 

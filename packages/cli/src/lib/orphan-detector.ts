@@ -1,7 +1,6 @@
 import { join } from 'node:path';
 import colors from 'ansi-colors';
 import type { ProjectManager, TaskDescriptionManager } from 'rover-core';
-import { VERBOSE } from 'rover-core';
 import { AGENT_EXIT_CODE } from 'rover-schemas';
 import { isResumeLockActive } from '../utils/resume-lock.js';
 import { createSandbox } from './sandbox/index.js';
@@ -12,7 +11,7 @@ function isResumeLockHeld(task: TaskDescriptionManager): boolean {
 }
 
 /** Maximum time (ms) to consider a restart "in flight" before treating it as stale. */
-const STARTUP_TIMEOUT_MS = 5 * 60 * 1000;
+export const STARTUP_TIMEOUT_MS = 5 * 60 * 1000;
 
 function isRestartStartupInFlight(task: TaskDescriptionManager): boolean {
   if (!task.lastRestartAt) return false;
@@ -147,16 +146,15 @@ export async function detectOrphanedTasks(
     })
   );
 
-  // Log any unexpected rejections that escaped the per-task try/catch
-  if (VERBOSE) {
-    for (const result of results) {
-      if (result.status === 'rejected') {
-        console.warn(
-          colors.yellow(
-            `⚠ Unexpected error during orphan detection: ${result.reason}`
-          )
-        );
-      }
+  // Log any unexpected rejections that escaped the per-task try/catch.
+  // Always log these — they indicate a bug in the per-task error handling.
+  for (const result of results) {
+    if (result.status === 'rejected') {
+      console.warn(
+        colors.yellow(
+          `⚠ Unexpected error during orphan detection: ${result.reason}`
+        )
+      );
     }
   }
 }

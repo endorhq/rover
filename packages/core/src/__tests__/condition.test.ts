@@ -107,22 +107,14 @@ describe('evaluateCondition', () => {
     warnSpy.mockRestore();
   });
 
-  it('returns false and warns when using && operator without spaces', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  it('does not treat && inside a value as a logical operator', () => {
     const stepsOutput = new Map<string, Map<string, string>>();
-    stepsOutput.set('a', new Map([['x', '1']]));
-    stepsOutput.set('b', new Map([['y', '2']]));
+    stepsOutput.set('cmd', new Map([['result', 'echo&&true']]));
 
+    // "echo&&true" in the value should NOT trigger the && warning
     expect(
-      evaluateCondition(
-        'steps.a.outputs.x == 1&&steps.b.outputs.y == 2',
-        stepsOutput
-      )
-    ).toBe(false);
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('"&&" (AND) operator is not supported')
-    );
-    warnSpy.mockRestore();
+      evaluateCondition('steps.cmd.outputs.result == echo&&true', stepsOutput)
+    ).toBe(true);
   });
 
   it('handles whitespace in condition', () => {
@@ -230,5 +222,37 @@ describe('evaluateCondition', () => {
         )
       ).toBe(false);
     });
+
+    it('does not split || inside a value (no steps. after ||)', () => {
+      const stepsOutput = new Map<string, Map<string, string>>();
+      stepsOutput.set('cmd', new Map([['result', 'a||b']]));
+
+      // "a||b" is the value, not a logical OR between clauses
+      expect(
+        evaluateCondition('steps.cmd.outputs.result == a||b', stepsOutput)
+      ).toBe(true);
+    });
+
+    it('handles three OR clauses', () => {
+      const stepsOutput = new Map<string, Map<string, string>>();
+      stepsOutput.set('a', new Map([['x', '0']]));
+      stepsOutput.set('b', new Map([['y', '0']]));
+      stepsOutput.set('c', new Map([['z', '1']]));
+
+      expect(
+        evaluateCondition(
+          'steps.a.outputs.x == 1 || steps.b.outputs.y == 1 || steps.c.outputs.z == 1',
+          stepsOutput
+        )
+      ).toBe(true);
+    });
+  });
+
+  it('returns false for empty condition string', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const stepsOutput = new Map<string, Map<string, string>>();
+
+    expect(evaluateCondition('', stepsOutput)).toBe(false);
+    warnSpy.mockRestore();
   });
 });

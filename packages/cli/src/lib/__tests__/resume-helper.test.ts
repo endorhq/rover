@@ -105,6 +105,7 @@ function createMockProject(task?: any) {
 
 describe('resumeTask', () => {
   let tempDir: string;
+  let killSpy: ReturnType<typeof vi.spyOn> | undefined;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -120,6 +121,8 @@ describe('resumeTask', () => {
   });
 
   afterEach(() => {
+    killSpy?.mockRestore();
+    killSpy = undefined;
     rmSync(tempDir, { recursive: true, force: true });
   });
 
@@ -325,7 +328,7 @@ describe('resumeTask', () => {
     const old = new Date(Date.now() - 10 * 60 * 1000);
     utimesSync(lockPath, old, old);
 
-    const killSpy = vi
+    killSpy = vi
       .spyOn(process, 'kill')
       .mockImplementation((pid: number | bigint) => {
         if (pid === 424242) return true as any;
@@ -338,8 +341,6 @@ describe('resumeTask', () => {
     expect(mockedCreateSandbox).not.toHaveBeenCalled();
     expect(task.markInProgress).not.toHaveBeenCalled();
     expect(existsSync(lockPath)).toBe(true);
-
-    killSpy.mockRestore();
   });
 
   it('does not bypass an existing lock owned by the current process', async () => {
@@ -577,7 +578,7 @@ describe('resumeTask', () => {
       writeFileSync(lockPath, '112233', 'utf8');
 
       // Simulate the owning PID being alive: process.kill(pid, 0) succeeds
-      const killSpy = vi
+      killSpy = vi
         .spyOn(process, 'kill')
         .mockImplementation((pid: number | bigint) => {
           if (pid === 112233) return true as any;
@@ -592,8 +593,6 @@ describe('resumeTask', () => {
       // Lock file should remain untouched with original PID
       expect(existsSync(lockPath)).toBe(true);
       expect(readFileSync(lockPath, 'utf8')).toBe('112233');
-
-      killSpy.mockRestore();
     });
 
     it('reclaims a stale lock from a dead PID and resumes successfully', async () => {
@@ -610,7 +609,7 @@ describe('resumeTask', () => {
       writeFileSync(lockPath, '554433', 'utf8');
 
       // Simulate the owning PID being dead: process.kill(pid, 0) throws ESRCH
-      const killSpy = vi
+      killSpy = vi
         .spyOn(process, 'kill')
         .mockImplementation((_pid: number | bigint) => {
           throw Object.assign(new Error('No such process'), { code: 'ESRCH' });
@@ -631,8 +630,6 @@ describe('resumeTask', () => {
       );
       // After successful resume, the lock should be released (cleaned up)
       expect(existsSync(lockPath)).toBe(false);
-
-      killSpy.mockRestore();
     });
 
     it('second caller fails gracefully when two callers race to acquire the lock', async () => {

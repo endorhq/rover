@@ -8,7 +8,7 @@ import { isProcessAlive } from './process.js';
  *  process later gets the same PID, the lock will be treated as stale after this
  *  timeout instead of blocking resume indefinitely.
  */
-const LOCK_STALENESS_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+export const LOCK_STALENESS_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 
 /**
  * Format the lock file content: "PID:TIMESTAMP" where TIMESTAMP is epoch ms.

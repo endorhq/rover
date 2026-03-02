@@ -36,7 +36,7 @@ export function calculateNextRetryWindow(
  * After this many failed resume attempts the task stays PAUSED and the
  * user must manually `rover resume <id>`.
  */
-const MAX_AUTO_RETRIES = 5;
+export const MAX_AUTO_RETRIES = 5;
 
 interface TaskTimerEntry {
   provider: string;

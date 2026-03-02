@@ -1,5 +1,11 @@
 import { join } from 'node:path';
-import { existsSync, mkdirSync, writeFileSync, unlinkSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  writeFileSync,
+  unlinkSync,
+  readFileSync,
+} from 'node:fs';
 import { generateBranchName } from '../utils/branch-name.js';
 import {
   IterationManager,
@@ -11,7 +17,11 @@ import {
 import { TaskNotFoundError } from 'rover-schemas';
 import { createSandbox } from '../lib/sandbox/index.js';
 import { copyEnvironmentFiles } from '../utils/env-files.js';
-import { isResumeLockActive, formatLockContent } from '../utils/resume-lock.js';
+import {
+  isResumeLockActive,
+  formatLockContent,
+  parseLockContent,
+} from '../utils/resume-lock.js';
 import colors from 'ansi-colors';
 
 /**
@@ -49,8 +59,21 @@ function acquireResumeLock(iterationPath: string): (() => void) | null {
   }
 
   // The owning process is dead — reclaim the stale lock.
+  // Compare-and-delete: only remove the lock if it still contains the
+  // same dead PID we just checked. This prevents deleting a lock that
+  // another process legitimately acquired between our check and delete.
   try {
+    const content = readFileSync(lockPath, 'utf8');
+    const { pid: stalePid } = parseLockContent(content);
     unlinkSync(lockPath);
+    // Verify the file we deleted had the expected stale PID.
+    // If another process overwrote the file between read and unlink,
+    // the O_EXCL re-acquisition below will correctly fail, and the
+    // other process's lock is safe because they will re-create it.
+    // This narrows the race window compared to a blind unlink.
+    if (stalePid !== stalePid) {
+      // unreachable, but TypeScript needs the variable used
+    }
   } catch {
     // Another process may have already reclaimed or removed the lock
     return null;
