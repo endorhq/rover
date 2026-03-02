@@ -137,3 +137,6 @@ echo "✅ Package manager MCP is ready"
 trap 'safe_exit $?' EXIT HUP INT QUIT TERM
 
 "$@"
+
+echo 'sleeping infinity'
+sleep infinity

@@ -185,6 +185,15 @@ export interface ACPInvokeConfig {
 export async function acpInvoke(config: ACPInvokeConfig): Promise<string> {
   const { agentName, prompt, cwd, model } = config;
   const mcpServers = config.mcpServers ?? loadMcpServersFromProject(cwd || process.cwd());
+
+  // Always include the built-in package-manager MCP
+  mcpServers.push({
+    type: 'http' as const,
+    name: 'package-manager',
+    url: 'http://127.0.0.1:8090/mcp',
+    headers: [],
+  });
+
   const agentConfig = getAgentACPConfig(agentName, model);
 
   console.log(

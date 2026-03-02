@@ -497,7 +497,77 @@ const createTaskForAgent = async (
     }
   }
 
-  await exitWithSuccess("expansion worked well", { success: true });
+  // Resolve and store the agent image that will be used for this task
+  const projectConfig = ProjectConfigManager.load(projectPath);
+  const agentImage = resolveAgentImage(projectConfig);
+  task.setAgentImage(agentImage);
+
+  // Start sandbox container for task execution
+  try {
+    const sandbox = await createSandbox(task, processManager, {
+      extraArgs: options.sandboxExtraArgs,
+      projectPath,
+      iterationLogsPath: project.getTaskIterationLogsPath(
+        task.id,
+        task.iterations
+      ),
+    });
+    const containerId = await sandbox.createAndStart();
+
+    updateTaskMetadata(
+      project,
+      task.id,
+      {
+        containerId,
+        executionStatus: 'running',
+        runningAt: new Date().toISOString(),
+        sandboxMetadata: process.env.DOCKER_HOST
+          ? { dockerHost: process.env.DOCKER_HOST }
+          : undefined,
+      },
+      jsonMode
+    );
+
+    processManager?.addItem('Task started in background');
+    processManager?.completeLastItem();
+    processManager?.finish();
+  } catch (err) {
+    if (isVerbose()) {
+      console.log('ERROR:', err);
+    }
+    // If Docker execution fails to start, reset task to NEW status
+    task.resetToNew();
+
+    processManager?.addItem('Task started in background');
+    processManager?.failLastItem();
+    processManager?.finish();
+
+    if (!jsonMode) {
+      console.warn(
+        colors.yellow(
+          `Task ${taskId} was created, but reset to 'New' due to an error running the container`
+        )
+      );
+      console.log(
+        colors.gray(
+          'Use ' + colors.cyan(`rover restart ${taskId}`) + ' to retry it'
+        )
+      );
+    }
+  }
+
+  return {
+    taskId: task.id,
+    title: task.title,
+    description: task.description,
+    status: task.status,
+    createdAt: task.createdAt,
+    startedAt: task.startedAt || '',
+    workspace: task.worktreePath,
+    branch: task.branchName,
+    savedTo: task.getBasePath(),
+    context: contextEntries.length > 0 ? contextEntries : undefined,
+  };
 };
 
 /**
