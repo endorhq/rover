@@ -53,13 +53,13 @@ const restartCommand = async (
     success: false,
   };
 
-  // Convert string taskId to number
-  const numericTaskId = parseInt(taskId, 10);
-  if (isNaN(numericTaskId)) {
+  // Convert string taskId to number (strict: reject '123abc' etc.)
+  if (!/^\d+$/.test(taskId)) {
     jsonOutput.error = `Invalid task ID '${taskId}' - must be a number`;
     await exitWithError(jsonOutput, { telemetry });
     return;
   }
+  const numericTaskId = parseInt(taskId, 10);
 
   // Require project context
   let project;
@@ -80,16 +80,21 @@ const restartCommand = async (
 
     // Check if task is in a restartable status
     if (!task.isNew() && !task.isFailed()) {
-      if (task.isInProgress()) {
-        // Allow restarting IN_PROGRESS tasks if the container is dead
+      if (task.isInProgress() || task.isIterating()) {
+        // Allow restarting IN_PROGRESS/ITERATING tasks if the container is dead
         try {
           const sandbox = await createSandbox(task, undefined, {
             projectPath: project.path,
           });
           const state = await sandbox.inspect();
-          // Container is still running — reject the restart
-          if (state && state.status === 'running') {
-            jsonOutput.error = `Task ${taskId} is IN_PROGRESS and its container is still running`;
+          // Container is still alive — reject the restart
+          const containerStatus = (state?.status ?? '').toLowerCase();
+          if (
+            containerStatus === 'running' ||
+            containerStatus === 'created' ||
+            containerStatus === 'restarting'
+          ) {
+            jsonOutput.error = `Task ${taskId} is ${task.status} and its container is still running`;
             await exitWithError(jsonOutput, {
               tips: [
                 'The container for this task is still running',
@@ -107,18 +112,33 @@ const restartCommand = async (
         }
       } else {
         jsonOutput.error = `Task ${taskId} is not in NEW or FAILED status (current: ${task.status})`;
-        await exitWithError(jsonOutput, {
-          tips: [
-            'Only NEW, FAILED, and stuck IN_PROGRESS tasks can be restarted',
+        const tips = [
+          'Only NEW, FAILED, and stuck IN_PROGRESS/ITERATING tasks can be restarted',
+          'Use ' +
+            colors.cyan(`rover inspect ${taskId}`) +
+            colors.gray(' to find out the current task status'),
+        ];
+        if (task.isPaused()) {
+          tips.unshift(
             'Use ' +
-              colors.cyan(`rover inspect ${taskId}`) +
-              colors.gray(' to find out the current task status'),
-          ],
-          telemetry,
-        });
+              colors.cyan(`rover resume ${taskId}`) +
+              colors.gray(' to resume a paused task from its last checkpoint')
+          );
+        }
+        await exitWithError(jsonOutput, { tips, telemetry });
         return;
       }
     }
+
+    const previousStatus = task.status;
+    const previousError = task.error;
+    const restorePreRestartStatus = () => {
+      if (previousStatus === 'FAILED' && previousError) {
+        task.setStatus(previousStatus, { error: previousError });
+        return;
+      }
+      task.setStatus(previousStatus);
+    };
 
     // Restart the task (resets to NEW status and tracks restart attempt)
     const restartedAt = new Date().toISOString();
@@ -173,7 +193,15 @@ const restartCommand = async (
         task.setWorkspace(worktreePath, branchName);
 
         if (spinner) spinner.success('Workspace setup complete');
-      } catch (error) {}
+      } catch (error) {
+        if (spinner) spinner.error('Workspace setup failed');
+        // task.restart() already moved status to IN_PROGRESS; roll it back to
+        // the pre-restart status so failed setup does not regress task state.
+        restorePreRestartStatus();
+        jsonOutput.error = `Failed to set up workspace: ${error instanceof Error ? error.message : String(error)}`;
+        await exitWithError(jsonOutput, { telemetry });
+        return;
+      }
     }
 
     // Ensure iterations directory exists
@@ -243,8 +271,8 @@ const restartCommand = async (
           : undefined
       );
     } catch (error) {
-      // If sandbox execution fails, reset task back to NEW status
-      task.resetToNew();
+      // If sandbox execution fails, restore the pre-restart task status.
+      restorePreRestartStatus();
       throw error;
     }
 
@@ -259,7 +287,7 @@ const restartCommand = async (
       restartedAt: restartedAt,
     };
 
-    await exitWithSuccess('Task restarted succesfully!', jsonOutput, {
+    await exitWithSuccess('Task restarted successfully!', jsonOutput, {
       tips: [
         'Use ' + colors.cyan('rover list') + ' to check the list of tasks',
         'Use ' +
@@ -293,7 +321,7 @@ export { restartCommand };
 
 export default {
   name: 'restart',
-  description: 'Restart a new, failed, or stuck in-progress task',
+  description: 'Restart a new, failed, or stuck in-progress/iterating task',
   requireProject: true,
   action: restartCommand,
 } satisfies CommandDefinition;

@@ -414,6 +414,357 @@ describe('TaskDescriptionManager', () => {
     });
   });
 
+  describe('pause/resume lifecycle', () => {
+    it('should set PAUSED status with error and pausedAt', () => {
+      const taskPath = getTaskPath(14);
+      const task = TaskDescriptionManager.create(taskPath, {
+        id: 14,
+        title: 'Pause Test',
+        description: 'Test description',
+        inputs: new Map(),
+        workflowName: 'swe',
+      });
+
+      task.markInProgress();
+      task.markPaused('Credit limit exceeded');
+
+      expect(task.status).toBe('PAUSED');
+      expect(task.isPaused()).toBe(true);
+      expect(task.error).toBe('Credit limit exceeded');
+      expect(task.pausedAt).toBeDefined();
+
+      // Verify persistence
+      const reloaded = TaskDescriptionManager.load(taskPath, 14);
+      expect(reloaded.status).toBe('PAUSED');
+      expect(reloaded.isPaused()).toBe(true);
+      expect(reloaded.error).toBe('Credit limit exceeded');
+      expect(reloaded.pausedAt).toBeDefined();
+    });
+
+    it('should clear error and pausedAt when resuming to IN_PROGRESS', () => {
+      const taskPath = getTaskPath(15);
+      const task = TaskDescriptionManager.create(taskPath, {
+        id: 15,
+        title: 'Resume Test',
+        description: 'Test description',
+        inputs: new Map(),
+        workflowName: 'swe',
+      });
+
+      task.markInProgress();
+      task.markPaused('Rate limit');
+      expect(task.pausedAt).toBeDefined();
+      expect(task.error).toBe('Rate limit');
+
+      task.markInProgress();
+      expect(task.status).toBe('IN_PROGRESS');
+      expect(task.isPaused()).toBe(false);
+      expect(task.error).toBeUndefined();
+      expect(task.pausedAt).toBeUndefined();
+
+      // Verify persistence
+      const reloaded = TaskDescriptionManager.load(taskPath, 15);
+      expect(reloaded.error).toBeUndefined();
+      expect(reloaded.pausedAt).toBeUndefined();
+    });
+
+    it('should clear error and pausedAt when transitioning to ITERATING', () => {
+      const taskPath = getTaskPath(16);
+      const task = TaskDescriptionManager.create(taskPath, {
+        id: 16,
+        title: 'Iterate After Pause',
+        description: 'Test description',
+        inputs: new Map(),
+        workflowName: 'swe',
+      });
+
+      task.markInProgress();
+      task.markPaused('Credit exhausted');
+      task.markIterating();
+
+      expect(task.status).toBe('ITERATING');
+      expect(task.error).toBeUndefined();
+      expect(task.pausedAt).toBeUndefined();
+    });
+
+    it('should report isActive() as false for PAUSED', () => {
+      const taskPath = getTaskPath(17);
+      const task = TaskDescriptionManager.create(taskPath, {
+        id: 17,
+        title: 'Active Check',
+        description: 'Test description',
+        inputs: new Map(),
+        workflowName: 'swe',
+      });
+
+      task.markInProgress();
+      expect(task.isActive()).toBe(true);
+
+      task.markPaused('Paused');
+      expect(task.isActive()).toBe(false);
+    });
+
+    it('should clear previous error when markPaused() is called without an error', () => {
+      const taskPath = getTaskPath(18);
+      const task = TaskDescriptionManager.create(taskPath, {
+        id: 18,
+        title: 'Pause No Error',
+        description: 'Test description',
+        inputs: new Map(),
+        workflowName: 'swe',
+      });
+
+      task.markInProgress();
+      task.markFailed('Previous failure');
+      expect(task.error).toBe('Previous failure');
+
+      task.markPaused();
+      expect(task.status).toBe('PAUSED');
+      expect(task.pausedAt).toBeDefined();
+      expect(task.error).toBeUndefined();
+
+      // Verify persistence
+      const reloaded = TaskDescriptionManager.load(taskPath, 18);
+      expect(reloaded.status).toBe('PAUSED');
+      expect(reloaded.error).toBeUndefined();
+      expect(reloaded.pausedAt).toBeDefined();
+    });
+
+    it('should map paused iteration status to PAUSED task status via updateStatusFromIteration', () => {
+      const { mkdirSync, writeFileSync } = require('node:fs');
+
+      const taskPath = getTaskPath(19);
+      const task = TaskDescriptionManager.create(taskPath, {
+        id: 19,
+        title: 'Iteration Pause Map',
+        description: 'Test description',
+        inputs: new Map(),
+        workflowName: 'swe',
+      });
+
+      task.markInProgress();
+
+      // Create a proper iteration directory with both iteration.json and status.json
+      const iterationPath = join(
+        taskPath,
+        'iterations',
+        (task.iterations || 1).toString()
+      );
+      mkdirSync(iterationPath, { recursive: true });
+      writeFileSync(
+        join(iterationPath, 'iteration.json'),
+        JSON.stringify({
+          version: '1.1',
+          iteration: 1,
+          id: 19,
+          title: 'Iteration Pause Map',
+          description: 'Test description',
+          createdAt: new Date().toISOString(),
+          previousContext: {},
+          context: [],
+        })
+      );
+      const now = new Date().toISOString();
+      writeFileSync(
+        join(iterationPath, 'status.json'),
+        JSON.stringify({
+          taskId: '19',
+          status: 'paused',
+          currentStep: 'step-1',
+          progress: 50,
+          startedAt: now,
+          updatedAt: now,
+          error: 'Credit limit hit',
+        })
+      );
+
+      task.updateStatusFromIteration();
+      expect(task.status).toBe('PAUSED');
+      expect(task.error).toBe('Credit limit hit');
+    });
+
+    it('should clear pausedAt when transitioning to FAILED', () => {
+      const taskPath = getTaskPath(22);
+      const task = TaskDescriptionManager.create(taskPath, {
+        id: 22,
+        title: 'Pause Then Fail',
+        description: 'Test description',
+        inputs: new Map(),
+        workflowName: 'swe',
+      });
+
+      task.markInProgress();
+      task.markPaused('Credit limit');
+      expect(task.pausedAt).toBeDefined();
+
+      task.markFailed('Container crashed');
+      expect(task.status).toBe('FAILED');
+      expect(task.pausedAt).toBeUndefined();
+      expect(task.error).toBe('Container crashed');
+
+      const reloaded = TaskDescriptionManager.load(taskPath, 22);
+      expect(reloaded.pausedAt).toBeUndefined();
+    });
+
+    it('should clear pausedAt when transitioning to COMPLETED', () => {
+      const taskPath = getTaskPath(23);
+      const task = TaskDescriptionManager.create(taskPath, {
+        id: 23,
+        title: 'Pause Then Complete',
+        description: 'Test description',
+        inputs: new Map(),
+        workflowName: 'swe',
+      });
+
+      task.markInProgress();
+      task.markPaused('Credit limit');
+      expect(task.pausedAt).toBeDefined();
+
+      task.markCompleted();
+      expect(task.status).toBe('COMPLETED');
+      expect(task.pausedAt).toBeUndefined();
+
+      const reloaded = TaskDescriptionManager.load(taskPath, 23);
+      expect(reloaded.pausedAt).toBeUndefined();
+    });
+
+    it('should clear pausedAt when transitioning to MERGED or PUSHED', () => {
+      const taskPath = getTaskPath(24);
+      const task = TaskDescriptionManager.create(taskPath, {
+        id: 24,
+        title: 'Pause Then Merge',
+        description: 'Test description',
+        inputs: new Map(),
+        workflowName: 'swe',
+      });
+
+      task.markInProgress();
+      task.markPaused('Credit limit');
+      expect(task.pausedAt).toBeDefined();
+
+      task.markMerged();
+      expect(task.status).toBe('MERGED');
+      expect(task.pausedAt).toBeUndefined();
+    });
+
+    it('should clear pausedAt and error when resetting from PAUSED to NEW', () => {
+      const taskPath = getTaskPath(25);
+      const task = TaskDescriptionManager.create(taskPath, {
+        id: 25,
+        title: 'Reset From Paused',
+        description: 'Test description',
+        inputs: new Map(),
+        workflowName: 'swe',
+      });
+
+      task.markInProgress();
+      task.markPaused('Credit limit reached');
+      expect(task.pausedAt).toBeDefined();
+      expect(task.error).toBe('Credit limit reached');
+
+      task.resetToNew();
+      expect(task.status).toBe('NEW');
+      expect(task.pausedAt).toBeUndefined();
+      expect(task.error).toBeUndefined();
+
+      // Verify persistence
+      const reloaded = TaskDescriptionManager.load(taskPath, 25);
+      expect(reloaded.status).toBe('NEW');
+      expect(reloaded.pausedAt).toBeUndefined();
+      expect(reloaded.error).toBeUndefined();
+    });
+
+    it('should clear error when resetting from FAILED to NEW', () => {
+      const taskPath = getTaskPath(26);
+      const task = TaskDescriptionManager.create(taskPath, {
+        id: 26,
+        title: 'Reset From Failed',
+        description: 'Test description',
+        inputs: new Map(),
+        workflowName: 'swe',
+      });
+
+      task.markInProgress();
+      task.markFailed('Container crashed');
+      expect(task.error).toBe('Container crashed');
+
+      task.resetToNew();
+      expect(task.status).toBe('NEW');
+      expect(task.error).toBeUndefined();
+    });
+
+    it('should support restart() from PAUSED status', () => {
+      const taskPath = getTaskPath(27);
+      const task = TaskDescriptionManager.create(taskPath, {
+        id: 27,
+        title: 'Restart From Paused',
+        description: 'Test description',
+        inputs: new Map(),
+        workflowName: 'swe',
+      });
+
+      task.markInProgress();
+      task.markPaused('Rate limit');
+      expect(task.pausedAt).toBeDefined();
+      expect(task.error).toBe('Rate limit');
+
+      task.restart();
+      expect(task.status).toBe('IN_PROGRESS');
+      expect(task.pausedAt).toBeUndefined();
+      expect(task.error).toBeUndefined();
+      expect(task.restartCount).toBe(1);
+      expect(task.lastRestartAt).toBeDefined();
+    });
+
+    it('should return null from getDuration() when task is PAUSED', () => {
+      const taskPath = getTaskPath(20);
+      const task = TaskDescriptionManager.create(taskPath, {
+        id: 20,
+        title: 'Duration Paused',
+        description: 'Test description',
+        inputs: new Map(),
+        workflowName: 'swe',
+      });
+
+      task.markInProgress();
+      task.markPaused('Paused');
+
+      // PAUSED sets pausedAt but not completedAt or failedAt,
+      // so getDuration() returns null (pause is non-terminal).
+      expect(task.getDuration()).toBeNull();
+    });
+  });
+
+  describe('schema migration', () => {
+    it('should handle v1.5 schema without pausedAt field', () => {
+      const { readFileSync, writeFileSync } = require('node:fs');
+
+      const taskPath = getTaskPath(21);
+      TaskDescriptionManager.create(taskPath, {
+        id: 21,
+        title: 'Migration PausedAt Test',
+        description: 'Test pausedAt migration',
+        inputs: new Map(),
+        workflowName: 'swe',
+      });
+
+      // Simulate v1.5 schema by removing pausedAt and setting older version
+      const descriptionPath = join(taskPath, 'description.json');
+      const taskData = JSON.parse(readFileSync(descriptionPath, 'utf8'));
+      delete taskData.pausedAt;
+      taskData.version = '1.5';
+      writeFileSync(descriptionPath, JSON.stringify(taskData, null, 2), 'utf8');
+
+      // Reload should migrate cleanly
+      const migratedTask = TaskDescriptionManager.load(taskPath, 21);
+      expect(migratedTask.pausedAt).toBeUndefined();
+      expect(migratedTask.version).toBe(
+        CURRENT_TASK_DESCRIPTION_SCHEMA_VERSION
+      );
+      expect(() => migratedTask.save()).not.toThrow();
+    });
+  });
+
   describe('utility methods', () => {
     it('should provide correct utility methods for new statuses', () => {
       const taskPath = getTaskPath(9);

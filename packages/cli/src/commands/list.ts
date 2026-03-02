@@ -25,6 +25,8 @@ import { getTelemetry } from '../lib/telemetry.js';
 import { formatTaskStatus, statusColor } from '../utils/task-status.js';
 import type { ListTasksOutput } from '../output-types.js';
 import type { CommandDefinition } from '../types.js';
+import { detectOrphanedTasks } from '../lib/orphan-detector.js';
+import { RetryScheduler } from '../lib/retry-scheduler.js';
 
 /**
  * Format duration from start to now or completion
@@ -58,13 +60,18 @@ const formatProgress = (step?: string, progress?: number): string => {
   if (step === undefined || progress === undefined) return colors.gray('─────');
 
   const barLength = 8;
-  const filled = Math.round((progress / 100) * barLength);
+  const filled = Math.max(
+    0,
+    Math.min(barLength, Math.round((progress / 100) * barLength))
+  );
   const bar = '█'.repeat(filled) + '░'.repeat(barLength - filled);
 
   if (step === 'FAILED') {
     return colors.red(bar);
   } else if (['COMPLETED', 'MERGED', 'PUSHED'].includes(step)) {
     return colors.green(bar);
+  } else if (step === 'PAUSED') {
+    return colors.yellow(bar);
   } else {
     return colors.cyan(bar);
   }
@@ -83,6 +90,8 @@ interface TaskRow {
   currentStep: string;
   duration: string;
   error?: string;
+  /** AI provider that caused the pause (for display purposes) */
+  provider?: string;
   /** Group ID for grouped rendering (project ID in global mode) */
   groupId?: string;
 }
@@ -113,7 +122,9 @@ const maybeIterationStatus = (
  */
 const buildTaskRow = (
   task: TaskDescriptionManager,
-  groupId?: string
+  groupId?: string,
+  retryScheduler?: RetryScheduler,
+  project?: ProjectManager | null
 ): TaskRow => {
   const lastIteration = task.getLastIteration();
   const taskStatus = task.status;
@@ -123,6 +134,8 @@ const buildTaskRow = (
   let endTime: string | undefined;
   if (taskStatus === 'FAILED') {
     endTime = task.failedAt;
+  } else if (taskStatus === 'PAUSED') {
+    endTime = task.pausedAt;
   } else if (['COMPLETED', 'MERGED', 'PUSHED'].includes(taskStatus)) {
     endTime = task.completedAt;
   }
@@ -135,6 +148,29 @@ const buildTaskRow = (
     agentDisplay = `${task.agent}:${task.agentModel}`;
   }
 
+  // Resolve provider for paused tasks
+  const pauseProvider =
+    taskStatus === 'PAUSED'
+      ? iterationStatus?.provider || task.agent || undefined
+      : undefined;
+
+  // For paused tasks, show retry time instead of step name
+  let currentStepDisplay = iterationStatus?.currentStep || '-';
+  if (taskStatus === 'PAUSED' && retryScheduler && pauseProvider) {
+    // Only show the task-specific retry time; don't fall back to provider-wide
+    // time which could show another task's scheduled retry.
+    const retryTime = project
+      ? retryScheduler.getScheduledTimeForTask(project, task.id)
+      : undefined;
+    if (retryTime) {
+      const timeStr = retryTime.toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+      currentStepDisplay = `retry at ${timeStr}`;
+    }
+  }
+
   return {
     id: task.id.toString(),
     title: task.title || 'Unknown Task',
@@ -142,9 +178,10 @@ const buildTaskRow = (
     workflow: task.workflowName || '-',
     status: taskStatus,
     progress: iterationStatus?.progress || 0,
-    currentStep: iterationStatus?.currentStep || '-',
+    currentStep: currentStepDisplay,
     duration: iterationStatus ? formatDuration(startedAt, endTime) : '-',
     error: task.error,
+    provider: pauseProvider,
     groupId,
   };
 };
@@ -169,6 +206,10 @@ const listCommand = async (
     verbose?: boolean;
     json?: boolean;
     watching?: boolean;
+    /** Internal: retry scheduler passed through from watch mode */
+    _retryScheduler?: RetryScheduler;
+    /** Internal: mutable ref for orphan detection throttle (shared across watch cycles) */
+    _orphanDetectRef?: { lastAt: number };
   } = {}
 ) => {
   if (options.json !== undefined) {
@@ -245,12 +286,67 @@ const listCommand = async (
       }
     }
 
-    // Update task status and detect completions for onComplete hooks
+    const refreshedTasksWithProjects: TaskWithProject[] = [];
+    const orphanCandidates: TaskWithProject[] = [];
     for (const { task, project: projectData } of tasksWithProjects) {
       try {
-        // Update status from iteration
         task.updateStatusFromIteration();
+        orphanCandidates.push({ task, project: projectData });
+        refreshedTasksWithProjects.push({ task, project: projectData });
+      } catch (err) {
+        if (!isJsonMode()) {
+          console.log(
+            `\n${colors.yellow(`⚠ Failed to update the status of task ${task.id}`)}`
+          );
+        }
+
+        if (VERBOSE) {
+          console.error(colors.gray(`Error details: ${err}`));
+        }
+      }
+    }
+
+    // Detect orphaned IN_PROGRESS/ITERATING tasks whose container died.
+    // Throttle to every 30 seconds in watch mode since each detection round
+    // involves container inspect calls that can be slow with many tasks.
+    const ORPHAN_DETECT_INTERVAL_MS = 30_000;
+    const now = Date.now();
+    const orphanRef = options._orphanDetectRef;
+    if (
+      !options.watching ||
+      !orphanRef ||
+      now - orphanRef.lastAt >= ORPHAN_DETECT_INTERVAL_MS
+    ) {
+      await detectOrphanedTasks(orphanCandidates, {
+        suppressWarnings: isJsonMode(),
+      });
+      if (orphanRef) {
+        orphanRef.lastAt = now;
+      }
+    }
+
+    // Use refreshed task state for scheduler updates and onComplete hooks.
+    const retryScheduler = options._retryScheduler;
+    for (const { task, project: projectData } of refreshedTasksWithProjects) {
+      try {
         const currentStatus = task.status;
+
+        // Auto-retry integration: register/unregister paused tasks
+        if (retryScheduler && projectData) {
+          if (currentStatus === 'PAUSED') {
+            const lastIteration = task.getLastIteration();
+            const iterStatus = maybeIterationStatus(lastIteration);
+            const provider = iterStatus?.provider || task.agent || 'unknown';
+            retryScheduler.registerPausedTask(provider, task.id, projectData);
+          } else {
+            // If task was paused but is no longer, unregister
+            const provider =
+              maybeIterationStatus(task.getLastIteration())?.provider ||
+              task.agent ||
+              'unknown';
+            retryScheduler.unregisterTask(provider, task.id, projectData);
+          }
+        }
 
         // Check if this is a terminal status that should trigger onComplete hooks
         const isTerminalStatus =
@@ -333,7 +429,8 @@ const listCommand = async (
 
     // Prepare table data
     const tableData: TaskRow[] = tasksWithProjects.map(
-      ({ task, project: projectData }) => buildTaskRow(task, projectData?.id)
+      ({ task, project: projectData }) =>
+        buildTaskRow(task, projectData?.id, retryScheduler, projectData)
     );
 
     // Define table columns
@@ -370,10 +467,10 @@ const listCommand = async (
       {
         header: 'Status',
         key: 'status',
-        width: 12,
-        format: (value: string) => {
+        width: 20,
+        format: (value: string, row: TaskRow) => {
           const colorFunc = statusColor(value);
-          return colorFunc(formatTaskStatus(value));
+          return colorFunc(formatTaskStatus(value, row.provider));
         },
       },
       {
@@ -433,6 +530,11 @@ const listCommand = async (
     }
 
     // Watch mode (configurable refresh interval, default 3 seconds)
+    if (options.watch && !options._retryScheduler) {
+      // Create a retry scheduler for auto-resuming paused tasks (only once, on the initial watch call)
+      options._retryScheduler = new RetryScheduler({ quiet: isJsonMode() });
+    }
+
     if (options.watch) {
       // CLI argument takes precedence, then settings, then default (3s)
       let intervalSeconds: number;
@@ -466,26 +568,80 @@ const listCommand = async (
 
       console.log(
         colors.gray(
-          `\n⏱️  Watching for changes every ${intervalSeconds}s (Ctrl+C to exit)...`
+          `\n⏱️  Watching for changes every ${intervalSeconds}s (Ctrl+C to exit)...\n` +
+            `    Paused tasks will auto-retry when credits reset (up to 5 attempts).`
         )
       );
 
-      const watchInterval = setInterval(async () => {
-        // Clear screen and show updated status
-        process.stdout.write('\x1b[2J\x1b[0f');
-        await listCommand({ ...options, watch: false, watching: true });
-        console.log(
-          colors.gray(
-            `\n⏱️  Refreshing every ${intervalSeconds}s (Ctrl+C to exit)...`
-          )
-        );
-      }, intervalMs);
+      const watchScheduler = options._retryScheduler;
+      // Mutable ref shared across watch cycles so the orphan detection
+      // throttle persists between recursive listCommand calls.
+      const orphanDetectRef = { lastAt: 0 };
+      let watchTimeout: ReturnType<typeof setTimeout> | undefined;
+      let stopping = false;
+      let consecutiveErrors = 0;
+      const MAX_CONSECUTIVE_ERRORS = 10;
 
-      // Handle Ctrl+C
-      process.on('SIGINT', () => {
-        clearInterval(watchInterval);
-        process.exit(0);
+      // Use setTimeout chain instead of setInterval to prevent overlapping
+      // refresh cycles when a refresh takes longer than the interval.
+      const scheduleRefresh = () => {
+        if (stopping) return;
+        watchTimeout = setTimeout(async () => {
+          try {
+            process.stdout.write('\x1b[2J\x1b[0f');
+            await listCommand({
+              ...options,
+              watch: false,
+              watching: true,
+              _retryScheduler: watchScheduler,
+              _orphanDetectRef: orphanDetectRef,
+            });
+            console.log(
+              colors.gray(
+                `\n⏱️  Refreshing every ${intervalSeconds}s (Ctrl+C to exit)...`
+              )
+            );
+            consecutiveErrors = 0;
+          } catch (err) {
+            consecutiveErrors++;
+            console.error(
+              colors.red(
+                `Error during watch refresh: ${err instanceof Error ? err.message : String(err)}`
+              )
+            );
+            if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+              console.error(
+                colors.red(
+                  `\nToo many consecutive refresh errors (${MAX_CONSECUTIVE_ERRORS}), stopping watch mode.`
+                )
+              );
+              stopping = true;
+              return;
+            }
+          }
+          scheduleRefresh();
+        }, intervalMs);
+      };
+      scheduleRefresh();
+
+      const cleanup = () => {
+        stopping = true;
+        if (watchTimeout) clearTimeout(watchTimeout);
+        watchScheduler?.destroy();
+      };
+
+      // Handle Ctrl+C (once — handler is only registered on the initial watch call)
+      process.once('SIGINT', () => {
+        cleanup();
+        // Allow event loop to drain (telemetry shutdown in finally block)
+        // instead of calling process.exit(0) which skips async cleanup.
+        process.exitCode = 0;
       });
+
+      // Safety net: ensure timers are cleaned up on any exit path
+      // (uncaught exceptions, SIGTERM, etc.)
+      process.once('SIGTERM', cleanup);
+      process.once('exit', cleanup);
     }
 
     if (!options.watch && !options.watching) {

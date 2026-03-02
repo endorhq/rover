@@ -27,6 +27,8 @@ import type {
   WorkflowOutput,
   WorkflowOutputType,
 } from 'rover-schemas';
+import { isAgentStep } from 'rover-schemas';
+import { resolvePlaceholders } from './placeholders.js';
 import {
   parseAgentError,
   isWaitingForAuthentication,
@@ -73,8 +75,14 @@ export class Runner {
     private currentStepIndex: number = 0,
     private logger?: JsonlLogger
   ) {
-    // Get the step from the workflow
-    this.step = this.workflow.getStep(stepId);
+    // Get the step from the workflow and verify it's an agent step
+    const step = this.workflow.getStep(stepId);
+    if (!isAgentStep(step)) {
+      throw new Error(
+        `Runner only supports agent steps, but step "${stepId}" is type "${step.type}"`
+      );
+    }
+    this.step = step;
 
     // Determine which tool to use
     const stepTool = this.workflow.getStepTool(stepId, this.defaultTool);
@@ -705,7 +713,7 @@ export class Runner {
       fileOutputs.forEach((output: WorkflowOutput) => {
         instructions += `- **${output.name}**: ${output.description}\n`;
 
-        if (this.tool == 'gemini' || this.tool == 'qwen') {
+        if (this.tool === 'gemini' || this.tool === 'qwen') {
           // Gemini and Qwen refuse to write files using relative paths, so we must
           // provide an absolute path in the prompt.
           const absolutePath = resolve(output.filename!);
@@ -751,86 +759,43 @@ export class Runner {
    * Adds output instructions based on the step's expected outputs.
    */
   prompt(): string {
-    let finalPrompt = this.step.prompt;
-    const placeholderRegex = /\{\{([^}]+)\}\}/g;
-    const matches = [...finalPrompt.matchAll(placeholderRegex)];
-    const warnings: string[] = [];
+    const extraWarnings: string[] = [];
 
-    for (const match of matches) {
-      const fullMatch = match[0];
-      const placeholder = match[1].trim();
-      let replacementValue: string | undefined;
+    const { text, warnings } = resolvePlaceholders(this.step.prompt, {
+      inputs: this.inputs,
+      stepsOutput: this.stepsOutput,
+      transformStepOutput: (stepId, outputName, rawValue) => {
+        // Find the step and output definition to check its type
+        const stepDef = this.workflow.findStep(stepId);
+        const outputDef = stepDef?.outputs?.find(
+          (o: WorkflowOutput) => o.name === outputName
+        );
 
-      // Parse the placeholder path
-      const parts = placeholder.split('.');
-
-      if (parts[0] === 'inputs' && parts.length == 2) {
-        // Format: {{inputs.input_name}}
-        const inputName = parts.slice(1).join('.');
-        const inputValue = this.inputs.get(inputName);
-
-        if (inputValue !== undefined) {
-          // Inputs are always string values (never files)
-          // The input type (string/number/boolean) just indicates validation,
-          // but in the context of template replacement, we use the string value directly
-          replacementValue = inputValue;
-        } else {
-          warnings.push(`Input '${inputName}' not provided`);
-        }
-      } else if (
-        parts[0] === 'steps' &&
-        parts.length == 4 &&
-        parts[2] === 'outputs'
-      ) {
-        // Format: {{steps.step_id.outputs.output_name}}
-        const stepId = parts[1];
-        const outputName = parts.slice(3).join('.');
-        const stepOutputs = this.stepsOutput.get(stepId);
-
-        if (stepOutputs && stepOutputs.has(outputName)) {
-          const outputValue = stepOutputs.get(outputName) || '';
-
-          // Find the step and output definition to check its type
-          const stepDef = this.workflow.steps.find(s => s.id === stepId);
-          const outputDef = stepDef?.outputs?.find(
-            (o: WorkflowOutput) => o.name === outputName
+        if (outputDef) {
+          return this.loadValueByType(rawValue, outputDef.type, extraWarnings);
+        } else if (stepDef && isAgentStep(stepDef)) {
+          // Agent steps should have explicit output definitions.
+          // A missing definition likely indicates a typo.
+          extraWarnings.push(
+            `Output '${outputName}' is not defined in agent step '${stepId}'`
           );
-
-          if (!outputDef) {
-            warnings.push(
-              `The output '${outputName}' definition in step '${stepId}' is missing`
-            );
-          } else {
-            replacementValue = this.loadValueByType(
-              outputValue,
-              outputDef.type,
-              warnings
-            );
-          }
-        } else if (!stepOutputs) {
-          warnings.push(`Step '${stepId}' has not been executed yet`);
-        } else {
-          warnings.push(`Output '${outputName}' not found in step '${stepId}'`);
         }
-      } else {
-        // Unknown placeholder format
-        warnings.push(`Invalid placeholder format: '${placeholder}'`);
-      }
-
-      // Replace the placeholder with the value or leave as-is if unresolved
-      if (replacementValue !== undefined) {
-        finalPrompt = finalPrompt.replace(fullMatch, replacementValue);
-      }
-    }
+        // Non-agent steps (command, loop) have implicit outputs
+        // without formal definitions. Use the raw value directly.
+        return rawValue;
+      },
+    });
 
     // Add output instructions
+    let finalPrompt = text;
     const outputInstructions = this.generateOutputInstructions();
     finalPrompt += outputInstructions;
 
     // Display warnings if any
-    if (warnings.length > 0) {
+    const allWarnings = [...warnings, ...extraWarnings];
+    if (allWarnings.length > 0) {
       showList(
-        warnings.map(warning => colors.yellow(warning)),
+        allWarnings.map(warning => colors.yellow(warning)),
         { title: colors.yellow.bold('\nPrompt Template Warnings:') }
       );
     }

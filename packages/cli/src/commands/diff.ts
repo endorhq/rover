@@ -185,7 +185,7 @@ const diffCommand = async (
             worktreePath: task.worktreePath,
             filePath: filePath,
             branch: compareRef,
-            includeUntracked: !compareRef,
+            includeUntracked: !options.branch,
           });
 
           if (isJsonMode()) {
@@ -238,7 +238,7 @@ const diffCommand = async (
             filePath: filePath,
             onlyFiles: options.onlyFiles,
             branch: compareRef,
-            includeUntracked: !compareRef, // Only include untracked when not comparing to a ref
+            includeUntracked: !options.branch, // Include untracked for default and --base, exclude for --branch
           });
 
           const diffOutput = diffResult.stdout?.toString();

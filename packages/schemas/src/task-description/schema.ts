@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { NetworkConfigSchema } from '../project-config/schema.js';
 
 // Schema version for migrations
-export const CURRENT_TASK_DESCRIPTION_SCHEMA_VERSION = '1.5';
+export const CURRENT_TASK_DESCRIPTION_SCHEMA_VERSION = '1.6';
 
 // Task status schema
 export const TaskStatusSchema = z.enum([
@@ -17,13 +17,14 @@ export const TaskStatusSchema = z.enum([
   'FAILED',
   'MERGED',
   'PUSHED',
+  'PAUSED',
 ]);
 
 /**
  * Source type schema for task origin tracking.
  * @deprecated Use iteration context instead. Will be removed in a future version.
  */
-export const SourceTypeSchema = z.enum(['github', 'manual']);
+export const SourceTypeSchema = z.enum(['github', 'gitlab', 'manual']);
 
 /**
  * Task source schema - tracks where a task originated from.
@@ -55,6 +56,7 @@ export const TaskDescriptionSchema = z.object({
   startedAt: z.string().datetime().optional(),
   completedAt: z.string().datetime().optional(),
   failedAt: z.string().datetime().optional(),
+  pausedAt: z.string().datetime().optional(),
   lastIterationAt: z.string().datetime().optional(),
   lastStatusCheck: z.string().datetime().optional(),
 

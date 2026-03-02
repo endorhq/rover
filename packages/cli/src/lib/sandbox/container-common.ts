@@ -1,7 +1,13 @@
 import { launch, ProjectConfigManager } from 'rover-core';
 import colors from 'ansi-colors';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir, UserInfo } from 'node:os';
 
@@ -27,14 +33,14 @@ export function getDefaultAgentImage(): string {
     const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
     const version = packageJson.version;
 
-    // Use agent-dev:latest for dev versions, agent:v{version} for production
+    // Use local image for dev versions, remote image for production
     if (version.includes('-dev')) {
-      return 'ghcr.io/endorhq/rover/agent-dev:latest';
+      return 'rover-agent-local:latest';
     } else {
       return `ghcr.io/endorhq/rover/agent:v${version}`;
     }
   } catch (_err) {
-    return 'ghcr.io/endorhq/rover/agent-dev:latest';
+    return 'rover-agent-local:latest';
   }
 }
 
@@ -115,11 +121,10 @@ export async function catFile(
         await launch(backend, [
           'run',
           '--entrypoint',
-          '/bin/sh',
+          '/bin/cat',
           '--rm',
           image,
-          '-c',
-          `/bin/cat ${file}`,
+          file,
         ])
       ).stdout
         ?.toString()
@@ -264,6 +269,78 @@ export async function tmpUserGroupFiles(
  * @param extraArgs - String or array of extra arguments
  * @returns Flat array of arguments
  */
+/**
+ * Returns volume mount args needed for git worktree support inside containers.
+ *
+ * Git worktrees use a `.git` file (not directory) that references the parent
+ * repo's `.git/worktrees/<id>` metadata directory via an absolute host path.
+ * When only `/workspace` is mounted, git commands inside the container fail
+ * because the referenced host path doesn't exist in the container.
+ *
+ * This function detects worktrees and returns mount args for the parent `.git`
+ * directory so that the worktree metadata path resolves correctly.
+ */
+export function getWorktreeGitMounts(worktreePath: string): string[] {
+  const dotGitPath = join(worktreePath, '.git');
+
+  // Only applies when .git is a file (worktree), not a directory (regular repo)
+  if (!existsSync(dotGitPath) || statSync(dotGitPath).isDirectory()) {
+    return [];
+  }
+
+  try {
+    const content = readFileSync(dotGitPath, 'utf-8').trim();
+    const match = content.match(/^gitdir:\s*(.+)$/);
+    if (!match) {
+      return [];
+    }
+
+    // Resolve the gitdir path (e.g. /home/.../repo/.git/worktrees/13)
+    const gitdirPath = resolve(worktreePath, match[1]);
+
+    // The parent .git directory is 2 levels up from the worktree metadata dir
+    // e.g. /home/.../repo/.git/worktrees/13 -> /home/.../repo/.git
+    const parentGitDir = resolve(gitdirPath, '../..');
+
+    // Sanity check: the resolved path should end with .git and exist
+    if (!parentGitDir.endsWith('.git') || !existsSync(parentGitDir)) {
+      return [];
+    }
+
+    return [
+      // Mount parent .git dir read-only (refs, config, hooks, etc.)
+      '-v',
+      `${parentGitDir}:${parentGitDir}:Z,ro`,
+      // Mount object store read-write (append-only, needed for creating commits)
+      '-v',
+      `${join(parentGitDir, 'objects')}:${join(parentGitDir, 'objects')}:Z,rw`,
+      // Mount worktree metadata subdir read-write (HEAD, index, etc.)
+      '-v',
+      `${gitdirPath}:${gitdirPath}:Z,rw`,
+    ];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Returns rover-agent CLI flags to pass a checkpoint file path.
+ * The checkpoint file lives inside the iteration directory (already
+ * mounted at /output), so we reference it via /output/checkpoint.json
+ * instead of adding a separate bind-mount. These args are appended
+ * after the image name in the container create command.
+ *
+ * The container path is always `/output/checkpoint.json` regardless of the
+ * host filename because the iteration directory is bind-mounted at `/output`
+ * and the agent always writes checkpoints as `checkpoint.json` within it.
+ */
+export function getCheckpointArgs(checkpointPath?: string): string[] {
+  if (checkpointPath && existsSync(checkpointPath)) {
+    return ['--checkpoint', '/output/checkpoint.json'];
+  }
+  return [];
+}
+
 export function normalizeExtraArgs(
   extraArgs: string | string[] | undefined
 ): string[] {

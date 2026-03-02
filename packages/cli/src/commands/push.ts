@@ -21,6 +21,7 @@ import { showRoverChat, TIP_TITLES } from '../utils/display.js';
 import { statusColor } from '../utils/task-status.js';
 import { executeHooks } from '../lib/hooks.js';
 import type { CommandDefinition } from '../types.js';
+import { collapseTaskCommits } from '../lib/squash.js';
 
 const { prompt } = enquirer;
 
@@ -30,23 +31,52 @@ interface PushOptions {
   json?: boolean;
 }
 
-/**
- * Get GitHub repo info from remote URL
- */
-const getGitHubRepoInfo = (
-  remoteUrl: string
-): { owner: string; repo: string } | null => {
-  // Handle various GitHub URL formats
-  const patterns = [
-    /github[^:/]*[:/]([^/]+)\/([^/.]+)(\.git)?$/,
-    /^https?:\/\/github\.com\/([^/]+)\/([^/.]+)(\.git)?$/,
-  ];
+interface RepoInfo {
+  provider: 'github' | 'gitlab';
+  host: string;
+  projectPath: string;
+}
 
-  for (const pattern of patterns) {
-    const match = remoteUrl.match(pattern);
-    if (match) {
-      return { owner: match[1], repo: match[2] };
+/**
+ * Get repository info (provider, host, project path) from a git remote URL.
+ * Supports GitHub and GitLab, including self-hosted instances and SSH aliases.
+ */
+export const getRepoInfo = (remoteUrl: string): RepoInfo | null => {
+  let host: string;
+  let pathPart: string;
+
+  // SCP-style: git@host:path/to/repo.git
+  const scpMatch = remoteUrl.match(/^[^@]+@([^:]+):(.+?)(?:\.git)?$/);
+  if (scpMatch) {
+    host = scpMatch[1];
+    pathPart = scpMatch[2];
+  } else {
+    // URL-style: https://host/path/to/repo.git
+    const urlMatch = remoteUrl.match(/^https?:\/\/([^/]+)\/(.+?)(?:\.git)?$/);
+    if (urlMatch) {
+      host = urlMatch[1];
+      pathPart = urlMatch[2];
+    } else {
+      return null;
     }
+  }
+
+  // Determine provider from hostname
+  const hostLower = host.toLowerCase();
+  if (hostLower.includes('github')) {
+    return {
+      provider: 'github',
+      host: hostLower.includes('.') ? host : 'github.com',
+      projectPath: pathPart,
+    };
+  }
+
+  if (hostLower.includes('gitlab')) {
+    return {
+      provider: 'gitlab',
+      host: hostLower.includes('.') ? host : 'gitlab.com',
+      projectPath: pathPart,
+    };
   }
 
   return null;
@@ -141,11 +171,18 @@ const pushCommand = async (taskId: string, options: PushOptions) => {
       });
     }
 
+    // Collapse all task commits into staged changes before evaluating state
+    const squashed = collapseTaskCommits(
+      git,
+      task.baseCommit,
+      task.worktreePath
+    );
+
     // Check for changes
     const fileChanges = git.uncommittedChanges({
       worktreePath: task.worktreePath,
     });
-    const hasChanges = fileChanges.length > 0;
+    const hasChanges = squashed || fileChanges.length > 0;
     result.hasChanges = hasChanges;
 
     if (!hasChanges) {
@@ -349,11 +386,11 @@ const pushCommand = async (taskId: string, options: PushOptions) => {
     //     }
     // }
 
-    let repoInfo;
+    let repoInfo: RepoInfo | null = null;
 
     try {
       const remoteUrl = git.remoteUrl();
-      repoInfo = getGitHubRepoInfo(remoteUrl);
+      repoInfo = getRepoInfo(remoteUrl);
     } catch (_err) {
       // Ignore the error
     }
@@ -376,12 +413,21 @@ const pushCommand = async (taskId: string, options: PushOptions) => {
 
     const tips = [];
     if (repoInfo != null) {
-      tips.push(
-        'You can open a new PR on ' +
-          colors.cyan(
-            `https://github.com/${repoInfo.owner}/${repoInfo.repo}/pull/new/${task.branchName}`
-          )
-      );
+      if (repoInfo.provider === 'github') {
+        tips.push(
+          'You can open a new PR on ' +
+            colors.cyan(
+              `https://${repoInfo.host}/${repoInfo.projectPath}/pull/new/${task.branchName}`
+            )
+        );
+      } else {
+        tips.push(
+          'You can open a new merge request on ' +
+            colors.cyan(
+              `https://${repoInfo.host}/${repoInfo.projectPath}/-/merge_requests/new?merge_request[source_branch]=${task.branchName}`
+            )
+        );
+      }
     }
 
     await exitWithSuccess('Push completed successfully!', result, {
@@ -396,7 +442,7 @@ const pushCommand = async (taskId: string, options: PushOptions) => {
       result.error = `The task with ID ${numericTaskId} was not found`;
       await exitWithError(result, { telemetry });
     } else {
-      result.error = `There was an error deleting the task: ${error}`;
+      result.error = `There was an error pushing the task: ${error}`;
       await exitWithError(result, { telemetry });
     }
   } finally {
@@ -406,7 +452,7 @@ const pushCommand = async (taskId: string, options: PushOptions) => {
 
 export default {
   name: 'push',
-  description: 'Commit and push task changes to remote, with GitHub PR support',
+  description: 'Commit and push task changes to remote',
   requireProject: true,
   action: pushCommand,
 } satisfies CommandDefinition;

@@ -23,6 +23,7 @@ export enum NewTaskProvider {
 // Config is injected at build time via tsdown define
 declare const __BUILD_CONFIG__: { apiKey: string; host: string };
 const config = __BUILD_CONFIG__;
+export const TELEMETRY_SCHEMA_VERSION = 1;
 
 // Constants
 // @deprecated Use the GlobalConfigManager from schemas package instead
@@ -62,6 +63,10 @@ enum EVENT_IDS {
   RESET = 'reset',
   // Restart a task
   RESTART_TASK = 'restart_task',
+  // Resume a paused/failed task
+  RESUME_TASK = 'resume_task',
+  // Resume attempt failed
+  RESUME_TASK_FAILED = 'resume_task_failed',
   // Open shell in container
   SHELL = 'shell',
   // Stop a task
@@ -224,6 +229,14 @@ class Telemetry {
     this.capture(EVENT_IDS.RESTART_TASK);
   }
 
+  eventResumeTask() {
+    this.capture(EVENT_IDS.RESUME_TASK);
+  }
+
+  eventResumeTaskFailed(error?: string) {
+    this.capture(EVENT_IDS.RESUME_TASK_FAILED, { error });
+  }
+
   eventListWorkflows() {
     this.capture(EVENT_IDS.LIST_WORKFLOWS);
   }
@@ -295,6 +308,7 @@ class Telemetry {
       event,
       properties: {
         from: this.telemetryFrom,
+        schemaVersion: TELEMETRY_SCHEMA_VERSION,
         ...properties,
       },
     });

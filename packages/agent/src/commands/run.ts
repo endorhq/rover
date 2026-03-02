@@ -14,24 +14,48 @@ import {
 import {
   ROVER_LOG_FILENAME,
   AGENT_LOGS_DIR,
+  AGENT_EXIT_CODE,
   isAgentStep,
+  isLoopStep,
   type WorkflowAgentStep,
+  type WorkflowStep,
 } from 'rover-schemas';
 import { parseCollectOptions } from '../lib/options.js';
-import { Runner } from '../lib/runner.js';
 import { ACPRunner } from '../lib/acp-runner.js';
 import { createAgent } from '../lib/agents/index.js';
+import {
+  executeStep,
+  isRetryableError,
+  isTransientError,
+  PauseWorkflowError,
+  collectNestedStepIds,
+} from '../lib/step-executor.js';
+import {
+  clearCheckpointFile,
+  createCheckpointStore,
+  loadCheckpoint,
+  saveCheckpoint,
+  type CheckpointData,
+  type CheckpointStore,
+} from '../lib/checkpoint-store.js';
 import { cpSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+export {
+  isRetryableError,
+  isTransientError,
+  loadCheckpoint,
+  saveCheckpoint,
+  type CheckpointData,
+};
+
+const EXIT_SUCCESS = AGENT_EXIT_CODE.SUCCESS;
+const EXIT_FAILED = AGENT_EXIT_CODE.FAILED;
+const EXIT_PAUSED = AGENT_EXIT_CODE.PAUSED;
 
 /**
  * Helper function to display step results consistently for both ACP and standard runners
  */
-function displayStepResults(
-  stepName: string,
-  result: StepResult,
-  _totalDuration: number
-): void {
+function displayStepResults(stepName: string, result: StepResult): void {
   showTitle(`📊 Step Results: ${stepName}`);
 
   const props: Record<string, string> = {
@@ -119,9 +143,13 @@ interface RunCommandOptions {
   output?: string;
   // Path to the context directory
   contextDir?: string;
+  // Path to checkpoint.json for resuming a paused workflow
+  checkpoint?: string;
 }
 
-interface RunCommandOutput extends CommandOutput {}
+interface RunCommandOutput extends CommandOutput {
+  paused?: boolean;
+}
 
 /**
  * Build context injection message from the context directory.
@@ -147,6 +175,22 @@ function buildContextMessage(contextDir: string): string | null {
 }
 
 /**
+ * Recursively inject context into agent steps, including those nested inside loops.
+ */
+function injectContextIntoSteps(
+  steps: WorkflowStep[],
+  contextMessage: string
+): void {
+  for (const step of steps) {
+    if (isAgentStep(step)) {
+      step.prompt = contextMessage + step.prompt;
+    } else if (isLoopStep(step)) {
+      injectContextIntoSteps(step.steps, contextMessage);
+    }
+  }
+}
+
+/**
  * Inject context sources into workflow step prompts.
  * Reads from the context directory mounted at the path specified by --context-dir.
  *
@@ -167,13 +211,41 @@ const handleContextInjection = (
       colors.gray('✓ Context sources injected into workflow steps\n')
     );
 
-    for (const step of workflowManager.steps) {
-      if (isAgentStep(step)) {
-        step.prompt = contextMessage + step.prompt;
-      }
-    }
+    injectContextIntoSteps(workflowManager.steps, contextMessage);
   }
 };
+
+/**
+ * Try to find the cached result for a step in the checkpoint data.
+ * Returns a synthetic StepResult if found, undefined otherwise.
+ */
+function getCachedStepResult(
+  checkpointStore: CheckpointStore | undefined,
+  step: WorkflowStep,
+  stepsOutput: Map<string, Map<string, string>>
+): StepResult | undefined {
+  if (!checkpointStore) return undefined;
+  const cached = checkpointStore.getCompletedStep(step.id);
+  if (!cached) return undefined;
+
+  if (isLoopStep(step)) {
+    for (const subStepId of step.steps.flatMap((subStep: WorkflowStep) =>
+      collectNestedStepIds(subStep)
+    )) {
+      const subStep = checkpointStore.getCompletedStep(subStepId);
+      if (!subStep) continue;
+      stepsOutput.set(subStepId, new Map(Object.entries(subStep.outputs)));
+    }
+  }
+
+  console.log(colors.gray(`\n⏭ Skipping completed step: ${step.name}`));
+  return {
+    id: step.id,
+    success: true,
+    duration: 0,
+    outputs: new Map(Object.entries(cached.outputs)),
+  };
+}
 
 /**
  * Run a specific agent workflow file definition. It performs a set of validations
@@ -190,6 +262,9 @@ export const runCommand = async (
   // Declare status manager outside try block so it's accessible in catch
   let statusManager: IterationStatusManager | undefined;
   let totalDuration = 0;
+  let sigtermHandler: (() => void) | undefined;
+  let sigintHandler: (() => void) | undefined;
+  let shutdownSignal: string | undefined;
 
   // Determine the logs directory. Prefer /logs (bind-mounted by the sandbox
   // to the project-level logs directory), fall back to the output directory.
@@ -334,6 +409,115 @@ export const runCommand = async (
     } else {
       // Continue with workflow run
 
+      // Load checkpoint if resuming from a paused workflow
+      let checkpoint: CheckpointData | null = null;
+      if (options.checkpoint) {
+        checkpoint = loadCheckpoint(options.checkpoint);
+        if (checkpoint) {
+          // Validate checkpoint step IDs against the current workflow.
+          // If the workflow was edited between pause and resume, stale
+          // entries could cause steps to be skipped incorrectly.
+          const validSteps = checkpoint.completedSteps.filter(step =>
+            workflowManager.findStep(step.id)
+          );
+          const droppedCount =
+            checkpoint.completedSteps.length - validSteps.length;
+          if (droppedCount > 0) {
+            console.log(
+              colors.yellow(
+                `\n⚠ Dropped ${droppedCount} checkpoint entry(s) referencing steps no longer in the workflow`
+              )
+            );
+            checkpoint.completedSteps = validSteps;
+          }
+
+          console.log(
+            colors.cyan(
+              `\n🔄 Resuming from checkpoint: ${checkpoint.completedSteps.length} step(s) will be skipped`
+            )
+          );
+          logger?.info(
+            'workflow_resume',
+            `Resuming from checkpoint with ${checkpoint.completedSteps.length} completed step(s)`,
+            {
+              taskId: options.taskId,
+              metadata: {
+                completedSteps: checkpoint.completedSteps.length,
+                failedStepId: checkpoint.failedStepId,
+              },
+            }
+          );
+        } else {
+          console.log(
+            colors.yellow(
+              '\n⚠ Checkpoint file not found or invalid, running full workflow'
+            )
+          );
+        }
+      }
+      const checkpointStore = createCheckpointStore(options.output, checkpoint);
+      // Shared with signal handlers so Ctrl+C/termination can close ACP cleanly.
+      let acpRunner: ACPRunner | undefined;
+
+      // Register signal handlers for graceful checkpoint save on termination.
+      // Without these, a SIGTERM/SIGINT during step execution would lose any
+      // in-flight checkpoint state between step completion and the next persist.
+      let shuttingDown = false;
+      const gracefulShutdown = (signal: string) => {
+        if (shuttingDown) return;
+        shuttingDown = true;
+        shutdownSignal = signal;
+        output.paused = true;
+        output.success = false;
+        output.error = `Workflow paused by ${signal} signal`;
+        const currentStep =
+          statusManager?.currentStep || 'Workflow execution interrupted';
+        statusManager?.pause(currentStep, output.error);
+        console.log(
+          colors.yellow(
+            `\n⚠ Received ${signal} — saving checkpoint before exit...`
+          )
+        );
+        const saved = saveCheckpoint(options.output, checkpointStore.getData());
+        if (!saved) {
+          console.warn(
+            colors.yellow(
+              '⚠ WARNING: Checkpoint could not be saved (no --output directory). Exiting as failed.'
+            )
+          );
+        }
+        // Collect agent-specific logs before exiting so diagnostics are
+        // preserved even when the workflow is interrupted by a signal.
+        if (logsDir) {
+          collectAgentLogs(logsDir, options.agentTool);
+        }
+        // Log the pause event before exiting so it's captured in structured logs.
+        logger?.info(
+          'workflow_pause',
+          output.error || 'Workflow paused by signal',
+          {
+            taskId: options.taskId,
+            metadata: { signal },
+          }
+        );
+        // IMPORTANT: process.exit() intentionally bypasses the normal cleanup
+        // flow. The finally-block at the end of the step loop (acpRunner.close())
+        // will NOT run. This is acceptable because:
+        //   1. acpRunner.close() is called synchronously right here
+        //   2. Signal handlers must exit quickly to avoid hanging
+        //   3. Checkpoint data has already been saved above
+        // If future cleanup is added to the finally block, ensure it is also
+        // called here or converted to a process 'exit' event handler.
+        acpRunner?.close();
+        // Exit as PAUSED only if checkpoint was saved, otherwise exit as
+        // FAILED so the CLI layer doesn't schedule a resume with no checkpoint.
+        process.exit(saved ? EXIT_PAUSED : EXIT_FAILED);
+      };
+      sigtermHandler = () => gracefulShutdown('SIGTERM');
+      sigintHandler = () => gracefulShutdown('SIGINT');
+      process.on('SIGTERM', sigtermHandler);
+      process.on('SIGINT', sigintHandler);
+
       // Print Steps
       showList(
         workflowManager.steps.map((step, idx) => `${idx}. ${step.name}`),
@@ -372,8 +556,6 @@ export const runCommand = async (
       const useACPMode = acpEnabledTools.includes(tool.toLowerCase());
 
       // Build the agent step executor based on mode
-      let acpRunner: ACPRunner | undefined;
-
       if (useACPMode) {
         console.log(colors.cyan('\n🔗 ACP Mode enabled'));
 
@@ -396,40 +578,89 @@ export const runCommand = async (
           stepIndex: number,
           stepsOutput: Map<string, Map<string, string>>
         ): Promise<StepResult> => {
-          if (useACPMode && acpRunner) {
-            try {
-              await acpRunner.createSession();
+          const cached = getCachedStepResult(
+            checkpointStore,
+            step,
+            stepsOutput
+          );
+          if (cached) return cached;
 
-              // Inject previous step outputs before running
-              for (const [prevStepId, prevOutputs] of stepsOutput.entries()) {
-                acpRunner.stepsOutput.set(prevStepId, prevOutputs);
-              }
+          return executeStep(step, {
+            workflow: workflowManager,
+            inputs,
+            stepsOutput,
+            defaultTool: tool,
+            defaultModel: options.agentModel,
+            statusManager,
+            totalSteps,
+            currentStepIndex: stepIndex,
+            logger,
+            output: options.output,
+            acpRunner,
+            checkpointStore,
+          });
+        },
 
-              return await acpRunner.runStep(step.id);
-            } finally {
-              acpRunner.closeSession();
-            }
-          } else {
-            const stepRunner = new Runner(
-              workflowManager,
-              step.id,
-              inputs,
-              stepsOutput,
-              options.agentTool,
-              options.agentModel,
-              statusManager,
-              totalSteps,
-              stepIndex,
-              logger
-            );
+        /**
+         * Generic step executor for non-agent step types (command, loop).
+         * Uses the unified executeStep dispatcher from step-executor.ts.
+         * For agent sub-steps inside loops, passes acpRunner so they can
+         * reuse the warm ACP connection instead of spawning subprocesses.
+         */
+        runStep: async (
+          step: WorkflowStep,
+          stepIndex: number,
+          stepsOutput: Map<string, Map<string, string>>
+        ): Promise<StepResult> => {
+          // Checkpoint resume: skip completed steps
+          const cached = getCachedStepResult(
+            checkpointStore,
+            step,
+            stepsOutput
+          );
+          if (cached) return cached;
 
-            return await stepRunner.run(options.output);
-          }
+          return executeStep(step, {
+            workflow: workflowManager,
+            inputs,
+            stepsOutput,
+            defaultTool: tool,
+            defaultModel: options.agentModel,
+            statusManager,
+            totalSteps,
+            currentStepIndex: stepIndex,
+            logger,
+            output: options.output,
+            acpRunner,
+            checkpointStore,
+          });
         },
       };
 
       const onStepComplete: OnStepComplete = (step, result, context) => {
-        displayStepResults(step.name, result, context.totalDuration);
+        if (result.success && checkpointStore) {
+          // Use addCompletedStep for direct in-place upsert (avoids
+          // double-copy overhead of getData() + setCompletedSteps()).
+          checkpointStore.addCompletedStep(
+            step.id,
+            Object.fromEntries(result.outputs.entries())
+          );
+
+          if (isLoopStep(step)) {
+            for (const subStepId of step.steps.flatMap(
+              (subStep: WorkflowStep) => collectNestedStepIds(subStep)
+            )) {
+              const subStepOutputs = context.stepsOutput.get(subStepId);
+              if (!subStepOutputs) continue;
+              checkpointStore.addCompletedStep(
+                subStepId,
+                Object.fromEntries(subStepOutputs.entries())
+              );
+            }
+          }
+        }
+
+        displayStepResults(step.name, result);
       };
 
       try {
@@ -438,8 +669,12 @@ export const runCommand = async (
         totalDuration = runResult.totalDuration;
 
         // Display workflow completion summary
-        const successfulSteps = Array.from(runResult.stepsOutput.keys()).length;
-        const failedSteps = runResult.runSteps - successfulSteps;
+        const successfulSteps = runResult.stepResults.filter(
+          r => r.success
+        ).length;
+        const failedSteps = runResult.stepResults.filter(
+          r => !r.success
+        ).length;
         const skippedSteps = workflowManager.steps.length - runResult.runSteps;
 
         let status = colors.green('✓ Workflow Completed Successfully');
@@ -452,6 +687,8 @@ export const runCommand = async (
         }
 
         showTitle('🎉 Workflow Execution Summary');
+        // Counts reflect top-level steps only; loop sub-step iterations
+        // are not included in these totals.
         showProperties({
           Duration: colors.cyan(runResult.totalDuration.toFixed(2) + 's'),
           'Total Steps': colors.cyan(workflowManager.steps.length.toString()),
@@ -476,6 +713,7 @@ export const runCommand = async (
           });
         } else {
           output.success = true;
+          clearCheckpointFile(options.output);
           statusManager?.complete('Workflow completed successfully');
           logger?.info('workflow_complete', 'Workflow completed successfully', {
             taskId: options.taskId,
@@ -486,6 +724,22 @@ export const runCommand = async (
               skippedSteps,
             },
           });
+        }
+      } catch (err) {
+        if (err instanceof PauseWorkflowError) {
+          // Already handled: output.paused is set, statusManager.pause() called
+          output.success = false;
+          output.error = err.message;
+          output.paused = true;
+          // Ensure checkpoint is persisted even if saveFailureSnapshot's
+          // internal persist() failed earlier (it warns but continues).
+          saveCheckpoint(options.output, checkpointStore.getData());
+          logger?.info('workflow_pause', output.error, {
+            taskId: options.taskId,
+            metadata: { reason: 'retryable_error' },
+          });
+        } else {
+          throw err;
         }
       } finally {
         // Always close the ACP runner after all steps are complete
@@ -498,14 +752,24 @@ export const runCommand = async (
   }
 
   if (!output.success) {
-    statusManager?.fail('Workflow execution', output.error || 'Unknown error');
-    logger?.error('workflow_fail', output.error || 'Unknown error', {
-      taskId: options.taskId,
-      error: output.error,
-      duration: totalDuration,
-    });
+    if (output.paused) {
+      // Already handled by statusManager.pause() - don't overwrite with fail()
+      if (!shutdownSignal) {
+        console.log(colors.yellow(`\n⏸ ${output.error}`));
+      }
+    } else {
+      statusManager?.fail(
+        'Workflow execution',
+        output.error || 'Unknown error'
+      );
+      logger?.error('workflow_fail', output.error || 'Unknown error', {
+        taskId: options.taskId,
+        error: output.error,
+        duration: totalDuration,
+      });
 
-    console.log(colors.red(`\n✗ ${output.error}`));
+      console.log(colors.red(`\n✗ ${output.error}`));
+    }
   }
 
   // Collect agent-specific logs into the logs directory
@@ -513,5 +777,14 @@ export const runCommand = async (
     collectAgentLogs(logsDir, options.agentTool);
   }
 
-  process.exit(output.success ? 0 : 1);
+  if (sigtermHandler) {
+    process.off('SIGTERM', sigtermHandler);
+  }
+  if (sigintHandler) {
+    process.off('SIGINT', sigintHandler);
+  }
+
+  process.exit(
+    output.success ? EXIT_SUCCESS : output.paused ? EXIT_PAUSED : EXIT_FAILED
+  );
 };

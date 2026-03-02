@@ -8,9 +8,13 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { execSync } from 'node:child_process';
 import { restartCommand } from '../restart.js';
-import { TaskDescriptionManager, clearProjectRootCache } from 'rover-core';
+import {
+  TaskDescriptionManager,
+  clearProjectRootCache,
+  Git,
+  launchSync,
+} from 'rover-core';
 
 // Store testDir for context mock
 let testDir: string;
@@ -80,19 +84,19 @@ describe('restart command', async () => {
     process.chdir(testDir);
 
     // Initialize git repository
-    execSync('git init', { stdio: 'pipe' });
-    execSync('git config user.email "test@example.com"', { stdio: 'pipe' });
-    execSync('git config user.name "Test User"', { stdio: 'pipe' });
-    execSync('git config commit.gpgsign false');
+    launchSync('git', ['init']);
+    launchSync('git', ['config', 'user.email', 'test@example.com']);
+    launchSync('git', ['config', 'user.name', 'Test User']);
+    launchSync('git', ['config', 'commit.gpgsign', 'false']);
 
     // Create main branch and initial commit
     writeFileSync(join(testDir, 'README.md'), '# Test Project');
-    execSync('git add README.md', { stdio: 'pipe' });
-    execSync('git commit -m "Initial commit"', { stdio: 'pipe' });
+    launchSync('git', ['add', 'README.md']);
+    launchSync('git', ['commit', '-m', 'Initial commit']);
 
     // Switch to main branch (some Git versions default to 'master')
     try {
-      execSync('git checkout -b main', { stdio: 'pipe' });
+      launchSync('git', ['checkout', '-b', 'main']);
     } catch {
       // Branch might already exist or be called 'master'
     }
@@ -366,6 +370,118 @@ describe('restart command', async () => {
       );
     });
 
+    it('should allow restarting ITERATING tasks when container is dead', async () => {
+      const { createSandbox } = await import('../../lib/sandbox/index.js');
+      const mockCreateSandbox = vi.mocked(createSandbox);
+
+      // Mock sandbox to report container as exited
+      mockCreateSandbox.mockResolvedValue({
+        createAndStart: vi.fn().mockResolvedValue('new-container-id'),
+        inspect: vi.fn().mockResolvedValue({ status: 'exited', exitCode: 1 }),
+      } as any);
+
+      const taskId = 793;
+      const taskDir = join(testDir, '.rover', 'tasks', taskId.toString());
+
+      const task = TaskDescriptionManager.create(taskDir, {
+        id: taskId,
+        title: 'Test Task',
+        description: 'A test task',
+        inputs: new Map(),
+        workflowName: 'swe',
+      });
+
+      // Set to ITERATING to simulate a stuck task from interrupted cache init
+      task.markInProgress();
+      task.markIterating();
+      expect(task.status).toBe('ITERATING');
+
+      // Restart should succeed because container is dead
+      await restartCommand(taskId.toString(), { json: true });
+
+      const reloadedTask = TaskDescriptionManager.load(taskDir, taskId);
+      expect(reloadedTask.status).toBe('IN_PROGRESS');
+      expect(reloadedTask.restartCount).toBe(1);
+    });
+
+    it('should reject restarting ITERATING tasks when container is still running', async () => {
+      const { exitWithError } = await import('../../utils/exit.js');
+      const mockExitWithError = vi.mocked(exitWithError);
+      const { createSandbox } = await import('../../lib/sandbox/index.js');
+      const mockCreateSandbox = vi.mocked(createSandbox);
+
+      // Mock sandbox to report container as running
+      mockCreateSandbox.mockResolvedValue({
+        createAndStart: vi.fn().mockResolvedValue('mock-container-id'),
+        inspect: vi.fn().mockResolvedValue({ status: 'running', exitCode: 0 }),
+      } as any);
+
+      const taskId = 794;
+      const taskDir = join(testDir, '.rover', 'tasks', taskId.toString());
+
+      const task = TaskDescriptionManager.create(taskDir, {
+        id: taskId,
+        title: 'Test Task',
+        description: 'A test task',
+        inputs: new Map(),
+        workflowName: 'swe',
+      });
+
+      // Set to ITERATING
+      task.markInProgress();
+      task.markIterating();
+      expect(task.status).toBe('ITERATING');
+
+      // Try to restart — should be rejected
+      await restartCommand(taskId.toString(), { json: true });
+
+      expect(mockExitWithError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          error: expect.stringContaining('still running'),
+        }),
+        expect.objectContaining({
+          tips: expect.arrayContaining([
+            'The container for this task is still running',
+          ]),
+          telemetry: expect.anything(),
+        })
+      );
+    });
+
+    it('should reject restarting PAUSED tasks with a resume tip', async () => {
+      const { exitWithError } = await import('../../utils/exit.js');
+      const mockExitWithError = vi.mocked(exitWithError);
+
+      const taskId = 795;
+      const taskDir = join(testDir, '.rover', 'tasks', taskId.toString());
+
+      const task = TaskDescriptionManager.create(taskDir, {
+        id: taskId,
+        title: 'Paused Task',
+        description: 'A paused task',
+        inputs: new Map(),
+        workflowName: 'swe',
+      });
+
+      task.markInProgress();
+      task.markPaused('Credit limit exceeded');
+      expect(task.status).toBe('PAUSED');
+
+      await restartCommand(taskId.toString(), { json: true });
+
+      expect(mockExitWithError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          error: expect.stringContaining('not in NEW or FAILED status'),
+        }),
+        expect.objectContaining({
+          tips: expect.arrayContaining([
+            expect.stringContaining('rover resume'),
+          ]),
+          telemetry: expect.anything(),
+        })
+      );
+    });
+
     it('should reject restarting tasks in COMPLETED status', async () => {
       const { exitWithError } = await import('../../utils/exit.js');
       const mockExitWithError = vi.mocked(exitWithError);
@@ -396,7 +512,7 @@ describe('restart command', async () => {
         }),
         expect.objectContaining({
           tips: expect.arrayContaining([
-            'Only NEW, FAILED, and stuck IN_PROGRESS tasks can be restarted',
+            'Only NEW, FAILED, and stuck IN_PROGRESS/ITERATING tasks can be restarted',
           ]),
           telemetry: expect.anything(),
         })
@@ -432,6 +548,88 @@ describe('restart command', async () => {
       expect(mockExitWithError).toHaveBeenCalledWith(
         expect.objectContaining({
           error: expect.stringContaining('not found'),
+        }),
+        expect.objectContaining({
+          telemetry: expect.anything(),
+        })
+      );
+    });
+
+    it('should restore FAILED status when workspace setup fails during restart', async () => {
+      const { exitWithError } = await import('../../utils/exit.js');
+      const mockExitWithError = vi.mocked(exitWithError);
+      const createWorktreeSpy = vi
+        .spyOn(Git.prototype, 'createWorktree')
+        .mockImplementation(() => {
+          throw new Error('worktree setup failed');
+        });
+
+      try {
+        const taskId = 901;
+        const taskDir = join(testDir, '.rover', 'tasks', taskId.toString());
+
+        const task = TaskDescriptionManager.create(taskDir, {
+          id: taskId,
+          title: 'Test Task',
+          description: 'A test task',
+          inputs: new Map(),
+          workflowName: 'swe',
+        });
+        task.markFailed('This task failed');
+
+        await restartCommand(taskId.toString(), { json: true });
+
+        const reloadedTask = TaskDescriptionManager.load(taskDir, taskId);
+        expect(reloadedTask.status).toBe('FAILED');
+        expect(reloadedTask.error).toBe('This task failed');
+        expect(reloadedTask.restartCount).toBe(1);
+        expect(mockExitWithError).toHaveBeenCalledWith(
+          expect.objectContaining({
+            error: expect.stringContaining('Failed to set up workspace'),
+          }),
+          expect.objectContaining({
+            telemetry: expect.anything(),
+          })
+        );
+      } finally {
+        createWorktreeSpy.mockRestore();
+      }
+    });
+
+    it('should preserve FAILED error when sandbox startup fails during restart', async () => {
+      const { exitWithError } = await import('../../utils/exit.js');
+      const mockExitWithError = vi.mocked(exitWithError);
+      const { createSandbox } = await import('../../lib/sandbox/index.js');
+      const mockCreateSandbox = vi.mocked(createSandbox);
+
+      mockCreateSandbox.mockResolvedValue({
+        createAndStart: vi
+          .fn()
+          .mockRejectedValue(new Error('container startup failed')),
+      } as any);
+
+      const taskId = 902;
+      const taskDir = join(testDir, '.rover', 'tasks', taskId.toString());
+
+      const task = TaskDescriptionManager.create(taskDir, {
+        id: taskId,
+        title: 'Test Task',
+        description: 'A test task',
+        inputs: new Map(),
+        workflowName: 'swe',
+      });
+      task.markFailed('Previous failure details');
+
+      await restartCommand(taskId.toString(), { json: true });
+
+      const reloadedTask = TaskDescriptionManager.load(taskDir, taskId);
+      expect(reloadedTask.status).toBe('FAILED');
+      expect(reloadedTask.error).toBe('Previous failure details');
+      expect(mockExitWithError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          error: expect.stringContaining(
+            'There was an error restarting the task'
+          ),
         }),
         expect.objectContaining({
           telemetry: expect.anything(),

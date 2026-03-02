@@ -16,6 +16,7 @@ import {
 import colors from 'ansi-colors';
 import { existsSync, readFileSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
+import { isAgentStep } from 'rover-schemas';
 import type {
   WorkflowAgentStep,
   WorkflowOutput,
@@ -29,11 +30,13 @@ import {
   showList,
   type StepResult,
 } from 'rover-core';
-import { ACPClient } from './acp-client.js';
+import { ACPClient, clearAllTerminals } from './acp-client.js';
 import { GeminiOrQwenACPClient } from './gemini-or-qwen-acp-client.js';
 import { createAgent } from './agents/index.js';
 import type { Agent } from './agents/types.js';
 import { copyFileSync, rmSync } from 'node:fs';
+import { resolvePlaceholders } from './placeholders.js';
+import { formatError } from './format-error.js';
 
 export interface ACPRunnerStepResult extends StepResult {}
 
@@ -45,20 +48,6 @@ export interface ACPRunnerConfig {
   statusManager?: IterationStatusManager;
   outputDir?: string;
   logger?: JsonlLogger;
-}
-
-/**
- * Format an error into a human-readable string.
- * Handles Error instances, plain objects (e.g. JSON-RPC errors), and primitives.
- */
-function formatError(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  if (error !== null && typeof error === 'object') {
-    return JSON.stringify(error, null, 2);
-  }
-  return String(error);
 }
 
 export class ACPRunner {
@@ -392,6 +381,14 @@ export class ACPRunner {
       const promptCost = this.client.getLastPromptCost();
       const cost = promptCost.amount > 0 ? promptCost.amount : undefined;
 
+      if (VERBOSE && promptCost.amount <= 0) {
+        console.log(
+          colors.gray(
+            `[ACP] Prompt cost not reported (amount: ${promptCost.amount}, currency: ${promptCost.currency})`
+          )
+        );
+      }
+
       return { stopReason: promptResult.stopReason, response, tokens, cost };
     } catch (error) {
       console.log(
@@ -481,10 +478,17 @@ export class ACPRunner {
     const outputs = new Map<string, string>();
     const step = this.workflow.getStep(stepId);
 
-    // Calculate current progress
-    const stepIndex = this.workflow.steps.findIndex(
+    if (!isAgentStep(step)) {
+      throw new Error(
+        `ACPRunner.runStep only supports agent steps, but step "${stepId}" is type "${step.type}"`
+      );
+    }
+
+    // Calculate current progress (clamp to 0 for loop sub-steps not in top-level array)
+    const rawStepIndex = this.workflow.steps.findIndex(
       (s: WorkflowStep) => s.id === stepId
     );
+    const stepIndex = Math.max(0, rawStepIndex);
     const totalSteps = this.workflow.steps.length;
     const currentProgress = Math.floor((stepIndex / totalSteps) * 100);
     const nextProgress = Math.floor(((stepIndex + 1) / totalSteps) * 100);
@@ -624,78 +628,39 @@ export class ACPRunner {
    * to avoid the agent trying to read from stale file locations.
    */
   private buildACPPrompt(step: WorkflowAgentStep): string {
-    let prompt = step.prompt;
-    const placeholderRegex = /\{\{([^}]+)\}\}/g;
-    const matches = [...prompt.matchAll(placeholderRegex)];
-    const warnings: string[] = [];
+    const extraWarnings: string[] = [];
 
-    for (const match of matches) {
-      const fullMatch = match[0];
-      const placeholder = match[1].trim();
-      let replacementValue: string | undefined;
+    const { text, warnings } = resolvePlaceholders(step.prompt, {
+      inputs: this.inputs,
+      stepsOutput: this.stepsOutput,
+      transformStepOutput: (stepId, outputName, rawValue) => {
+        // Find the output definition (recursive lookup for loop sub-steps)
+        const stepDef = this.workflow.findStep(stepId);
+        const outputDef = stepDef?.outputs?.find(
+          (o: WorkflowOutput) => o.name === outputName
+        );
 
-      const parts = placeholder.split('.');
-
-      if (parts[0] === 'inputs' && parts.length === 2) {
-        // Format: {{inputs.input_name}}
-        const inputName = parts[1];
-        const inputValue = this.inputs.get(inputName);
-
-        if (inputValue !== undefined) {
-          replacementValue = inputValue;
-        } else {
-          warnings.push(`Input '${inputName}' not provided`);
-        }
-      } else if (
-        parts[0] === 'steps' &&
-        parts.length === 4 &&
-        parts[2] === 'outputs'
-      ) {
-        // Format: {{steps.step_id.outputs.output_name}}
-        const stepId = parts[1];
-        const outputName = parts[3];
-        const stepOutputs = this.stepsOutput.get(stepId);
-
-        if (stepOutputs && stepOutputs.has(outputName)) {
-          // Find the output definition
-          const stepDef = this.workflow.steps.find(
-            (s: WorkflowStep) => s.id === stepId
-          );
-          const outputDef = stepDef?.outputs?.find(
-            (o: WorkflowOutput) => o.name === outputName
-          );
-
-          if (outputDef?.type === 'file') {
-            // For file outputs, inject the file content directly into the prompt.
-            // The content is stored as `${outputName}_content` by extractFileOutputs().
-            // This ensures the agent doesn't try to read from stale file locations.
-            const contentKey = `${outputName}_content`;
-            const fileContent = stepOutputs.get(contentKey);
-            if (fileContent) {
-              replacementValue = fileContent;
-            } else {
-              warnings.push(
-                `File content for '${outputName}' not found in step '${stepId}'`
-              );
-            }
-          } else {
-            replacementValue = stepOutputs.get(outputName) || '';
+        if (outputDef?.type === 'file') {
+          // For file outputs, inject the file content directly into the prompt.
+          // The content is stored as `${outputName}_content` by extractFileOutputs().
+          // This ensures the agent doesn't try to read from stale file locations.
+          const contentKey = `${outputName}_content`;
+          const stepOutputs = this.stepsOutput.get(stepId);
+          const fileContent = stepOutputs?.get(contentKey);
+          if (fileContent) {
+            return fileContent;
           }
-        } else if (!stepOutputs) {
-          warnings.push(`Step '${stepId}' has not been executed yet`);
-        } else {
-          warnings.push(`Output '${outputName}' not found in step '${stepId}'`);
+          extraWarnings.push(
+            `File content for '${outputName}' not found in step '${stepId}'`
+          );
+          return rawValue;
         }
-      } else {
-        warnings.push(`Invalid placeholder format: '${placeholder}'`);
-      }
-
-      if (replacementValue !== undefined) {
-        prompt = prompt.replace(fullMatch, replacementValue);
-      }
-    }
+        return rawValue;
+      },
+    });
 
     // Add output instructions
+    let prompt = text;
     const outputInstructions = this.generateOutputInstructions(step);
     prompt += outputInstructions;
 
@@ -706,9 +671,10 @@ export class ACPRunner {
     }
 
     // Display warnings if any
-    if (warnings.length > 0) {
+    const allWarnings = [...warnings, ...extraWarnings];
+    if (allWarnings.length > 0) {
       showList(
-        warnings.map(warning => colors.yellow(warning)),
+        allWarnings.map(warning => colors.yellow(warning)),
         { title: colors.yellow.bold('\nPrompt Template Warnings:') }
       );
     }
@@ -761,7 +727,7 @@ export class ACPRunner {
       fileOutputs.forEach(output => {
         instructions += `- **${output.name}**: ${output.description}\n`;
 
-        if (this.tool == 'gemini' || this.tool == 'qwen') {
+        if (this.tool === 'gemini' || this.tool === 'qwen') {
           // Gemini refuses to write files using relative paths, so we must
           // provide an absolute path in the prompt.
           const absolutePath = resolve(output.filename!);
@@ -1066,6 +1032,8 @@ export class ACPRunner {
       this.agentProcess.kill('SIGTERM');
       this.agentProcess = null;
     }
+    // Clean up any tracked terminals to prevent resource leaks
+    clearAllTerminals();
     this.connection = null;
     this.sessionId = null;
     this.isConnectionInitialized = false;

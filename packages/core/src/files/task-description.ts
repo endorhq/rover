@@ -213,6 +213,7 @@ export class TaskDescriptionManager {
     migrated.startedAt = data.startedAt || undefined;
     migrated.completedAt = data.completedAt || undefined;
     migrated.failedAt = data.failedAt || undefined;
+    migrated.pausedAt = data.pausedAt || undefined;
     migrated.lastIterationAt = data.lastIterationAt || undefined;
     migrated.lastStatusCheck = data.lastStatusCheck || undefined;
 
@@ -277,6 +278,8 @@ export class TaskDescriptionManager {
         return 'MERGED';
       case 'pushed':
         return 'PUSHED';
+      case 'paused':
+        return 'PAUSED';
       default:
         return 'NEW';
     }
@@ -333,22 +336,41 @@ export class TaskDescriptionManager {
     const timestamp = metadata?.timestamp || new Date().toISOString();
 
     switch (status) {
+      case 'NEW':
+        // Clear stale metadata from a previous PAUSED, FAILED, or IN_PROGRESS state
+        this.data.error = undefined;
+        this.data.pausedAt = undefined;
+        break;
       case 'IN_PROGRESS':
         if (!this.data.startedAt) {
           this.data.startedAt = timestamp;
         }
+        // Clear stale error and pausedAt from a previous PAUSED or FAILED state on resume
+        this.data.error = undefined;
+        this.data.pausedAt = undefined;
         break;
       case 'ITERATING':
         this.data.lastIterationAt = timestamp;
+        // Clear stale error and pausedAt from a previous PAUSED or FAILED state on resume
+        this.data.error = undefined;
+        this.data.pausedAt = undefined;
         break;
       case 'COMPLETED':
         this.data.completedAt = timestamp;
+        this.data.pausedAt = undefined;
         break;
       case 'FAILED':
         this.data.failedAt = timestamp;
-        if (metadata?.error) {
-          this.data.error = metadata.error;
-        }
+        this.data.pausedAt = undefined;
+        // Intentionally clears error when metadata.error is undefined so that
+        // stale errors from a previous status don't persist.
+        this.data.error = metadata?.error;
+        break;
+      case 'PAUSED':
+        this.data.pausedAt = timestamp;
+        // Intentionally clears error when metadata.error is undefined so that
+        // stale errors from a previous status don't persist.
+        this.data.error = metadata?.error;
         break;
       case 'MERGED':
       case 'PUSHED':
@@ -356,6 +378,7 @@ export class TaskDescriptionManager {
         if (!this.data.completedAt) {
           this.data.completedAt = timestamp;
         }
+        this.data.pausedAt = undefined;
         break;
     }
 
@@ -403,6 +426,13 @@ export class TaskDescriptionManager {
    */
   markPushed(timestamp?: string): void {
     this.setStatus('PUSHED', { timestamp });
+  }
+
+  /**
+   * Mark task as paused (e.g., due to credit limit exhaustion)
+   */
+  markPaused(error?: string): void {
+    this.setStatus('PAUSED', { error });
   }
 
   /**
@@ -589,6 +619,11 @@ export class TaskDescriptionManager {
           timestamp = status.completedAt;
           error = status.error;
           break;
+        case 'paused':
+          statusName = 'PAUSED';
+          timestamp = status.updatedAt;
+          error = status.error;
+          break;
         case 'running':
           statusName = 'ITERATING';
           timestamp = status.updatedAt;
@@ -681,6 +716,9 @@ export class TaskDescriptionManager {
   get failedAt(): string | undefined {
     return this.data.failedAt;
   }
+  get pausedAt(): string | undefined {
+    return this.data.pausedAt;
+  }
   get lastIterationAt(): string | undefined {
     return this.data.lastIterationAt;
   }
@@ -763,6 +801,14 @@ export class TaskDescriptionManager {
   // ============================================================
   // Data Modification (Setters)
   // ============================================================
+
+  /**
+   * Set task source
+   */
+  setSource(source: TaskDescription['source']): void {
+    this.data.source = source;
+    this.save();
+  }
 
   /**
    * Update task title
@@ -854,6 +900,8 @@ export class TaskDescriptionManager {
       this.data.completedAt = new Date().toISOString();
     } else if (status === 'failed') {
       this.data.failedAt = new Date().toISOString();
+    } else if (status === 'paused') {
+      this.data.pausedAt = new Date().toISOString();
     }
 
     this.save();
@@ -920,7 +968,15 @@ export class TaskDescriptionManager {
   }
 
   /**
+   * Check if task is paused
+   */
+  isPaused(): boolean {
+    return this.data.status === 'PAUSED';
+  }
+
+  /**
    * Check if task is in an active state (NEW, IN_PROGRESS, or ITERATING)
+   * PAUSED is NOT active - it's idle, waiting for external resume.
    */
   isActive(): boolean {
     return this.isNew() || this.isInProgress() || this.isIterating();

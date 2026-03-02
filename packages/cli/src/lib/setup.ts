@@ -72,12 +72,16 @@ export class SetupBuilder {
 
     let isDockerRootless = false;
 
-    const dockerInfo = launchSync('docker', ['info', '-f', 'json']).stdout;
-    if (dockerInfo) {
-      const info = JSON.parse(dockerInfo.toString());
-      isDockerRootless = (info?.SecurityOptions || []).some((value: string) =>
-        value.includes('rootless')
-      );
+    try {
+      const dockerInfo = launchSync('docker', ['info', '-f', 'json']).stdout;
+      if (dockerInfo) {
+        const info = JSON.parse(dockerInfo.toString());
+        isDockerRootless = (info?.SecurityOptions || []).some((value: string) =>
+          value.includes('rootless')
+        );
+      }
+    } catch {
+      // Docker may not be available (e.g. Podman-only environment)
     }
 
     this.isDockerRootless = isDockerRootless;
@@ -250,7 +254,6 @@ source $HOME/.profile`;
     // --- package installation ---
     let installAllPackages = '';
     if (!useCachedImage) {
-      // Generate installation scripts for languages, package managers, and task managers
       const languagePackages = this.getLanguagePackages();
       const packageManagerPackages = this.getPackageManagerPackages();
       const taskManagerPackages = this.getTaskManagerPackages();
@@ -307,7 +310,7 @@ ${installScripts.join('\n')}
       agentInstallSection = `# Agent-specific CLI installation and credential setup
 echo -e "\\n📦 Installing Agent CLI and setting up credentials"
 # Pass the environment variables to ensure it loads the right credentials
-sudo rover-agent install $AGENT
+sudo -E rover-agent install $AGENT --user-dir $HOME
 # Set the right permissions after installing and moving credentials
 sudo chown -R $(id -u):$(id -g) $HOME
 
@@ -521,7 +524,10 @@ echo "======================================="
     // Use the current iteration's expanded title/description when available,
     // falling back to the original task-level values for the first iteration.
     const currentIteration = this.task.getLastIteration();
-    const inputs = {
+    const inputs: Record<string, string> = {
+      // Start with all user-provided workflow inputs stored in the task
+      ...this.task.inputs,
+      // Always override title/description with the expanded versions
       title: currentIteration?.title ?? this.task.title,
       description: currentIteration?.description ?? this.task.description,
     };

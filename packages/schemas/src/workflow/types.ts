@@ -14,9 +14,7 @@ import type {
   WorkflowAgentToolSchema,
   WorkflowAgentStepSchema,
   WorkflowCommandStepSchema,
-  WorkflowConditionalStepSchema,
-  WorkflowParallelStepSchema,
-  WorkflowSequentialStepSchema,
+  WorkflowLoopStepSchema,
   WorkflowStepSchema,
   WorkflowSchema,
 } from './schema.js';
@@ -41,13 +39,7 @@ export type WorkflowConfig = z.infer<typeof WorkflowConfigSchema>;
 // Step types - all inferred from Zod schemas
 export type WorkflowAgentStep = z.infer<typeof WorkflowAgentStepSchema>;
 export type WorkflowCommandStep = z.infer<typeof WorkflowCommandStepSchema>;
-export type WorkflowConditionalStep = z.infer<
-  typeof WorkflowConditionalStepSchema
->;
-export type WorkflowParallelStep = z.infer<typeof WorkflowParallelStepSchema>;
-export type WorkflowSequentialStep = z.infer<
-  typeof WorkflowSequentialStepSchema
->;
+export type WorkflowLoopStep = z.infer<typeof WorkflowLoopStepSchema>;
 
 // Discriminated union of all step types
 export type WorkflowStep = z.infer<typeof WorkflowStepSchema>;
@@ -62,4 +54,8 @@ export function isAgentStep(step: WorkflowStep): step is WorkflowAgentStep {
 
 export function isCommandStep(step: WorkflowStep): step is WorkflowCommandStep {
   return step.type === 'command';
+}
+
+export function isLoopStep(step: WorkflowStep): step is WorkflowLoopStep {
+  return step.type === 'loop';
 }

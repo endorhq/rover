@@ -293,7 +293,7 @@ const createTaskForAgent = async (
   jsonMode: boolean,
   networkConfig?: NetworkConfig,
   source?: {
-    type: 'github' | 'manual';
+    type: 'github' | 'gitlab' | 'manual';
     id?: string;
     url?: string;
     title?: string;
@@ -444,9 +444,9 @@ const createTaskForAgent = async (
 
     // Read context content for AI expansion
     // Skip PRs to avoid huge context.
-    const expansionEntries = entries.filter(entry => {
-      !(entry.metadata?.type || '').includes('pr');
-    });
+    const expansionEntries = entries.filter(
+      entry => !(entry.metadata?.type || '').includes('pr')
+    );
     const storedContent = contextManager.readStoredContent(expansionEntries);
     if (storedContent) {
       contextContent = storedContent;
@@ -463,6 +463,22 @@ const createTaskForAgent = async (
       uri: entry.uri,
       description: entry.description,
     }));
+
+    // Populate task.source from context if not already set
+    if (!source) {
+      const issueEntry = entries.find(entry => {
+        const type = entry.metadata?.type;
+        return type === 'github:issue' || type === 'gitlab:issue';
+      });
+      if (issueEntry?.metadata && 'number' in issueEntry.metadata) {
+        const isGitHub = issueEntry.metadata.type === 'github:issue';
+        task.setSource({
+          type: isGitHub ? 'github' : 'gitlab',
+          id: String(issueEntry.metadata.number),
+          title: issueEntry.name,
+        });
+      }
+    }
   } catch (error) {
     processManager?.failLastItem();
     if (error instanceof ContextFetchError) {
@@ -782,7 +798,7 @@ const taskCommand = async (initPrompt?: string, options: TaskOptions = {}) => {
   // Task source (populated when --from-github is used)
   let taskSource:
     | {
-        type: 'github' | 'manual';
+        type: 'github' | 'gitlab' | 'manual';
         id?: string;
         url?: string;
         title?: string;
@@ -1015,6 +1031,15 @@ const taskCommand = async (initPrompt?: string, options: TaskOptions = {}) => {
 
         // We are already asking of providing it.
         if (input.name == 'description') {
+          continue;
+        }
+
+        // When running non-interactively (-y), skip optional inputs.
+        // They will use their default value or be auto-detected by the workflow.
+        if (yes && !input.required) {
+          if (input.default !== undefined) {
+            inputsData.set(input.name, String(input.default));
+          }
           continue;
         }
 

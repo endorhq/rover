@@ -1,0 +1,755 @@
+# Software Engineering TDD Workflow
+# This workflow implements a test-driven development lifecycle:
+# context analysis, planning, test writing, implementation,
+# test-fix loop, review, fixes, and summary
+version: '1.0'
+name: 'swe-tdd'
+description: 'Test-driven development workflow that writes tests first, then implements and iterates until tests pass'
+
+inputs:
+  - name: description
+    description: 'Detailed task description'
+    type: string
+    required: true
+  - name: test_command
+    description: 'Override the test command (e.g. "npm test", "pytest"). If not provided, it will be auto-detected from the project.'
+    type: string
+    required: false
+
+outputs:
+  - name: summary
+    description: 'Final implementation summary'
+    type: file
+    filename: summary.md
+  - name: context
+    description: 'Technical context analysis'
+    type: file
+    filename: context.md
+  - name: plan
+    description: 'Implementation plan'
+    type: file
+    filename: plan.md
+  - name: changes
+    description: 'Implementation changes and review fixes'
+    type: file
+    filename: changes.md
+
+defaults:
+  tool: claude
+  model: sonnet
+
+config:
+  timeout: 3600
+  continueOnError: false
+  loopLimit: 5
+
+steps:
+  - id: context
+    type: agent
+    name: 'Context Analysis'
+    prompt: |
+      You are preparing a technical context for this TDD task implementation:
+
+      Task title: {{inputs.title}}
+      Task description: {{inputs.description}}
+      User-provided test command override (if empty or not set, auto-detect from project): {{inputs.test_command}}
+
+      Follow these steps to complete it. Do not move to the next phase until you complete the previous one.
+
+      1. Phase 1: Triage the task complexity.
+         - Identify the task complexity by analyzing the affected files and the complexity of the task. Categorize it as:
+           - Simple task: affects 1-3 files. No complex changes involved. The changes are straightforward and a plan might not be required.
+           - Complex task: affects multiple files. It requires to introduce new libraries or create them. To properly implement them, it is recommended to first write a plan.
+      2. Phase 2: Adapt your analysis depth:
+         - For simple tasks: fill only the "Task Complexity", "Relevant Code", "Test Infrastructure" and "Extra OS packages" sections. Skip all other sections
+         - For complex tasks: complete all sections.
+
+      Follow these rules to complete the research:
+
+      - Use 1-line bullets wherever possible. Do not fabricate content; if information is unavailable or irrelevant, skip it
+      - Find the main file or files affected by these changes. Then, identify other secondary files. Focus mostly on main files and avoid a deep research in the secondary ones
+      - Identify existing test files, test frameworks, and test configuration
+      - Determine the correct test command for this project by examining package.json, Makefile, pyproject.toml, go.mod, or other build/test configuration files. If a user-provided test command is shown above, use that instead.
+      - Follow the template strictly
+      - Just output the template. Skip any text before and after
+      - Use globs when a change affects multiple files
+
+      Then, write your structured analysis to `context.md` following this template. This is mandatory.
+
+      <template>
+      # Context
+
+      ## Task complexity
+
+      simple|complex
+
+      ## Relevant code
+
+      - path/to/file:start-end: 1-line description (include line numbers only if code is accessible)
+
+      ## Test Infrastructure
+
+      - Test framework: (e.g. vitest, jest, pytest, go test)
+      - Build command: (the command to compile/build the project, if applicable. e.g. "go build ./...", "pnpm build", "cargo build", "make build". Write "none" if the language is interpreted or the test command handles compilation implicitly)
+      - Test command: (the exact command to run the relevant tests for this project)
+      - Existing test files: list of relevant test files
+      - Test patterns: describe the testing conventions used in this project
+
+      ## Extra OS packages
+
+      Identify missing OS packages to accomplish this task and install them using the tools provided by the `package-manager` MCP. Return a list of new installed packages or "No additional packages required".
+
+      ## Relevant knowledge
+
+      Skip this entire section and title for simple tasks
+
+      ### Patterns
+
+      - pattern: brief description (only if non-standard)
+
+      ### Dependencies
+
+      - library name: 1-line description about why this library is relevant
+
+      </template>
+
+      IMPORTANT: After writing context.md, you MUST extract the task complexity value, build command, and test command and return them. For the test command: if the user provided a valid override above, return that exactly. Otherwise, return the command you discovered from the project's configuration files. For the build command: return the compile/build command if the project needs one, or "none" if the test command handles it or the language is interpreted.
+    outputs:
+      - name: complexity
+        description: 'Task complexity: either "simple" or "complex"'
+        type: string
+      - name: build_command
+        description: 'The command to build/compile the project, or "none" if not needed'
+        type: string
+      - name: test_command
+        description: 'The command to run tests for this project'
+        type: string
+      - name: context_file
+        description: 'Technical context analysis file'
+        type: file
+        filename: context.md
+
+  - id: plan
+    type: agent
+    name: 'TDD Planning'
+    prompt: |
+      You are preparing a TDD implementation plan for this task:
+
+      ---
+
+      Title: {{inputs.title}}
+      Description:
+      {{inputs.description}}
+      Context: {{steps.context.outputs.context_file}}
+
+      ---
+
+      Provide a clear, concise and actionable TDD plan that another engineer can follow.
+      The plan MUST follow test-driven development: tests are written BEFORE implementation.
+
+      Follow these steps to complete it. Do not move to the next phase until you complete the previous one.
+
+      ### Phase 1: Evaluate task requirements
+
+      - Read the provided context
+      - Identify the complexity of the given task. Check the context.
+      - Define a clear and concise objective for the plan
+      - Specify the scope, focusing on the task objective
+      - Identify files that will be affected by the changes
+      - Identify existing test files that should be updated
+      - Plan what tests need to be written to verify the implementation
+
+      ### Phase 2: Write a TDD plan based on the task requirements.
+
+      Adapt the details depending on the task complexity, objectives and scope:
+
+      - Simple task: ≤3 steps max, short objective, scope limited to 1–3 files. Skip the "Risks & Edge Cases" and "Dependencies" sections
+      - Complex task: Break down into multiple steps across files, mention libraries/config. Complete all sections
+
+      ### Phase 3: Output
+
+      - Do not fabricate content; if information is unavailable or irrelevant, skip it
+      - Only list in-scope changes. Do not mention out-of-scope items.
+      - Break down implementation into small, clear and concise steps. Do not overengineer, focus on the changes to complete the task and clear side effects.
+      - The plan MUST have test-writing steps BEFORE implementation steps
+      - Follow the template strictly
+      - Just output the template. Skip any text before and after
+
+      Write your plan to `plan.md` following this template. This is mandatory.
+
+      <template>
+      # TDD Implementation Plan
+
+      ## Objective
+
+      1-2 sentences describing the task objective
+
+      ## Scope
+
+      - List of changes that are in the task scope (one line each)
+
+      ## Test Plan
+
+      - [ ] Tests to write first (before implementation), with file paths and descriptions
+
+      ## Implementation Steps
+
+      - [ ] One line each, start with a verb, always include filenames, keep concise and actionable.
+
+      ## Risks & Edge Cases
+
+      - Potential pitfalls in 1 line each (skip if none)
+
+      ## Dependencies
+
+      - Prerequisite libraries, configs, or tasks (skip if none)
+      </template>
+    outputs:
+      - name: plan_file
+        description: 'TDD Implementation plan file'
+        type: file
+        filename: plan.md
+
+  - id: write_tests
+    type: agent
+    name: 'Write Tests'
+    prompt: |
+      You are in TDD mode — writing tests BEFORE the implementation.
+
+      ---
+
+      Title: {{inputs.title}}
+      Description:
+      {{inputs.description}}
+
+      Context:
+      ```
+      {{steps.context.outputs.context_file}}
+      ```
+
+      Plan:
+      ```
+      {{steps.plan.outputs.plan_file}}
+      ```
+      ---
+
+      ### Phase 1: Review the test plan
+
+      - Read the plan and context carefully
+      - Identify which test files to create or modify
+      - Understand the testing patterns used in this project
+
+      ### Phase 2: Write failing tests
+
+      1. Write tests that describe the expected behavior of the new code
+      2. Follow existing test patterns and conventions in the project
+      3. Tests should be comprehensive but focused on the task scope
+      4. Tests MUST fail at this point (since implementation doesn't exist yet)
+      5. Use the same test framework and patterns found in the context
+
+      ### Phase 3: Output
+
+      Write `test_changes.md` describing what tests you wrote and why. This is mandatory.
+
+      <template>
+      # Tests Written
+
+      ## Test Files
+
+      ### `path/to/test-file`
+
+      **Purpose**: What behavior these tests verify
+      **Tests added**:
+      - Test name: brief description of what it verifies
+
+      ## Expected Failures
+
+      - List of tests that will fail until implementation is complete
+      </template>
+    outputs:
+      - name: test_changes_file
+        description: 'Description of tests written'
+        type: file
+        filename: test_changes.md
+
+  - id: implement
+    type: agent
+    name: 'Implementation'
+    prompt: |
+      You are in implementation mode.
+      Your task is to implement the code to make the tests pass.
+      This is a TDD workflow — tests have already been written.
+
+      ---
+
+      Task:
+      Title: {{inputs.title}}
+      Description:
+      {{inputs.description}}
+
+      Context:
+      ```
+      {{steps.context.outputs.context_file}}
+      ```
+
+      Plan:
+      ```
+      {{steps.plan.outputs.plan_file}}
+      ```
+
+      Tests Written:
+      ```
+      {{steps.write_tests.outputs.test_changes_file}}
+      ```
+      ---
+
+      ### Phase 1: Review tests and plan
+
+      - Read the tests that have been written
+      - Understand what the tests expect
+      - Review the implementation plan
+
+      ### Phase 2: Implementation process
+
+      1. Follow the implementation steps in `plan.md` sequentially
+      2. Reference `context.md` for technical constraints
+      3. Make the tests pass — this is your primary goal
+      4. Make minimal, maintainable changes that fit existing patterns
+      5. Do not modify the test files unless absolutely necessary
+
+      ### Phase 3: Output
+
+      Write `changes.md` following this template. This is mandatory.
+
+      <template>
+      # Implementation Changes
+
+      ## Overview
+
+      1-2 sentences on what was implemented and why
+
+      ## Files Modified
+
+      ### `path/to/file.ts`
+
+      **Purpose**: What this file does in the system
+      **Changes made**:
+
+      - Bullet list of actual changes with explanations
+
+      ## Files Added
+
+      ### `path/to/new-file.ts`
+
+      **Purpose**: What this file does
+      **Implementation details**:
+
+      - Explanation of structure, functions, and integrations
+      </template>
+    outputs:
+      - name: changes_file
+        description: 'Implementation changes file'
+        type: file
+        filename: changes.md
+
+  - id: test_fix_loop
+    type: loop
+    name: 'Test & Fix Loop'
+    until: steps.run_tests.outputs.exit_code == 0 || steps.checkpoint.outputs.exit_code != 0
+    maxIterations: 5
+    steps:
+      - id: build
+        type: command
+        name: 'Build'
+        if: steps.context.outputs.build_command != none
+        command: '{{steps.context.outputs.build_command}}'
+
+      - id: run_tests
+        type: command
+        name: 'Run Tests'
+        command: '{{steps.context.outputs.test_command}}'
+
+      - id: fix_code
+        type: agent
+        name: 'Fix Build or Test Failures'
+        if: steps.run_tests.outputs.exit_code != 0
+        prompt: |
+          The build or tests are failing. Your job is to fix the implementation so it compiles and all tests pass.
+
+          ---
+
+          Task:
+          Title: {{inputs.title}}
+          Description:
+          {{inputs.description}}
+
+          Build output (stdout):
+          ```
+          {{steps.build.outputs.stdout}}
+          ```
+
+          Build errors (stderr):
+          ```
+          {{steps.build.outputs.stderr}}
+          ```
+
+          Build exit code: {{steps.build.outputs.exit_code}}
+
+          Test command output (stdout):
+          ```
+          {{steps.run_tests.outputs.stdout}}
+          ```
+
+          Test command errors (stderr):
+          ```
+          {{steps.run_tests.outputs.stderr}}
+          ```
+
+          Test exit code: {{steps.run_tests.outputs.exit_code}}
+
+          Previous implementation changes:
+          ```
+          {{steps.implement.outputs.changes_file}}
+          ```
+          ---
+
+          ### Instructions
+
+          1. If the build failed, fix compile errors first — the code must build before tests can run
+          2. Analyze the test failures carefully
+          3. Identify the root cause of each failure
+          4. Fix the implementation code (NOT the tests) to make tests pass
+          5. Only modify tests if they have genuine bugs (not just because they're failing)
+          6. Make minimal, targeted fixes
+          7. After making fixes, verify your changes are consistent with the project patterns
+        outputs:
+          - name: fixes_description
+            description: 'Description of fixes applied'
+            type: string
+
+      - id: checkpoint
+        type: command
+        name: 'Checkpoint & Circle Detection'
+        if: steps.build.outputs.exit_code != 0 || steps.run_tests.outputs.exit_code != 0
+        command: |
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -m "[checkpoint] test-fix"
+          TREE_HASH=$(git rev-parse HEAD^{tree})
+          HASH_FILE="/output/.tree_hashes"
+          if [ -f "$HASH_FILE" ] && grep -qF "$TREE_HASH" "$HASH_FILE"; then
+            echo "Circle detected: tree $TREE_HASH already seen"
+            exit 1
+          fi
+          echo "$TREE_HASH" >> "$HASH_FILE"
+
+  - id: review_loop
+    type: loop
+    name: 'Review & Fix Loop'
+    until: steps.code_review.outputs.issues_found != true || steps.review_checkpoint.outputs.exit_code != 0
+    maxIterations: 5
+    steps:
+      - id: git_diff
+        type: command
+        name: 'Capture Git Diff'
+        command: 'git diff $(git merge-base HEAD main 2>/dev/null || echo HEAD~1)'
+
+      - id: code_review
+        type: agent
+        name: 'Code Review'
+        prompt: |
+          You are in review mode, performing a strict code review for this TDD task.
+          Review the git diff below — this is the actual diff of all changes made for this task. Use it as your primary source of truth, then read specific source files when you need more context.
+
+          ---
+
+          Title: {{inputs.title}}
+          Description:
+          {{inputs.description}}
+          Task Complexity: {{steps.context.outputs.complexity}}
+
+          Plan:
+          ```
+          {{steps.plan.outputs.plan_file}}
+          ```
+
+          Git diff (all changes for this task):
+          ```diff
+          {{steps.git_diff.outputs.stdout}}
+          ```
+
+          Previous test results (if any):
+          stdout: {{steps.run_tests_after_review.outputs.stdout}}
+          stderr: {{steps.run_tests_after_review.outputs.stderr}}
+          exit_code: {{steps.run_tests_after_review.outputs.exit_code}}
+          ---
+
+          ### Phase 1: Confirm if review is required
+
+          Check the task complexity from above.
+
+          - Simple task: skip the review entirely. Output: {"skipped": "true", "issues_found": "false"} and do NOT create any file. Stop here.
+          - Complex task: continue with the next phase.
+
+          ### Phase 2: For complex tasks, perform the review
+
+          Use the git diff above as the primary input for your review. It shows exactly what was changed.
+          Be thorough — flag everything wrong in the changed code. But stay in scope: only review lines and files that were changed for this task. Do not flag issues in pre-existing code that the task did not touch.
+
+          1. Review every hunk in the diff for correctness, quality, and adherence to existing patterns
+          2. Compare the changes against the Plan — verify task requirements are satisfied
+          3. Check that tests are comprehensive and meaningful
+          4. Check security concerns in the changed code
+          5. **Verify the code has no obvious errors**: unused variables, missing imports, type errors, syntax errors, dead code, and other regressions visible in the diff
+          6. Check naming, formatting, comments, and code style in the changed lines — flag anything that doesn't match the project's conventions
+          7. If previous test results are present above, check whether the failures were addressed
+          8. Read specific source files only when you need more context around the changed lines
+          9. **Stay in scope**: do not suggest changes to code outside the diff. Do not add features, refactor surrounding code, or improve files the task did not modify
+
+          ### Phase 3: Output
+
+          - If the implementation is satisfactory with no issues of any kind: output {"skipped": "false", "issues_found": "false"} and do NOT create any file.
+          - Do not fabricate content; if information is unavailable or irrelevant, skip it
+          - Only report issues you can confirm from the diff or by reading the actual source files
+          - If ANY issues are found in the changed code — including nits and style issues — output {"skipped": "false", "issues_found": "true"} and create `review.md` with the following template:
+
+          <template>
+          # Code Review
+
+          ## Overall Assessment
+
+          Brief summary of the implementation quality
+
+          ## Issues
+
+          ### [File path/section]
+
+          **Issue**: [Concise description of the problem]
+          **Fix**: [Exact actionable fix — what to change and where]
+          **Code location**: [Line numbers or function names]
+
+          (Repeat for every issue found in the changed code. Include everything: bugs, logic errors, compile errors, unused variables, missing imports, naming, style, nits, test gaps, security concerns, plan deviations. Do not flag issues in code the task did not change.)
+          </template>
+        outputs:
+          - name: skipped
+            description: 'Whether review was skipped (true/false)'
+            type: string
+          - name: issues_found
+            description: 'Whether issues were found (true/false)'
+            type: string
+          - name: review_file
+            description: 'Code review file with issues (only created if issues found)'
+            type: file
+            filename: review.md
+
+      - id: apply_fixes
+        type: agent
+        name: 'Apply Review Fixes'
+        if: steps.code_review.outputs.issues_found == true
+        prompt: |
+          You are in apply-review mode. Your fixes will be tested and re-reviewed, so they must be correct.
+
+          ---
+
+          Title: {{inputs.title}}
+          Description:
+          {{inputs.description}}
+
+          Git diff (current state of all changes):
+          ```diff
+          {{steps.git_diff.outputs.stdout}}
+          ```
+
+          Review:
+          ```
+          {{steps.code_review.outputs.review_file}}
+          ```
+
+          Test command: {{steps.context.outputs.test_command}}
+
+          Context:
+          ```
+          {{steps.context.outputs.context_file}}
+          ```
+
+          ---
+
+          ### Instructions
+
+          Fix every issue in the review — bugs, nits, style, naming, everything. But stay in scope: only modify code that was changed for this task. Do not refactor, improve, or touch code outside the scope of the review.
+
+          1. Read all issues in Review
+          2. Fix every single one. Do not skip any issue regardless of size
+          3. Follow review recommendations exactly — do not invent alternative solutions
+          4. Only modify files and lines relevant to the review issues — do not make unrelated changes
+          5. Ensure fixes preserve existing functionality and do not introduce regressions
+          6. Reference Context for consistency
+          7. **After applying all fixes, run the test command above** to verify your changes compile and tests still pass. If they fail, fix the regressions before finishing.
+          8. Do not leave unused variables, missing imports, or dead code — clean up after yourself
+        outputs:
+          - name: fixes_applied
+            description: 'Whether fixes were applied (true/false)'
+            type: string
+          - name: review_fixes_file
+            description: 'Updated changes file with review fixes appended'
+            type: file
+            filename: review_fixes.md
+
+      - id: build_after_review
+        type: command
+        name: 'Build After Review'
+        if: steps.context.outputs.build_command != none
+        command: '{{steps.context.outputs.build_command}}'
+
+      - id: run_tests_after_review
+        type: command
+        name: 'Run Tests After Review'
+        if: steps.apply_fixes.outputs.fixes_applied == true
+        command: '{{steps.context.outputs.test_command}}'
+
+      - id: fix_regressions
+        type: agent
+        name: 'Fix Review Regressions'
+        if: steps.run_tests_after_review.outputs.exit_code != 0
+        prompt: |
+          Review fixes broke the build or tests. Your job is to fix the regressions while preserving the review improvements.
+
+          ---
+
+          Task:
+          Title: {{inputs.title}}
+          Description:
+          {{inputs.description}}
+
+          Build output (stdout):
+          ```
+          {{steps.build_after_review.outputs.stdout}}
+          ```
+
+          Build errors (stderr):
+          ```
+          {{steps.build_after_review.outputs.stderr}}
+          ```
+
+          Build exit code: {{steps.build_after_review.outputs.exit_code}}
+
+          Test command output (stdout):
+          ```
+          {{steps.run_tests_after_review.outputs.stdout}}
+          ```
+
+          Test command errors (stderr):
+          ```
+          {{steps.run_tests_after_review.outputs.stderr}}
+          ```
+
+          Test exit code: {{steps.run_tests_after_review.outputs.exit_code}}
+
+          Review that was applied:
+          ```
+          {{steps.code_review.outputs.review_file}}
+          ```
+          ---
+
+          ### Instructions
+
+          1. If the build failed, fix compile errors first — the code must build before tests can run
+          2. Analyze the test/build failures carefully
+          3. Identify which review fixes caused the regressions
+          3. Fix the code to make tests pass while keeping valid review improvements
+          4. Do NOT revert review fixes wholesale — preserve improvements that aren't causing failures
+          5. Make minimal, targeted fixes
+        outputs:
+          - name: fixes_description
+            description: 'Description of regression fixes applied'
+            type: string
+
+      - id: review_checkpoint
+        type: command
+        name: 'Review Checkpoint & Circle Detection'
+        if: steps.code_review.outputs.issues_found == true
+        command: |
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -m "[checkpoint] review-fix"
+          TREE_HASH=$(git rev-parse HEAD^{tree})
+          HASH_FILE="/output/.tree_hashes"
+          if [ -f "$HASH_FILE" ] && grep -qF "$TREE_HASH" "$HASH_FILE"; then
+            echo "Circle detected: tree $TREE_HASH already seen"
+            exit 1
+          fi
+          echo "$TREE_HASH" >> "$HASH_FILE"
+
+  - id: summary
+    type: agent
+    name: 'Summary'
+    prompt: |
+      You are in summary mode.
+
+      ---
+
+      Title: {{inputs.title}}
+      Description:
+      {{inputs.description}}
+      Task Complexity: {{steps.context.outputs.complexity}}
+
+      Context:
+      ```
+      {{steps.context.outputs.context_file}}
+      ```
+
+      Changes:
+      ```
+      {{steps.implement.outputs.changes_file}}
+      ```
+
+      Test-Fix Loop Iterations: {{steps.test_fix_loop.outputs.iterations}}
+      Tests Passed: {{steps.test_fix_loop.outputs.condition_met}}
+      ---
+
+      ### Phase 1: Triage task complexity
+
+      Check the context to identify the task complexity: {{steps.context.outputs.complexity}}
+
+      - Simple task: skip the "Technical decisions" and "Notes" sections in phase 3.
+      - Complex task: complete the full template in phase 3.
+
+      ### Phase 2: For complex tasks
+
+      - Use only information from Context and Changes
+      - Do not fabricate content; if a section has nothing to report, write `None`
+      - Keep all required sections concise: 1-2 sentences or one-line bullets only
+
+      ### Phase 3: Output
+
+      Write to `summary.md` following this template. This is mandatory.
+
+      <template>
+      # Implementation Summary
+
+      ## What was implemented
+
+      1-2 sentences describing the changes made
+
+      ## TDD Results
+
+      - Test-fix iterations: [number]
+      - All tests passing: [yes/no]
+
+      ## Files modified
+
+      - `path/to/file`: Brief description of changes
+
+      ## Technical decisions
+
+      - Key decision and rationale (skip if none)
+
+      ## Notes
+
+      - Remaining tasks, considerations, or `None`
+      </template>
+    outputs:
+      - name: summary_file
+        description: 'Implementation summary file'
+        type: file
+        filename: summary.md

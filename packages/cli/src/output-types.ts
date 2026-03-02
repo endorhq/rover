@@ -196,12 +196,17 @@ export interface TaskInspectionOutput {
   agentModel?: string;
   agentDisplay?: string;
   source?: {
-    type: 'github' | 'manual';
+    type: 'github' | 'gitlab' | 'manual';
     id?: string;
     url?: string;
     title?: string;
     ref?: Record<string, unknown>;
   };
+  context?: Array<{
+    name: string;
+    uri: string;
+    description: string;
+  }>;
 }
 
 export interface RawFileOutput {
@@ -288,6 +293,18 @@ export interface AddWorkflowOutput extends CLIJsonOutput {
     path: string;
     store: 'local' | 'global';
   };
+}
+
+// ---------------------------------------------------------------------------
+// resume command
+// ---------------------------------------------------------------------------
+
+export interface TaskResumeOutput extends CLIJsonOutput {
+  taskId?: number;
+  title?: string;
+  description?: string;
+  status?: string;
+  resumedAt?: string;
 }
 
 // ---------------------------------------------------------------------------

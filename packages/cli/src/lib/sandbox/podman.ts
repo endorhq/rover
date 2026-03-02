@@ -12,6 +12,8 @@ import { existsSync, mkdirSync } from 'node:fs';
 import { userInfo } from 'node:os';
 import {
   ContainerBackend,
+  getCheckpointArgs,
+  getWorktreeGitMounts,
   resolveAgentImage,
   warnIfCustomImage,
   tmpUserGroupFiles,
@@ -21,10 +23,26 @@ import {
   checkImageCache,
   waitForInitAndCommit,
 } from './container-image-cache.js';
+import { isContainerMissingInspectError } from './inspect-errors.js';
 import { mergeNetworkConfig } from '../network-config.js';
 import { isJsonMode } from '../context.js';
 import { isPathWithin } from '../../utils/path-utils.js';
 import colors from 'ansi-colors';
+
+/**
+ * Normalize UID/GID for environments that return -1 (e.g. Windows).
+ * Returns a shallow copy with UID/GID set to 1000 (unprivileged) when
+ * the OS cannot provide them. Does not mutate the input.
+ */
+function normalizeUserInfo(
+  info: ReturnType<typeof userInfo>
+): ReturnType<typeof userInfo> {
+  return {
+    ...info,
+    uid: info.uid === -1 ? 1000 : info.uid,
+    gid: info.gid === -1 ? 1000 : info.gid,
+  };
+}
 
 export class PodmanSandbox extends Sandbox {
   backend = ContainerBackend.Podman;
@@ -126,7 +144,7 @@ export class PodmanSandbox extends Sandbox {
 
     const podmanArgs = ['create', '--name', this.sandboxName];
 
-    const userInfo_ = userInfo();
+    const userInfo_ = normalizeUserInfo(userInfo());
 
     // Warn if using a custom agent image
     warnIfCustomImage(projectConfig);
@@ -155,6 +173,7 @@ export class PodmanSandbox extends Sandbox {
       `${userInfo_.uid}:${userInfo_.gid}`,
       '-v',
       `${worktreePath}:/workspace:Z,rw`,
+      ...getWorktreeGitMounts(worktreePath),
       '-v',
       `${iteration.iterationPath}:/output:Z,rw`
     );
@@ -241,6 +260,9 @@ export class PodmanSandbox extends Sandbox {
         podmanArgs.push('--context-dir', '/context');
       }
 
+      // Mount checkpoint if resuming from a paused workflow
+      podmanArgs.push(...getCheckpointArgs(this.options?.checkpointPath));
+
       // Pass model if specified
       if (this.task.agentModel) {
         podmanArgs.push('--agent-model', this.task.agentModel);
@@ -318,6 +340,7 @@ export class PodmanSandbox extends Sandbox {
           throw new Error('Init container did not exit successfully');
         }
       } catch (err) {
+        this.initMode = false;
         this.processManager?.failLastItem();
         this.processManager?.finish();
         throw err;
@@ -417,7 +440,7 @@ export class PodmanSandbox extends Sandbox {
     const interactiveName = `${this.sandboxName}-i`;
     const podmanArgs = ['run', '--name', interactiveName, '-it', '--rm'];
 
-    const userInfo_ = userInfo();
+    const userInfo_ = normalizeUserInfo(userInfo());
 
     // Warn if using a custom agent image
     warnIfCustomImage(projectConfig);
@@ -449,6 +472,7 @@ export class PodmanSandbox extends Sandbox {
       `${userInfo_.uid}:${userInfo_.gid}`,
       '-v',
       `${worktreePath}:/workspace:Z,rw`,
+      ...getWorktreeGitMounts(worktreePath),
       '-v',
       `${iteration.iterationPath}:/output:Z,rw`,
       ...containerMounts,
@@ -508,17 +532,30 @@ export class PodmanSandbox extends Sandbox {
     });
   }
 
-  async inspect(): Promise<{ status: string } | null> {
+  async inspect(): Promise<{ status: string; exitCode?: number } | null> {
     try {
       const result = await launch(
         'podman',
-        ['inspect', '--format', '{{.State.Status}}', this.sandboxName],
+        [
+          'inspect',
+          '--format',
+          '{{.State.Status}}|{{.State.ExitCode}}',
+          this.sandboxName,
+        ],
         { stdio: 'pipe' }
       );
-      const status = result.stdout?.toString().trim();
-      return status ? { status } : null;
-    } catch {
-      return null;
+      const output = result.stdout?.toString().trim();
+      if (!output) return null;
+      const [status, exitCodeStr] = output.split('|');
+      const exitCode = exitCodeStr ? parseInt(exitCodeStr, 10) : undefined;
+      return status
+        ? { status, exitCode: Number.isNaN(exitCode) ? undefined : exitCode }
+        : null;
+    } catch (error) {
+      if (isContainerMissingInspectError(error)) {
+        return null;
+      }
+      throw error;
     }
   }
 

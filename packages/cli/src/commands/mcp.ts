@@ -99,8 +99,20 @@ const mcpCommand = async () => {
   // Task command schema
   const taskSchema = z.object({
     initPrompt: z.string(),
-    fromGithub: z.string().optional(),
-    includeComments: z.boolean().optional(),
+    fromGithub: z
+      .string()
+      .optional()
+      .describe('Deprecated. Use context with github:issue/<number> instead.'),
+    fromGitlab: z
+      .string()
+      .optional()
+      .describe('Deprecated. Use context with gitlab:issue/<number> instead.'),
+    includeComments: z
+      .boolean()
+      .optional()
+      .describe(
+        'Deprecated. Use contextTrustAllAuthors instead. Requires fromGithub or fromGitlab.'
+      ),
     sourceBranch: z.string().optional(),
     targetBranch: z.string().optional(),
     agent: z.nativeEnum(AI_AGENT).optional(),
@@ -114,7 +126,8 @@ const mcpCommand = async () => {
     'create-task',
     {
       title: 'Create task',
-      description: 'Create a new Rover task for AI agents to work on',
+      description:
+        'Create a new Rover task for AI agents to work on. Supports GitHub and GitLab context (e.g., github:issue/15, gitlab:mr/42).',
       inputSchema: taskSchema.shape,
     },
     async args => {
@@ -153,7 +166,7 @@ const mcpCommand = async () => {
   const diffSchema = z.object({
     taskId: z.string(),
     filePath: z.string().optional(),
-    onlyFiles: z.array(z.string()).optional(),
+    onlyFiles: z.boolean().optional(),
     branch: z.string().optional(),
   });
 
@@ -297,7 +310,7 @@ const mcpCommand = async () => {
     {
       title: 'Iterate task',
       description:
-        'Add a new iteration to an existing task with additional instructions',
+        'Add a new iteration to an existing task with additional instructions. Supports GitHub and GitLab context (e.g., github:issue/15, gitlab:mr/42).',
       inputSchema: iterateSchema.shape,
     },
     async args => {

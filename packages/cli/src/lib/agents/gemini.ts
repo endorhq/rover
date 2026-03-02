@@ -33,6 +33,11 @@ class GeminiAI implements AIAgentTool {
   // constants
   public AGENT_BIN = 'gemini';
   private promptBuilder = new PromptBuilder('gemini');
+  private model?: string;
+
+  constructor(model?: string) {
+    this.model = model;
+  }
 
   async checkAgent(): Promise<void> {
     try {
@@ -142,6 +147,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
         .filter((line: string) => line.trim() !== '');
       return lines[0] || null;
     } catch (error) {
+      console.error('Failed to generate commit message with Gemini:', error);
       return null;
     }
   }
@@ -151,18 +157,27 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
     diffContext: string,
     conflictedContent: string
   ): Promise<string | null> {
-    try {
-      const prompt = this.promptBuilder.resolveMergeConflictsPrompt(
-        filePath,
-        diffContext,
-        conflictedContent
-      );
-      const response = await this.invoke(prompt);
+    const prompt = this.promptBuilder.resolveMergeConflictsPrompt(
+      filePath,
+      diffContext,
+      conflictedContent
+    );
+    return this.invoke(prompt);
+  }
 
-      return response;
-    } catch (err) {
-      return null;
-    }
+  async resolveMergeConflictsRegions(
+    filePath: string,
+    diffContext: string,
+    conflictedContent: string,
+    regionCount: number
+  ): Promise<string | null> {
+    const prompt = this.promptBuilder.resolveMergeConflictsRegionsPrompt(
+      filePath,
+      diffContext,
+      conflictedContent,
+      regionCount
+    );
+    return this.invoke(prompt);
   }
 
   async extractGithubInputs(

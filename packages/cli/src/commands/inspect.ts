@@ -264,6 +264,14 @@ const inspectCommand = async (
         workflowName: task.workflowName,
         worktreePath: task.worktreePath,
         source: task.source,
+        context:
+          iteration.context.length > 0
+            ? iteration.context.map(entry => ({
+                name: entry.name,
+                uri: entry.uri,
+                description: entry.description,
+              }))
+            : undefined,
       };
 
       await exitWithSuccess(null, jsonOutput, { telemetry });
@@ -288,10 +296,14 @@ const inspectCommand = async (
         'Created At': new Date(task.createdAt).toLocaleString(),
       };
 
-      // Show task source if available (e.g., GitHub issue, etc.)
+      // Show task source if available (e.g., GitHub issue, GitLab issue, etc.)
       if (task.source?.url) {
         const sourceLabel =
-          task.source.type === 'github' ? 'GitHub Issue' : 'Source';
+          task.source.type === 'github'
+            ? 'GitHub Issue'
+            : task.source.type === 'gitlab'
+              ? 'GitLab Issue'
+              : 'Source';
         properties[sourceLabel] = colors.cyan(task.source.url);
       }
 
@@ -309,6 +321,17 @@ const inspectCommand = async (
       }
 
       showProperties(properties);
+
+      // Show context entries if available
+      if (iteration.context.length > 0) {
+        showTitle('Context');
+        showList(
+          iteration.context.map(
+            entry =>
+              `${colors.cyan(entry.uri)} ${colors.gray('→')} ${entry.name}`
+          )
+        );
+      }
 
       // Workspace information
       showTitle('Workspace');

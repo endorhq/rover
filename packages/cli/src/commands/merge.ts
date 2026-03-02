@@ -3,7 +3,11 @@ import enquirer from 'enquirer';
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import yoctoSpinner from 'yocto-spinner';
-import { getAIAgentTool, type AIAgentTool } from '../lib/agents/index.js';
+import {
+  getAIAgentTool,
+  getUserDefaultModel,
+  type AIAgentTool,
+} from '../lib/agents/index.js';
 import {
   AI_AGENT,
   Git,
@@ -13,8 +17,17 @@ import {
   showProperties,
   showList,
 } from 'rover-core';
+import { parseAgentString } from '../utils/agent-parser.js';
 import { TaskNotFoundError } from 'rover-schemas';
 import { executeHooks } from '../lib/hooks.js';
+import {
+  truncateConflictContext,
+  getBlameContext,
+  parseResolvedRegions,
+  reconstructFile,
+  sanitizeAIOutput,
+  hasConflictMarkers,
+} from '../lib/context-optimizer.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { showRoverChat, showTips } from '../utils/display.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
@@ -25,6 +38,7 @@ import {
   requireProjectContext,
 } from '../lib/context.js';
 import type { CommandDefinition } from '../types.js';
+import { collapseTaskCommits } from '../lib/squash.js';
 
 const { prompt } = enquirer;
 
@@ -123,71 +137,181 @@ const resolveMergeConflicts = async (
   git: Git,
   conflictedFiles: string[],
   aiAgent: AIAgentTool,
-  json: boolean
-): Promise<boolean> => {
+  json: boolean,
+  concurrency: number = 4,
+  contextLines: number = 50,
+  sendFullFile: boolean = false
+): Promise<{ success: boolean; failureReason?: string }> => {
   let spinner;
 
   if (!isJsonMode()) {
-    spinner = yoctoSpinner({ text: 'Analyzing merge conflicts...' }).start();
+    spinner = yoctoSpinner({
+      text: `Resolving conflicts in ${conflictedFiles.length} file(s)...`,
+    }).start();
   }
 
   try {
-    // Process each conflicted file
+    // Fallback diff context for --send-full-file mode
+    const fallbackDiffContext = sendFullFile
+      ? git
+          .getRecentCommits({
+            branch: git.getCurrentBranch(),
+          })
+          .join('\n')
+      : '';
+
+    const failures: string[] = [];
+    let resolvedCount = 0;
+    const executing: Promise<void>[] = [];
+
     for (const filePath of conflictedFiles) {
-      if (spinner) {
-        spinner.text = `Resolving conflicts in ${filePath}...`;
-      }
-
-      if (!existsSync(filePath)) {
-        spinner?.error(`File ${filePath} not found, skipping...`);
-        continue;
-      }
-
-      // Read the conflicted file
-      const conflictedContent = readFileSync(filePath, 'utf8');
-
-      // Get git diff context for better understanding
-      const diffContext = git
-        .getRecentCommits({
-          branch: git.getCurrentBranch(),
-        })
-        .join('\n');
-
-      try {
-        const resolvedContent = await aiAgent.resolveMergeConflicts(
-          filePath,
-          diffContext,
-          conflictedContent
-        );
-
-        if (!resolvedContent) {
-          spinner?.error(`Failed to resolve conflicts in ${filePath}`);
-          return false;
+      const task = (async () => {
+        if (!existsSync(filePath)) {
+          failures.push(`File ${filePath} not found`);
+          return;
         }
 
-        // Write the resolved content back to the file
-        writeFileSync(filePath, resolvedContent);
+        const rawContent = readFileSync(filePath, 'utf8');
 
-        // Stage the resolved file
-        if (!git.add(filePath)) {
-          spinner?.error(`Error adding ${filePath} to the git commit`);
-          return false;
+        let conflictedContent: string;
+        let diffContext: string;
+        const truncated = sendFullFile
+          ? null
+          : truncateConflictContext(rawContent, contextLines);
+
+        if (sendFullFile) {
+          conflictedContent = rawContent;
+          diffContext = fallbackDiffContext;
+        } else {
+          conflictedContent = truncated!.content;
+          diffContext = getBlameContext(
+            git,
+            filePath,
+            truncated!.conflictRegions,
+            { ours: 'HEAD', theirs: 'MERGE_HEAD' }
+          );
+          if (!diffContext) {
+            diffContext =
+              fallbackDiffContext ||
+              git
+                .getRecentCommits({ branch: git.getCurrentBranch() })
+                .join('\n');
+          }
         }
-      } catch (error) {
-        spinner?.error(`Error resolving ${filePath}: ${error}`);
-        return false;
+
+        try {
+          let finalContent: string | null = null;
+
+          if (sendFullFile) {
+            // Full-file mode: AI returns entire resolved file
+            finalContent = await aiAgent.resolveMergeConflicts(
+              filePath,
+              diffContext,
+              conflictedContent
+            );
+            if (finalContent) {
+              finalContent = sanitizeAIOutput(finalContent, rawContent);
+            }
+          } else {
+            // Region-based mode: AI returns only resolved conflict regions
+            const regionCount = truncated!.conflictRegions.length;
+
+            try {
+              let regionOutput = await aiAgent.resolveMergeConflictsRegions(
+                filePath,
+                diffContext,
+                conflictedContent,
+                regionCount
+              );
+
+              if (regionOutput) {
+                regionOutput = sanitizeAIOutput(
+                  regionOutput,
+                  conflictedContent
+                );
+                const resolvedRegions = parseResolvedRegions(
+                  regionOutput,
+                  regionCount
+                );
+                finalContent = reconstructFile(
+                  rawContent,
+                  truncated!.conflictRegions,
+                  resolvedRegions
+                );
+              }
+            } catch {
+              // Region parsing failed — fallback to full-file resolution
+              finalContent = await aiAgent.resolveMergeConflicts(
+                filePath,
+                diffContext,
+                rawContent
+              );
+              if (finalContent) {
+                finalContent = sanitizeAIOutput(finalContent, rawContent);
+              }
+            }
+          }
+
+          if (!finalContent) {
+            failures.push(`AI returned empty resolution for ${filePath}`);
+            return;
+          }
+
+          if (hasConflictMarkers(finalContent)) {
+            failures.push(
+              `AI output for ${filePath} still contains conflict markers`
+            );
+            return;
+          }
+
+          writeFileSync(filePath, finalContent);
+
+          if (!git.add(filePath)) {
+            failures.push(`Error adding ${filePath} to the git commit`);
+            return;
+          }
+
+          resolvedCount++;
+          if (spinner) {
+            spinner.text = `Resolved ${resolvedCount}/${conflictedFiles.length} file(s)...`;
+          }
+        } catch (error) {
+          failures.push(`Error resolving ${filePath}: ${error}`);
+        }
+      })();
+
+      const wrapped = task.then(() => {
+        executing.splice(executing.indexOf(wrapped), 1);
+      });
+      executing.push(wrapped);
+
+      if (executing.length >= concurrency) {
+        await Promise.race(executing);
       }
     }
 
+    await Promise.all(executing);
+
+    if (failures.length > 0) {
+      const reason = failures.join('; ');
+      spinner?.error(`Failed to resolve ${failures.length} file(s)`);
+      return { success: false, failureReason: reason };
+    }
+
     spinner?.success('All conflicts resolved by AI');
-    return true;
+    return { success: true };
   } catch (error) {
-    spinner?.error('Failed to resolve merge conflicts');
-    return false;
+    const reason = `Failed to resolve merge conflicts: ${error}`;
+    spinner?.error(reason);
+    return { success: false, failureReason: reason };
   }
 };
 
 interface MergeOptions {
+  agent?: string;
+  concurrency?: string;
+  contextLines?: string;
+  sendFullFile?: boolean;
   force?: boolean;
   json?: boolean;
 }
@@ -236,7 +360,7 @@ const mergeCommand = async (taskId: string, options: MergeOptions = {}) => {
   const git = new Git({ cwd: project.path });
 
   if (!git.isGitRepo()) {
-    jsonOutput.error = 'No worktree found for this task';
+    jsonOutput.error = 'Not a git repository';
     await exitWithError(jsonOutput, { telemetry });
     return;
   }
@@ -250,39 +374,50 @@ const mergeCommand = async (taskId: string, options: MergeOptions = {}) => {
 
   jsonOutput.taskId = numericTaskId;
 
-  // Load AI agent selection from user settings
+  // Load AI agent selection
   let selectedAiAgent = 'claude'; // default
+  let selectedModel: string | undefined;
   let projectConfig;
 
   // Load config
   projectConfig = ProjectConfigManager.load(project.path);
 
-  // Load user preferences
-  try {
-    if (UserSettingsManager.exists(project.path)) {
-      const userSettings = UserSettingsManager.load(project.path);
-      selectedAiAgent = userSettings.defaultAiAgent || AI_AGENT.Claude;
-    } else {
+  if (options.agent) {
+    // Use agent from -a flag
+    const parsed = parseAgentString(options.agent);
+    selectedAiAgent = parsed.agent;
+    selectedModel = parsed.model;
+  } else {
+    // Load user preferences
+    try {
+      if (UserSettingsManager.exists(project.path)) {
+        const userSettings = UserSettingsManager.load(project.path);
+        selectedAiAgent = userSettings.defaultAiAgent || AI_AGENT.Claude;
+      } else {
+        if (!isJsonMode()) {
+          console.log(
+            colors.yellow('⚠ User settings not found, defaulting to Claude')
+          );
+          console.log(
+            colors.gray('  Run `rover init` to configure AI agent preferences')
+          );
+        }
+      }
+    } catch (error) {
       if (!isJsonMode()) {
         console.log(
-          colors.yellow('⚠ User settings not found, defaulting to Claude')
-        );
-        console.log(
-          colors.gray('  Run `rover init` to configure AI agent preferences')
+          colors.yellow('⚠ Could not load user settings, defaulting to Claude')
         );
       }
+      selectedAiAgent = AI_AGENT.Claude;
     }
-  } catch (error) {
-    if (!isJsonMode()) {
-      console.log(
-        colors.yellow('⚠ Could not load user settings, defaulting to Claude')
-      );
-    }
-    selectedAiAgent = AI_AGENT.Claude;
+
+    // Load default model from user settings if no -a flag
+    selectedModel = getUserDefaultModel(selectedAiAgent as AI_AGENT);
   }
 
   // Create AI agent instance
-  const aiAgent = getAIAgentTool(selectedAiAgent);
+  const aiAgent = getAIAgentTool(selectedAiAgent, selectedModel);
 
   try {
     // Load task using ProjectManager
@@ -353,17 +488,16 @@ const mergeCommand = async (taskId: string, options: MergeOptions = {}) => {
       return;
     }
 
-    // Check if worktree has changes to commit or if there are unmerged commits
-    const hasWorktreeChanges = git.hasUncommittedChanges({
+    // Check for uncommitted changes and unmerged commits before collapsing
+    const hasUncommittedChanges = git.hasUncommittedChanges({
       worktreePath: task.worktreePath,
     });
     const taskBranch = task.branchName;
     const hasUnmerged = git.hasUnmergedCommits(taskBranch);
 
-    jsonOutput.hasWorktreeChanges = hasWorktreeChanges;
-    jsonOutput.hasUnmergedCommits = hasUnmerged;
-
-    if (!hasWorktreeChanges && !hasUnmerged) {
+    if (!hasUncommittedChanges && !hasUnmerged) {
+      jsonOutput.hasWorktreeChanges = false;
+      jsonOutput.hasUnmergedCommits = false;
       jsonOutput.success = true;
       await exitWithSuccess('No changes to merge', jsonOutput, {
         tips: [
@@ -378,7 +512,7 @@ const mergeCommand = async (taskId: string, options: MergeOptions = {}) => {
       // Show what will happen
       console.log('');
       const mergeSteps = [];
-      if (hasWorktreeChanges) {
+      if (hasUncommittedChanges) {
         mergeSteps.push(colors.cyan('Commit changes in the task worktree'));
       }
       mergeSteps.push(
@@ -418,6 +552,17 @@ const mergeCommand = async (taskId: string, options: MergeOptions = {}) => {
       console.log(''); // breakline
     }
 
+    // Collapse task commits AFTER user confirmation (this is destructive)
+    const squashed = collapseTaskCommits(
+      git,
+      task.baseCommit,
+      task.worktreePath
+    );
+
+    const hasWorktreeChanges = squashed || hasUncommittedChanges;
+    jsonOutput.hasWorktreeChanges = hasWorktreeChanges;
+    jsonOutput.hasUnmergedCommits = hasUnmerged;
+
     const spinner = !options.json
       ? yoctoSpinner({ text: 'Preparing merge...' }).start()
       : null;
@@ -425,7 +570,9 @@ const mergeCommand = async (taskId: string, options: MergeOptions = {}) => {
     try {
       // Get recent commit messages for AI context
       if (spinner) spinner.text = 'Gathering commit context...';
-      const recentCommits = git.getRecentCommits();
+      const recentCommits = git.getRecentCommits({
+        branch: git.getCurrentBranch(),
+      });
 
       let finalCommitMessage = '';
 
@@ -483,9 +630,9 @@ const mergeCommand = async (taskId: string, options: MergeOptions = {}) => {
 
       telemetry?.eventMergeTask();
 
-      const merge = git.mergeBranch(taskBranch, `merge: ${task.title}`);
+      const mergeResult = git.mergeBranch(taskBranch, `merge: ${task.title}`);
 
-      if (merge) {
+      if (mergeResult.success) {
         // Update status
         mergeSuccessful = true;
         jsonOutput.merged = true;
@@ -516,14 +663,19 @@ const mergeCommand = async (taskId: string, options: MergeOptions = {}) => {
             ]);
           }
 
-          const resolutionSuccessful = await resolveMergeConflicts(
+          const concurrency = parseInt(options.concurrency || '4', 10);
+          const contextLinesNum = parseInt(options.contextLines || '50', 10);
+          const resolution = await resolveMergeConflicts(
             git,
             mergeConflicts,
             aiAgent,
-            options.json === true
+            options.json === true,
+            concurrency,
+            contextLinesNum,
+            options.sendFullFile === true
           );
 
-          if (resolutionSuccessful) {
+          if (resolution.success) {
             jsonOutput.conflictsResolved = true;
 
             if (!isJsonMode()) {
@@ -583,7 +735,9 @@ const mergeCommand = async (taskId: string, options: MergeOptions = {}) => {
               return;
             }
           } else {
-            jsonOutput.error = 'AI failed to resolve merge conflicts';
+            jsonOutput.error =
+              resolution.failureReason ||
+              'AI failed to resolve merge conflicts';
             if (!isJsonMode()) {
               console.log(colors.yellow('\n⚠ Merge aborted due to conflicts.'));
               showList(
@@ -605,6 +759,10 @@ const mergeCommand = async (taskId: string, options: MergeOptions = {}) => {
         } else {
           // Other merge error, not conflicts
           if (spinner) spinner.error('Merge failed');
+          git.abortMerge();
+          jsonOutput.error = mergeResult.error || 'Merge failed';
+          await exitWithError(jsonOutput, { telemetry });
+          return;
         }
       }
 

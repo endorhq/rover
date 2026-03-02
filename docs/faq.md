@@ -33,6 +33,20 @@ rm -rf /workspace/*
 
 ---
 
+## Telemetry
+
+### Are telemetry event names and fields stable?
+
+Rover keeps telemetry event IDs stable (for example `resume_task`) and
+includes a `schemaVersion` field in each event payload.
+
+This allows downstream dashboards and pipelines to:
+- treat event ID + `schemaVersion` as the contract key
+- detect payload-shape upgrades safely
+- avoid silent drift when new metadata fields are added
+
+---
+
 ## Task Lifecycle
 
 ### What happens if a task fails or crashes mid-execution?
@@ -63,6 +77,29 @@ Common failure causes:
 - Container ran out of memory
 - Network issues during package installation
 - Agent encountered an unrecoverable error
+
+### How do paused tasks and checkpoints work?
+
+When Rover hits a **retryable** failure (for example, temporary provider limits),
+the task is marked as **PAUSED** and Rover writes a checkpoint at:
+
+```bash
+.rover/tasks/<task-id>/iterations/<iteration>/checkpoint.json
+```
+
+The checkpoint stores the completed-step state so `rover resume <task-id>` can
+continue from the last safe boundary instead of replaying the full iteration.
+
+**Expected behavior:**
+- `rover resume <task-id>` uses the latest iteration checkpoint when present
+- Completed steps are skipped on resume
+- Successful completion clears the checkpoint for that iteration
+
+**Interruption edge case (terminal closed, host reboot, Docker restart):**
+- Running containers stop
+- The task may appear as `FAILED` or remain resumable depending on when it was interrupted
+- `rover resume <task-id>` attempts to recover using checkpoint data when available
+- If no checkpoint exists, resume may re-run part of the iteration
 
 ### How do I stop a running task?
 

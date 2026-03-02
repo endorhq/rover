@@ -5,6 +5,8 @@ export { VERBOSE, setVerbose } from './verbose.js';
 
 export { generateRandomId } from './random-id.js';
 
+export { evaluateCondition } from './condition.js';
+
 export { findProjectRoot, clearProjectRootCache } from './project-root.js';
 
 export {
@@ -131,6 +133,7 @@ export {
   registerBuiltInProviders,
   LocalFileProvider,
   GitHubProvider,
+  GitLabProvider,
   HTTPSProvider,
   // Manager
   ContextManager,

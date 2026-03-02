@@ -19,6 +19,7 @@ import type {
   Workflow,
   WorkflowAgentStep,
   WorkflowCommandStep,
+  WorkflowLoopStep,
   WorkflowStep,
   WorkflowInput,
   WorkflowOutput,
@@ -1088,6 +1089,137 @@ steps: []
     });
   });
 
+  describe('injectStep()', () => {
+    function createWorkflowWithLoop(): WorkflowManager {
+      const loopStep: WorkflowLoopStep = {
+        id: 'test_loop',
+        name: 'Test Loop',
+        type: 'loop',
+        until: 'steps.run_tests.outputs.exit_code == 0',
+        maxIterations: 3,
+        steps: [
+          {
+            id: 'run_tests',
+            name: 'Run Tests',
+            type: 'command',
+            command: 'npm test',
+          } as WorkflowCommandStep,
+          {
+            id: 'fix_agent',
+            name: 'Fix',
+            type: 'agent',
+            prompt: 'Fix it',
+            outputs: [],
+          } as WorkflowAgentStep,
+        ],
+      };
+
+      const steps: WorkflowStep[] = [
+        {
+          id: 'setup',
+          type: 'agent',
+          name: 'Setup',
+          prompt: 'Setup',
+          outputs: [],
+        } as WorkflowAgentStep,
+        loopStep,
+      ];
+
+      return WorkflowManager.create(
+        workflowPath,
+        'inject-test',
+        'Inject test workflow',
+        [],
+        [],
+        steps
+      );
+    }
+
+    it('injects before a nested sub-step', () => {
+      const workflow = createWorkflowWithLoop();
+
+      const newStep: WorkflowCommandStep = {
+        id: 'lint',
+        name: 'Lint',
+        type: 'command',
+        command: 'npm run lint',
+      };
+
+      workflow.injectStep(newStep, 'before', 'run_tests');
+
+      const loop = workflow.steps[1] as WorkflowLoopStep;
+      expect(loop.steps[0].id).toBe('lint');
+      expect(loop.steps[1].id).toBe('run_tests');
+      expect(loop.steps[2].id).toBe('fix_agent');
+    });
+
+    it('injects after a nested sub-step', () => {
+      const workflow = createWorkflowWithLoop();
+
+      const newStep: WorkflowCommandStep = {
+        id: 'report',
+        name: 'Report',
+        type: 'command',
+        command: 'echo done',
+      };
+
+      workflow.injectStep(newStep, 'after', 'run_tests');
+
+      const loop = workflow.steps[1] as WorkflowLoopStep;
+      expect(loop.steps[0].id).toBe('run_tests');
+      expect(loop.steps[1].id).toBe('report');
+      expect(loop.steps[2].id).toBe('fix_agent');
+    });
+
+    it('still works for top-level reference steps', () => {
+      const workflow = createWorkflowWithLoop();
+
+      const newStep: WorkflowAgentStep = {
+        id: 'teardown',
+        name: 'Teardown',
+        type: 'agent',
+        prompt: 'Teardown',
+        outputs: [],
+      };
+
+      workflow.injectStep(newStep, 'after', 'setup');
+
+      expect(workflow.steps[0].id).toBe('setup');
+      expect(workflow.steps[1].id).toBe('teardown');
+      expect(workflow.steps[2].id).toBe('test_loop');
+    });
+
+    it('throws for non-existent reference step', () => {
+      const workflow = createWorkflowWithLoop();
+
+      const newStep: WorkflowCommandStep = {
+        id: 'new',
+        name: 'New',
+        type: 'command',
+        command: 'echo hi',
+      };
+
+      expect(() =>
+        workflow.injectStep(newStep, 'after', 'nonexistent')
+      ).toThrow('Reference step "nonexistent" not found');
+    });
+
+    it('throws for duplicate step ID', () => {
+      const workflow = createWorkflowWithLoop();
+
+      const newStep: WorkflowCommandStep = {
+        id: 'run_tests',
+        name: 'Duplicate',
+        type: 'command',
+        command: 'echo dup',
+      };
+
+      expect(() => workflow.injectStep(newStep, 'before', 'setup')).toThrow(
+        'Cannot inject step: a step with ID "run_tests" already exists'
+      );
+    });
+  });
+
   describe('edge cases', () => {
     it('should accept empty strings in string fields', () => {
       // Zod z.string() accepts empty strings by default
@@ -1623,6 +1755,7 @@ steps:
           totalSteps: number;
           runSteps: number;
           totalDuration: number;
+          stepsOutput: Map<string, Map<string, string>>;
         };
       }> = [];
 

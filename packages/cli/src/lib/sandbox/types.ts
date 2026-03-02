@@ -19,6 +19,8 @@ export interface SandboxOptions {
   sandboxMetadata?: Record<string, unknown>;
   /** Path to mount as /logs inside the container for this iteration */
   iterationLogsPath?: string;
+  /** Path to checkpoint.json for resuming a paused workflow */
+  checkpointPath?: string;
 }
 
 export abstract class SandboxPackage {
@@ -47,7 +49,7 @@ export abstract class Sandbox {
 
   abstract isBackendAvailable(): Promise<boolean>;
   abstract openShellAtWorktree(): Promise<void>;
-  abstract inspect(): Promise<{ status: string } | null>;
+  abstract inspect(): Promise<{ status: string; exitCode?: number } | null>;
 
   protected abstract create(): Promise<string>;
   protected abstract start(): Promise<string>;

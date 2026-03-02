@@ -68,6 +68,79 @@ const logStdout = log('stdout');
 const logStderr = log('stderr');
 
 /**
+ * Detect execa sync results that report EPERM but actually succeeded.
+ *
+ * On some platforms (notably Windows/Git-Bash and certain Linux filesystem
+ * configurations), execa marks a synchronous spawn as `failed: true` with
+ * `code: 'EPERM'` even though the child process exited successfully
+ * (`exitCode: 0`).  This happens because the OS returns a transient
+ * permission error during process cleanup (e.g. unlinking temp files)
+ * after the child has already exited normally.
+ *
+ * Without this normalisation the caller would treat a successful command
+ * as a failure, breaking Git operations and other tooling that relies on
+ * `launchSync`.
+ */
+const isBenignSyncSpawnError = (error: unknown): boolean => {
+  if (!error || typeof error !== 'object') return false;
+
+  const execaError = error as {
+    code?: unknown;
+    exitCode?: unknown;
+    failed?: unknown;
+  };
+
+  return (
+    execaError.code === 'EPERM' &&
+    execaError.exitCode === 0 &&
+    execaError.failed === true
+  );
+};
+
+const normalizeSyncResult = <T extends ReturnType<typeof execaSync>>(
+  result: T
+): T => {
+  if (!isBenignSyncSpawnError(result)) {
+    return result;
+  }
+
+  if (VERBOSE) {
+    const r = result as {
+      message?: string;
+      shortMessage?: string;
+      originalMessage?: string;
+    };
+    console.error(
+      colors.gray(
+        `Normalizing benign EPERM sync spawn error (exitCode=0): ${r.originalMessage || r.shortMessage || r.message || '(no message)'}`
+      )
+    );
+  }
+
+  return {
+    ...result,
+    failed: false,
+    code: undefined,
+    shortMessage: '',
+    originalMessage: '',
+    message: '',
+  } as T;
+};
+
+const runExecaSync = (
+  command: () => ReturnType<typeof execaSync>
+): ReturnType<typeof execaSync> => {
+  try {
+    return normalizeSyncResult(command());
+  } catch (error) {
+    if (isBenignSyncSpawnError(error)) {
+      return normalizeSyncResult(error as ReturnType<typeof execaSync>);
+    }
+    throw error;
+  }
+};
+
+/**
  * Expand the stdio option into individual stdin, stdout, stderr options.
  * This prevents conflicts with execa when setting both stdio and individual streams.
  *
@@ -347,12 +420,12 @@ export function launchSync(
     }
 
     // Use template string as array format quotes arguments even when using shell
-    return execaSync(newOpts)`${parsedCommand}`;
+    return runExecaSync(() => execaSync(newOpts)`${parsedCommand}`);
   }
 
   if (expandedOptions) {
-    return execaSync(expandedOptions)`${parsedCommand}`;
+    return runExecaSync(() => execaSync(expandedOptions)`${parsedCommand}`);
   } else {
-    return execaSync`${parsedCommand}`;
+    return runExecaSync(() => execaSync`${parsedCommand}`);
   }
 }

@@ -484,6 +484,62 @@ describe('diff command', () => {
       expect(output).toContain('+Task branch content');
     });
 
+    it('should show untracked files when using --base flag', async () => {
+      const { task, worktreePath } = createTestTask(30, 'Base Untracked Task');
+
+      // Get the current HEAD commit to use as base
+      const headResult = launchSync('git', ['rev-parse', 'HEAD'], {
+        cwd: worktreePath,
+      });
+      const baseCommit = headResult.stdout.toString().trim();
+      task.setBaseCommit(baseCommit);
+
+      // Create only untracked files (no modifications to tracked files)
+      writeFileSync(
+        join(worktreePath, 'new-feature.ts'),
+        'export function hello() { return "world"; }\n'
+      );
+      writeFileSync(
+        join(worktreePath, 'new-test.ts'),
+        'import { hello } from "./new-feature";\n'
+      );
+
+      await diffCommand('30', undefined, { base: true });
+
+      const logCalls = consoleSpy.log.mock.calls.map(call => call.join(' '));
+      const output = logCalls.join('\n');
+
+      // Should show untracked files even with --base
+      expect(output).toContain('new-feature.ts');
+      expect(output).toContain('+export function hello()');
+      expect(output).toContain('new-test.ts');
+      // Should NOT show "No changes found"
+      expect(output).not.toContain('No changes found in workspace');
+    });
+
+    it('should show untracked files in --only-files with --base flag', async () => {
+      const { task, worktreePath } = createTestTask(31, 'Base Only Files Task');
+
+      const headResult = launchSync('git', ['rev-parse', 'HEAD'], {
+        cwd: worktreePath,
+      });
+      task.setBaseCommit(headResult.stdout.toString().trim());
+
+      // Create only untracked files
+      writeFileSync(
+        join(worktreePath, 'handler_test.go'),
+        'package test\nfunc TestHandler() {}\n'
+      );
+
+      await diffCommand('31', undefined, { onlyFiles: true, base: true });
+
+      const logCalls = consoleSpy.log.mock.calls.map(call => call.join(' '));
+      const output = logCalls.join('\n');
+
+      expect(output).toContain('handler_test.go');
+      expect(output).not.toContain('No changes found in workspace');
+    });
+
     it('should handle invalid branch name', async () => {
       createTestTask(14, 'Invalid Branch Task');
 
