@@ -136,7 +136,9 @@ async function askAIForDecision(
       reasoning: step.reasoning ?? 'unknown error',
     };
 
-    const mapping = store.getTaskMapping(step.actionId);
+    const mapping = step.originAction
+      ? store.getTaskMapping(step.originAction)
+      : undefined;
     if (mapping && project) {
       const task = project.getTask(mapping.taskId);
       if (task) {
@@ -237,7 +239,8 @@ function gatherReviewOutput(
   for (const step of trace.steps) {
     if (step.status !== 'completed') continue;
 
-    const mapping = store.getTaskMapping(step.actionId);
+    if (!step.originAction) continue;
+    const mapping = store.getTaskMapping(step.originAction);
     if (!mapping) continue;
 
     const task = project.getTask(mapping.taskId);
@@ -287,6 +290,7 @@ function executeDecision(
       const resolveSpan = new SpanWriter(projectId, {
         step: 'resolve',
         parentId: pending.spanId,
+        originAction: pending.actionId,
         meta: { decision: 'wait', reason },
       });
       resolveSpan.complete(`resolve: wait: ${trace.summary}`);
@@ -305,6 +309,7 @@ function executeDecision(
       const resolveSpan = new SpanWriter(projectId, {
         step: 'resolve',
         parentId: pending.spanId,
+        originAction: pending.actionId,
         meta: { decision: 'push', reason },
       });
       resolveSpan.complete(`resolve: trace ready to push: ${trace.summary}`);
@@ -348,6 +353,7 @@ function executeDecision(
       const resolveSpan = new SpanWriter(projectId, {
         step: 'resolve',
         parentId: pending.spanId,
+        originAction: pending.actionId,
         meta: { decision: 'notify', reason },
       });
       resolveSpan.complete(
@@ -366,8 +372,8 @@ function executeDecision(
           s.action !== 'notify'
       );
       const lastWorkflowStep = workflowSteps[workflowSteps.length - 1];
-      const taskMapping = lastWorkflowStep
-        ? store.getTaskMapping(lastWorkflowStep.actionId)
+      const taskMapping = lastWorkflowStep?.originAction
+        ? store.getTaskMapping(lastWorkflowStep.originAction)
         : undefined;
 
       const notifyMeta: Record<string, any> = {
@@ -414,6 +420,7 @@ function executeDecision(
         const resolveSpan = new SpanWriter(projectId, {
           step: 'resolve',
           parentId: pending.spanId,
+          originAction: pending.actionId,
           meta: { decision: 'iterate', reason, error: 'no project manager' },
         });
         resolveSpan.fail(
@@ -440,9 +447,9 @@ function executeDecision(
       );
 
       const failedActionId =
-        failedWorkflowStep?.actionId ??
+        failedWorkflowStep?.originAction ??
         trace.steps.find(s => s.status === 'failed' && s.action === 'commit')
-          ?.actionId;
+          ?.originAction;
 
       const mapping = failedActionId
         ? store.getTaskMapping(failedActionId)
@@ -452,6 +459,7 @@ function executeDecision(
         const resolveSpan = new SpanWriter(projectId, {
           step: 'resolve',
           parentId: pending.spanId,
+          originAction: pending.actionId,
           meta: { decision: 'iterate', reason, error: 'no task mapping' },
         });
         resolveSpan.fail(
@@ -474,6 +482,7 @@ function executeDecision(
         const resolveSpan = new SpanWriter(projectId, {
           step: 'resolve',
           parentId: pending.spanId,
+          originAction: pending.actionId,
           meta: {
             decision: 'iterate',
             reason,
@@ -530,6 +539,7 @@ function executeDecision(
       const resolveSpan = new SpanWriter(projectId, {
         step: 'resolve',
         parentId: pending.spanId,
+        originAction: pending.actionId,
         meta: {
           decision: 'iterate',
           reason,
@@ -589,15 +599,16 @@ function executeDecision(
       const resolveSpan = new SpanWriter(projectId, {
         step: 'resolve',
         parentId: pending.spanId,
+        originAction: pending.actionId,
         meta: { decision: 'fail', reason },
       });
       resolveSpan.fail(`resolve: trace failed: ${trace.summary}`);
 
       // Mark all pending steps as failed via traceMutations
       const stepUpdates = trace.steps
-        .filter(s => s.status === 'pending')
+        .filter(s => s.status === 'pending' && s.originAction != null)
         .map(s => ({
-          actionId: s.actionId,
+          originAction: s.originAction!,
           status: 'failed' as const,
           reasoning: `trace failed: ${reason}`,
         }));

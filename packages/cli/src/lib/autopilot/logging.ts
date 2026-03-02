@@ -41,6 +41,7 @@ export class SpanWriter {
     opts: {
       step: string;
       parentId: string | null;
+      originAction?: string | null;
       meta?: Record<string, any>;
     }
   ) {
@@ -59,6 +60,8 @@ export class SpanWriter {
       completed: null,
       summary: null,
       meta: opts.meta ?? {},
+      originAction: opts.originAction ?? null,
+      newActions: [],
     };
 
     this.write();
@@ -149,6 +152,37 @@ export function finalizeSpan(
   writeFileSync(filePath, JSON.stringify(data, null, 2));
 }
 
+// ── linkNewAction ──────────────────────────────────────────────────────────
+
+/**
+ * Append an action ID to a span's `newActions` array on disk.
+ * No-op if the span file is missing. Idempotent (skips duplicates).
+ */
+export function linkNewAction(
+  projectId: string,
+  spanId: string,
+  actionId: string
+): void {
+  const spansDir = join(getDataDir(), 'projects', projectId, 'spans');
+  const filePath = join(spansDir, `${spanId}.json`);
+
+  let data: Span;
+  try {
+    data = JSON.parse(readFileSync(filePath, 'utf8'));
+  } catch {
+    return; // Span file not found or unreadable — skip
+  }
+
+  if (!data.newActions) {
+    data.newActions = [];
+  }
+
+  if (data.newActions.includes(actionId)) return; // Already linked
+
+  data.newActions.push(actionId);
+  writeFileSync(filePath, JSON.stringify(data, null, 2));
+}
+
 // ── ActionWriter ────────────────────────────────────────────────────────────
 
 /**
@@ -205,6 +239,9 @@ export class ActionWriter {
       join(actionsDir, `${this.id}.json`),
       JSON.stringify(this.data, null, 2)
     );
+
+    // Register this action on its parent span
+    linkNewAction(projectId, opts.spanId, this.id);
   }
 }
 

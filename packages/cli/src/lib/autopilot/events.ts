@@ -216,6 +216,7 @@ export function writeSpanAndAction(
   const span = new SpanWriter(projectId, {
     step: 'event',
     parentId: null,
+    originAction: null,
     meta: event.meta,
   });
   span.complete(event.summary);
@@ -233,6 +234,7 @@ export function writeSpanAndAction(
     action,
     step: 'event',
     summary: event.summary,
+    meta: { ...event.meta, eventSpanId: span.id },
   });
 
   return { spanId: span.id, actionId: action.id, traceId };

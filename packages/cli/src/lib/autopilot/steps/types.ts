@@ -64,7 +64,7 @@ export interface StepResult {
   /** Direct trace mutations (e.g. resolver marking pending steps failed). */
   traceMutations?: {
     stepUpdates?: Array<{
-      actionId: string;
+      originAction: string;
       status: ActionStepStatus;
       reasoning?: string;
     }>;
@@ -77,7 +77,7 @@ export interface TraceMutations {
   updates: Array<{
     traceId: string;
     stepUpdates: Array<{
-      actionId: string;
+      originAction: string;
       status: ActionStepStatus;
       reasoning?: string;
     }>;

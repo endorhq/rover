@@ -108,6 +108,7 @@ export const plannerStep: Step = {
     const span = new SpanWriter(projectId, {
       step: 'plan',
       parentId: pending.spanId,
+      originAction: pending.actionId,
     });
 
     // Reconstruct span trace

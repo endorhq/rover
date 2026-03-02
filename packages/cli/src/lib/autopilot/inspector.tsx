@@ -539,7 +539,9 @@ const TracesListView = React.memo(function TracesListView({
         </Box>
         <Box width="30%" justifyContent="flex-end">
           <Text dimColor>
-            {'Filter: '}<Text color="yellow">{filter}</Text>{' (f)'}
+            {'Filter: '}
+            <Text color="yellow">{filter}</Text>
+            {' (f)'}
           </Text>
         </Box>
       </Box>
@@ -563,11 +565,14 @@ const TracesListView = React.memo(function TracesListView({
           const realIndex = startIndex + i;
           const isSelected = realIndex === selectedIndex;
           const age = timeAgo(trace.createdAt);
-          const completedSteps = trace.steps.filter(s => s.status === 'completed').length;
+          const completedSteps = trace.steps.filter(
+            s => s.status === 'completed'
+          ).length;
           const totalSteps = trace.steps.length;
-          const currentStep = trace.steps.find(s => s.status === 'running')
-            ?? trace.steps.findLast(s => s.status === 'completed')
-            ?? trace.steps[trace.steps.length - 1];
+          const currentStep =
+            trace.steps.find(s => s.status === 'running') ??
+            trace.steps.findLast(s => s.status === 'completed') ??
+            trace.steps[trace.steps.length - 1];
           const stepLabel = currentStep?.action ?? '—';
           const retries = trace.retryCount ?? 0;
           return (
@@ -577,7 +582,7 @@ const TracesListView = React.memo(function TracesListView({
               </Text>
               <Box>
                 {trace.steps.map((step, si) => (
-                  <Text key={`${step.actionId}-${si}`}>
+                  <Text key={`${step.originAction ?? step.spanId ?? si}-${si}`}>
                     <Text color={STEP_COLORS[step.status]}>
                       {step.terminal
                         ? STEP_TERMINAL[step.status]
@@ -599,12 +604,24 @@ const TracesListView = React.memo(function TracesListView({
                   {trace.summary}
                 </Text>
               </Box>
-              <Text color={isSelected ? 'white' : undefined} dimColor={!isSelected}>{` ${stepLabel.padStart(10)}`}</Text>
-              <Text color={isSelected ? 'white' : undefined} dimColor={!isSelected}>{` ${String(completedSteps)}/${String(totalSteps)}`}</Text>
+              <Text
+                color={isSelected ? 'white' : undefined}
+                dimColor={!isSelected}
+              >{` ${stepLabel.padStart(10)}`}</Text>
+              <Text
+                color={isSelected ? 'white' : undefined}
+                dimColor={!isSelected}
+              >{` ${String(completedSteps)}/${String(totalSteps)}`}</Text>
               {retries > 0 ? (
-                <Text color={isSelected ? 'yellow' : 'yellow'} dimColor={!isSelected}>{` \u21BB${retries}`}</Text>
+                <Text
+                  color={isSelected ? 'yellow' : 'yellow'}
+                  dimColor={!isSelected}
+                >{` \u21BB${retries}`}</Text>
               ) : null}
-              <Text color={isSelected ? 'white' : undefined} dimColor={!isSelected}>{` ${age.padStart(8)}`}</Text>
+              <Text
+                color={isSelected ? 'white' : undefined}
+                dimColor={!isSelected}
+              >{` ${age.padStart(8)}`}</Text>
             </Box>
           );
         })
@@ -622,18 +639,12 @@ interface DisplayStep {
 }
 
 function buildDisplaySteps(trace: ActionTrace): DisplayStep[] {
-  const display: DisplayStep[] = [
-    { label: 'event', status: 'completed', reasoning: trace.summary },
-  ];
-  for (const step of trace.steps) {
-    display.push({
-      label: step.action,
-      status: step.status,
-      reasoning: step.reasoning,
-      terminal: !!step.terminal,
-    });
-  }
-  return display;
+  return trace.steps.map(step => ({
+    label: step.action,
+    status: step.status,
+    reasoning: step.reasoning,
+    terminal: !!step.terminal,
+  }));
 }
 
 function loadStepData(
@@ -642,38 +653,41 @@ function loadStepData(
   store: AutopilotStore,
   cache: Map<string, Action | null>
 ): { span: Span | null; actionData: Action | null } {
-  if (di > 0) {
-    const traceStep = trace.steps[di - 1];
-
-    if (traceStep?.terminal && traceStep.spanId) {
-      const span = store.readSpan(traceStep.spanId);
-      return { span, actionData: null };
-    }
-
-    if (traceStep?.spanId) {
-      const span = store.readSpan(traceStep.spanId);
-      let actionData: Action | null = null;
-      if (di < trace.steps.length) {
-        const nextActionId = trace.steps[di].actionId;
-        if (!cache.has(nextActionId)) {
-          cache.set(nextActionId, store.readAction(nextActionId));
-        }
-        actionData = cache.get(nextActionId) ?? null;
-      }
-      return { span, actionData };
-    }
+  if (di < 0 || di >= trace.steps.length) {
+    return { span: null, actionData: null };
   }
 
-  if (di < trace.steps.length) {
-    const actionId = trace.steps[di].actionId;
-    if (!cache.has(actionId)) {
-      cache.set(actionId, store.readAction(actionId));
+  const traceStep = trace.steps[di];
+
+  if (traceStep?.terminal && traceStep.spanId) {
+    const span = store.readSpan(traceStep.spanId);
+    return { span, actionData: null };
+  }
+
+  if (traceStep?.spanId) {
+    const span = store.readSpan(traceStep.spanId);
+    let actionData: Action | null = null;
+    if (di + 1 < trace.steps.length) {
+      const nextOrigin = trace.steps[di + 1].originAction;
+      if (nextOrigin) {
+        if (!cache.has(nextOrigin)) {
+          cache.set(nextOrigin, store.readAction(nextOrigin));
+        }
+        actionData = cache.get(nextOrigin) ?? null;
+      }
     }
-    const actionData = cache.get(actionId) ?? null;
-    const span = actionData?.spanId ? store.readSpan(actionData.spanId) : null;
     return { span, actionData };
   }
-  return { span: null, actionData: null };
+
+  // No span yet — try loading the action itself
+  const origin = traceStep.originAction;
+  if (!origin) return { span: null, actionData: null };
+  if (!cache.has(origin)) {
+    cache.set(origin, store.readAction(origin));
+  }
+  const actionData = cache.get(origin) ?? null;
+  const span = actionData?.spanId ? store.readSpan(actionData.spanId) : null;
+  return { span, actionData };
 }
 
 function StepDetailView({
@@ -707,20 +721,29 @@ function StepDetailView({
   };
 
   // ── Header: title + duration/completion on the right ──
-  const duration = formatDuration(span?.timestamp, span?.completed ?? undefined);
+  const duration = formatDuration(
+    span?.timestamp,
+    span?.completed ?? undefined
+  );
   const completedAt = span?.completed
     ? new Date(span.completed).toLocaleString()
     : '';
-  const timeInfo = completedAt ? `${duration} \u00B7 ${completedAt} ` : `${duration} `;
+  const timeInfo = completedAt
+    ? `${duration} \u00B7 ${completedAt} `
+    : `${duration} `;
   lines.push(
     <Box key="h1">
       <Box width="65%">
         <Text bold wrap="truncate">{` Step #${displayIndex + 1}: `}</Text>
-        <Text bold color={STEP_COLORS[stepStatus]}>{stepLabel}</Text>
+        <Text bold color={STEP_COLORS[stepStatus]}>
+          {stepLabel}
+        </Text>
         <Text dimColor>{` (${stepStatus})`}</Text>
       </Box>
       <Box width="35%" justifyContent="flex-end">
-        <Text dimColor wrap="truncate">{timeInfo}</Text>
+        <Text dimColor wrap="truncate">
+          {timeInfo}
+        </Text>
       </Box>
     </Box>
   );
@@ -747,11 +770,13 @@ function StepDetailView({
   // ── Reasoning ──
   if (actionData?.reasoning) {
     lines.push(
-      <Text key="reasoning-label" dimColor>{' Reasoning:'}</Text>
+      <Text key="reasoning-label" dimColor>
+        {' Reasoning:'}
+      </Text>
     );
     lines.push(
       <Text key="reasoning-content">
-        <Text>{' '}</Text>
+        <Text> </Text>
         <Text>{actionData.reasoning}</Text>
       </Text>
     );
@@ -760,9 +785,7 @@ function StepDetailView({
   // ── Span section ──
   lines.push(<Text key="spacer-span-1"> </Text>);
   lines.push(<Text key="spacer-span-2"> </Text>);
-  lines.push(
-    React.cloneElement(sectionLine('SPAN'), { key: 'span-header' })
-  );
+  lines.push(React.cloneElement(sectionLine('SPAN'), { key: 'span-header' }));
   if (span) {
     lines.push(
       <Text key="span-status">
@@ -811,7 +834,9 @@ function StepDetailView({
     if (span.meta && Object.keys(span.meta).length > 0) {
       lines.push(<Text key="span-meta-spacer"> </Text>);
       lines.push(
-        <Text key="span-meta-label" dimColor>{' Meta:'}</Text>
+        <Text key="span-meta-label" dimColor>
+          {' Meta:'}
+        </Text>
       );
       const metaStr = JSON.stringify(span.meta, null, 2);
       const metaLines = metaStr.split('\n');
@@ -860,7 +885,9 @@ function StepDetailView({
     if (actionData.meta && Object.keys(actionData.meta).length > 0) {
       lines.push(<Text key="action-meta-spacer"> </Text>);
       lines.push(
-        <Text key="action-meta-label" dimColor>{' Meta:'}</Text>
+        <Text key="action-meta-label" dimColor>
+          {' Meta:'}
+        </Text>
       );
       const metaStr = JSON.stringify(actionData.meta, null, 2);
       const metaLines = metaStr.split('\n');
@@ -940,7 +967,9 @@ function TracesDetailView({
 
   // Header: event source + time on the right (30%)
   const age = timeAgo(trace.createdAt);
-  const retryInfo = trace.retryCount ? ` \u00B7 ${trace.retryCount} retries` : '';
+  const retryInfo = trace.retryCount
+    ? ` \u00B7 ${trace.retryCount} retries`
+    : '';
   lines.push(
     <Box key="h1">
       <Box width="70%">
@@ -959,20 +988,20 @@ function TracesDetailView({
   );
   if (terminalStep?.reasoning) {
     lines.push(
-      <Text key="h3" dimColor>{' Summary:'}</Text>
+      <Text key="h3" dimColor>
+        {' Summary:'}
+      </Text>
     );
     lines.push(
       <Text key="h4">
-        <Text>{' '}</Text>
+        <Text> </Text>
         <Text>{terminalStep.reasoning}</Text>
       </Text>
     );
   }
 
   // Space + Steps header
-  lines.push(
-    <Text key="spacer"> </Text>
-  );
+  lines.push(<Text key="spacer"> </Text>);
   const stepsLineLen = Math.max(1, width - 9);
   lines.push(
     <Box key="steps-header">

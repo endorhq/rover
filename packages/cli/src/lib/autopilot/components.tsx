@@ -157,7 +157,7 @@ const ActionTraceRow = React.memo(function ActionTraceRow({
       <Text> </Text>
       <Box>
         {trace.steps.map((step, i) => (
-          <Text key={`${step.actionId}-${i}`}>
+          <Text key={`${step.originAction ?? step.spanId ?? i}-${i}`}>
             <Text color={STEP_COLORS[step.status]}>
               {step.terminal
                 ? STEP_TERMINAL[step.status]
@@ -211,7 +211,6 @@ export const TracesSection = React.memo(function TracesSection({
   );
 });
 
-
 // ── Star Field ──────────────────────────────────────────────────────────────
 
 const STAR_WIDTH = 20;
@@ -227,10 +226,10 @@ interface StarVariant {
 const STAR_VARIANTS: StarVariant[] = [
   { char: '\u00B7', color: undefined }, //  ·  dim white
   { char: '\u00B7', color: '#6b7280' }, //  ·  grey
-  { char: '.', color: '#4b5563' },      //  .  dark grey
-  { char: '+', color: '#7dd3fc' },      //  +  sky blue
-  { char: '*', color: undefined },      //  *  dim white
-  { char: '*', color: '#c4b5fd' },      //  *  violet
+  { char: '.', color: '#4b5563' }, //  .  dark grey
+  { char: '+', color: '#7dd3fc' }, //  +  sky blue
+  { char: '*', color: undefined }, //  *  dim white
+  { char: '*', color: '#c4b5fd' }, //  *  violet
   { char: '\u2022', color: '#fbbf24' }, //  •  amber
   { char: '\u2219', color: '#0d9488' }, //  ∙  teal
   { char: '\u2734', color: '#f9a8d4' }, //  ✴  pink
@@ -244,14 +243,16 @@ interface StarLayer {
 }
 
 const LAYERS: StarLayer[] = [
-  { density: 0.04, variants: [0, 1, 2, 3], interval: 2000 },    // far, slow
+  { density: 0.04, variants: [0, 1, 2, 3], interval: 2000 }, // far, slow
   { density: 0.02, variants: [4, 5, 6, 7, 8, 9], interval: 1200 }, // near, fast
 ];
 
 function randomColumn(rows: number, layer: StarLayer): StarCell[] {
   return Array.from({ length: rows }, () => {
     if (Math.random() >= layer.density) return 0;
-    return layer.variants[Math.floor(Math.random() * layer.variants.length)]! + 1;
+    return (
+      layer.variants[Math.floor(Math.random() * layer.variants.length)]! + 1
+    );
   });
 }
 
@@ -259,7 +260,11 @@ function buildGrid(rows: number, cols: number, layer: StarLayer): StarCell[][] {
   return Array.from({ length: cols }, () => randomColumn(rows, layer));
 }
 
-function shiftGrid(grid: StarCell[][], rows: number, layer: StarLayer): StarCell[][] {
+function shiftGrid(
+  grid: StarCell[][],
+  rows: number,
+  layer: StarLayer
+): StarCell[][] {
   return [...grid.slice(1), randomColumn(rows, layer)];
 }
 
@@ -268,9 +273,7 @@ export const StarField = React.memo(function StarField({
 }: {
   height: number;
 }) {
-  const gridsRef = useRef(
-    LAYERS.map(l => buildGrid(height, STAR_WIDTH, l))
-  );
+  const gridsRef = useRef(LAYERS.map(l => buildGrid(height, STAR_WIDTH, l)));
   const [grids, setGrids] = useState(() => gridsRef.current);
 
   useEffect(() => {

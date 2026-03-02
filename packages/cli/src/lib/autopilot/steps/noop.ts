@@ -35,6 +35,7 @@ export const noopStep: Step = {
     const span = new SpanWriter(projectId, {
       step: 'noop',
       parentId: pending.spanId,
+      originAction: pending.actionId,
       meta: { summary: chainSummary },
     });
 

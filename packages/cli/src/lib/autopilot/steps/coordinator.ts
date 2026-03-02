@@ -55,6 +55,7 @@ export const coordinatorStep: Step = {
     const span = new SpanWriter(projectId, {
       step: 'coordinate',
       parentId: pending.spanId,
+      originAction: pending.actionId,
       meta: pending.meta ?? {},
     });
 

@@ -26,7 +26,9 @@ import colors from 'ansi-colors';
 import pushCmd from './commands/push.js';
 import stopCmd from './commands/stop.js';
 import mcpCmd from './commands/mcp.js';
-import autopilotCmd from './commands/autopilot.js';
+import { addAutopilotCommands } from './commands/autopilot/index.js';
+import autopilotDashboardCmd from './commands/autopilot/dashboard.js';
+import autopilotInspectCmd from './commands/autopilot/inspect.js';
 import { addWorkflowCommands } from './commands/workflows/index.js';
 import workflowAddCmd from './commands/workflows/add.js';
 import workflowListCmd from './commands/workflows/list.js';
@@ -65,7 +67,8 @@ const commands: CommandDefinition[] = [
   workflowAddCmd,
   workflowListCmd,
   workflowInspectCmd,
-  autopilotCmd,
+  autopilotDashboardCmd,
+  autopilotInspectCmd,
 ];
 
 /**
@@ -491,19 +494,7 @@ export function createProgram(
 
   program.commandsGroup(colors.cyan('Autopilot:'));
 
-  program
-    .command('autopilot')
-    .description('Launch an interactive dashboard to monitor task progress')
-    .option('-r, --refresh <seconds>', 'Refresh interval in seconds', '3')
-    .option(
-      '--from <datetime>',
-      'Ignore GitHub events before this date or datetime (e.g. 2025-01-15 or 2025-01-15T09:30:00)'
-    )
-    .option(
-      '--bot <name>',
-      'GitHub bot account name used by the autopilot (used to identify self-generated events)'
-    )
-    .action(autopilotCmd.action);
+  addAutopilotCommands(program);
 
   program.commandsGroup(colors.cyan('Model Context Protocol:'));
 

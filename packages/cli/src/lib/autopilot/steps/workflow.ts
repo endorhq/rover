@@ -54,6 +54,7 @@ function enqueueCommitAction(
   const span = new SpanWriter(projectId, {
     step: 'commit',
     parentId: workflowSpanId,
+    originAction: pending.actionId,
     meta: commitMeta,
   });
   span.complete(`commit: ${pending.meta?.title}`);
@@ -295,6 +296,7 @@ export const workflowStep: Step = {
     const workflowSpan = new SpanWriter(projectId, {
       step: 'workflow',
       parentId: pending.spanId,
+      originAction: pending.actionId,
       meta: {
         roverTaskId: taskId,
         branchName,
@@ -345,7 +347,7 @@ export const workflowStep: Step = {
       const trace = traces.get(mapping.traceId);
       if (!trace) continue;
 
-      const step = trace.steps.find(s => s.actionId === actionId);
+      const step = trace.steps.find(s => s.originAction === actionId);
       if (!step || step.status !== 'running') continue;
 
       const task = project.getTask(mapping.taskId);
@@ -397,14 +399,14 @@ export const workflowStep: Step = {
           traceId: mapping.traceId,
           stepUpdates: [
             {
-              actionId,
+              originAction: actionId,
               status: 'completed',
               reasoning: `task #${mapping.taskId} on ${mapping.branchName}`,
             },
           ],
           newSteps: [
             {
-              actionId: commitActionId,
+              originAction: commitActionId,
               action: 'commit',
               status: 'pending',
               timestamp: new Date().toISOString(),
@@ -451,14 +453,14 @@ export const workflowStep: Step = {
           traceId: mapping.traceId,
           stepUpdates: [
             {
-              actionId,
+              originAction: actionId,
               status: 'failed',
               reasoning: errorMessage,
             },
           ],
           newSteps: [
             {
-              actionId: commitActionId,
+              originAction: commitActionId,
               action: 'commit',
               status: 'pending',
               timestamp: new Date().toISOString(),

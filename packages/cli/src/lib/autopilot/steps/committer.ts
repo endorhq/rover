@@ -127,6 +127,7 @@ export const committerStep: Step = {
       const commitSpan = new SpanWriter(projectId, {
         step: 'commit',
         parentId: pending.spanId,
+        originAction: pending.actionId,
         meta: {
           roverTaskId: taskId,
           branchName,
@@ -223,6 +224,7 @@ export const committerStep: Step = {
     const commitSpan = new SpanWriter(projectId, {
       step: 'commit',
       parentId: pending.spanId,
+      originAction: pending.actionId,
       meta: commitSpanMeta,
     });
 

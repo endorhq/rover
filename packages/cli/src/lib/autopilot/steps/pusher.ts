@@ -52,7 +52,7 @@ async function checkExistingPR(
 
 function collectBranchInfos(
   trace: PendingAction['meta'] extends infer M ? M : never,
-  traceSteps: { action: string; actionId: string }[],
+  traceSteps: { action: string; originAction: string | null }[],
   store: StepContext['store']
 ): BranchInfo[] {
   const seen = new Set<string>();
@@ -60,7 +60,8 @@ function collectBranchInfos(
 
   for (const step of traceSteps) {
     if (step.action !== 'workflow' && step.action !== 'commit') continue;
-    const mapping = store.getTaskMapping(step.actionId);
+    if (!step.originAction) continue;
+    const mapping = store.getTaskMapping(step.originAction);
     if (!mapping) continue;
     if (seen.has(mapping.branchName)) continue;
     seen.add(mapping.branchName);
@@ -181,6 +182,7 @@ export const pusherStep: Step = {
       const pushSpan = new SpanWriter(projectId, {
         step: 'push',
         parentId: pending.spanId,
+        originAction: pending.actionId,
         meta: { error: 'no branches found' },
       });
       pushSpan.fail('push: no branches found to push');
@@ -258,6 +260,7 @@ export const pusherStep: Step = {
     const pushSpan = new SpanWriter(projectId, {
       step: 'push',
       parentId: pending.spanId,
+      originAction: pending.actionId,
       meta: pushSpanMeta,
     });
 

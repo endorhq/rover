@@ -283,6 +283,7 @@ export const notifyStep: Step = {
       const span = new SpanWriter(projectId, {
         step: 'notify',
         parentId: pending.spanId,
+        originAction: pending.actionId,
         meta: {
           skipped: true,
           aiReasoning,
@@ -378,6 +379,7 @@ export const notifyStep: Step = {
     const span = new SpanWriter(projectId, {
       step: 'notify',
       parentId: pending.spanId,
+      originAction: pending.actionId,
       meta: spanMeta,
     });
 

@@ -297,18 +297,40 @@ export class StepOrchestrator {
 
     try {
       // Get or create trace
-      const trace = this.traces.get(action.traceId) ?? {
-        traceId: action.traceId,
-        summary: action.summary,
-        steps: [],
-        createdAt: action.createdAt,
-      };
+      let trace = this.traces.get(action.traceId);
+      if (!trace) {
+        trace = {
+          traceId: action.traceId,
+          summary: action.summary,
+          steps: [],
+          createdAt: action.createdAt,
+        };
+
+        // Prepend the event as a real step if the action carries eventSpanId
+        const eventSpanId = action.meta?.eventSpanId as string | undefined;
+        if (eventSpanId) {
+          const eventSpan = this.store.readSpan(eventSpanId);
+          if (eventSpan) {
+            trace.steps.push({
+              originAction: null,
+              action: 'event',
+              status: 'completed',
+              timestamp: eventSpan.timestamp,
+              reasoning: eventSpan.summary ?? action.summary,
+              spanId: eventSpanId,
+              newActions: eventSpan.newActions ?? [],
+            });
+          }
+        }
+      }
 
       // Idempotent: reuse existing step if present (e.g. after restart)
-      let runningStep = trace.steps.find(s => s.actionId === action.actionId);
+      let runningStep = trace.steps.find(
+        s => s.originAction === action.actionId
+      );
       if (!runningStep) {
         runningStep = {
-          actionId: action.actionId,
+          originAction: action.actionId,
           action: actionType,
           status: 'running',
           timestamp: new Date().toISOString(),
@@ -356,14 +378,17 @@ export class StepOrchestrator {
       if (result.terminal) {
         runningStep.terminal = true;
       }
+      if (result.enqueuedActions.length > 0) {
+        runningStep.newActions = result.enqueuedActions.map(e => e.actionId);
+      }
 
       // Add enqueued actions as pending steps in trace (skip duplicates)
       // NOTE: This runs BEFORE traceMutations so that steps can create an
       // action and immediately mark it completed (e.g. noop end-steps).
       for (const enqueued of result.enqueuedActions) {
-        if (!trace.steps.some(s => s.actionId === enqueued.actionId)) {
+        if (!trace.steps.some(s => s.originAction === enqueued.actionId)) {
           trace.steps.push({
-            actionId: enqueued.actionId,
+            originAction: enqueued.actionId,
             action: enqueued.actionType,
             status: 'pending',
             timestamp: new Date().toISOString(),
@@ -375,7 +400,9 @@ export class StepOrchestrator {
       // Apply trace mutations if present
       if (result.traceMutations?.stepUpdates) {
         for (const update of result.traceMutations.stepUpdates) {
-          const s = trace.steps.find(s => s.actionId === update.actionId);
+          const s = trace.steps.find(
+            s => s.originAction === update.originAction
+          );
           if (s) {
             s.status = update.status;
             if (update.reasoning) s.reasoning = update.reasoning;
@@ -395,7 +422,7 @@ export class StepOrchestrator {
       // Mark step as failed in trace
       const trace = this.traces.get(action.traceId);
       if (trace) {
-        const s = trace.steps.find(s => s.actionId === action.actionId);
+        const s = trace.steps.find(s => s.originAction === action.actionId);
         if (s) {
           s.status = 'failed';
           s.reasoning = err instanceof Error ? err.message : String(err);
@@ -423,7 +450,9 @@ export class StepOrchestrator {
       if (!trace) continue;
 
       for (const stepUpdate of update.stepUpdates) {
-        const step = trace.steps.find(s => s.actionId === stepUpdate.actionId);
+        const step = trace.steps.find(
+          s => s.originAction === stepUpdate.originAction
+        );
         if (step) {
           step.status = stepUpdate.status;
           if (stepUpdate.reasoning) step.reasoning = stepUpdate.reasoning;
@@ -432,7 +461,7 @@ export class StepOrchestrator {
       }
 
       for (const newStep of update.newSteps) {
-        if (!trace.steps.some(s => s.actionId === newStep.actionId)) {
+        if (!trace.steps.some(s => s.originAction === newStep.originAction)) {
           trace.steps.push(newStep);
           updated = true;
         }

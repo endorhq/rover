@@ -1,11 +1,11 @@
 import React from 'react';
 import { render } from 'ink';
 import colors from 'ansi-colors';
-import { requireProjectContext } from '../lib/context.js';
-import { exitWithError } from '../utils/exit.js';
-import { AutopilotApp } from '../lib/autopilot/app.js';
-import { ensureTraceDirs } from '../lib/autopilot/helpers.js';
-import type { CommandDefinition } from '../types.js';
+import { requireProjectContext } from '../../lib/context.js';
+import { exitWithError } from '../../utils/exit.js';
+import { AutopilotApp } from '../../lib/autopilot/app.js';
+import { ensureTraceDirs } from '../../lib/autopilot/helpers.js';
+import type { CommandDefinition } from '../../types.js';
 
 // Alternate screen buffer escape sequences
 const ENTER_ALT_SCREEN = '\x1b[?1049h';
