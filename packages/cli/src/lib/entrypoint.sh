@@ -126,6 +126,7 @@ echo "✅ Package manager MCP is ready"
 {taskDataSection}
 {installAllPackages}
 {agentInstallSection}
+{credentialInstallSection}
 {mcpConfigSection}
 {exportTaskVariables}
 {networkConfigSection}

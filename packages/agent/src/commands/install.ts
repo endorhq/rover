@@ -61,6 +61,9 @@ export const installCommand = async (
       // Install the agent
       await agent.install();
 
+      // Copy credentials to the user's home directory
+      await agent.copyCredentials(process.env.HOME || '/home/agent');
+
       console.log(colors.green('\n✓ Installation completed successfully'));
       output.success = true;
     }
