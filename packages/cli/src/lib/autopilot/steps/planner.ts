@@ -10,6 +10,11 @@ import type {
   StepContext,
   StepResult,
 } from './types.js';
+import {
+  loadCustomInstructions,
+  formatCustomInstructions,
+  formatMaintainers,
+} from './custom-instructions.js';
 import planPromptTemplate from './prompts/plan-prompt.md';
 
 function buildPlanUserMessage(
@@ -126,6 +131,10 @@ export const plannerStep: Step = {
     systemPrompt = systemPrompt.replaceAll(
       '{{MEMORY_COLLECTION}}',
       ctx.memoryStore?.collectionName || 'rover-memory'
+    );
+    systemPrompt += formatMaintainers(ctx.maintainers);
+    systemPrompt += formatCustomInstructions(
+      loadCustomInstructions(projectPath, 'plan')
     );
 
     // Invoke agent with system prompt and read-only tools

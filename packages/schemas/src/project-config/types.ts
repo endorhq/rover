@@ -13,6 +13,7 @@ import type {
   NetworkConfigSchema,
   SandboxConfigSchema,
   HooksConfigSchema,
+  AutopilotConfigSchema,
   ProjectConfigSchema,
 } from './schema.js';
 
@@ -26,4 +27,5 @@ export type NetworkRule = z.infer<typeof NetworkRuleSchema>;
 export type NetworkConfig = z.infer<typeof NetworkConfigSchema>;
 export type SandboxConfig = z.infer<typeof SandboxConfigSchema>;
 export type HooksConfig = z.infer<typeof HooksConfigSchema>;
+export type AutopilotConfig = z.infer<typeof AutopilotConfigSchema>;
 export type ProjectConfig = z.infer<typeof ProjectConfigSchema>;

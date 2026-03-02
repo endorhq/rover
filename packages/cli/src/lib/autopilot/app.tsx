@@ -40,11 +40,13 @@ export function AutopilotApp({
   refreshInterval,
   fromDate,
   botName,
+  maintainers,
 }: {
   project: ProjectManager;
   refreshInterval: number;
   fromDate?: Date;
   botName?: string;
+  maintainers?: string[];
 }) {
   const { exit } = useApp();
   const tasks = useTasks(project, refreshInterval);
@@ -64,7 +66,8 @@ export function AutopilotApp({
     project.path,
     project.id,
     store,
-    botName
+    botName,
+    maintainers
   );
 
   const { log: githubLog } = useGitHubEvents(

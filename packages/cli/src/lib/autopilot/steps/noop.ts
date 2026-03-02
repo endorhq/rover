@@ -28,7 +28,8 @@ export const noopStep: Step = {
     const { summary: chainSummary, saveToMemory } = await summarizeChain(
       spans,
       ctx.trace,
-      projectPath
+      projectPath,
+      ctx.maintainers
     );
 
     // Create and complete the noop span

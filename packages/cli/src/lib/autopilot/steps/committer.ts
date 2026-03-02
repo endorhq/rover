@@ -12,6 +12,10 @@ import type {
   StepContext,
   StepResult,
 } from './types.js';
+import {
+  loadCustomInstructions,
+  formatCustomInstructions,
+} from './custom-instructions.js';
 import commitPromptTemplate from './prompts/commit-prompt.md';
 
 function getTaskIterationSummaries(iterationsPath: string): string[] {
@@ -194,12 +198,17 @@ export const committerStep: Step = {
       attribution
     );
 
+    let systemPrompt: string = commitPromptTemplate;
+    systemPrompt += formatCustomInstructions(
+      loadCustomInstructions(projectPath, 'commit')
+    );
+
     const agent = getUserAIAgent();
     const agentTool = getAIAgentTool(agent);
     const response = await agentTool.invoke(userMessage, {
       json: true,
       cwd: task.worktreePath,
-      systemPrompt: commitPromptTemplate,
+      systemPrompt,
       tools: ['Bash'],
     });
 

@@ -17,9 +17,11 @@ export const addAutopilotCommands = (program: Command) => {
       'Ignore GitHub events before this date or datetime (e.g. 2025-01-15 or 2025-01-15T09:30:00)'
     )
     .option(
-      '--bot <name>',
+      '--bot-name <name>',
       'GitHub bot account name used by the autopilot (used to identify self-generated events)'
     )
+    .option('--bot <name>', '')
+    .option('--maintainers <names...>', 'GitHub handles of project maintainers')
     .action(dashboardCmd.action);
 
   command

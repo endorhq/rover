@@ -2,6 +2,7 @@ import React from 'react';
 import { render } from 'ink';
 import colors from 'ansi-colors';
 import { requireProjectContext } from '../../lib/context.js';
+import { ProjectConfigManager } from 'rover-core';
 import { exitWithError } from '../../utils/exit.js';
 import { AutopilotApp } from '../../lib/autopilot/app.js';
 import { ensureTraceDirs } from '../../lib/autopilot/helpers.js';
@@ -30,7 +31,13 @@ function printLandingMessage() {
 }
 
 const autopilotCommand = async (
-  options: { refresh?: string; from?: string; bot?: string } = {}
+  options: {
+    refresh?: string;
+    from?: string;
+    bot?: string;
+    botName?: string;
+    maintainers?: string[];
+  } = {}
 ) => {
   let project;
   try {
@@ -62,6 +69,14 @@ const autopilotCommand = async (
   // Ensure spans/ and actions/ directories exist before any step runs
   ensureTraceDirs(project.id);
 
+  // Resolve autopilot config: CLI flags > rover.json > undefined
+  const projectConfig = ProjectConfigManager.load(project.path);
+  const autopilotConfig = projectConfig.autopilot;
+  const resolvedBotName =
+    options.botName ?? options.bot ?? autopilotConfig?.botName;
+  const resolvedMaintainers =
+    options.maintainers ?? autopilotConfig?.maintainers;
+
   // Enter alternate screen so quitting restores the original shell
   process.stdout.write(ENTER_ALT_SCREEN + HIDE_CURSOR);
 
@@ -85,7 +100,8 @@ const autopilotCommand = async (
       project={project}
       refreshInterval={refreshInterval}
       fromDate={fromDate}
-      botName={options.bot}
+      botName={resolvedBotName}
+      maintainers={resolvedMaintainers}
     />
   );
 

@@ -5,7 +5,7 @@
 import { z } from 'zod';
 
 // Current schema version
-export const CURRENT_PROJECT_SCHEMA_VERSION = '1.3';
+export const CURRENT_PROJECT_SCHEMA_VERSION = '1.4';
 
 // Filename constant
 export const PROJECT_CONFIG_FILENAME = 'rover.json';
@@ -125,6 +125,16 @@ export const HooksConfigSchema = z.object({
 });
 
 /**
+ * Autopilot configuration
+ */
+export const AutopilotConfigSchema = z.object({
+  /** GitHub bot account name used by the autopilot */
+  botName: z.string().optional(),
+  /** GitHub handles of project maintainers */
+  maintainers: z.array(z.string()).optional(),
+});
+
+/**
  * Complete project configuration schema
  * Defines the structure of a rover.json file
  */
@@ -151,4 +161,6 @@ export const ProjectConfigSchema = z.object({
   hooks: HooksConfigSchema.optional(),
   /** Optional glob patterns for files to exclude from agent context */
   excludePatterns: z.array(z.string()).optional(),
+  /** Optional autopilot configuration */
+  autopilot: AutopilotConfigSchema.optional(),
 });

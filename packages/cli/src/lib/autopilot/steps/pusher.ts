@@ -11,6 +11,10 @@ import type {
   StepContext,
   StepResult,
 } from './types.js';
+import {
+  loadCustomInstructions,
+  formatCustomInstructions,
+} from './custom-instructions.js';
 import pushPromptTemplate from './prompts/push-prompt.md';
 
 interface BranchInfo {
@@ -235,13 +239,19 @@ export const pusherStep: Step = {
     const firstTask = project.getTask(branches[0].taskId);
     const cwd = firstTask?.worktreePath ?? projectPath;
 
+    // Build system prompt with custom instructions
+    let systemPrompt: string = pushPromptTemplate;
+    systemPrompt += formatCustomInstructions(
+      loadCustomInstructions(projectPath, 'push')
+    );
+
     // Invoke the AI agent
     const agent = getUserAIAgent();
     const agentTool = getAIAgentTool(agent);
     const response = await agentTool.invoke(userMessage, {
       json: true,
       cwd,
-      systemPrompt: pushPromptTemplate,
+      systemPrompt,
       tools: ['Bash'],
     });
 

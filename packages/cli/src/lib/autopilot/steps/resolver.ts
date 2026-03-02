@@ -18,6 +18,11 @@ import type {
   StepContext,
   StepResult,
 } from './types.js';
+import {
+  loadCustomInstructions,
+  formatCustomInstructions,
+  formatMaintainers,
+} from './custom-instructions.js';
 import resolvePromptTemplate from './prompts/resolve-prompt.md';
 
 const MAX_RETRIES = 3;
@@ -169,9 +174,13 @@ async function askAIForDecision(
   );
 
   // Build system prompt with memory collection
-  const systemPrompt = resolvePromptTemplate.replaceAll(
+  let systemPrompt = resolvePromptTemplate.replaceAll(
     '{{MEMORY_COLLECTION}}',
     ctx.memoryStore?.collectionName || 'rover-memory'
+  );
+  systemPrompt += formatMaintainers(ctx.maintainers);
+  systemPrompt += formatCustomInstructions(
+    loadCustomInstructions(projectPath, 'resolve')
   );
 
   const agent = getUserAIAgent();

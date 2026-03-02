@@ -1,6 +1,11 @@
 import { getUserAIAgent, getAIAgentTool } from '../agents/index.js';
 import { parseJsonResponse } from '../../utils/json-parser.js';
 import type { Span, ActionTrace, SummaryAIResult } from './types.js';
+import {
+  loadCustomInstructions,
+  formatCustomInstructions,
+  formatMaintainers,
+} from './steps/custom-instructions.js';
 import summaryPromptTemplate from './steps/prompts/summary-prompt.md';
 
 export interface SummaryResult {
@@ -23,7 +28,8 @@ export interface SummaryResult {
 export async function summarizeChain(
   spans: Span[],
   trace: ActionTrace,
-  _projectPath: string
+  projectPath: string,
+  maintainers?: string[]
 ): Promise<SummaryResult> {
   try {
     const input = {
@@ -42,12 +48,18 @@ export async function summarizeChain(
 
     const userMessage = '```json\n' + JSON.stringify(input, null, 2) + '\n```';
 
+    let systemPrompt: string = summaryPromptTemplate;
+    systemPrompt += formatMaintainers(maintainers);
+    systemPrompt += formatCustomInstructions(
+      loadCustomInstructions(projectPath, 'noop')
+    );
+
     const agent = getUserAIAgent();
     const agentTool = getAIAgentTool(agent);
     const response = await agentTool.invoke(userMessage, {
       json: true,
       model: 'haiku',
-      systemPrompt: summaryPromptTemplate,
+      systemPrompt,
     });
 
     const result = parseJsonResponse<SummaryAIResult>(response);

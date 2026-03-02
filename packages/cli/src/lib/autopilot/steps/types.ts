@@ -41,6 +41,8 @@ export interface StepContext {
   memoryStore?: MemoryStore;
   /** GitHub bot account name used by the autopilot. */
   botName?: string;
+  /** GitHub handles of project maintainers. */
+  maintainers?: string[];
 }
 
 // ── Step result (returned by process, applied by orchestrator) ──────────────
@@ -99,6 +101,8 @@ export interface MonitorContext {
   memoryStore?: MemoryStore;
   /** GitHub bot account name used by the autopilot. */
   botName?: string;
+  /** GitHub handles of project maintainers. */
+  maintainers?: string[];
 }
 
 export interface Step {

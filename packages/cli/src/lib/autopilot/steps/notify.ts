@@ -17,6 +17,11 @@ import type {
   StepContext,
   StepResult,
 } from './types.js';
+import {
+  loadCustomInstructions,
+  formatCustomInstructions,
+  formatMaintainers,
+} from './custom-instructions.js';
 import notifyPromptTemplate from './prompts/notify-prompt.md';
 
 // ── Rover footer ──────────────────────────────────────────────────────────
@@ -262,12 +267,19 @@ export const notifyStep: Step = {
 
     try {
       const userMessage = buildNotifyUserMessage(spans, trace, meta);
+
+      let systemPrompt: string = notifyPromptTemplate;
+      systemPrompt += formatMaintainers(ctx.maintainers);
+      systemPrompt += formatCustomInstructions(
+        loadCustomInstructions(projectPath, 'notify')
+      );
+
       const agent = getUserAIAgent();
       const agentTool = getAIAgentTool(agent);
       const response = await agentTool.invoke(userMessage, {
         json: true,
         model: 'haiku',
-        systemPrompt: notifyPromptTemplate,
+        systemPrompt,
       });
       const result = parseJsonResponse<NotifyAIResult>(response);
       shouldNotify = result.notify;

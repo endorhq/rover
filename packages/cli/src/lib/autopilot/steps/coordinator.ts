@@ -10,12 +10,19 @@ import type {
   StepContext,
   StepResult,
 } from './types.js';
+import {
+  loadCustomInstructions,
+  formatCustomInstructions,
+  formatMaintainers,
+} from './custom-instructions.js';
 import pilotPromptTemplate from './prompts/pilot-prompt.md';
 
 export function buildPilotPrompt(
   workflowCatalog?: string,
   memoryCollection?: string,
-  botName?: string
+  botName?: string,
+  projectPath?: string,
+  maintainers?: string[]
 ): string {
   let prompt = pilotPromptTemplate;
 
@@ -36,6 +43,13 @@ export function buildPilotPrompt(
 
   prompt +=
     '\n\n## Constraint\n\nThe `coordinate` action is NOT available for this decision. You must choose one of the other actions.\n';
+
+  prompt += formatMaintainers(maintainers);
+
+  if (projectPath) {
+    const instructions = loadCustomInstructions(projectPath, 'coordinate');
+    prompt += formatCustomInstructions(instructions);
+  }
 
   return prompt;
 }
@@ -68,7 +82,9 @@ export const coordinatorStep: Step = {
     const systemPrompt = buildPilotPrompt(
       catalog,
       ctx.memoryStore?.collectionName,
-      ctx.botName
+      ctx.botName,
+      projectPath,
+      ctx.maintainers
     );
 
     const userMessage =
