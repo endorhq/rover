@@ -184,6 +184,7 @@ export class ACPClient implements Client {
           this.capturedMessages += `[THINKING] ${update.content.text}`;
         }
         break;
+      case 'usage_update':
       case 'available_commands_update':
       case 'plan':
       case 'user_message_chunk':

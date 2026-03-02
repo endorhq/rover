@@ -46,7 +46,7 @@
     "e2e-test:real": "pnpm build && ROVER_E2E_REAL_AGENT=true vitest --config vitest.e2e.config.ts --run"
   },
   "dependencies": {
-    "@agentclientprotocol/sdk": "^0.13.0",
+    "@agentclientprotocol/sdk": "^0.14.1",
     "@modelcontextprotocol/sdk": "^1.23.0",
     "ansi-colors": "catalog:runtime",
     "commander": "catalog:runtime",
