@@ -55,7 +55,7 @@ function getAgentACPConfig(agentName: string, model?: string): AgentACPConfig {
       return {
         kind: 'bridge',
         command: 'npx',
-        args: ['-y', '@zed-industries/claude-code-acp'],
+        args: ['-y', '@zed-industries/claude-agent-acp'],
       };
     case 'codex':
       return {
