@@ -116,17 +116,11 @@ export class ClaudeAgent extends BaseAgent {
         } else if (cred.path.includes('.settings.json')) {
           // Copy settings.json to .claude directory, but strip any
           // MCP server definitions to prevent host MCPs from leaking
-          // into the sandbox. Then inject the built-in package-manager
-          // MCP server so it is always available inside the container.
+          // into the sandbox. The built-in package-manager MCP is
+          // registered later via `claude mcp add` in the entrypoint.
           try {
             const settings = JSON.parse(readFileSync(cred.path, 'utf-8'));
             delete settings.mcpServers;
-            settings.mcpServers = {
-              'package-manager': {
-                type: 'streamable-http',
-                url: 'http://127.0.0.1:8090/mcp',
-              },
-            };
             writeFileSync(
               join(targetClaudeDir, 'settings.json'),
               JSON.stringify(settings, null, 2)
@@ -145,25 +139,15 @@ export class ClaudeAgent extends BaseAgent {
       }
     }
 
-    // If no host settings.json was found, still create one with the
-    // built-in package-manager MCP so it is always available.
+    // If no host settings.json was found, create an empty one so
+    // Claude starts with a clean slate. The built-in package-manager
+    // MCP is registered later via `claude mcp add` in the entrypoint.
     if (!settingsWritten) {
       writeFileSync(
         join(targetClaudeDir, 'settings.json'),
-        JSON.stringify(
-          {
-            mcpServers: {
-              'package-manager': {
-                type: 'streamable-http',
-                url: 'http://127.0.0.1:8090/mcp',
-              },
-            },
-          },
-          null,
-          2
-        )
+        JSON.stringify({}, null, 2)
       );
-      copiedItems.push(colors.cyan('settings.json (package-manager MCP)'));
+      copiedItems.push(colors.cyan('settings.json (empty)'));
     }
 
     if (copiedItems.length > 0) {
@@ -180,6 +164,10 @@ export class ClaudeAgent extends BaseAgent {
     envs: string[],
     headers: string[]
   ): Promise<void> {
+    // Reset any previously cached MCP approval choices so Claude
+    // doesn't silently skip the server we're about to register.
+    await launch(this.binary, ['mcp', 'reset-project-choices']);
+
     const args = ['mcp', 'add', '--transport', transport];
 
     // Prepend this to other options to avoid issues with the command.

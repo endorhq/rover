@@ -331,7 +331,12 @@ sudo chown -R $(id -u):$(id -g) $HOME
 echo "✅ Credentials copied successfully"`;
 
     // --- MCP config section ---
-    let mcpConfigSection = '';
+    // The built-in package-manager MCP must always be registered via
+    // `claude mcp add` (it is no longer baked into settings.json).
+    let mcpConfigSection = `echo -e "\\n📦 Installing MCP servers"
+# Configure built-in MCPs
+rover-agent config mcp $AGENT package-manager --transport "http" http://127.0.0.1:8090/mcp`;
+
     if (!useCachedImage) {
       // Generate MCP configuration commands from rover.json
       const mcps = this.projectConfig.mcps;
@@ -364,9 +369,7 @@ echo "✅ Credentials copied successfully"`;
         );
       }
 
-      mcpConfigSection = `echo -e "\\n📦 Installing MCP servers"
-# Configure built-in MCPs
-rover-agent config mcp $AGENT package-manager --transport "http" http://127.0.0.1:8090/mcp
+      mcpConfigSection += `
 
 # Configure MCPs from rover.json if mcps array exists
 #
@@ -391,10 +394,12 @@ warn_mcp_configuration_failed() {
   safe_exit 1
 }
 
-configure_all_mcps
+configure_all_mcps`;
+    }
+
+    mcpConfigSection += `
 
 echo -e "\\n📦 Done installing MCP servers"`;
-    }
 
     // --- initScript execution ---
     let initScriptExecution = '';
