@@ -141,6 +141,3 @@ if [[ "$@" = "true" ]]; then
 fi
 
 "$@"
-
-echo 'sleeping infinity'
-sleep infinity
