@@ -136,8 +136,4 @@ echo "✅ Package manager MCP is ready"
 # Capture the CMD exit and ensure we recover the result!
 trap 'safe_exit $?' EXIT HUP INT QUIT TERM
 
-if [[ "$@" = "true" ]]; then
-    exit 0
-fi
-
 "$@"
