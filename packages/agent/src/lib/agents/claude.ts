@@ -139,10 +139,6 @@ export class ClaudeAgent extends BaseAgent {
     envs: string[],
     headers: string[]
   ): Promise<void> {
-    // Reset any previously cached MCP approval choices so Claude
-    // doesn't silently skip the server we're about to register.
-    await launch(this.binary, ['mcp', 'reset-project-choices']);
-
     const args = ['mcp', 'add', '--transport', transport];
 
     // Prepend this to other options to avoid issues with the command.

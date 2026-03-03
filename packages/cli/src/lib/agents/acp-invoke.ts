@@ -218,7 +218,7 @@ export async function acpInvoke(config: ACPInvokeConfig): Promise<string> {
     // 5. Create session
     const sessionRequest = {
       cwd: cwd || process.cwd(),
-      mcpServers: []
+      mcpServers: [],
     };
 
     console.log(

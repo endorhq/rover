@@ -224,9 +224,7 @@ export class ACPRunner {
    * Create a new session
    * Maps to the ACP session/new method
    */
-  async createSession(
-    cwd?: string,
-  ): Promise<string> {
+  async createSession(cwd?: string): Promise<string> {
     if (!this.isConnectionInitialized || !this.connection) {
       throw new Error(
         'Connection not initialized. Call initializeConnection() first.'

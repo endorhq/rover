@@ -111,7 +111,10 @@ function roverMcpToAcpServer(mcp: MCP): McpServer {
   const headerEntries = (mcp.headers || []).map(h => {
     const colonIdx = h.indexOf(':');
     if (colonIdx === -1) return { name: h.trim(), value: '' };
-    return { name: h.slice(0, colonIdx).trim(), value: h.slice(colonIdx + 1).trim() };
+    return {
+      name: h.slice(0, colonIdx).trim(),
+      value: h.slice(colonIdx + 1).trim(),
+    };
   });
 
   const envEntries = (mcp.envs || []).map(e => {
@@ -122,13 +125,28 @@ function roverMcpToAcpServer(mcp: MCP): McpServer {
 
   switch (mcp.transport) {
     case 'http':
-      return { type: 'http' as const, name: mcp.name, url: mcp.commandOrUrl, headers: headerEntries };
+      return {
+        type: 'http' as const,
+        name: mcp.name,
+        url: mcp.commandOrUrl,
+        headers: headerEntries,
+      };
     case 'sse':
-      return { type: 'sse' as const, name: mcp.name, url: mcp.commandOrUrl, headers: headerEntries };
+      return {
+        type: 'sse' as const,
+        name: mcp.name,
+        url: mcp.commandOrUrl,
+        headers: headerEntries,
+      };
     case 'stdio':
     default: {
       const parts = mcp.commandOrUrl.split(' ');
-      return { name: mcp.name, command: parts[0], args: parts.slice(1), env: envEntries };
+      return {
+        name: mcp.name,
+        command: parts[0],
+        args: parts.slice(1),
+        env: envEntries,
+      };
     }
   }
 }
