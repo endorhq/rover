@@ -17,10 +17,11 @@ import {
 import colors from 'ansi-colors';
 import { existsSync, readFileSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
-import type {
-  WorkflowAgentStep,
-  WorkflowOutput,
-  WorkflowStep,
+import {
+  isAgentStep,
+  type WorkflowAgentStep,
+  type WorkflowOutput,
+  type WorkflowStep,
 } from 'rover-schemas';
 import {
   WorkflowManager,
@@ -514,8 +515,13 @@ export class ACPRunner {
         progress: currentProgress,
       });
 
-      // Set the model for this step if specified (step-level > CLI flag > workflow defaults)
-      const stepModel = this.workflow.getStepModel(stepId, this.defaultModel);
+      // Set the model only if explicitly specified at the step level or via
+      // CLI flag.  When neither is set we must NOT fall back to the workflow-
+      // level defaults because those belong to the workflow's default tool
+      // (e.g. "sonnet" for Claude) and would be invalid for a different agent
+      // (e.g. Qwen).  Omitting the model lets the agent use its own default.
+      const stepModel =
+        (isAgentStep(step) && step.model) || this.defaultModel || undefined;
       if (stepModel) {
         try {
           await this.setModel(stepModel);
