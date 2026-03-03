@@ -142,7 +142,6 @@ function roverMcpToAcpServer(mcp: MCP): McpServer {
     default: {
       const parts = mcp.commandOrUrl.split(' ');
       return {
-        type: 'stdio' as const,
         name: mcp.name,
         command: parts[0],
         args: parts.slice(1),
