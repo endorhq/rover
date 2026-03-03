@@ -125,17 +125,6 @@ export class ClaudeAgent extends BaseAgent {
       }
     }
 
-    // If no host settings.json was found, create an empty one so
-    // Claude starts with a clean slate. The built-in package-manager
-    // MCP is registered later via `claude mcp add` in the entrypoint.
-    if (!settingsWritten) {
-      writeFileSync(
-        join(targetClaudeDir, 'settings.json'),
-        JSON.stringify({}, null, 2)
-      );
-      copiedItems.push(colors.cyan('settings.json (empty)'));
-    }
-
     if (copiedItems.length > 0) {
       showList(copiedItems);
     }
