@@ -1,9 +1,8 @@
 import { join } from 'node:path';
 import { mkdirSync, readFileSync, existsSync } from 'node:fs';
 import { IterationManager } from 'rover-core';
-import { getUserAIAgent, getAIAgentTool } from '../../agents/index.js';
-import { parseJsonResponse } from '../../../utils/json-parser.js';
-import { SpanWriter, ActionWriter, enqueueAction } from '../logging.js';
+import { invokeAI, appendPromptSuffix } from './ai.js';
+import { SpanWriter, emitAction } from '../logging.js';
 import type {
   PendingAction,
   ResolverDecision,
@@ -18,11 +17,6 @@ import type {
   StepContext,
   StepResult,
 } from './types.js';
-import {
-  loadCustomInstructions,
-  formatCustomInstructions,
-  formatMaintainers,
-} from './custom-instructions.js';
 import resolvePromptTemplate from './prompts/resolve-prompt.md';
 
 const MAX_RETRIES = 3;
@@ -174,25 +168,24 @@ async function askAIForDecision(
   );
 
   // Build system prompt with memory collection
-  let systemPrompt = resolvePromptTemplate.replaceAll(
-    '{{MEMORY_COLLECTION}}',
-    ctx.memoryStore?.collectionName || 'rover-memory'
-  );
-  systemPrompt += formatMaintainers(ctx.maintainers);
-  systemPrompt += formatCustomInstructions(
-    loadCustomInstructions(projectPath, 'resolve')
+  const systemPrompt = appendPromptSuffix(
+    resolvePromptTemplate.replaceAll(
+      '{{MEMORY_COLLECTION}}',
+      ctx.memoryStore?.collectionName || 'rover-memory'
+    ),
+    {
+      projectPath,
+      stepName: 'resolve',
+      maintainers: ctx.maintainers,
+    }
   );
 
-  const agent = getUserAIAgent();
-  const agentTool = getAIAgentTool(agent);
-  const response = await agentTool.invoke(userMessage, {
-    json: true,
-    cwd: projectPath,
+  const result = await invokeAI<ResolverAIResult>({
+    userMessage,
     systemPrompt,
+    cwd: projectPath,
     tools: ['Bash(qmd:*)'],
   });
-
-  const result = parseJsonResponse<ResolverAIResult>(response);
 
   if (result.decision === 'notify') {
     return {
@@ -323,26 +316,17 @@ function executeDecision(
       });
       resolveSpan.complete(`resolve: trace ready to push: ${trace.summary}`);
 
-      const pushMeta = {
-        ...pending.meta,
-        decision: 'push',
-      };
-
-      const pushAction = new ActionWriter(projectId, {
+      const pushAction = emitAction(store, {
+        projectId,
+        traceId: pending.traceId,
         action: 'push',
         spanId: resolveSpan.id,
         reasoning: `Push trace: ${trace.summary}`,
-        meta: pushMeta,
-      });
-
-      enqueueAction(store, {
-        traceId: pending.traceId,
-        action: pushAction,
-        step: 'resolve',
+        meta: { ...pending.meta, decision: 'push' },
+        fromStep: 'resolve',
         summary: `push: ${trace.summary}`,
+        removePendingId: pending.actionId,
       });
-
-      store.removePending(pending.actionId);
 
       return {
         spanId: resolveSpan.id,
@@ -385,30 +369,24 @@ function executeDecision(
         ? store.getTaskMapping(lastWorkflowStep.originAction)
         : undefined;
 
-      const notifyMeta: Record<string, any> = {
-        ...pending.meta,
-        decision: 'notify',
-        ...(review ? { review, reviewWorkflow: true } : {}),
-        ...(taskMapping
-          ? { taskId: taskMapping.taskId, branchName: taskMapping.branchName }
-          : {}),
-      };
-
-      const notifyAction = new ActionWriter(projectId, {
+      const notifyAction = emitAction(store, {
+        projectId,
+        traceId: pending.traceId,
         action: 'notify',
         spanId: resolveSpan.id,
         reasoning: `Notify: ${trace.summary}`,
-        meta: notifyMeta,
-      });
-
-      enqueueAction(store, {
-        traceId: pending.traceId,
-        action: notifyAction,
-        step: 'resolve',
+        meta: {
+          ...pending.meta,
+          decision: 'notify',
+          ...(review ? { review, reviewWorkflow: true } : {}),
+          ...(taskMapping
+            ? { taskId: taskMapping.taskId, branchName: taskMapping.branchName }
+            : {}),
+        },
+        fromStep: 'resolve',
         summary: `notify: ${trace.summary}`,
+        removePendingId: pending.actionId,
       });
-
-      store.removePending(pending.actionId);
 
       return {
         spanId: resolveSpan.id,
@@ -562,33 +540,28 @@ function executeDecision(
       );
 
       const workflowName = pending.meta?.workflow ?? 'swe';
-      const workflowMeta = {
-        workflow: workflowName,
-        title: task.title,
-        description: iterationDescription,
-        acceptance_criteria: pending.meta?.acceptance_criteria ?? [],
-        context: {
-          files: pending.meta?.context?.files ?? [],
-          references: pending.meta?.context?.references ?? [],
-          depends_on: null,
-        },
-      };
 
-      const workflowAction = new ActionWriter(projectId, {
+      const workflowAction = emitAction(store, {
+        projectId,
+        traceId: pending.traceId,
         action: 'workflow',
         spanId: resolveSpan.id,
         reasoning: `${workflowName}: ${task.title} (retry #${trace.retryCount})`,
-        meta: workflowMeta,
-      });
-
-      enqueueAction(store, {
-        traceId: pending.traceId,
-        action: workflowAction,
-        step: 'resolve',
+        meta: {
+          workflow: workflowName,
+          title: task.title,
+          description: iterationDescription,
+          acceptance_criteria: pending.meta?.acceptance_criteria ?? [],
+          context: {
+            files: pending.meta?.context?.files ?? [],
+            references: pending.meta?.context?.references ?? [],
+            depends_on: null,
+          },
+        },
+        fromStep: 'resolve',
         summary: `${workflowName}: ${task.title}`,
+        removePendingId: pending.actionId,
       });
-
-      store.removePending(pending.actionId);
 
       return {
         spanId: resolveSpan.id,

@@ -1,7 +1,6 @@
 import { Git, launch } from 'rover-core';
-import { getUserAIAgent, getAIAgentTool } from '../../agents/index.js';
-import { parseJsonResponse } from '../../../utils/json-parser.js';
-import { SpanWriter, ActionWriter, enqueueAction } from '../logging.js';
+import { invokeAI, appendPromptSuffix } from './ai.js';
+import { SpanWriter, emitAction } from '../logging.js';
 import { ROVER_FOOTER_MARKER } from '../constants.js';
 import type { PendingAction, PusherAIResult, TaskMapping } from '../types.js';
 import type {
@@ -11,10 +10,6 @@ import type {
   StepContext,
   StepResult,
 } from './types.js';
-import {
-  loadCustomInstructions,
-  formatCustomInstructions,
-} from './custom-instructions.js';
 import pushPromptTemplate from './prompts/push-prompt.md';
 
 interface BranchInfo {
@@ -240,22 +235,18 @@ export const pusherStep: Step = {
     const cwd = firstTask?.worktreePath ?? projectPath;
 
     // Build system prompt with custom instructions
-    let systemPrompt: string = pushPromptTemplate;
-    systemPrompt += formatCustomInstructions(
-      loadCustomInstructions(projectPath, 'push')
-    );
-
-    // Invoke the AI agent
-    const agent = getUserAIAgent();
-    const agentTool = getAIAgentTool(agent);
-    const response = await agentTool.invoke(userMessage, {
-      json: true,
-      cwd,
-      systemPrompt,
-      tools: ['Bash'],
+    const systemPrompt = appendPromptSuffix(pushPromptTemplate, {
+      projectPath,
+      stepName: 'push',
     });
 
-    const result = parseJsonResponse<PusherAIResult>(response);
+    // Invoke the AI agent
+    const result = await invokeAI<PusherAIResult>({
+      userMessage,
+      systemPrompt,
+      cwd,
+      tools: ['Bash'],
+    });
 
     // Build push span
     const pushed = result.status === 'pushed';
@@ -283,33 +274,27 @@ export const pusherStep: Step = {
       pushSpan.complete(`push: ${result.branches_pushed.join(', ')}${prInfo}`);
     }
 
-    // Enqueue a notify/noop action to complete the trace
-    const notifyMeta = {
-      ...meta,
-      pushed,
-      branchesPushed: result.branches_pushed,
-      pullRequestUrl: result.pull_request?.url ?? null,
-    };
-
-    const notifyAction = new ActionWriter(projectId, {
+    // Enqueue a notify action to complete the trace
+    const notifyAction = emitAction(store, {
+      projectId,
+      traceId: pending.traceId,
       action: 'notify',
       spanId: pushSpan.id,
       reasoning: pushed
         ? `Push completed: ${result.summary}`
         : `Push failed: ${result.error ?? 'unknown'}`,
-      meta: notifyMeta,
-    });
-
-    enqueueAction(store, {
-      traceId: pending.traceId,
-      action: notifyAction,
-      step: 'push',
+      meta: {
+        ...meta,
+        pushed,
+        branchesPushed: result.branches_pushed,
+        pullRequestUrl: result.pull_request?.url ?? null,
+      },
+      fromStep: 'push',
       summary: pushed
         ? `done: ${trace.summary}`
         : `push failed: ${trace.summary}`,
+      removePendingId: pending.actionId,
     });
-
-    store.removePending(pending.actionId);
 
     const prUrl = result.pull_request?.url;
     const reasoning =

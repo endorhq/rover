@@ -1,5 +1,4 @@
-import { getUserAIAgent, getAIAgentTool } from '../../agents/index.js';
-import { parseJsonResponse } from '../../../utils/json-parser.js';
+import { invokeAI, appendPromptSuffix } from './ai.js';
 import { SpanWriter, ActionWriter, enqueueAction } from '../logging.js';
 import { buildWorkflowCatalog } from '../helpers.js';
 import type { PendingAction, PlanResult, PlanTask, Span } from '../types.js';
@@ -10,11 +9,6 @@ import type {
   StepContext,
   StepResult,
 } from './types.js';
-import {
-  loadCustomInstructions,
-  formatCustomInstructions,
-  formatMaintainers,
-} from './custom-instructions.js';
 import planPromptTemplate from './prompts/plan-prompt.md';
 
 function buildPlanUserMessage(
@@ -132,22 +126,19 @@ export const plannerStep: Step = {
       '{{MEMORY_COLLECTION}}',
       ctx.memoryStore?.collectionName || 'rover-memory'
     );
-    systemPrompt += formatMaintainers(ctx.maintainers);
-    systemPrompt += formatCustomInstructions(
-      loadCustomInstructions(projectPath, 'plan')
-    );
-
-    // Invoke agent with system prompt and read-only tools
-    const agent = getUserAIAgent();
-    const agentTool = getAIAgentTool(agent);
-    const response = await agentTool.invoke(userMessage, {
-      json: true,
-      cwd: projectPath,
-      systemPrompt,
-      tools: ['Read', 'Glob', 'Grep', 'Bash(gh:*)', 'Bash(qmd:*)'],
+    systemPrompt = appendPromptSuffix(systemPrompt, {
+      projectPath,
+      stepName: 'plan',
+      maintainers: ctx.maintainers,
     });
 
-    const planResult = parseJsonResponse<PlanResult>(response);
+    // Invoke agent with system prompt and read-only tools
+    const planResult = await invokeAI<PlanResult>({
+      userMessage,
+      systemPrompt,
+      cwd: projectPath,
+      tools: ['Read', 'Glob', 'Grep', 'Bash(gh:*)', 'Bash(qmd:*)'],
+    });
 
     // Validate: non-empty tasks, valid workflow types
     if (!planResult.tasks || planResult.tasks.length === 0) {

@@ -1,6 +1,4 @@
-import { SpanWriter } from '../logging.js';
-import { summarizeChain } from '../summarizer.js';
-import { recordTraceCompletion } from '../memory/writer.js';
+import { processTerminalStep } from './terminal.js';
 import type { PendingAction } from '../types.js';
 import type {
   Step,
@@ -19,45 +17,13 @@ export const noopStep: Step = {
   dependencies: {} satisfies StepDependencies,
 
   async process(pending: PendingAction, ctx: StepContext): Promise<StepResult> {
-    const { store, projectId, projectPath } = ctx;
-
-    // Retrieve the full span chain leading to this action
-    const spans = store.getSpanTrace(pending.spanId);
-
-    // Summarize the chain
-    const { summary: chainSummary, saveToMemory } = await summarizeChain(
-      spans,
-      ctx.trace,
-      projectPath,
-      ctx.maintainers
-    );
-
-    // Create and complete the noop span
-    const span = new SpanWriter(projectId, {
-      step: 'noop',
-      parentId: pending.spanId,
-      originAction: pending.actionId,
-      meta: { summary: chainSummary },
+    return processTerminalStep(pending, ctx, {
+      stepName: 'noop',
+      buildSpanMeta: chainSummary => ({ summary: chainSummary }),
+      hook: ({ chainSummary }) => ({
+        summary: `noop: ${chainSummary}`,
+        reasoning: `noop: ${chainSummary}`,
+      }),
     });
-
-    span.complete(`noop: ${chainSummary}`);
-
-    // Record trace completion in memory only when the summarizer
-    // determined the trace contains information useful for future decisions
-    if (saveToMemory) {
-      await recordTraceCompletion(ctx.memoryStore, ctx.trace, spans, store, {
-        summary: chainSummary,
-      });
-    }
-
-    // Remove the processed action
-    store.removePending(pending.actionId);
-
-    return {
-      spanId: span.id,
-      terminal: true,
-      enqueuedActions: [],
-      reasoning: `noop: ${chainSummary}`,
-    };
   },
 };

@@ -292,3 +292,50 @@ export function enqueueAction(
     summary: opts.summary,
   });
 }
+
+// ── emitAction ─────────────────────────────────────────────────────────────
+
+/**
+ * Create an action, enqueue it, and optionally remove a pending entry.
+ *
+ * Combines the 3-step pattern used by most steps:
+ * 1. `new ActionWriter(...)` — write the action to disk.
+ * 2. `enqueueAction(...)` — add to pending queue + audit log.
+ * 3. `store.removePending(...)` — remove the processed action.
+ *
+ * Returns the `ActionWriter` so callers can read `action.id`.
+ */
+export function emitAction(
+  store: AutopilotStore,
+  opts: {
+    projectId: string;
+    traceId: string;
+    action: string;
+    spanId: string;
+    reasoning: string;
+    meta?: Record<string, any>;
+    fromStep: string;
+    summary: string;
+    removePendingId?: string;
+  }
+): ActionWriter {
+  const action = new ActionWriter(opts.projectId, {
+    action: opts.action,
+    spanId: opts.spanId,
+    reasoning: opts.reasoning,
+    meta: opts.meta,
+  });
+
+  enqueueAction(store, {
+    traceId: opts.traceId,
+    action,
+    step: opts.fromStep,
+    summary: opts.summary,
+  });
+
+  if (opts.removePendingId) {
+    store.removePending(opts.removePendingId);
+  }
+
+  return action;
+}

@@ -1,6 +1,5 @@
 import { launch } from 'rover-core';
-import { getUserAIAgent, getAIAgentTool } from '../../agents/index.js';
-import { parseJsonResponse } from '../../../utils/json-parser.js';
+import { invokeAI, appendPromptSuffix } from './ai.js';
 import { SpanWriter } from '../logging.js';
 import { ROVER_FOOTER_MARKER } from '../constants.js';
 import { recordTraceCompletion } from '../memory/writer.js';
@@ -17,11 +16,6 @@ import type {
   StepContext,
   StepResult,
 } from './types.js';
-import {
-  loadCustomInstructions,
-  formatCustomInstructions,
-  formatMaintainers,
-} from './custom-instructions.js';
 import notifyPromptTemplate from './prompts/notify-prompt.md';
 
 // ── Rover footer ──────────────────────────────────────────────────────────
@@ -268,20 +262,17 @@ export const notifyStep: Step = {
     try {
       const userMessage = buildNotifyUserMessage(spans, trace, meta);
 
-      let systemPrompt: string = notifyPromptTemplate;
-      systemPrompt += formatMaintainers(ctx.maintainers);
-      systemPrompt += formatCustomInstructions(
-        loadCustomInstructions(projectPath, 'notify')
-      );
-
-      const agent = getUserAIAgent();
-      const agentTool = getAIAgentTool(agent);
-      const response = await agentTool.invoke(userMessage, {
-        json: true,
-        model: 'haiku',
-        systemPrompt,
+      const systemPrompt = appendPromptSuffix(notifyPromptTemplate, {
+        projectPath,
+        stepName: 'notify',
+        maintainers: ctx.maintainers,
       });
-      const result = parseJsonResponse<NotifyAIResult>(response);
+
+      const result = await invokeAI<NotifyAIResult>({
+        userMessage,
+        systemPrompt,
+        model: 'haiku',
+      });
       shouldNotify = result.notify;
       message = result.message;
       aiReasoning = result.reasoning ?? '';

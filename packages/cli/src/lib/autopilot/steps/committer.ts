@@ -1,9 +1,8 @@
 import { join } from 'node:path';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { ProjectConfigManager, Git } from 'rover-core';
-import { getUserAIAgent, getAIAgentTool } from '../../agents/index.js';
-import { parseJsonResponse } from '../../../utils/json-parser.js';
-import { SpanWriter, ActionWriter, enqueueAction } from '../logging.js';
+import { invokeAI, appendPromptSuffix } from './ai.js';
+import { SpanWriter, emitAction } from '../logging.js';
 import type { PendingAction, CommitterAIResult } from '../types.js';
 import type {
   Step,
@@ -12,10 +11,6 @@ import type {
   StepContext,
   StepResult,
 } from './types.js';
-import {
-  loadCustomInstructions,
-  formatCustomInstructions,
-} from './custom-instructions.js';
 import commitPromptTemplate from './prompts/commit-prompt.md';
 
 function getTaskIterationSummaries(iterationsPath: string): string[] {
@@ -143,27 +138,21 @@ export const committerStep: Step = {
       });
       commitSpan.fail(`commit: task #${taskId} failed, skipping commit`);
 
-      const resolveMeta = {
-        ...meta,
-        committed: false,
-        taskStatus: 'FAILED',
-      };
-
-      const resolveAction = new ActionWriter(projectId, {
+      const resolveAction = emitAction(store, {
+        projectId,
+        traceId: pending.traceId,
         action: 'resolve',
         spanId: commitSpan.id,
         reasoning: `Resolve task #${taskId}: ${meta.title} (failed)`,
-        meta: resolveMeta,
-      });
-
-      enqueueAction(store, {
-        traceId: pending.traceId,
-        action: resolveAction,
-        step: 'commit',
+        meta: {
+          ...meta,
+          committed: false,
+          taskStatus: 'FAILED',
+        },
+        fromStep: 'commit',
         summary: `resolve: ${meta.title}`,
+        removePendingId: pending.actionId,
       });
-
-      store.removePending(pending.actionId);
 
       return {
         spanId: commitSpan.id,
@@ -198,21 +187,17 @@ export const committerStep: Step = {
       attribution
     );
 
-    let systemPrompt: string = commitPromptTemplate;
-    systemPrompt += formatCustomInstructions(
-      loadCustomInstructions(projectPath, 'commit')
-    );
-
-    const agent = getUserAIAgent();
-    const agentTool = getAIAgentTool(agent);
-    const response = await agentTool.invoke(userMessage, {
-      json: true,
-      cwd: task.worktreePath,
-      systemPrompt,
-      tools: ['Bash'],
+    const systemPrompt = appendPromptSuffix(commitPromptTemplate, {
+      projectPath,
+      stepName: 'commit',
     });
 
-    const result = parseJsonResponse<CommitterAIResult>(response);
+    const result = await invokeAI<CommitterAIResult>({
+      userMessage,
+      systemPrompt,
+      cwd: task.worktreePath,
+      tools: ['Bash'],
+    });
 
     // Build commit span based on result
     const committed = result.status === 'committed';
@@ -248,33 +233,25 @@ export const committerStep: Step = {
     }
 
     // Always enqueue a resolve action
-    const resolveMeta = {
-      ...meta,
-      committed,
-      taskStatus: 'COMPLETED',
-      ...(result.error ? { commitError: result.error } : {}),
-    };
-
-    const resolveReasoning =
-      result.status === 'failed'
-        ? `Resolve task #${taskId}: ${meta.title} (commit failed: ${result.error})`
-        : `Resolve task #${taskId}: ${meta.title} (${committed ? 'committed' : 'no changes'})`;
-
-    const resolveAction = new ActionWriter(projectId, {
+    const resolveAction = emitAction(store, {
+      projectId,
+      traceId: pending.traceId,
       action: 'resolve',
       spanId: commitSpan.id,
-      reasoning: resolveReasoning,
-      meta: resolveMeta,
-    });
-
-    enqueueAction(store, {
-      traceId: pending.traceId,
-      action: resolveAction,
-      step: 'commit',
+      reasoning:
+        result.status === 'failed'
+          ? `Resolve task #${taskId}: ${meta.title} (commit failed: ${result.error})`
+          : `Resolve task #${taskId}: ${meta.title} (${committed ? 'committed' : 'no changes'})`,
+      meta: {
+        ...meta,
+        committed,
+        taskStatus: 'COMPLETED',
+        ...(result.error ? { commitError: result.error } : {}),
+      },
+      fromStep: 'commit',
       summary: `resolve: ${meta.title}`,
+      removePendingId: pending.actionId,
     });
-
-    store.removePending(pending.actionId);
 
     const reasoning =
       result.status === 'failed'

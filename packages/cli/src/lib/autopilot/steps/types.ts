@@ -26,14 +26,12 @@ export interface StepDependencies {
   needsProjectManager?: boolean;
 }
 
-// ── Step context (provided by orchestrator to each process call) ────────────
+// ── Base context (shared fields between StepContext and MonitorContext) ──────
 
-export interface StepContext {
+export interface BaseContext {
   store: AutopilotStore;
   projectId: string;
   projectPath: string;
-  /** The trace for the pending action (get-or-created by orchestrator). */
-  trace: ActionTrace;
   owner?: string;
   repo?: string;
   project?: ProjectManager;
@@ -45,6 +43,13 @@ export interface StepContext {
   maintainers?: string[];
   /** Project-specific custom instructions for the step. */
   customInstructions?: string;
+}
+
+// ── Step context (provided by orchestrator to each process call) ────────────
+
+export interface StepContext extends BaseContext {
+  /** The trace for the pending action (get-or-created by orchestrator). */
+  trace: ActionTrace;
 }
 
 // ── Step result (returned by process, applied by orchestrator) ──────────────
@@ -91,22 +96,8 @@ export interface TraceMutations {
 
 // ── Step interface ──────────────────────────────────────────────────────────
 
-export interface MonitorContext {
-  store: AutopilotStore;
-  projectId: string;
-  projectPath: string;
+export interface MonitorContext extends BaseContext {
   traces: Map<string, ActionTrace>;
-  owner?: string;
-  repo?: string;
-  project?: ProjectManager;
-  workflowStore?: WorkflowStore;
-  memoryStore?: MemoryStore;
-  /** GitHub bot account name used by the autopilot. */
-  botName?: string;
-  /** GitHub handles of project maintainers. */
-  maintainers?: string[];
-  /** Project-specific custom instructions for the step. */
-  customInstructions?: string;
 }
 
 export interface Step {

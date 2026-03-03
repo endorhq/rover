@@ -1,6 +1,5 @@
-import { getUserAIAgent, getAIAgentTool } from '../../agents/index.js';
-import { parseJsonResponse } from '../../../utils/json-parser.js';
-import { SpanWriter, ActionWriter, enqueueAction } from '../logging.js';
+import { invokeAI } from './ai.js';
+import { SpanWriter, emitAction } from '../logging.js';
 import { buildWorkflowCatalog } from '../helpers.js';
 import type { PendingAction, CoordinatorDecision } from '../types.js';
 import type {
@@ -121,13 +120,11 @@ export const coordinatorStep: Step = {
       }
     }
 
-    const agent = getUserAIAgent();
-    const agentTool = getAIAgentTool(agent);
-    const response = await agentTool.invoke(userMessage, {
-      json: true,
+    const decision = await invokeAI<CoordinatorDecision>({
+      userMessage,
+      systemPrompt,
       model: 'sonnet',
       cwd: projectPath,
-      systemPrompt,
       tools: [
         'Read',
         'Glob',
@@ -138,7 +135,6 @@ export const coordinatorStep: Step = {
         'Bash(rover:*)',
       ],
     });
-    const decision = parseJsonResponse<CoordinatorDecision>(response);
 
     // Safety: prevent recursive coordinate
     if (decision.action === 'coordinate') {
@@ -164,31 +160,24 @@ export const coordinatorStep: Step = {
       store.removeWaitEntry(decision.meta.satisfied_wait_id);
     }
 
-    // Write follow-up action. Every decision produces an action — the
-    // coordinator is never an end step.
-    const action = new ActionWriter(projectId, {
-      action: decision.action,
-      spanId: span.id,
-      reasoning: decision.reasoning,
-      meta: decision.meta,
-    });
-
     // Store gathered context in span for downstream steps
     span.complete(`coordinate: ${decision.action} — ${pending.summary}`, {
       ...decision.meta,
       context: decision.context,
     });
 
-    // Enqueue the action for the next step to pick up (including noop)
-    enqueueAction(store, {
+    // Write follow-up action, enqueue it, and remove the processed action
+    const action = emitAction(store, {
+      projectId,
       traceId: pending.traceId,
-      action,
-      step: 'coordinate',
+      action: decision.action,
+      spanId: span.id,
+      reasoning: decision.reasoning,
+      meta: decision.meta,
+      fromStep: 'coordinate',
       summary: `${decision.action}: ${pending.summary}`,
+      removePendingId: pending.actionId,
     });
-
-    // Remove the processed coordinate action
-    store.removePending(pending.actionId);
 
     return {
       spanId: span.id,

@@ -1,11 +1,5 @@
-import { getUserAIAgent, getAIAgentTool } from '../agents/index.js';
-import { parseJsonResponse } from '../../utils/json-parser.js';
+import { invokeAI, appendPromptSuffix } from './steps/ai.js';
 import type { Span, ActionTrace, SummaryAIResult } from './types.js';
-import {
-  loadCustomInstructions,
-  formatCustomInstructions,
-  formatMaintainers,
-} from './steps/custom-instructions.js';
 import summaryPromptTemplate from './steps/prompts/summary-prompt.md';
 
 export interface SummaryResult {
@@ -48,21 +42,17 @@ export async function summarizeChain(
 
     const userMessage = '```json\n' + JSON.stringify(input, null, 2) + '\n```';
 
-    let systemPrompt: string = summaryPromptTemplate;
-    systemPrompt += formatMaintainers(maintainers);
-    systemPrompt += formatCustomInstructions(
-      loadCustomInstructions(projectPath, 'noop')
-    );
-
-    const agent = getUserAIAgent();
-    const agentTool = getAIAgentTool(agent);
-    const response = await agentTool.invoke(userMessage, {
-      json: true,
-      model: 'haiku',
-      systemPrompt,
+    const systemPrompt = appendPromptSuffix(summaryPromptTemplate, {
+      projectPath,
+      stepName: 'noop',
+      maintainers,
     });
 
-    const result = parseJsonResponse<SummaryAIResult>(response);
+    const result = await invokeAI<SummaryAIResult>({
+      userMessage,
+      systemPrompt,
+      model: 'haiku',
+    });
     return {
       summary: result.summary,
       saveToMemory: result.saveToMemory ?? false,

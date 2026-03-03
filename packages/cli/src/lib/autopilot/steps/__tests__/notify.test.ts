@@ -22,11 +22,11 @@ vi.mock('rover-core', async importOriginal => {
   };
 });
 
-// Mock AI agent
-const mockInvoke = vi.fn();
-vi.mock('../../../agents/index.js', () => ({
-  getUserAIAgent: () => 'claude',
-  getAIAgentTool: () => ({ invoke: mockInvoke }),
+// Mock AI helper
+const mockInvokeAI = vi.fn();
+vi.mock('../ai.js', () => ({
+  invokeAI: (...args: any[]) => mockInvokeAI(...args),
+  appendPromptSuffix: (prompt: string) => prompt,
 }));
 
 // Mock SpanWriter — avoid file I/O
@@ -273,13 +273,11 @@ describe('notifyStep.process', () => {
     const ctx = makeStepContext();
     (ctx.store.getSpanTrace as any).mockReturnValue([rootSpan]);
 
-    mockInvoke.mockResolvedValue(
-      JSON.stringify({
-        notify: true,
-        message: 'Task completed successfully.',
-        reasoning: 'User needs to know',
-      })
-    );
+    mockInvokeAI.mockResolvedValue({
+      notify: true,
+      message: 'Task completed successfully.',
+      reasoning: 'User needs to know',
+    });
     mockLaunch.mockResolvedValue({ failed: false, stdout: '', stderr: '' });
 
     const pending = makePending({
@@ -308,13 +306,11 @@ describe('notifyStep.process', () => {
     const ctx = makeStepContext();
     (ctx.store.getSpanTrace as any).mockReturnValue([rootSpan]);
 
-    mockInvoke.mockResolvedValue(
-      JSON.stringify({
-        notify: true,
-        message: 'Done.',
-        reasoning: 'informational',
-      })
-    );
+    mockInvokeAI.mockResolvedValue({
+      notify: true,
+      message: 'Done.',
+      reasoning: 'informational',
+    });
 
     const result = await notifyStep.process(makePending(), ctx);
 
@@ -332,7 +328,7 @@ describe('notifyStep.process', () => {
     const ctx = makeStepContext();
     (ctx.store.getSpanTrace as any).mockReturnValue([rootSpan]);
 
-    mockInvoke.mockRejectedValue(new Error('AI unavailable'));
+    mockInvokeAI.mockRejectedValue(new Error('AI unavailable'));
     mockLaunch.mockResolvedValue({ failed: false, stdout: '', stderr: '' });
 
     const result = await notifyStep.process(makePending(), ctx);
@@ -351,13 +347,11 @@ describe('notifyStep.process', () => {
     const ctx = makeStepContext();
     (ctx.store.getSpanTrace as any).mockReturnValue([rootSpan]);
 
-    mockInvoke.mockResolvedValue(
-      JSON.stringify({
-        notify: true,
-        message: 'Comment body',
-        reasoning: 'failure needs reporting',
-      })
-    );
+    mockInvokeAI.mockResolvedValue({
+      notify: true,
+      message: 'Comment body',
+      reasoning: 'failure needs reporting',
+    });
     mockLaunch.mockResolvedValue({
       failed: true,
       stdout: '',
@@ -382,13 +376,11 @@ describe('notifyStep.process', () => {
     const ctx = makeStepContext();
     (ctx.store.getSpanTrace as any).mockReturnValue([rootSpan]);
 
-    mockInvoke.mockResolvedValue(
-      JSON.stringify({
-        notify: true,
-        message: 'Could you clarify the expected behavior?',
-        reasoning: 'clarification needed from user',
-      })
-    );
+    mockInvokeAI.mockResolvedValue({
+      notify: true,
+      message: 'Could you clarify the expected behavior?',
+      reasoning: 'clarification needed from user',
+    });
     mockLaunch.mockResolvedValue({ failed: false, stdout: '', stderr: '' });
 
     const pending = makePending({
@@ -404,7 +396,7 @@ describe('notifyStep.process', () => {
     expect(result.status).toBe('completed');
 
     // Verify AI was called with the clarify context
-    const aiCallArgs = mockInvoke.mock.calls[0][0] as string;
+    const aiCallArgs = mockInvokeAI.mock.calls[0][0].userMessage as string;
     expect(aiCallArgs).toContain('originalAction');
     expect(aiCallArgs).toContain('clarify');
   });
@@ -416,13 +408,11 @@ describe('notifyStep.process', () => {
     const ctx = makeStepContext({ owner: undefined, repo: undefined });
     (ctx.store.getSpanTrace as any).mockReturnValue([rootSpan]);
 
-    mockInvoke.mockResolvedValue(
-      JSON.stringify({
-        notify: true,
-        message: 'Done.',
-        reasoning: 'informational',
-      })
-    );
+    mockInvokeAI.mockResolvedValue({
+      notify: true,
+      message: 'Done.',
+      reasoning: 'informational',
+    });
 
     const result = await notifyStep.process(makePending(), ctx);
 
@@ -439,13 +429,11 @@ describe('notifyStep.process', () => {
     const ctx = makeStepContext();
     (ctx.store.getSpanTrace as any).mockReturnValue([rootSpan]);
 
-    mockInvoke.mockResolvedValue(
-      JSON.stringify({
-        notify: false,
-        message: '',
-        reasoning: 'PR was created and is already linked on the issue',
-      })
-    );
+    mockInvokeAI.mockResolvedValue({
+      notify: false,
+      message: '',
+      reasoning: 'PR was created and is already linked on the issue',
+    });
 
     const pending = makePending({
       meta: {
