@@ -19,6 +19,7 @@ import type {
   Span,
   Action,
   TaskMapping,
+  WaitEntry,
 } from './types.js';
 
 const CURSOR_MAX_IDS = 200;
@@ -274,6 +275,26 @@ export class AutopilotStore {
 
   getAllTaskMappings(): Record<string, TaskMapping> {
     return this.loadState().taskMappings ?? {};
+  }
+
+  // --- Wait queue methods ---
+
+  getWaitQueue(): WaitEntry[] {
+    return this.loadState().waitQueue ?? [];
+  }
+
+  addWaitEntry(entry: WaitEntry): void {
+    const state = this.loadState();
+    if (!state.waitQueue) state.waitQueue = [];
+    state.waitQueue.push(entry);
+    this.saveState(state);
+  }
+
+  removeWaitEntry(actionId: string): void {
+    const state = this.loadState();
+    if (!state.waitQueue) return;
+    state.waitQueue = state.waitQueue.filter(e => e.actionId !== actionId);
+    this.saveState(state);
   }
 
   // --- Traces persistence ---

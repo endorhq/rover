@@ -41,6 +41,7 @@ export class StepOrchestrator {
   private memoryStore?: MemoryStore;
   private botName?: string;
   private maintainers?: string[];
+  private customInstructions?: string;
   private callbacks: OrchestratorCallbacks;
   private fallbackIntervalMs: number;
 
@@ -63,6 +64,7 @@ export class StepOrchestrator {
     memoryStore?: MemoryStore;
     botName?: string;
     maintainers?: string[];
+    customInstructions?: string;
     callbacks: OrchestratorCallbacks;
     fallbackIntervalMs?: number;
   }) {
@@ -81,6 +83,7 @@ export class StepOrchestrator {
     this.memoryStore = opts.memoryStore;
     this.botName = opts.botName;
     this.maintainers = opts.maintainers;
+    this.customInstructions = opts.customInstructions;
     this.callbacks = opts.callbacks;
     this.fallbackIntervalMs =
       opts.fallbackIntervalMs ?? DEFAULT_FALLBACK_INTERVAL_MS;
@@ -147,6 +150,7 @@ export class StepOrchestrator {
         memoryStore: this.memoryStore,
         botName: this.botName,
         maintainers: this.maintainers,
+        customInstructions: this.customInstructions,
       };
 
       const mutations = step.monitor(ctx);
@@ -359,6 +363,7 @@ export class StepOrchestrator {
         memoryStore: this.memoryStore,
         botName: this.botName,
         maintainers: this.maintainers,
+        customInstructions: this.customInstructions,
       };
 
       // Call step.process()

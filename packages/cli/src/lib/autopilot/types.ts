@@ -67,10 +67,11 @@ export interface PendingAction {
   meta?: Record<string, any>;
 }
 
-export interface PilotDecision {
+export interface CoordinatorDecision {
   action: string;
   confidence: string;
   reasoning: string;
+  context: string;
   meta: Record<string, any>;
 }
 
@@ -179,10 +180,22 @@ export interface PlanResult {
   reasoning: string;
 }
 
+export interface WaitEntry {
+  traceId: string;
+  actionId: string;
+  spanId: string;
+  waitingFor: string;
+  resumeAction: string;
+  resumeMeta: Record<string, any>;
+  eventSummary: string;
+  createdAt: string;
+}
+
 export interface AutopilotState {
   version: string;
   pending: PendingAction[];
   taskMappings?: Record<string, TaskMapping>;
+  waitQueue?: WaitEntry[];
   updatedAt: string;
 }
 

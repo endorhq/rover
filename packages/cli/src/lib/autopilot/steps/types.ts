@@ -43,6 +43,8 @@ export interface StepContext {
   botName?: string;
   /** GitHub handles of project maintainers. */
   maintainers?: string[];
+  /** Project-specific custom instructions for the step. */
+  customInstructions?: string;
 }
 
 // ── Step result (returned by process, applied by orchestrator) ──────────────
@@ -103,6 +105,8 @@ export interface MonitorContext {
   botName?: string;
   /** GitHub handles of project maintainers. */
   maintainers?: string[];
+  /** Project-specific custom instructions for the step. */
+  customInstructions?: string;
 }
 
 export interface Step {

@@ -35,11 +35,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { findOrRegisterProject } from 'rover-core';
 import { MemoryStore } from './lib/autopilot/memory/store.js';
-import { buildPilotPrompt } from './lib/autopilot/steps/coordinator.js';
+import { buildCoordinatorPrompt } from './lib/autopilot/steps/coordinator.js';
 import { buildWorkflowCatalog } from './lib/autopilot/helpers.js';
 import { initWorkflowStore } from './lib/workflow.js';
 import { parseJsonResponse } from './utils/json-parser.js';
-import type { PilotDecision } from './lib/autopilot/types.js';
+import type { CoordinatorDecision } from './lib/autopilot/types.js';
 import colors from 'ansi-colors';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -291,7 +291,7 @@ async function gatherCoordinateContext(
   const workflowCatalog = buildWorkflowCatalog(workflowStore);
   const entries = workflowStore.getAllWorkflowEntries();
   dim(`  Loaded ${entries.length} workflow(s)`);
-  const systemPrompt = buildPilotPrompt(
+  const systemPrompt = buildCoordinatorPrompt(
     workflowCatalog,
     memoryStore.collectionName
   );
@@ -382,7 +382,7 @@ async function runCoordinate(
   header('Parsed Decision');
   try {
     const textToParse = parseAgentOutput(rawOutput);
-    const decision = parseJsonResponse<PilotDecision>(textToParse);
+    const decision = parseJsonResponse<CoordinatorDecision>(textToParse);
     console.log(JSON.stringify(decision, null, 2));
   } catch (err) {
     console.log(colors.yellow('Could not parse JSON decision from response.'));

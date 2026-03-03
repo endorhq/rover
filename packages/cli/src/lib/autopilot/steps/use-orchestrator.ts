@@ -14,6 +14,8 @@ import { resolverStep } from './resolver.js';
 import { pusherStep } from './pusher.js';
 import { noopStep } from './noop.js';
 import { notifyStep } from './notify.js';
+import { waitStep } from './wait.js';
+import { cleanupStep } from './cleanup.js';
 import type { OrchestratorCallbacks } from './types.js';
 
 export type StepStatus = 'idle' | 'processing' | 'error';
@@ -27,6 +29,8 @@ export interface StepStatuses {
   pusher: { status: StepStatus; processedCount: number };
   notify: { status: StepStatus; processedCount: number };
   noop: { status: StepStatus; processedCount: number };
+  wait: { status: StepStatus; processedCount: number };
+  cleanup: { status: StepStatus; processedCount: number };
 }
 
 const ACTION_TYPE_TO_KEY: Record<string, keyof StepStatuses> = {
@@ -38,6 +42,8 @@ const ACTION_TYPE_TO_KEY: Record<string, keyof StepStatuses> = {
   push: 'pusher',
   notify: 'notify',
   noop: 'noop',
+  wait: 'wait',
+  cleanup: 'cleanup',
 };
 
 const DEFAULT_STATUSES: StepStatuses = {
@@ -49,6 +55,8 @@ const DEFAULT_STATUSES: StepStatuses = {
   pusher: { status: 'idle', processedCount: 0 },
   notify: { status: 'idle', processedCount: 0 },
   noop: { status: 'idle', processedCount: 0 },
+  wait: { status: 'idle', processedCount: 0 },
+  cleanup: { status: 'idle', processedCount: 0 },
 };
 
 export function useStepOrchestrator(
@@ -126,6 +134,8 @@ export function useStepOrchestrator(
         pusherStep,
         notifyStep,
         noopStep,
+        waitStep,
+        cleanupStep,
       ],
       store,
       traces: tracesRef.current,
