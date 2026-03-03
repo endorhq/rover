@@ -148,9 +148,9 @@ export class PodmanSandbox extends Sandbox {
 
     podmanArgs.push(
       '-v',
-      `${etcPasswd}:/etc/passwd:Z,rw`,
+      `${etcPasswd}:/etc/passwd:Z,ro`,
       '-v',
-      `${etcGroup}:/etc/group:Z,rw`,
+      `${etcGroup}:/etc/group:Z,ro`,
       '--user',
       `${userInfo_.uid}:${userInfo_.gid}`,
       '-v',
@@ -442,9 +442,9 @@ export class PodmanSandbox extends Sandbox {
 
     podmanArgs.push(
       '-v',
-      `${etcPasswd}:/etc/passwd:Z,rw`,
+      `${etcPasswd}:/etc/passwd:Z,ro`,
       '-v',
-      `${etcGroup}:/etc/group:Z,rw`,
+      `${etcGroup}:/etc/group:Z,ro`,
       '--user',
       `${userInfo_.uid}:${userInfo_.gid}`,
       '-v',
