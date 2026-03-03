@@ -114,23 +114,9 @@ export class ClaudeAgent extends BaseAgent {
           });
           copiedItems.push(colors.cyan(cred.path));
         } else if (cred.path.includes('.settings.json')) {
-          // Copy settings.json to .claude directory, but strip any
-          // MCP server definitions to prevent host MCPs from leaking
-          // into the sandbox. The built-in package-manager MCP is
-          // registered later via `claude mcp add` in the entrypoint.
-          try {
-            const settings = JSON.parse(readFileSync(cred.path, 'utf-8'));
-            delete settings.mcpServers;
-            writeFileSync(
-              join(targetClaudeDir, 'settings.json'),
-              JSON.stringify(settings, null, 2)
-            );
-            settingsWritten = true;
-          } catch {
-            // If we can't parse settings.json, skip it rather than
-            // copying potentially unsafe MCP configurations.
-          }
-          copiedItems.push(colors.cyan('settings.json (mcpServers cleared)'));
+          copyFileSync(cred.path, join(targetClaudeDir, 'settings.json'));
+          settingsWritten = true;
+          copiedItems.push(colors.cyan('settings.json'));
         } else {
           // Copy file right away
           copyFileSync(cred.path, join(targetClaudeDir, filename));
