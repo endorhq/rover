@@ -140,7 +140,7 @@ export async function acpInvoke(config: ACPInvokeConfig): Promise<string> {
 
   const agentConfig = getAgentACPConfig(agentName, model);
 
-  console.log(
+  console.error(
     colors.blue(
       `\n🚀 Starting ACP agent: ${agentConfig.command} ${agentConfig.args.join(' ')}`
     )
@@ -160,7 +160,7 @@ export async function acpInvoke(config: ACPInvokeConfig): Promise<string> {
   if (agentProcess.stderr) {
     agentProcess.stderr.on('data', (chunk: Buffer) => {
       const text = chunk.toString();
-      console.log(colors.yellow(`[ACP Agent stderr] ${text.trim()}`));
+      console.error(colors.yellow(`[ACP Agent stderr] ${text.trim()}`));
     });
   }
 
@@ -202,14 +202,14 @@ export async function acpInvoke(config: ACPInvokeConfig): Promise<string> {
       },
     };
 
-    console.log(
+    console.error(
       colors.gray('[ACP] Sending initialize request:'),
       colors.cyan(JSON.stringify(initRequest, null, 2))
     );
 
     const initResult = await connection.initialize(initRequest);
 
-    console.log(
+    console.error(
       colors.green(
         `✅ Connected to agent (protocol v${initResult.protocolVersion})`
       )
@@ -221,7 +221,7 @@ export async function acpInvoke(config: ACPInvokeConfig): Promise<string> {
       mcpServers: [],
     };
 
-    console.log(
+    console.error(
       colors.gray('[ACP] Sending newSession request:'),
       colors.cyan(JSON.stringify(sessionRequest, null, 2))
     );
@@ -229,7 +229,7 @@ export async function acpInvoke(config: ACPInvokeConfig): Promise<string> {
     const sessionResult = await connection.newSession(sessionRequest);
     const sessionId = sessionResult.sessionId;
 
-    console.log(colors.gray(`📝 Created session: ${sessionId}`));
+    console.error(colors.gray(`📝 Created session: ${sessionId}`));
 
     // 6. For bridge agents, set model via unstable_setSessionModel
     if (agentConfig.kind === 'bridge' && model) {
@@ -237,13 +237,13 @@ export async function acpInvoke(config: ACPInvokeConfig): Promise<string> {
         sessionId,
         modelId: model,
       });
-      console.log(colors.gray(`🔄 Model changed to: ${model}`));
+      console.error(colors.gray(`🔄 Model changed to: ${model}`));
     }
 
     // 7. Send prompt and capture response
     client.startCapturing();
 
-    console.log(
+    console.error(
       colors.gray(
         `[ACP] Sending prompt request (prompt length: ${prompt.length} chars)`
       )
@@ -254,7 +254,7 @@ export async function acpInvoke(config: ACPInvokeConfig): Promise<string> {
       prompt: [{ type: 'text', text: prompt }],
     });
 
-    console.log(
+    console.error(
       colors.gray('[ACP] Prompt response:'),
       colors.cyan(JSON.stringify(promptResult, null, 2))
     );
@@ -263,11 +263,11 @@ export async function acpInvoke(config: ACPInvokeConfig): Promise<string> {
 
     return response;
   } catch (error) {
-    console.log(colors.red('[ACP] Error:'), colors.red(formatError(error)));
+    console.error(colors.red('[ACP] Error:'), colors.red(formatError(error)));
     throw error;
   } finally {
     // 8. Cleanup: kill the agent process
-    console.log(colors.gray('\n🔌 Closing ACP connection...'));
+    console.error(colors.gray('\n🔌 Closing ACP connection...'));
     agentProcess.kill('SIGTERM');
   }
 }

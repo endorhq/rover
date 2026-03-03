@@ -14,7 +14,7 @@ export class GeminiOrQwenACPClient extends ACPClient {
   protected override onFileNotFound(
     path: string
   ): Promise<ReadTextFileResponse> {
-    console.log(
+    console.error(
       colors.yellow(
         `[ACP] readTextFile: Returning empty content for missing file ${path} (Gemini/Qwen)`
       )
