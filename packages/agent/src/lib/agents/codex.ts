@@ -130,17 +130,12 @@ export class CodexAgent extends BaseAgent {
     }
   }
 
+  override get acpCommand(): string {
+    return 'npx';
+  }
+
   toolArguments(): string[] {
-    const args = [
-      'exec',
-      '--dangerously-bypass-approvals-and-sandbox',
-      '--skip-git-repo-check',
-    ];
-    if (this.model) {
-      args.push('--model', this.model);
-    }
-    args.push('-');
-    return args;
+    return ['-y', '@zed-industries/codex-acp'];
   }
 
   toolInteractiveArguments(

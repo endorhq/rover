@@ -1,11 +1,10 @@
 import { existsSync, copyFileSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { homedir, platform } from 'node:os';
+import { homedir } from 'node:os';
 import colors from 'ansi-colors';
 import { AgentCredentialFile } from './types.js';
 import { BaseAgent } from './base.js';
-import { launch, launchSync, VERBOSE, showList } from 'rover-core';
-import { mcpJsonSchema } from '../mcp/schema.js';
+import { showList } from 'rover-core';
 
 export class CursorAgent extends BaseAgent {
   name = 'Cursor';
@@ -155,19 +154,12 @@ export class CursorAgent extends BaseAgent {
     );
   }
 
+  override get acpCommand(): string {
+    return 'npx';
+  }
+
   toolArguments(): string[] {
-    const args = [
-      'agent',
-      '--approve-mcps',
-      '--force',
-      '--print',
-      '--output-format',
-      'json',
-    ];
-    if (this.model) {
-      args.push('--model', this.model);
-    }
-    return args;
+    return ['-y', '@blowmage/cursor-agent-acp'];
   }
 
   toolInteractiveArguments(

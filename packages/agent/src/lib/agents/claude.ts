@@ -82,15 +82,21 @@ export class ClaudeAgent extends BaseAgent {
     const credentials = this.getRequiredCredentials();
     const copiedItems: string[] = [];
 
+    let settingsWritten = false;
+
     for (const cred of credentials) {
       if (existsSync(cred.path)) {
         const filename = basename(cred.path);
 
-        // For .claude.json, we need to edit the projects section
+        // For .claude.json, we need to sanitize host-specific sections
         if (cred.path.includes('.claude.json')) {
-          // Read the config and clear the projects object
+          // Read the config and clear host-specific sections
           const config = JSON.parse(readFileSync(cred.path, 'utf-8'));
           config.projects = {};
+          // Remove host MCP servers — only rover.json-defined MCPs
+          // (configured via the entrypoint script or ACP session) should
+          // be available inside the sandbox.
+          delete config.mcpServers;
 
           // Write to targetDir instead of targetClaudeDir.
           // The .claude.json file is located at $HOME
@@ -98,7 +104,9 @@ export class ClaudeAgent extends BaseAgent {
             join(targetDir, filename),
             JSON.stringify(config, null, 2)
           );
-          copiedItems.push(colors.cyan('.claude.json (projects cleared)'));
+          copiedItems.push(
+            colors.cyan('.claude.json (projects & mcpServers cleared)')
+          );
         } else if (cred.path.includes('gcloud')) {
           // Copy the entire folder
           cpSync(cred.path, join(targetDir, '.config', 'gcloud'), {
@@ -106,8 +114,8 @@ export class ClaudeAgent extends BaseAgent {
           });
           copiedItems.push(colors.cyan(cred.path));
         } else if (cred.path.includes('.settings.json')) {
-          // Copy settings.json to .claude directory
           copyFileSync(cred.path, join(targetClaudeDir, 'settings.json'));
+          settingsWritten = true;
           copiedItems.push(colors.cyan('settings.json'));
         } else {
           // Copy file right away

@@ -15,9 +15,9 @@
  */
 
 import { beforeEach, afterEach, describe, it, expect, vi } from 'vitest';
+import { safeCleanup } from './e2e-utils.js';
 import {
   mkdtempSync,
-  rmSync,
   writeFileSync,
   readFileSync,
   existsSync,
@@ -108,7 +108,7 @@ describe('rover init (e2e)', () => {
     // Restore original state
     process.chdir(originalCwd);
     process.env.PATH = originalPath;
-    rmSync(testDir, { recursive: true, force: true });
+    safeCleanup(testDir);
   });
 
   /**
@@ -564,7 +564,7 @@ tasks:
       expect(clonedSettings.defaults.aiAgent).toBe('claude');
 
       // Cleanup: Remove cloned directory
-      rmSync(cloneDir, { recursive: true, force: true });
+      safeCleanup(cloneDir);
     });
   });
 

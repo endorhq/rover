@@ -15,13 +15,8 @@
  */
 
 import { beforeEach, afterEach, describe, it, expect } from 'vitest';
-import {
-  mkdtempSync,
-  rmSync,
-  writeFileSync,
-  mkdirSync,
-  chmodSync,
-} from 'node:fs';
+import { safeCleanup } from './e2e-utils.js';
+import { mkdtempSync, writeFileSync, mkdirSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execa } from 'execa';
@@ -156,7 +151,7 @@ exit 0
   afterEach(() => {
     process.chdir(originalCwd);
     process.env.PATH = originalPath;
-    rmSync(testDir, { recursive: true, force: true });
+    safeCleanup(testDir);
   });
 
   describe('worktree detection and notification', () => {

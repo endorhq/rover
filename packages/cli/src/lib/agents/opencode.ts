@@ -11,6 +11,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { existsSync } from 'node:fs';
 import type { WorkflowInput } from 'rover-schemas';
+import { acpInvoke } from './acp-invoke.js';
 
 // Environment variables reference for OpenCode:
 // - https://opencode.ai/docs/providers/#environment-variables-quick-start
@@ -69,32 +70,20 @@ class OpenCodeAI implements AIAgentTool {
 
   async invoke(prompt: string, options: InvokeOptions = {}): Promise<string> {
     const { json = false, cwd, model } = options;
-    // OpenCode uses: echo "prompt" | opencode run
-    // See: https://opencode.ai/docs/cli/
-    // Note: We don't use --format json because it outputs streaming JSON events,
-    // not a single result object. Instead, we rely on prompt instructions for JSON output.
+
     if (json) {
       prompt = `${prompt}
 
 You MUST output a valid JSON string as an output. Just output the JSON string and nothing else. If you had any error, still return a JSON string with an "error" property.`;
     }
 
-    // Build arguments: run
-    const opencodeArgs = ['run'];
-
-    if (model) {
-      opencodeArgs.push('--model', model);
-    }
-
     try {
-      const { stdout } = await launch(this.AGENT_BIN, opencodeArgs, {
-        input: prompt,
+      const result = await acpInvoke({
+        agentName: 'opencode',
+        prompt,
         cwd,
-        env: process.env,
+        model,
       });
-
-      // Result - OpenCode outputs plain text when not using --format json
-      const result = stdout?.toString().trim() || '';
 
       return result;
     } catch (error) {

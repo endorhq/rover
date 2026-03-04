@@ -17,7 +17,9 @@ certain state of the system set by other tests.
 Tests **MUST NOT** rely on system state that is not previously set up
 by any before/after test code. Tests **MUST** clean up after
 themselves all temporary state they have created in order to run
-tests, regardless of the outcome of the test result.
+tests, regardless of the outcome of the test result. However, cleanup
+failures **MUST NOT** cause test failures — see [Resilient test
+cleanup](#resilient-test-cleanup) below.
 
 In general, and unless otherwise explicitly mentioned on the test
 description, tests **SHOULD** use fixtures for agent
@@ -117,3 +119,30 @@ on that package if that script is present in the `package.json` file,
 but only for making quicker checks. You **MUST** check that the
 overall suite that includes all tests passes before calling a testing
 session done.
+
+## Resilient test cleanup
+
+Test cleanup (e.g. removing temporary directories in `afterEach`)
+**MUST** be resilient to filesystem errors. Specifically, `rmSync`
+with `{ recursive: true }` can spuriously fail with `ENOTEMPTY` on
+Linux and Windows due to a race condition in Node.js's internal rimraf
+implementation where `rmdir` is called before preceding `unlink`
+operations have fully propagated at the VFS level
+(https://github.com/nodejs/node/issues/41201).
+
+The `e2e-utils.ts` module exports a `safeCleanup(dir: string)` helper
+that **MUST** be used instead of calling `rmSync` directly. This
+helper uses `maxRetries` with a `retryDelay` as a best effort, and
+catches any remaining errors so that cleanup failures never cause test
+failures. Temporary directories live under `/tmp` and will be reclaimed
+by the OS regardless.
+
+```ts
+import { safeCleanup } from './e2e-utils';
+
+afterEach(() => {
+  process.chdir(originalCwd);
+  process.env.PATH = originalPath;
+  safeCleanup(testDir);
+});
+```

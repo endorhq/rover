@@ -15,7 +15,7 @@
  */
 
 import { beforeEach, afterEach, describe, it, expect } from 'vitest';
-import { SKIP_REAL_AGENT_TESTS } from './e2e-utils.js';
+import { SKIP_REAL_AGENT_TESTS, safeCleanup } from './e2e-utils.js';
 import {
   mkdtempSync,
   rmSync,
@@ -263,7 +263,7 @@ steps:
   afterEach(() => {
     process.chdir(originalCwd);
     process.env.PATH = originalPath;
-    rmSync(testDir, { recursive: true, force: true });
+    safeCleanup(testDir);
   });
 
   describe('add workflow from URL', () => {
