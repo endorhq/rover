@@ -5,7 +5,6 @@
  * sends a prompt, captures the response, and cleans up.
  */
 
-import { spawn, ChildProcess } from 'node:child_process';
 import { Readable, Writable } from 'node:stream';
 import {
   ClientSideConnection,
@@ -13,7 +12,7 @@ import {
   PROTOCOL_VERSION,
 } from '@agentclientprotocol/sdk';
 import colors from 'ansi-colors';
-import { VERBOSE } from 'rover-core';
+import { VERBOSE, launch } from 'rover-core';
 import { ACPClient } from './acp-client.js';
 import { GeminiOrQwenACPClient } from './gemini-or-qwen-acp-client.js';
 
@@ -140,24 +139,22 @@ export async function acpInvoke(config: ACPInvokeConfig): Promise<string> {
 
   const agentConfig = getAgentACPConfig(agentName, model);
 
-  console.error(
-    colors.blue(
-      `\n🚀 Starting ACP agent: ${agentConfig.command} ${agentConfig.args.join(' ')}`
-    )
-  );
+  if (VERBOSE) {
+    console.error(
+      colors.blue(
+        `\n🚀 Starting ACP agent: ${agentConfig.command} ${agentConfig.args.join(' ')}`
+      )
+    );
+  }
 
   // 1. Spawn agent process
-  const agentProcess: ChildProcess = spawn(
-    agentConfig.command,
-    agentConfig.args,
-    {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: process.env,
-    }
-  );
+  const agentProcess = launch(agentConfig.command, agentConfig.args, {
+    stdio: 'pipe',
+    reject: false,
+  });
 
   // Forward stderr for debugging
-  if (agentProcess.stderr) {
+  if (VERBOSE && agentProcess.stderr) {
     agentProcess.stderr.on('data', (chunk: Buffer) => {
       const text = chunk.toString();
       console.error(colors.yellow(`[ACP Agent stderr] ${text.trim()}`));
@@ -202,18 +199,22 @@ export async function acpInvoke(config: ACPInvokeConfig): Promise<string> {
       },
     };
 
-    console.error(
-      colors.gray('[ACP] Sending initialize request:'),
-      colors.cyan(JSON.stringify(initRequest, null, 2))
-    );
+    if (VERBOSE) {
+      console.error(
+        colors.gray('[ACP] Sending initialize request:'),
+        colors.cyan(JSON.stringify(initRequest, null, 2))
+      );
+    }
 
     const initResult = await connection.initialize(initRequest);
 
-    console.error(
-      colors.green(
-        `✅ Connected to agent (protocol v${initResult.protocolVersion})`
-      )
-    );
+    if (VERBOSE) {
+      console.error(
+        colors.green(
+          `✅ Connected to agent (protocol v${initResult.protocolVersion})`
+        )
+      );
+    }
 
     // 5. Create session
     const sessionRequest = {
@@ -221,15 +222,19 @@ export async function acpInvoke(config: ACPInvokeConfig): Promise<string> {
       mcpServers: [],
     };
 
-    console.error(
-      colors.gray('[ACP] Sending newSession request:'),
-      colors.cyan(JSON.stringify(sessionRequest, null, 2))
-    );
+    if (VERBOSE) {
+      console.error(
+        colors.gray('[ACP] Sending newSession request:'),
+        colors.cyan(JSON.stringify(sessionRequest, null, 2))
+      );
+    }
 
     const sessionResult = await connection.newSession(sessionRequest);
     const sessionId = sessionResult.sessionId;
 
-    console.error(colors.gray(`📝 Created session: ${sessionId}`));
+    if (VERBOSE) {
+      console.error(colors.gray(`📝 Created session: ${sessionId}`));
+    }
 
     // 6. For bridge agents, set model via unstable_setSessionModel
     if (agentConfig.kind === 'bridge' && model) {
@@ -237,37 +242,47 @@ export async function acpInvoke(config: ACPInvokeConfig): Promise<string> {
         sessionId,
         modelId: model,
       });
-      console.error(colors.gray(`🔄 Model changed to: ${model}`));
+      if (VERBOSE) {
+        console.error(colors.gray(`🔄 Model changed to: ${model}`));
+      }
     }
 
     // 7. Send prompt and capture response
     client.startCapturing();
 
-    console.error(
-      colors.gray(
-        `[ACP] Sending prompt request (prompt length: ${prompt.length} chars)`
-      )
-    );
+    if (VERBOSE) {
+      console.error(
+        colors.gray(
+          `[ACP] Sending prompt request (prompt length: ${prompt.length} chars)`
+        )
+      );
+    }
 
     const promptResult = await connection.prompt({
       sessionId,
       prompt: [{ type: 'text', text: prompt }],
     });
 
-    console.error(
-      colors.gray('[ACP] Prompt response:'),
-      colors.cyan(JSON.stringify(promptResult, null, 2))
-    );
+    if (VERBOSE) {
+      console.error(
+        colors.gray('[ACP] Prompt response:'),
+        colors.cyan(JSON.stringify(promptResult, null, 2))
+      );
+    }
 
     const response = client.stopCapturing();
 
     return response;
   } catch (error) {
-    console.error(colors.red('[ACP] Error:'), colors.red(formatError(error)));
+    if (VERBOSE) {
+      console.error(colors.red('[ACP] Error:'), colors.red(formatError(error)));
+    }
     throw error;
   } finally {
     // 8. Cleanup: kill the agent process
-    console.error(colors.gray('\n🔌 Closing ACP connection...'));
+    if (VERBOSE) {
+      console.error(colors.gray('\n🔌 Closing ACP connection...'));
+    }
     agentProcess.kill('SIGTERM');
   }
 }
