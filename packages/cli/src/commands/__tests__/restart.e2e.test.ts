@@ -15,14 +15,8 @@
  */
 
 import { beforeEach, afterEach, describe, it, expect } from 'vitest';
-import { SKIP_REAL_AGENT_TESTS } from './e2e-utils.js';
-import {
-  mkdtempSync,
-  rmSync,
-  writeFileSync,
-  mkdirSync,
-  chmodSync,
-} from 'node:fs';
+import { SKIP_REAL_AGENT_TESTS, safeCleanup } from './e2e-utils.js';
+import { mkdtempSync, writeFileSync, mkdirSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execa } from 'execa';
@@ -175,7 +169,7 @@ exit 0
   afterEach(() => {
     process.chdir(originalCwd);
     process.env.PATH = originalPath;
-    rmSync(testDir, { recursive: true, force: true });
+    safeCleanup(testDir);
   });
 
   /**
