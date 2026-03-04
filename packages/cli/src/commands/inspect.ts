@@ -20,6 +20,7 @@ import {
   requireProjectContext,
 } from '../lib/context.js';
 import { exitWithError, exitWithSuccess } from '../utils/exit.js';
+import { isStdoutTTY } from '../utils/stdout.js';
 import type {
   FileChangeStat,
   RawFileOutput,
@@ -269,133 +270,147 @@ const inspectCommand = async (
       await exitWithSuccess(null, jsonOutput, { telemetry });
       return;
     } else {
-      // Format status with user-friendly names
-      const formattedStatus = formatTaskStatus(task.status);
-
-      // Status color
-      const statusColorFunc = statusColor(task.status);
-
-      showTitle('Details');
-
-      const properties: Record<string, string> = {
-        ID: `${task.id.toString()} (${colors.gray(task.uuid)})`,
-        Title: task.title,
-        Status: statusColorFunc(formattedStatus),
-        Agent: task.agent
-          ? formatAgentWithModel(task.agent as any, task.agentModel)
-          : '-',
-        Workflow: task.workflowName,
-        'Created At': new Date(task.createdAt).toLocaleString(),
-      };
-
-      // Show task source if available (e.g., GitHub issue, etc.)
-      if (task.source?.url) {
-        const sourceLabel =
-          task.source.type === 'github' ? 'GitHub Issue' : 'Source';
-        properties[sourceLabel] = colors.cyan(task.source.url);
-      }
-
-      if (task.completedAt) {
-        properties['Completed At'] = new Date(
-          task.completedAt
-        ).toLocaleString();
-      } else if (task.failedAt) {
-        properties['Failed At'] = new Date(task.failedAt).toLocaleString();
-      }
-
-      // Show error if failed
-      if (task.error) {
-        properties['Error'] = colors.red(task.error);
-      }
-
-      showProperties(properties);
-
-      // Workspace information
-      showTitle('Workspace');
-
-      const workspaceProps: Record<string, string> = {
-        'Branch Name': task.branchName,
-        'Git Workspace path': task.worktreePath,
-      };
-
-      showProperties(workspaceProps);
-
-      // Workflow files
       const discoveredFiles = iteration.listMarkdownFiles();
 
-      if (discoveredFiles.length > 0) {
-        showTitle(
-          `Workflow Output ${colors.gray(`| Iteration ${iterationNumber}/${task.iterations}`)}`
-        );
-        showList(discoveredFiles);
-
-        // Show the summary file by default only when it's available
-        const hasSummary = discoveredFiles.includes(DEFAULT_FILE_CONTENTS);
-        const fileFilter = options.file || [
-          hasSummary
-            ? DEFAULT_FILE_CONTENTS
-            : discoveredFiles[discoveredFiles.length - 1],
-        ];
-
-        const iterationFileContents = iteration.getMarkdownFiles(fileFilter);
-        if (iterationFileContents.size === 0) {
-          console.log(
-            colors.gray(
-              `\nNo content for the ${fileFilter.join(', ')} files found for iteration ${iterationNumber}.`
-            )
-          );
-        } else {
-          console.log();
-          iterationFileContents.forEach((contents, file) => {
-            showFile(file, contents.trim());
+      if (!isStdoutTTY()) {
+        // Piped stdout: output only raw file content, no decorations
+        if (discoveredFiles.length > 0) {
+          const hasSummary = discoveredFiles.includes(DEFAULT_FILE_CONTENTS);
+          const fileFilter = options.file || [
+            hasSummary
+              ? DEFAULT_FILE_CONTENTS
+              : discoveredFiles[discoveredFiles.length - 1],
+          ];
+          const iterationFileContents = iteration.getMarkdownFiles(fileFilter);
+          iterationFileContents.forEach(contents => {
+            console.log(contents.trim());
           });
         }
-      }
+      } else {
+        // Interactive TTY: Format status with user-friendly names
+        const formattedStatus = formatTaskStatus(task.status);
+        // Status color
+        const statusColorFunc = statusColor(task.status);
 
-      // Show file changes only if task is not in an active state
-      if (!task.isActive()) {
-        const git = new Git({ cwd: project.path });
-        const stats = await git.diffStats({
-          worktreePath: task.worktreePath,
-          includeUntracked: true,
-        });
+        showTitle('Details');
 
-        const statFiles = stats.files.map(fileStat => {
-          const insertions =
-            fileStat.insertions > 0
-              ? colors.green(`+${fileStat.insertions}`)
-              : '';
-          const deletions =
-            fileStat.deletions > 0 ? colors.red(`-${fileStat.deletions}`) : '';
-          return `${insertions} ${deletions} ${colors.cyan(fileStat.path)}`;
-        });
+        const properties: Record<string, string> = {
+          ID: `${task.id.toString()} (${colors.gray(task.uuid)})`,
+          Title: task.title,
+          Status: statusColorFunc(formattedStatus),
+          Agent: task.agent
+            ? formatAgentWithModel(task.agent as any, task.agentModel)
+            : '-',
+          Workflow: task.workflowName,
+          'Created At': new Date(task.createdAt).toLocaleString(),
+        };
 
-        showTitle('File Changes');
-        showList(statFiles);
-      }
+        // Show task source if available (e.g., GitHub issue, etc.)
+        if (task.source?.url) {
+          const sourceLabel =
+            task.source.type === 'github' ? 'GitHub Issue' : 'Source';
+          properties[sourceLabel] = colors.cyan(task.source.url);
+        }
 
-      const tips = [];
+        if (task.completedAt) {
+          properties['Completed At'] = new Date(
+            task.completedAt
+          ).toLocaleString();
+        } else if (task.failedAt) {
+          properties['Failed At'] = new Date(task.failedAt).toLocaleString();
+        }
 
-      if (task.status === 'NEW' || task.status === 'FAILED') {
-        tips.push(
-          'Use ' + colors.cyan(`rover restart ${taskId}`) + ' to retry it'
-        );
-      } else if (options.file == null && discoveredFiles.length > 0) {
-        tips.push(
+        // Show error if failed
+        if (task.error) {
+          properties['Error'] = colors.red(task.error);
+        }
+
+        showProperties(properties);
+
+        // Workspace information
+        showTitle('Workspace');
+
+        const workspaceProps: Record<string, string> = {
+          'Branch Name': task.branchName,
+          'Git Workspace path': task.worktreePath,
+        };
+
+        showProperties(workspaceProps);
+
+        if (discoveredFiles.length > 0) {
+          showTitle(
+            `Workflow Output ${colors.gray(`| Iteration ${iterationNumber}/${task.iterations}`)}`
+          );
+          showList(discoveredFiles);
+
+          // Show the summary file by default only when it's available
+          const hasSummary = discoveredFiles.includes(DEFAULT_FILE_CONTENTS);
+          const fileFilter = options.file || [
+            hasSummary
+              ? DEFAULT_FILE_CONTENTS
+              : discoveredFiles[discoveredFiles.length - 1],
+          ];
+
+          const iterationFileContents = iteration.getMarkdownFiles(fileFilter);
+          if (iterationFileContents.size === 0) {
+            console.log(
+              colors.gray(
+                `\nNo content for the ${fileFilter.join(', ')} files found for iteration ${iterationNumber}.`
+              )
+            );
+          } else {
+            console.log();
+            iterationFileContents.forEach((contents, file) => {
+              showFile(file, contents.trim());
+            });
+          }
+        }
+
+        // Show file changes only if task is not in an active state
+        if (!task.isActive()) {
+          const git = new Git({ cwd: project.path });
+          const stats = await git.diffStats({
+            worktreePath: task.worktreePath,
+            includeUntracked: true,
+          });
+
+          const statFiles = stats.files.map(fileStat => {
+            const insertions =
+              fileStat.insertions > 0
+                ? colors.green(`+${fileStat.insertions}`)
+                : '';
+            const deletions =
+              fileStat.deletions > 0 ? colors.red(`-${fileStat.deletions}`) : '';
+            return `${insertions} ${deletions} ${colors.cyan(fileStat.path)}`;
+          });
+
+          showTitle('File Changes');
+          showList(statFiles);
+        }
+
+        const tips = [];
+
+        if (task.status === 'NEW' || task.status === 'FAILED') {
+          tips.push(
+            'Use ' + colors.cyan(`rover restart ${taskId}`) + ' to retry it'
+          );
+        } else if (options.file == null && discoveredFiles.length > 0) {
+          tips.push(
+            'Use ' +
+              colors.cyan(
+                `rover inspect ${taskId} --file ${discoveredFiles[0]}`
+              ) +
+              ' to read its content'
+          );
+        }
+
+        showTips([
+          ...tips,
           'Use ' +
-            colors.cyan(
-              `rover inspect ${taskId} --file ${discoveredFiles[0]}`
-            ) +
-            ' to read its content'
-        );
+            colors.cyan(`rover iterate ${taskId}`) +
+            ' to start a new agent iteration on this task',
+        ]);
       }
-
-      showTips([
-        ...tips,
-        'Use ' +
-          colors.cyan(`rover iterate ${taskId}`) +
-          ' to start a new agent iteration on this task',
-      ]);
     }
 
     await exitWithSuccess(null, { success: true }, { telemetry });

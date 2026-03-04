@@ -40,6 +40,7 @@ import {
 } from './lib/context.js';
 import { showRoverHeader } from 'rover-core/src/display/header.js';
 import { getUserAIAgent } from './lib/agents/index.js';
+import { isStdoutTTY } from './utils/stdout.js';
 import type { CommandDefinition } from './types.js';
 
 // Registry of all commands for metadata lookup
@@ -207,8 +208,8 @@ export function createProgram(
           agentName = agent.toString();
         }
 
-        if (isJsonMode() || commandName === 'mcp') {
-          // Do not print anything for JSON or MCP mode
+        if (isJsonMode() || commandName === 'mcp' || !isStdoutTTY()) {
+          // Do not print anything for JSON, MCP, or when stdout is piped
           return;
         }
 
