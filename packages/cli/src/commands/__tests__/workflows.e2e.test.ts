@@ -263,7 +263,7 @@ steps:
   afterEach(() => {
     process.chdir(originalCwd);
     process.env.PATH = originalPath;
-    rmSync(testDir, { recursive: true, force: true });
+    rmSync(testDir, { recursive: true, force: true, maxRetries: 3 });
   });
 
   describe('add workflow from URL', () => {

@@ -201,7 +201,7 @@ exit 0
     // Restore original state
     process.chdir(originalCwd);
     process.env.PATH = originalPath;
-    rmSync(testDir, { recursive: true, force: true });
+    rmSync(testDir, { recursive: true, force: true, maxRetries: 3 });
   });
 
   /**

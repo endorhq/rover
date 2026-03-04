@@ -108,7 +108,7 @@ describe('rover init (e2e)', () => {
     // Restore original state
     process.chdir(originalCwd);
     process.env.PATH = originalPath;
-    rmSync(testDir, { recursive: true, force: true });
+    rmSync(testDir, { recursive: true, force: true, maxRetries: 3 });
   });
 
   /**
@@ -564,7 +564,7 @@ tasks:
       expect(clonedSettings.defaults.aiAgent).toBe('claude');
 
       // Cleanup: Remove cloned directory
-      rmSync(cloneDir, { recursive: true, force: true });
+      rmSync(cloneDir, { recursive: true, force: true, maxRetries: 3 });
     });
   });
 
