@@ -169,8 +169,55 @@ export const committerStep: Step = {
       };
     }
 
-    // Task completed — invoke the committer agent
+    // Task completed — check if the worktree has any uncommitted changes first
     const git = new Git({ cwd: projectPath });
+
+    if (!git.hasUncommittedChanges({ worktreePath: task.worktreePath })) {
+      // No code changes in worktree — skip AI invocation entirely
+      const commitSpan = new SpanWriter(projectId, {
+        step: 'commit',
+        parentId: pending.spanId,
+        originAction: pending.actionId,
+        meta: {
+          roverTaskId: taskId,
+          branchName,
+          committed: false,
+          commitSha: null,
+          taskStatus: 'COMPLETED',
+          skippedReason: 'no uncommitted changes in worktree',
+        },
+      });
+      commitSpan.complete(
+        `commit: task #${taskId}: skipped (no changes in worktree)`
+      );
+
+      const resolveAction = emitAction(store, {
+        projectId,
+        traceId: pending.traceId,
+        action: 'resolve',
+        spanId: commitSpan.id,
+        reasoning: `Resolve task #${taskId}: ${meta.title} (no code changes)`,
+        meta: { ...meta, committed: false, taskStatus: 'COMPLETED' },
+        fromStep: 'commit',
+        summary: `resolve: ${meta.title}`,
+        removePendingId: pending.actionId,
+      });
+
+      return {
+        spanId: commitSpan.id,
+        terminal: false,
+        enqueuedActions: [
+          {
+            actionId: resolveAction.id,
+            actionType: 'resolve',
+            summary: meta.title,
+          },
+        ],
+        reasoning: `task #${taskId} no changes in worktree, skipping commit`,
+        status: 'completed',
+      };
+    }
+
     const summaries = getTaskIterationSummaries(task.iterationsPath());
     const recentCommits = git.getRecentCommits();
 

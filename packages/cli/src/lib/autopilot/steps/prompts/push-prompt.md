@@ -63,6 +63,20 @@ Read error output carefully. Common recoverable cases:
 - **Auth failure** -> report, not recoverable
 - **`gh` not found** -> skip PR creation, push is still successful
 
+### Phase 5 — Workflow Output Delivery (when applicable)
+
+If no code branches are available but workflow outputs are provided, deliver them appropriately:
+
+1. **Review output** (contains body, decision, comments): Post as a PR review using `gh api`:
+   ```
+   echo '<json payload>' | gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews --method POST --input -
+   ```
+   The payload should include `body`, `event` (APPROVE/REQUEST_CHANGES/COMMENT), and `comments` array with objects containing `path`, `position` (or `line`), and `body`.
+
+2. **Other outputs**: Analyze the workflow description and outputs to determine the best delivery. Use `gh` commands as appropriate (e.g., `gh issue comment`, `gh pr comment`).
+
+When delivering non-code output, your status should be `"reviewed"` or `"delivered"` instead of `"pushed"`.
+
 ### Safe Actions
 
 You MAY run these commands:
@@ -76,6 +90,7 @@ You MAY run these commands:
 - `git log`, `git diff`, `git diff --stat`
 - `git add <file>` (only for merge conflict resolution)
 - `gh pr list`, `gh pr create`, `gh pr view`
+- `gh api` (for posting reviews, comments, and other API interactions)
 
 ### Unsafe Actions (MUST NOT do)
 
@@ -92,12 +107,16 @@ After completing your work, output a single JSON object and nothing else:
 
 ```json
 {
-  "status": "pushed | failed",
+  "status": "pushed | reviewed | delivered | failed",
   "branches_pushed": ["<branch names that were pushed>"],
   "pull_request": {
     "url": "<PR URL or null>",
     "created": true,
     "existing": false
+  },
+  "review_posted": {
+    "pr_number": 42,
+    "decision": "APPROVE | REQUEST_CHANGES | COMMENT"
   },
   "error": "<error description if failed, or null>",
   "summary": "<1-2 sentence summary of what happened>"
@@ -107,13 +126,20 @@ After completing your work, output a single JSON object and nothing else:
 ### Status Values
 
 - `"pushed"` — At least one branch was pushed to the remote. `pull_request` may be non-null if a PR was created or already existed.
-- `"failed"` — The push could not be completed. Provide the `error` field with details. `branches_pushed` should list any branches that were successfully pushed before the failure.
+- `"reviewed"` — A PR review was posted (no code pushed). Provide the `review_posted` field.
+- `"delivered"` — Workflow output was delivered via other means (comment, API call, etc.). No code was pushed.
+- `"failed"` — The delivery could not be completed. Provide the `error` field with details. `branches_pushed` should list any branches that were successfully pushed before the failure.
 
 ### Pull Request Field
 
 - If a PR was created: `{ "url": "...", "created": true, "existing": false }`
 - If a PR already existed: `{ "url": "...", "created": false, "existing": true }`
 - If no PR was created (gh unavailable, error, etc.): `null`
+
+### Review Posted Field
+
+- If a review was posted: `{ "pr_number": 42, "decision": "APPROVE" }`
+- If no review was posted: `null` (or omit the field)
 
 ## Important Rules
 

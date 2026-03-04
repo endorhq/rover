@@ -44,6 +44,7 @@ function enqueueCommitAction(
   const commitMeta = {
     roverTaskId,
     workflow: pending.meta?.workflow,
+    workflowProfile: pending.meta?.workflowProfile,
     title: pending.meta?.title,
     branchName,
     sourceActionId: pending.actionId,
@@ -163,9 +164,12 @@ export const workflowStep: Step = {
 
     const git = new Git({ cwd: projectPath });
 
-    // 1. Resolve source branch (dependency branching)
+    // 1. Resolve source branch (dependency branching or explicit source)
     let baseBranch: string;
-    if (meta.depends_on_action_id) {
+    if (meta.sourceBranch) {
+      // Coordinator/planner specified a source branch (e.g., PR head branch for code-review)
+      baseBranch = meta.sourceBranch;
+    } else if (meta.depends_on_action_id) {
       const depMapping = store.getTaskMapping(meta.depends_on_action_id);
       if (depMapping) {
         baseBranch = depMapping.branchName;
@@ -371,6 +375,25 @@ export const workflowStep: Step = {
           `workflow: task #${mapping.taskId} completed on ${mapping.branchName}`
         );
 
+        // Gather workflow definition metadata for downstream inference
+        const workflowName = task.workflowName;
+        const workflowDef = ctx.workflowStore?.getWorkflow(workflowName);
+        const workflowProfile = workflowDef
+          ? {
+              description: workflowDef.description,
+              outputs: workflowDef.outputs.map(o => ({
+                name: o.name,
+                type: o.type,
+                filename: o.filename,
+              })),
+              inputs: workflowDef.inputs.map(i => ({
+                name: i.name,
+                type: i.type,
+                description: i.description,
+              })),
+            }
+          : undefined;
+
         const pendingForCommit: PendingAction = {
           traceId: mapping.traceId,
           actionId,
@@ -379,7 +402,8 @@ export const workflowStep: Step = {
           summary: step.reasoning ?? '',
           createdAt: step.timestamp,
           meta: {
-            workflow: step.action,
+            workflow: workflowName,
+            workflowProfile,
             title: task.title,
             description: task.description,
           },
@@ -425,6 +449,25 @@ export const workflowStep: Step = {
           { error: errorMessage }
         );
 
+        // Gather workflow definition metadata for downstream inference
+        const workflowName = task.workflowName;
+        const workflowDef = ctx.workflowStore?.getWorkflow(workflowName);
+        const workflowProfile = workflowDef
+          ? {
+              description: workflowDef.description,
+              outputs: workflowDef.outputs.map(o => ({
+                name: o.name,
+                type: o.type,
+                filename: o.filename,
+              })),
+              inputs: workflowDef.inputs.map(i => ({
+                name: i.name,
+                type: i.type,
+                description: i.description,
+              })),
+            }
+          : undefined;
+
         const pendingForCommit: PendingAction = {
           traceId: mapping.traceId,
           actionId,
@@ -433,7 +476,8 @@ export const workflowStep: Step = {
           summary: step.reasoning ?? '',
           createdAt: step.timestamp,
           meta: {
-            workflow: step.action,
+            workflow: workflowName,
+            workflowProfile,
             title: task.title,
             description: task.description,
           },

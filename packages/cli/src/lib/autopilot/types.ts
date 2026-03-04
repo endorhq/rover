@@ -114,7 +114,7 @@ export type PusherStatus = 'idle' | 'processing' | 'error';
 export type ResolverDecision = 'wait' | 'push' | 'notify' | 'iterate' | 'fail';
 
 export interface ResolverAIResult {
-  decision: 'iterate' | 'fail' | 'notify';
+  decision: 'iterate' | 'fail';
   reasoning: string;
   iterate_instructions?: string;
   fail_reason?: string;
@@ -134,12 +134,16 @@ export interface CommitterAIResult {
   summary: string;
 }
 export interface PusherAIResult {
-  status: 'pushed' | 'failed';
+  status: 'pushed' | 'reviewed' | 'delivered' | 'failed';
   branches_pushed: string[];
   pull_request: {
     url: string | null;
     created: boolean;
     existing: boolean;
+  } | null;
+  review_posted?: {
+    pr_number: number;
+    decision: string;
   } | null;
   error: string | null;
   summary: string;

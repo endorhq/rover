@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { mkdirSync, readFileSync, existsSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
 import { IterationManager } from 'rover-core';
 import { invokeAI, appendPromptSuffix } from './ai.js';
 import { SpanWriter, emitAction } from '../logging.js';
@@ -117,7 +117,7 @@ async function askAIForDecision(
   pending: PendingAction,
   ctx: StepContext
 ): Promise<{
-  decision: 'iterate' | 'fail' | 'notify';
+  decision: 'iterate' | 'fail';
   reason: string;
   iterateInstructions?: string;
 }> {
@@ -187,13 +187,6 @@ async function askAIForDecision(
     tools: ['Bash(qmd:*)'],
   });
 
-  if (result.decision === 'notify') {
-    return {
-      decision: 'notify',
-      reason: result.reasoning,
-    };
-  }
-
   if (result.decision !== 'iterate' && result.decision !== 'fail') {
     return {
       decision: 'iterate',
@@ -218,61 +211,6 @@ async function askAIForDecision(
     decision: 'fail',
     reason: result.fail_reason ?? result.reasoning,
   };
-}
-
-// ── Review output gathering ──────────────────────────────────────────────────
-
-/**
- * Look for review.json output from a code-review workflow in the trace.
- * Returns the parsed review data or null if not found.
- */
-function gatherReviewOutput(
-  trace: ActionTrace,
-  store: import('../store.js').AutopilotStore,
-  project: import('rover-core').ProjectManager | undefined
-): {
-  body: string;
-  decision: string;
-  comments: Array<{ path: string; line: number; body: string }>;
-} | null {
-  if (!project) return null;
-
-  // Find workflow steps that completed (code-review tasks)
-  for (const step of trace.steps) {
-    if (step.status !== 'completed') continue;
-
-    if (!step.originAction) continue;
-    const mapping = store.getTaskMapping(step.originAction);
-    if (!mapping) continue;
-
-    const task = project.getTask(mapping.taskId);
-    if (!task) continue;
-
-    // Look for review.json in the task's last iteration directory
-    const iterationPath = join(
-      task.iterationsPath(),
-      task.iterations.toString()
-    );
-    const reviewPath = join(iterationPath, 'review.json');
-
-    if (existsSync(reviewPath)) {
-      try {
-        const content = readFileSync(reviewPath, 'utf-8');
-        const review = JSON.parse(content);
-        if (review.body && review.decision) {
-          return {
-            body: review.body,
-            decision: review.decision,
-            comments: Array.isArray(review.comments) ? review.comments : [],
-          };
-        }
-      } catch {
-        // Invalid review.json — skip
-      }
-    }
-  }
-
-  return null;
 }
 
 // ── Execute a decision ───────────────────────────────────────────────────────
@@ -349,25 +287,7 @@ function executeDecision(
         originAction: pending.actionId,
         meta: { decision: 'notify', reason },
       });
-      resolveSpan.complete(
-        `resolve: notify (no code changes): ${trace.summary}`
-      );
-
-      // Gather review output from the trace if available
-      const review = gatherReviewOutput(trace, store, project);
-
-      // Find task mapping for metadata
-      const workflowSteps = trace.steps.filter(
-        s =>
-          s.action !== 'commit' &&
-          s.action !== 'resolve' &&
-          s.action !== 'push' &&
-          s.action !== 'notify'
-      );
-      const lastWorkflowStep = workflowSteps[workflowSteps.length - 1];
-      const taskMapping = lastWorkflowStep?.originAction
-        ? store.getTaskMapping(lastWorkflowStep.originAction)
-        : undefined;
+      resolveSpan.complete(`resolve: notify: ${trace.summary}`);
 
       const notifyAction = emitAction(store, {
         projectId,
@@ -378,10 +298,6 @@ function executeDecision(
         meta: {
           ...pending.meta,
           decision: 'notify',
-          ...(review ? { review, reviewWorkflow: true } : {}),
-          ...(taskMapping
-            ? { taskId: taskMapping.taskId, branchName: taskMapping.branchName }
-            : {}),
         },
         fromStep: 'resolve',
         summary: `notify: ${trace.summary}`,
@@ -395,7 +311,7 @@ function executeDecision(
           {
             actionId: notifyAction.id,
             actionType: 'notify',
-            summary: 'no code changes — notify',
+            summary: `notify: ${reason}`,
           },
         ],
         reasoning: `notify: ${reason}`,
@@ -549,6 +465,7 @@ function executeDecision(
         reasoning: `${workflowName}: ${task.title} (retry #${trace.retryCount})`,
         meta: {
           workflow: workflowName,
+          workflowProfile: pending.meta?.workflowProfile,
           title: task.title,
           description: iterationDescription,
           acceptance_criteria: pending.meta?.acceptance_criteria ?? [],
@@ -595,17 +512,29 @@ function executeDecision(
           reasoning: `trace failed: ${reason}`,
         }));
 
-      store.removePending(pending.actionId);
-
-      // NOTE: No manual appendLog here — the resolve action was already
-      // logged when the committer enqueued it. Re-logging with the new
-      // resolveSpan would violate the invariant (different spanId, same
-      // actionId).
+      // Enqueue notify so the notify step can decide whether/where to report the failure
+      const notifyAction = emitAction(store, {
+        projectId,
+        traceId: pending.traceId,
+        action: 'notify',
+        spanId: resolveSpan.id,
+        reasoning: `Notify: trace failed — ${reason}`,
+        meta: { ...pending.meta, decision: 'fail', failReason: reason },
+        fromStep: 'resolve',
+        summary: `notify: ${trace.summary} (failed)`,
+        removePendingId: pending.actionId,
+      });
 
       return {
         spanId: resolveSpan.id,
-        terminal: true,
-        enqueuedActions: [],
+        terminal: false,
+        enqueuedActions: [
+          {
+            actionId: notifyAction.id,
+            actionType: 'notify',
+            summary: `failed: ${reason}`,
+          },
+        ],
         reasoning: `fail: ${reason}`,
         status: 'failed',
         traceMutations: {
@@ -631,26 +560,7 @@ export const resolverStep: Step = {
     const { store, projectId, project, projectPath, trace } = ctx;
 
     // Try deterministic paths first
-    let quick = tryQuickDecision(trace);
-
-    // If quick decision is 'push', check whether any commit step actually
-    // produced code changes. If not, override to 'notify' — this handles
-    // non-code-producing workflows like code-review.
-    if (quick?.decision === 'push') {
-      const commitSteps = trace.steps.filter(
-        s => s.action === 'commit' && s.spanId
-      );
-      const anyCodeCommitted = commitSteps.some(s => {
-        const span = store.readSpan(s.spanId!);
-        return span?.meta?.committed === true;
-      });
-      if (!anyCodeCommitted) {
-        quick = {
-          decision: 'notify',
-          reason: 'all tasks completed with no code changes',
-        };
-      }
-    }
+    const quick = tryQuickDecision(trace);
 
     if (quick) {
       return executeDecision(

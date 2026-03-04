@@ -99,7 +99,8 @@ export function buildWorkflowCatalog(workflowStore: WorkflowStore): string {
     if (wf.outputs.length > 0) {
       section += '**Outputs**:\n';
       for (const output of wf.outputs) {
-        section += `- \`${output.name}\` (${output.type}) — ${output.description}\n`;
+        const filename = output.filename ? ` → \`${output.filename}\`` : '';
+        section += `- \`${output.name}\` (${output.type}${filename}) — ${output.description}\n`;
       }
       section += '\n';
     }

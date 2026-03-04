@@ -1,8 +1,15 @@
+import { join } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
 import { Git, launch } from 'rover-core';
 import { invokeAI, appendPromptSuffix } from './ai.js';
 import { SpanWriter, emitAction } from '../logging.js';
 import { ROVER_FOOTER_MARKER } from '../constants.js';
-import type { PendingAction, PusherAIResult, TaskMapping } from '../types.js';
+import type {
+  PendingAction,
+  PusherAIResult,
+  TaskMapping,
+  ActionTrace,
+} from '../types.js';
 import type {
   Step,
   StepConfig,
@@ -10,6 +17,7 @@ import type {
   StepContext,
   StepResult,
 } from './types.js';
+import type { AutopilotStore } from '../store.js';
 import pushPromptTemplate from './prompts/push-prompt.md';
 
 interface BranchInfo {
@@ -74,6 +82,51 @@ function collectBranchInfos(
   return infos;
 }
 
+/**
+ * Gather workflow output files from task iteration directories.
+ * Returns a map of output name → content for the AI to analyze.
+ */
+function gatherWorkflowOutputs(
+  trace: ActionTrace,
+  store: AutopilotStore,
+  project: import('rover-core').ProjectManager | undefined,
+  workflowProfile?: {
+    outputs: Array<{ name: string; type: string; filename?: string }>;
+  }
+): Record<string, string> {
+  if (!project) return {};
+  const outputs: Record<string, string> = {};
+
+  for (const step of trace.steps) {
+    if (step.status !== 'completed' || !step.originAction) continue;
+    const mapping = store.getTaskMapping(step.originAction);
+    if (!mapping) continue;
+
+    const task = project.getTask(mapping.taskId);
+    if (!task || typeof task.iterationsPath !== 'function') continue;
+
+    const iterationPath = join(
+      task.iterationsPath(),
+      task.iterations.toString()
+    );
+    const declaredOutputs = workflowProfile?.outputs ?? [];
+
+    for (const output of declaredOutputs) {
+      if (output.filename && output.type === 'file') {
+        const filePath = join(iterationPath, output.filename);
+        if (existsSync(filePath)) {
+          try {
+            outputs[output.name] = readFileSync(filePath, 'utf-8');
+          } catch {
+            /* skip unreadable */
+          }
+        }
+      }
+    }
+  }
+  return outputs;
+}
+
 function buildPusherUserMessage(opts: {
   branches: BranchInfo[];
   owner?: string;
@@ -84,17 +137,49 @@ function buildPusherUserMessage(opts: {
   eventMeta: Record<string, any>;
   traceId: string;
   actionId: string;
+  workflowOutputs?: Record<string, string>;
+  workflowProfile?: {
+    description?: string;
+    outputs?: Array<{ name: string; type: string; filename?: string }>;
+    inputs?: Array<{ name: string; type: string; description?: string }>;
+  };
+  workflowName?: string;
 }): string {
   let msg = '## Push Context\n\n';
 
   msg += `**Repository**: ${opts.owner}/${opts.repo}\n`;
   msg += `**Main branch**: ${opts.mainBranch}\n\n`;
 
-  msg += '## Branches to Push\n\n';
-  for (const branch of opts.branches) {
-    msg += `- **${branch.branchName}** (task #${branch.taskId})\n`;
+  // Workflow profile for AI context
+  if (opts.workflowProfile) {
+    msg += '## Workflow\n\n';
+    msg += `**Name**: ${opts.workflowName ?? 'unknown'}\n`;
+    if (opts.workflowProfile.description) {
+      msg += `**Description**: ${opts.workflowProfile.description}\n`;
+    }
+    if (
+      opts.workflowProfile.outputs &&
+      opts.workflowProfile.outputs.length > 0
+    ) {
+      msg += '**Declared outputs**:\n';
+      for (const o of opts.workflowProfile.outputs) {
+        const fn = o.filename ? ` → \`${o.filename}\`` : '';
+        msg += `- \`${o.name}\` (${o.type}${fn})\n`;
+      }
+    }
+    msg += '\n';
   }
-  msg += '\n';
+
+  if (opts.branches.length > 0) {
+    msg += '## Branches to Push\n\n';
+    for (const branch of opts.branches) {
+      msg += `- **${branch.branchName}** (task #${branch.taskId})\n`;
+    }
+    msg += '\n';
+  } else {
+    msg +=
+      '## Branches\n\nNo code branches to push (workflow produced non-code output).\n\n';
+  }
 
   msg += `## Trace Summary\n\n${opts.traceSummary}\n\n`;
 
@@ -104,7 +189,7 @@ function buildPusherUserMessage(opts: {
     msg += `- **URL**: ${opts.existingPR.url}\n`;
     msg += `- **Number**: #${opts.existingPR.number}\n`;
     msg += `- **State**: ${opts.existingPR.state}\n\n`;
-  } else {
+  } else if (opts.branches.length > 0) {
     msg += `## Pull Request\n\nNo existing PR found. Please create one after pushing.\n\n`;
   }
 
@@ -122,19 +207,32 @@ function buildPusherUserMessage(opts: {
     msg += '\n';
   }
 
-  msg += '## Required Footer\n\n';
-  msg +=
-    'When creating a PR, you MUST append the following HTML block at the very end of the PR body. ';
-  msg +=
-    'This is used for automation tracking and must be included verbatim:\n\n';
-  msg += '```html\n';
-  msg += '<details>\n';
-  msg += `${ROVER_FOOTER_MARKER}\n`;
-  msg += '\n';
-  msg += `Trace: \`${opts.traceId}\` | Action: \`${opts.actionId}\`\n`;
-  msg += '\n';
-  msg += '</details>\n';
-  msg += '```\n\n';
+  // Workflow outputs (review data, summaries, etc.)
+  if (opts.workflowOutputs && Object.keys(opts.workflowOutputs).length > 0) {
+    msg += '## Workflow Outputs\n\n';
+    for (const [name, content] of Object.entries(opts.workflowOutputs)) {
+      msg += `### Output: \`${name}\`\n\n`;
+      msg += '```\n';
+      msg += content;
+      msg += '\n```\n\n';
+    }
+  }
+
+  if (opts.branches.length > 0) {
+    msg += '## Required Footer\n\n';
+    msg +=
+      'When creating a PR, you MUST append the following HTML block at the very end of the PR body. ';
+    msg +=
+      'This is used for automation tracking and must be included verbatim:\n\n';
+    msg += '```html\n';
+    msg += '<details>\n';
+    msg += `${ROVER_FOOTER_MARKER}\n`;
+    msg += '\n';
+    msg += `Trace: \`${opts.traceId}\` | Action: \`${opts.actionId}\`\n`;
+    msg += '\n';
+    msg += '</details>\n';
+    msg += '```\n\n';
+  }
 
   return msg;
 }
@@ -177,14 +275,30 @@ export const pusherStep: Step = {
       }
     }
 
-    if (branches.length === 0) {
+    // Gather workflow outputs for non-code delivery
+    const workflowProfile = meta.workflowProfile as
+      | {
+          description?: string;
+          outputs: Array<{ name: string; type: string; filename?: string }>;
+          inputs?: Array<{ name: string; type: string; description?: string }>;
+        }
+      | undefined;
+    const workflowOutputs = gatherWorkflowOutputs(
+      trace,
+      store,
+      project,
+      workflowProfile
+    );
+    const hasWorkflowOutputs = Object.keys(workflowOutputs).length > 0;
+
+    if (branches.length === 0 && !hasWorkflowOutputs) {
       const pushSpan = new SpanWriter(projectId, {
         step: 'push',
         parentId: pending.spanId,
         originAction: pending.actionId,
-        meta: { error: 'no branches found' },
+        meta: { error: 'no branches and no workflow outputs found' },
       });
-      pushSpan.fail('push: no branches found to push');
+      pushSpan.fail('push: no branches and no workflow outputs found');
 
       store.removePending(pending.actionId);
 
@@ -192,7 +306,7 @@ export const pusherStep: Step = {
         spanId: pushSpan.id,
         terminal: true,
         enqueuedActions: [],
-        reasoning: 'no branches found to push',
+        reasoning: 'no branches and no workflow outputs found',
         status: 'failed',
       };
     }
@@ -201,10 +315,12 @@ export const pusherStep: Step = {
     const git = new Git({ cwd: projectPath });
     const mainBranch = git.getMainBranch();
 
-    // Check for existing PR on the primary branch
-    const primaryBranch = branches[0].branchName;
+    // Check for existing PR on the primary branch (only if branches exist)
+    const primaryBranch = branches.length > 0 ? branches[0].branchName : null;
     const existingPR =
-      owner && repo ? await checkExistingPR(owner, repo, primaryBranch) : null;
+      owner && repo && primaryBranch
+        ? await checkExistingPR(owner, repo, primaryBranch)
+        : null;
 
     // Extract root event metadata from span trace
     const spans = store.getSpanTrace(pending.spanId);
@@ -220,16 +336,28 @@ export const pusherStep: Step = {
     // ── Assistant mode: dry-run (skip AI invocation + push) ────────────
     if (ctx.mode === 'assistant') {
       const commands: string[] = [];
-      for (const branch of branches) {
-        commands.push(`git push origin ${branch.branchName}`);
-      }
-      if (existingPR) {
-        commands.push(`# PR already exists: ${existingPR.url}`);
-      } else if (owner && repo) {
+      if (branches.length > 0) {
+        for (const branch of branches) {
+          commands.push(`git push origin ${branch.branchName}`);
+        }
+        if (existingPR) {
+          commands.push(`# PR already exists: ${existingPR.url}`);
+        } else if (owner && repo && primaryBranch) {
+          commands.push(
+            `gh pr create --head ${primaryBranch} --base ${mainBranch} --fill --repo ${owner}/${repo}`
+          );
+        }
+      } else if (hasWorkflowOutputs && eventMeta.prNumber && owner && repo) {
+        // Non-code delivery: post review or comment
         commands.push(
-          `gh pr create --head ${primaryBranch} --base ${mainBranch} --fill --repo ${owner}/${repo}`
+          `gh api repos/${owner}/${repo}/pulls/${eventMeta.prNumber}/reviews --method POST --input -`
         );
       }
+
+      const dryRunSummary =
+        branches.length > 0
+          ? branches.map(b => b.branchName).join(', ')
+          : 'workflow output delivery';
 
       const pushSpan = new SpanWriter(projectId, {
         step: 'push',
@@ -239,11 +367,10 @@ export const pusherStep: Step = {
           dryRun: true,
           commands,
           branches: branches.map(b => b.branchName),
+          hasWorkflowOutputs,
         },
       });
-      pushSpan.complete(
-        `push (dry-run): ${branches.map(b => b.branchName).join(', ')}`
-      );
+      pushSpan.complete(`push (dry-run): ${dryRunSummary}`);
       store.removePending(pending.actionId);
       return {
         spanId: pushSpan.id,
@@ -264,10 +391,14 @@ export const pusherStep: Step = {
       eventMeta,
       traceId: pending.traceId,
       actionId: pending.actionId,
+      workflowOutputs: hasWorkflowOutputs ? workflowOutputs : undefined,
+      workflowProfile,
+      workflowName: meta.workflow,
     });
 
     // Determine a working directory — use the first task's worktree if available
-    const firstTask = project.getTask(branches[0].taskId);
+    const firstTask =
+      branches.length > 0 ? project.getTask(branches[0].taskId) : null;
     const cwd = firstTask?.worktreePath ?? projectPath;
 
     // Build system prompt with custom instructions
@@ -285,11 +416,12 @@ export const pusherStep: Step = {
     });
 
     // Build push span
-    const pushed = result.status === 'pushed';
+    const succeeded = result.status !== 'failed';
     const pushSpanMeta: Record<string, any> = {
-      pushed,
+      deliveryStatus: result.status,
       branchesPushed: result.branches_pushed,
       pullRequest: result.pull_request,
+      reviewPosted: result.review_posted ?? null,
       agentSummary: result.summary,
       ...(result.error ? { error: result.error } : {}),
     };
@@ -303,6 +435,13 @@ export const pusherStep: Step = {
 
     if (result.status === 'failed') {
       pushSpan.error(`push: failed: ${result.error ?? 'unknown error'}`);
+    } else if (result.status === 'reviewed') {
+      const prNum = result.review_posted?.pr_number;
+      pushSpan.complete(
+        `push: review posted${prNum ? ` on PR #${prNum}` : ''}`
+      );
+    } else if (result.status === 'delivered') {
+      pushSpan.complete(`push: workflow output delivered`);
     } else {
       const prInfo = result.pull_request?.url
         ? ` (PR: ${result.pull_request.url})`
@@ -316,29 +455,36 @@ export const pusherStep: Step = {
       traceId: pending.traceId,
       action: 'notify',
       spanId: pushSpan.id,
-      reasoning: pushed
-        ? `Push completed: ${result.summary}`
-        : `Push failed: ${result.error ?? 'unknown'}`,
+      reasoning: succeeded
+        ? `Delivery completed: ${result.summary}`
+        : `Delivery failed: ${result.error ?? 'unknown'}`,
       meta: {
         ...meta,
-        pushed,
+        deliveryStatus: result.status,
         branchesPushed: result.branches_pushed,
         pullRequestUrl: result.pull_request?.url ?? null,
+        reviewPosted: result.review_posted ?? null,
       },
       fromStep: 'push',
-      summary: pushed
+      summary: succeeded
         ? `done: ${trace.summary}`
         : `push failed: ${trace.summary}`,
       removePendingId: pending.actionId,
     });
 
     const prUrl = result.pull_request?.url;
-    const reasoning =
-      result.status === 'failed'
-        ? `push failed: ${result.error}`
-        : prUrl
-          ? `pushed ${result.branches_pushed.join(', ')} — PR: ${prUrl}`
-          : `pushed ${result.branches_pushed.join(', ')}`;
+    let reasoning: string;
+    if (result.status === 'failed') {
+      reasoning = `push failed: ${result.error}`;
+    } else if (result.status === 'reviewed') {
+      reasoning = `review posted on PR #${result.review_posted?.pr_number ?? '?'}`;
+    } else if (result.status === 'delivered') {
+      reasoning = `workflow output delivered`;
+    } else {
+      reasoning = prUrl
+        ? `pushed ${result.branches_pushed.join(', ')} — PR: ${prUrl}`
+        : `pushed ${result.branches_pushed.join(', ')}`;
+    }
 
     return {
       spanId: pushSpan.id,

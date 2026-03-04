@@ -166,7 +166,8 @@ The `context` field is MANDATORY — it contains a structured summary of everyth
 
 - **plan**: `{ "scope": "<what needs planning>", "constraints": ["..."], "references": ["#42", "PR #15"] }`
 - **notify**: `{ "audience": "<author|team|maintainer>", "summary": "<what to communicate>", "intent": "<clarify|answer|inform|diagnose|flag>", "mentions": ["@user"] }`
-- **workflow**: `{ "workflow": "<id from catalog>", "title": "<short task title>", "inputs": { ... } }`
+- **workflow**: `{ "workflow": "<id from catalog>", "title": "<short task title>", "inputs": { ... }, "sourceBranch": "<optional: branch to base the worktree on>" }`
+  When triggering a workflow on a pull request (e.g., code-review), set `sourceBranch` to the PR's head ref name so the workflow can access the PR's changes.
 - **wait**: `{ "waiting_for": "<condition>", "resume_action": "<action type>", "resume_meta": { ... } }`
 - **noop**: `{ "reason": "<why no response is needed>" }`
 - **cleanup**: `{ "pr_number": 15, "branch": "rover/task-5-abc123", "reason": "<merged|closed|obsolete>" }`
