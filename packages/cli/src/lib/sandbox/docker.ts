@@ -15,6 +15,7 @@ import {
   resolveAgentImage,
   warnIfCustomImage,
   tmpUserGroupFiles,
+  copyUserGroupFiles,
   normalizeExtraArgs,
 } from './container-common.js';
 import {
@@ -32,6 +33,8 @@ export class DockerSandbox extends Sandbox {
   private cacheTag?: string;
   private shouldCommitCache = false;
   private initMode = false;
+  private etcPasswdPath?: string;
+  private etcGroupPath?: string;
 
   constructor(
     task: TaskDescriptionManager,
@@ -150,11 +153,16 @@ export class DockerSandbox extends Sandbox {
     // Warn if using a custom agent image
     warnIfCustomImage(projectConfig);
 
+    // Generate passwd/group files to copy into the container after creation.
+    // Files are copied (not bind-mounted) so that tools like adduser/addgroup
+    // can use atomic rename on /etc/passwd and /etc/group.
     const [etcPasswd, etcGroup] = await tmpUserGroupFiles(
       ContainerBackend.Docker,
       effectiveImage,
       userInfo_
     );
+    this.etcPasswdPath = etcPasswd;
+    this.etcGroupPath = etcGroup;
 
     // Add NET_ADMIN capability if network filtering is configured
     const effectiveNetworkConfig = mergeNetworkConfig(
@@ -166,10 +174,6 @@ export class DockerSandbox extends Sandbox {
     }
 
     dockerArgs.push(
-      '-v',
-      `${etcPasswd}:/etc/passwd:Z,ro`,
-      '-v',
-      `${etcGroup}:/etc/group:Z,ro`,
       '--user',
       `${userInfo_.uid}:${userInfo_.gid}`,
       '-v',
@@ -315,6 +319,12 @@ export class DockerSandbox extends Sandbox {
       );
       try {
         await this.create();
+        await copyUserGroupFiles(
+          ContainerBackend.Docker,
+          this.sandboxName,
+          this.etcPasswdPath!,
+          this.etcGroupPath!
+        );
         this.processManager?.completeLastItem();
         this.processManager?.addItem(
           `Run initialization (${this.backend}) | Name: ${this.sandboxName}`
@@ -353,6 +363,12 @@ export class DockerSandbox extends Sandbox {
     );
     try {
       sandboxId = await this.create();
+      await copyUserGroupFiles(
+        ContainerBackend.Docker,
+        this.sandboxName,
+        this.etcPasswdPath!,
+        this.etcGroupPath!
+      );
       this.processManager?.completeLastItem();
       this.processManager?.addItem(
         `Start sandbox (${this.backend}) | Name: ${this.sandboxName}`
@@ -432,7 +448,11 @@ export class DockerSandbox extends Sandbox {
     );
 
     const interactiveName = `${this.sandboxName}-i`;
-    const dockerArgs = ['run', '--name', interactiveName, '-it', '--rm'];
+    // Use docker create + docker cp + docker start instead of docker run
+    // so we can copy passwd/group files into the container before starting.
+    // This avoids bind-mounting these files, which breaks adduser/addgroup
+    // (they use atomic rename which fails across mount boundaries).
+    const dockerArgs = ['create', '--name', interactiveName, '-it', '--rm'];
 
     const userInfo_ = userInfo();
 
@@ -474,10 +494,6 @@ export class DockerSandbox extends Sandbox {
     }
 
     dockerArgs.push(
-      '-v',
-      `${etcPasswd}:/etc/passwd:Z,ro`,
-      '-v',
-      `${etcGroup}:/etc/group:Z,ro`,
       '--user',
       `${userInfo_.uid}:${userInfo_.gid}`,
       '-v',
@@ -533,8 +549,17 @@ export class DockerSandbox extends Sandbox {
       dockerArgs.push('-v');
     }
 
+    // Create the container, copy passwd/group files, then start interactively
+    await launch('docker', dockerArgs);
+    await copyUserGroupFiles(
+      ContainerBackend.Docker,
+      interactiveName,
+      etcPasswd,
+      etcGroup
+    );
+
     // Use detached: false to ensure proper TTY signal handling and job control
-    return launch('docker', dockerArgs, {
+    return launch('docker', ['start', '-ai', interactiveName], {
       stdio: 'inherit',
       reject: false,
       detached: false,

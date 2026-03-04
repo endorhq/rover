@@ -29,8 +29,7 @@ RUN apt-get update && \
     esac && \
     curl -fsSL -o /usr/local/bin/package-manager-mcp-server \
       https://github.com/endorhq/package-manager-mcp/releases/download/${PACKAGE_MANAGER_MCP_SERVER_VERSION}/package-manager-mcp-${ARCH_SUFFIX} && \
-    chown root:root /usr/local/bin/package-manager-mcp-server && \
-    chmod u+s,a+x /usr/local/bin/package-manager-mcp-server
+    chmod +x /usr/local/bin/package-manager-mcp-server
 
 # Install Node dependencies
 COPY --from=agent-builder /rover-agent.tgz /rover-agent.tgz

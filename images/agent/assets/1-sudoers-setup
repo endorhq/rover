@@ -1,5 +1,6 @@
 Defaults env_reset
 Defaults env_keep += "HOME"
+Defaults env_keep += "RUST_LOG"
 
 # Rover agent group; if there is no matching gid within the container
 # with the host gid, the `agent` group will be used.

@@ -223,7 +223,22 @@ export async function etcGroupWithUserInfo(
 }
 
 /**
- * Generate the user and group files to mount on the image. It contains
+ * Copy the user and group files into a created (but not yet started) container.
+ * This replaces bind-mounting these files, which caused issues with tools like
+ * adduser/addgroup that use atomic rename (rename(2) fails across mount boundaries).
+ */
+export async function copyUserGroupFiles(
+  backend: ContainerBackend,
+  containerName: string,
+  etcPasswd: string,
+  etcGroup: string
+): Promise<void> {
+  await launch(backend, ['cp', etcPasswd, `${containerName}:/etc/passwd`]);
+  await launch(backend, ['cp', etcGroup, `${containerName}:/etc/group`]);
+}
+
+/**
+ * Generate the user and group files to copy into the container. It contains
  * the user and group id from the host user to ensure a correct permission
  * handling when possible.
  *
