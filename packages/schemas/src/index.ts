@@ -131,6 +131,7 @@ export type {
   NetworkConfig,
   SandboxConfig,
   HooksConfig,
+  AutopilotMode,
   AutopilotConfig,
   ProjectConfig,
 } from './project-config/types.js';
@@ -146,6 +147,8 @@ export {
   PROJECT_CONFIG_FILENAME,
   ProjectConfigSchema,
   AutopilotConfigSchema,
+  AutopilotModeSchema,
+  AUTOPILOT_MODE_VALUES,
   NETWORK_MODE_VALUES,
 } from './project-config/schema.js';
 

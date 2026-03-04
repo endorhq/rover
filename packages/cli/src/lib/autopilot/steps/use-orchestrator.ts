@@ -65,7 +65,8 @@ export function useStepOrchestrator(
   projectId: string,
   store: AutopilotStore,
   botName?: string,
-  maintainers?: string[]
+  maintainers?: string[],
+  mode?: string
 ): {
   statuses: StepStatuses;
   traces: ActionTrace[];
@@ -149,6 +150,7 @@ export function useStepOrchestrator(
       callbacks,
       botName,
       maintainers,
+      mode: mode as 'self-driving' | 'assistant' | undefined,
     });
 
     orchestratorRef.current = orchestrator;
@@ -164,6 +166,7 @@ export function useStepOrchestrator(
     store,
     botName,
     maintainers,
+    mode,
     onTracesUpdated,
     onStatusChanged,
   ]);

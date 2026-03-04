@@ -456,6 +456,136 @@ describe('notifyStep.process', () => {
   });
 });
 
+describe('notifyStep.process — assistant mode', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    spanWriterInstances = [];
+  });
+
+  it('still invokes AI for message composition', async () => {
+    const rootSpan = makeSpan({
+      meta: { type: 'IssuesEvent', issueNumber: 42 },
+    });
+    const ctx = makeStepContext({ mode: 'assistant' });
+    (ctx.store.getSpanTrace as any).mockReturnValue([rootSpan]);
+
+    mockInvokeAI.mockResolvedValue({
+      notify: true,
+      message: 'Task completed.',
+      reasoning: 'notify user',
+    });
+
+    await notifyStep.process(makePending(), ctx);
+
+    expect(mockInvokeAI).toHaveBeenCalled();
+  });
+
+  it('does not post comments (launch not called for posting)', async () => {
+    const rootSpan = makeSpan({
+      meta: { type: 'IssuesEvent', issueNumber: 42 },
+    });
+    const ctx = makeStepContext({ mode: 'assistant' });
+    (ctx.store.getSpanTrace as any).mockReturnValue([rootSpan]);
+
+    mockInvokeAI.mockResolvedValue({
+      notify: true,
+      message: 'Done.',
+      reasoning: 'informational',
+    });
+
+    await notifyStep.process(makePending(), ctx);
+
+    expect(mockLaunch).not.toHaveBeenCalled();
+  });
+
+  it('creates span with dryRun metadata and commands', async () => {
+    const rootSpan = makeSpan({
+      meta: { type: 'IssuesEvent', issueNumber: 42 },
+    });
+    const ctx = makeStepContext({ mode: 'assistant' });
+    (ctx.store.getSpanTrace as any).mockReturnValue([rootSpan]);
+
+    mockInvokeAI.mockResolvedValue({
+      notify: true,
+      message: 'Task completed.',
+      reasoning: 'notify user',
+    });
+
+    await notifyStep.process(makePending(), ctx);
+
+    const span = spanWriterInstances[0];
+    expect(span.meta.dryRun).toBe(true);
+    expect(span.meta.commands).toBeInstanceOf(Array);
+    expect(span.complete).toHaveBeenCalled();
+  });
+
+  it('generates gh comment command for issue channel', async () => {
+    const rootSpan = makeSpan({
+      meta: { type: 'IssuesEvent', issueNumber: 42 },
+    });
+    const ctx = makeStepContext({ mode: 'assistant' });
+    (ctx.store.getSpanTrace as any).mockReturnValue([rootSpan]);
+
+    mockInvokeAI.mockResolvedValue({
+      notify: true,
+      message: 'Done.',
+      reasoning: 'informational',
+    });
+
+    await notifyStep.process(makePending(), ctx);
+
+    const span = spanWriterInstances[0];
+    const commands = span.meta.commands as string[];
+    expect(
+      commands.some(
+        (c: string) =>
+          c.includes('gh issue comment 42') &&
+          c.includes('--repo test-owner/test-repo')
+      )
+    ).toBe(true);
+  });
+
+  it('returns terminal: true with empty enqueuedActions', async () => {
+    const rootSpan = makeSpan({
+      meta: { type: 'IssuesEvent', issueNumber: 10 },
+    });
+    const ctx = makeStepContext({ mode: 'assistant' });
+    (ctx.store.getSpanTrace as any).mockReturnValue([rootSpan]);
+
+    mockInvokeAI.mockResolvedValue({
+      notify: true,
+      message: 'Done.',
+      reasoning: 'informational',
+    });
+
+    const result = await notifyStep.process(makePending(), ctx);
+
+    expect(result.terminal).toBe(true);
+    expect(result.enqueuedActions).toEqual([]);
+  });
+
+  it('handles AI deciding not to notify in assistant mode', async () => {
+    const rootSpan = makeSpan({
+      meta: { type: 'IssuesEvent', issueNumber: 7 },
+    });
+    const ctx = makeStepContext({ mode: 'assistant' });
+    (ctx.store.getSpanTrace as any).mockReturnValue([rootSpan]);
+
+    mockInvokeAI.mockResolvedValue({
+      notify: false,
+      message: '',
+      reasoning: 'not needed',
+    });
+
+    const result = await notifyStep.process(makePending(), ctx);
+
+    // When AI says don't notify, the existing skip logic runs (not dry-run)
+    expect(result.terminal).toBe(true);
+    expect(result.reasoning).toContain('skipped');
+    expect(mockLaunch).not.toHaveBeenCalled();
+  });
+});
+
 describe('buildRoverFooter', () => {
   it('includes the footer marker', () => {
     const footer = buildRoverFooter('trace-abc', 'action-xyz');

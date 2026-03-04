@@ -124,6 +124,7 @@ export function LaunchableApp(props: {
   botName?: string;
   maintainers?: string[];
   allowEvents?: string;
+  mode?: string;
 }) {
   const [launched, setLaunched] = useState(false);
   const version = getVersion();

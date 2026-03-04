@@ -217,6 +217,42 @@ export const pusherStep: Step = {
       if (rootSpan.meta.prNumber) eventMeta.prNumber = rootSpan.meta.prNumber;
     }
 
+    // ── Assistant mode: dry-run (skip AI invocation + push) ────────────
+    if (ctx.mode === 'assistant') {
+      const commands: string[] = [];
+      for (const branch of branches) {
+        commands.push(`git push origin ${branch.branchName}`);
+      }
+      if (existingPR) {
+        commands.push(`# PR already exists: ${existingPR.url}`);
+      } else if (owner && repo) {
+        commands.push(
+          `gh pr create --head ${primaryBranch} --base ${mainBranch} --fill --repo ${owner}/${repo}`
+        );
+      }
+
+      const pushSpan = new SpanWriter(projectId, {
+        step: 'push',
+        parentId: pending.spanId,
+        originAction: pending.actionId,
+        meta: {
+          dryRun: true,
+          commands,
+          branches: branches.map(b => b.branchName),
+        },
+      });
+      pushSpan.complete(
+        `push (dry-run): ${branches.map(b => b.branchName).join(', ')}`
+      );
+      store.removePending(pending.actionId);
+      return {
+        spanId: pushSpan.id,
+        terminal: true,
+        enqueuedActions: [],
+        reasoning: `dry-run: ${commands.join('; ')}`,
+      };
+    }
+
     // Build the user message for the AI agent
     const userMessage = buildPusherUserMessage({
       branches,

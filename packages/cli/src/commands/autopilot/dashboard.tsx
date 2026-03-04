@@ -38,6 +38,7 @@ const autopilotCommand = async (
     botName?: string;
     maintainers?: string[];
     allowEvents?: string;
+    mode?: string;
   } = {}
 ) => {
   let project;
@@ -111,6 +112,25 @@ const autopilotCommand = async (
     );
   }
 
+  // Resolve mode: CLI flag > rover.json > default "self-driving"
+  const resolvedMode = options.mode ?? autopilotConfig?.mode ?? 'self-driving';
+
+  if (resolvedMode !== 'self-driving' && resolvedMode !== 'assistant') {
+    exitWithError({
+      error: `Invalid --mode value "${resolvedMode}". Expected "self-driving" or "assistant".`,
+      success: false,
+    });
+    return;
+  }
+
+  if (resolvedMode === 'assistant') {
+    console.log(
+      colors.cyan(
+        '🛡 Assistant mode: push and notify steps will dry-run. You will see commands to run manually.'
+      )
+    );
+  }
+
   // Enter alternate screen so quitting restores the original shell
   process.stdout.write(ENTER_ALT_SCREEN + HIDE_CURSOR);
 
@@ -137,6 +157,7 @@ const autopilotCommand = async (
       botName={resolvedBotName}
       maintainers={resolvedMaintainers}
       allowEvents={resolvedAllowEvents}
+      mode={resolvedMode}
     />
   );
 

@@ -313,7 +313,51 @@ export const notifyStep: Step = {
       };
     }
 
-    // 5. Truncate if necessary
+    // 5. Assistant mode: dry-run (skip posting)
+    if (ctx.mode === 'assistant') {
+      const commands: string[] = [];
+      if (channel && owner && repo) {
+        const escapedMessage = message.replace(/'/g, "'\\''");
+        commands.push(
+          `gh ${channel.command} comment ${channel.number} --repo ${owner}/${repo} --body '${escapedMessage}'`
+        );
+      }
+
+      const span = new SpanWriter(projectId, {
+        step: 'notify',
+        parentId: pending.spanId,
+        originAction: pending.actionId,
+        meta: {
+          dryRun: true,
+          commands,
+          channel: channel
+            ? { command: channel.command, number: channel.number }
+            : null,
+          aiReasoning,
+        },
+      });
+      span.complete(
+        channel
+          ? `notify (dry-run): ${channel.command} #${channel.number}`
+          : `notify (dry-run): no comment target`
+      );
+
+      await recordTraceCompletion(ctx.memoryStore, trace, spans, store, {
+        summary: `dry-run: notification composed but not posted`,
+      });
+
+      store.removePending(pending.actionId);
+      return {
+        spanId: span.id,
+        terminal: true,
+        enqueuedActions: [],
+        reasoning: channel
+          ? `dry-run: ${channel.command} #${channel.number}`
+          : `dry-run: no comment target`,
+      };
+    }
+
+    // 5b. Truncate if necessary
     if (message.length > TRUNCATION_LIMIT) {
       message =
         message.slice(0, TRUNCATION_LIMIT) +

@@ -26,6 +26,10 @@ export const addAutopilotCommands = (program: Command) => {
       '--allow-events <value>',
       'Filter events by actor: "maintainers" (default), "all", or comma-separated usernames'
     )
+    .option(
+      '--mode <mode>',
+      'Autopilot mode: "self-driving" (default) or "assistant" (dry-run write steps)'
+    )
     .action(dashboardCmd.action);
 
   command

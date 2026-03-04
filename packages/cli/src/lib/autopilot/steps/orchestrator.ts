@@ -42,6 +42,7 @@ export class StepOrchestrator {
   private botName?: string;
   private maintainers?: string[];
   private customInstructions?: string;
+  private mode?: 'self-driving' | 'assistant';
   private callbacks: OrchestratorCallbacks;
   private fallbackIntervalMs: number;
 
@@ -65,6 +66,7 @@ export class StepOrchestrator {
     botName?: string;
     maintainers?: string[];
     customInstructions?: string;
+    mode?: 'self-driving' | 'assistant';
     callbacks: OrchestratorCallbacks;
     fallbackIntervalMs?: number;
   }) {
@@ -84,6 +86,7 @@ export class StepOrchestrator {
     this.botName = opts.botName;
     this.maintainers = opts.maintainers;
     this.customInstructions = opts.customInstructions;
+    this.mode = opts.mode;
     this.callbacks = opts.callbacks;
     this.fallbackIntervalMs =
       opts.fallbackIntervalMs ?? DEFAULT_FALLBACK_INTERVAL_MS;
@@ -151,6 +154,7 @@ export class StepOrchestrator {
         botName: this.botName,
         maintainers: this.maintainers,
         customInstructions: this.customInstructions,
+        mode: this.mode,
       };
 
       const mutations = step.monitor(ctx);
@@ -364,6 +368,7 @@ export class StepOrchestrator {
         botName: this.botName,
         maintainers: this.maintainers,
         customInstructions: this.customInstructions,
+        mode: this.mode,
       };
 
       // Call step.process()

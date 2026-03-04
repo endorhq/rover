@@ -43,6 +43,8 @@ export interface BaseContext {
   maintainers?: string[];
   /** Project-specific custom instructions for the step. */
   customInstructions?: string;
+  /** Autopilot mode: "self-driving" or "assistant" (dry-run write steps). */
+  mode?: 'self-driving' | 'assistant';
 }
 
 // ── Step context (provided by orchestrator to each process call) ────────────

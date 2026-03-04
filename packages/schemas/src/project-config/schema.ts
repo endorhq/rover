@@ -125,6 +125,16 @@ export const HooksConfigSchema = z.object({
 });
 
 /**
+ * Autopilot operating mode
+ */
+export const AutopilotModeSchema = z.enum(['self-driving', 'assistant']);
+
+/**
+ * Autopilot mode values as an array for CLI choices
+ */
+export const AUTOPILOT_MODE_VALUES = AutopilotModeSchema.options;
+
+/**
  * Autopilot configuration
  */
 export const AutopilotConfigSchema = z.object({
@@ -134,6 +144,8 @@ export const AutopilotConfigSchema = z.object({
   maintainers: z.array(z.string()).optional(),
   /** Filter events by actor: "maintainers", "all", or comma-separated usernames */
   allowEvents: z.string().optional(),
+  /** Operating mode: "self-driving" (default) or "assistant" (dry-run write steps) */
+  mode: AutopilotModeSchema.optional(),
 });
 
 /**
