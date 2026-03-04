@@ -80,17 +80,13 @@ function SplashScreen({
 
       {/* Rover logo — wrapped so lines align as a group */}
       <Box flexDirection="column">
-        <Text color={TEAL_600}>
-          {' \u256D\u2550\u2550\u2550\u2550\u256E'}
-        </Text>
+        <Text color={TEAL_600}>{' \u256D\u2550\u2550\u2550\u2550\u256E'}</Text>
         <Text>
           <Text color={TEAL_600}>{'\u2759\u2502 '}</Text>
           <Text color={TEAL_400}>{'\u2588\u2588'}</Text>
           <Text color={TEAL_600}>{' \u2502\u2759'}</Text>
         </Text>
-        <Text color={TEAL_600}>
-          {' \u2570\u2550\u2550\u2550\u2550\u256F'}
-        </Text>
+        <Text color={TEAL_600}>{' \u2570\u2550\u2550\u2550\u2550\u256F'}</Text>
       </Box>
 
       <Text> </Text>
@@ -127,6 +123,7 @@ export function LaunchableApp(props: {
   fromDate?: Date;
   botName?: string;
   maintainers?: string[];
+  allowEvents?: string;
 }) {
   const [launched, setLaunched] = useState(false);
   const version = getVersion();

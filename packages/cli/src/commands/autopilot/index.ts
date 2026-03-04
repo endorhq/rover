@@ -22,6 +22,10 @@ export const addAutopilotCommands = (program: Command) => {
     )
     .option('--bot <name>', '')
     .option('--maintainers <names...>', 'GitHub handles of project maintainers')
+    .option(
+      '--allow-events <value>',
+      'Filter events by actor: "maintainers" (default), "all", or comma-separated usernames'
+    )
     .action(dashboardCmd.action);
 
   command

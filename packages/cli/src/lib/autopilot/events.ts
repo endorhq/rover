@@ -205,6 +205,51 @@ export function filterRelevantEvents(
   return results;
 }
 
+/**
+ * Resolve an --allow-events value into a set of lowercase actor logins,
+ * or null when every actor is allowed.
+ */
+export function resolveAllowedActors(
+  allowEvents: string | undefined,
+  maintainers: string[] | undefined
+): Set<string> | null {
+  if (!allowEvents || allowEvents === 'all') return null;
+
+  if (allowEvents === 'maintainers') {
+    if (!maintainers || maintainers.length === 0) return new Set();
+    return new Set(maintainers.map(m => m.toLowerCase()));
+  }
+
+  // Comma-separated usernames
+  const names = allowEvents
+    .split(',')
+    .map(n => n.trim().toLowerCase())
+    .filter(n => n.length > 0);
+  return new Set(names);
+}
+
+/**
+ * Filter events to only those whose actor is in the allowed set.
+ * If allowedActors is null, all events pass through (no filtering).
+ */
+export function filterByAllowedActors<T extends GitHubEvent>(
+  events: T[],
+  allowedActors: Set<string> | null
+): { allowed: T[]; filteredCount: number } {
+  if (!allowedActors) return { allowed: events, filteredCount: 0 };
+
+  const allowed: T[] = [];
+  let filteredCount = 0;
+  for (const event of events) {
+    if (allowedActors.has(event.actor.login.toLowerCase())) {
+      allowed.push(event);
+    } else {
+      filteredCount++;
+    }
+  }
+  return { allowed, filteredCount };
+}
+
 export function writeSpanAndAction(
   projectId: string,
   event: GitHubEvent & RelevantEvent,

@@ -4,6 +4,8 @@ import type { AutopilotStore } from '../store.js';
 import {
   fetchEvents,
   filterRelevantEvents,
+  filterByAllowedActors,
+  resolveAllowedActors,
   writeSpanAndAction,
   POLL_INTERVAL_MS,
 } from '../events.js';
@@ -18,7 +20,9 @@ export function useGitHubEvents(
   projectId: string,
   store: AutopilotStore,
   onNewEvents?: () => void,
-  fromDate?: Date
+  fromDate?: Date,
+  allowEvents?: string,
+  maintainers?: string[]
 ): {
   status: FetchStatus;
   log: LogEntry | null;
@@ -26,6 +30,9 @@ export function useGitHubEvents(
   const [status, setStatus] = useState<FetchStatus>('idle');
   const [log, setLog] = useState<LogEntry | null>(null);
   const repoRef = useRef(getRepoInfo(projectPath));
+  const allowedActorsRef = useRef(
+    resolveAllowedActors(allowEvents, maintainers)
+  );
 
   const doFetchRef = useRef<() => Promise<void>>();
   doFetchRef.current = async () => {
@@ -41,8 +48,16 @@ export function useGitHubEvents(
       const events = await fetchEvents(repo.owner, repo.repo);
       const relevant = filterRelevantEvents(events, fromDate);
 
+      // Filter by allowed actors
+      const { allowed: actorFiltered, filteredCount } = filterByAllowedActors(
+        relevant,
+        allowedActorsRef.current
+      );
+
       // Deduplicate against cursor
-      const newEvents = relevant.filter(e => !store.isEventProcessed(e.id));
+      const newEvents = actorFiltered.filter(
+        e => !store.isEventProcessed(e.id)
+      );
 
       for (const event of newEvents) {
         writeSpanAndAction(projectId, event, store);
@@ -55,9 +70,11 @@ export function useGitHubEvents(
       }
 
       setStatus('done');
+      const filterSuffix =
+        filteredCount > 0 ? `, ${filteredCount} filtered by allow-events` : '';
       setLog({
         timestamp: ts(),
-        message: `GitHub: ${newEvents.length} new events (${relevant.length} relevant, ${events.length} fetched)`,
+        message: `GitHub: ${newEvents.length} new events (${actorFiltered.length} allowed, ${events.length} fetched${filterSuffix})`,
       });
     } catch {
       setStatus('error');

@@ -132,6 +132,8 @@ export const AutopilotConfigSchema = z.object({
   botName: z.string().optional(),
   /** GitHub handles of project maintainers */
   maintainers: z.array(z.string()).optional(),
+  /** Filter events by actor: "maintainers", "all", or comma-separated usernames */
+  allowEvents: z.string().optional(),
 });
 
 /**

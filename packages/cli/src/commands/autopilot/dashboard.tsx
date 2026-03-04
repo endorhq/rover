@@ -37,6 +37,7 @@ const autopilotCommand = async (
     bot?: string;
     botName?: string;
     maintainers?: string[];
+    allowEvents?: string;
   } = {}
 ) => {
   let project;
@@ -77,6 +78,39 @@ const autopilotCommand = async (
   const resolvedMaintainers =
     options.maintainers ?? autopilotConfig?.maintainers;
 
+  // Resolve allow-events: CLI flag > rover.json > default "maintainers"
+  const resolvedAllowEvents =
+    options.allowEvents ?? autopilotConfig?.allowEvents ?? 'maintainers';
+
+  if (
+    resolvedAllowEvents === 'maintainers' &&
+    (!resolvedMaintainers || resolvedMaintainers.length === 0)
+  ) {
+    exitWithError(
+      {
+        error:
+          'The default --allow-events mode is "maintainers", but no maintainers are configured.',
+        success: false,
+      },
+      {
+        tips: [
+          'Add maintainers via --maintainers flag: rover autopilot --maintainers alice bob',
+          'Or set them in rover.json: { "autopilot": { "maintainers": ["alice", "bob"] } }',
+          'Or use --allow-events all to process events from all actors (not recommended for public repos)',
+        ],
+      }
+    );
+    return;
+  }
+
+  if (resolvedAllowEvents === 'all') {
+    console.warn(
+      colors.yellow(
+        '⚠ --allow-events=all: processing events from ALL actors. This may increase token usage and exposes the coordinator to prompt injection from untrusted users.'
+      )
+    );
+  }
+
   // Enter alternate screen so quitting restores the original shell
   process.stdout.write(ENTER_ALT_SCREEN + HIDE_CURSOR);
 
@@ -102,6 +136,7 @@ const autopilotCommand = async (
       fromDate={fromDate}
       botName={resolvedBotName}
       maintainers={resolvedMaintainers}
+      allowEvents={resolvedAllowEvents}
     />
   );
 
