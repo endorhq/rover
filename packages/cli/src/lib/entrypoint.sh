@@ -97,7 +97,7 @@ echo -e "\n======================================="
 echo "📦 Starting the package manager MCP server"
 echo "======================================="
 export PACKAGE_MANAGER_MCP_PORT=8090
-RUST_LOG=info package-manager-mcp-server $PACKAGE_MANAGER_MCP_PORT &
+RUST_LOG=info sudo package-manager-mcp-server $PACKAGE_MANAGER_MCP_PORT &
 
 PACKAGE_MANAGER_MCP_INIT_PAYLOAD='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{"tools":{},"resources":{},"prompts":{}},"clientInfo":{"name":"test-client","version":"1.0.0"}}}'
 
