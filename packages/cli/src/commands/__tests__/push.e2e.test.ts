@@ -189,8 +189,8 @@ exit 0
   afterEach(() => {
     process.chdir(originalCwd);
     process.env.PATH = originalPath;
-    rmSync(testDir, { recursive: true, force: true, maxRetries: 3 });
-    rmSync(remoteDir, { recursive: true, force: true, maxRetries: 3 });
+    rmSync(testDir, { recursive: true, force: true });
+    rmSync(remoteDir, { recursive: true, force: true });
   });
 
   /**
