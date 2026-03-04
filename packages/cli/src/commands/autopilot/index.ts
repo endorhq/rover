@@ -1,7 +1,7 @@
 /**
  * Defines the autopilot subcommands for the CLI.
  */
-import { Command } from 'commander';
+import type { Command } from 'commander';
 import dashboardCmd from './dashboard.js';
 import inspectCmd from './inspect.js';
 

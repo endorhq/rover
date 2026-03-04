@@ -1,8 +1,8 @@
-import React from 'react';
+
 import { render } from 'ink';
 import colors from 'ansi-colors';
 import { requireProjectContext } from '../../lib/context.js';
-import { ProjectConfigManager } from 'rover-core';
+import { ProjectConfigManager, type ProjectManager } from 'rover-core';
 import { exitWithError } from '../../utils/exit.js';
 import { LaunchableApp } from '../../lib/autopilot/launch.js';
 import { ensureTraceDirs } from '../../lib/autopilot/helpers.js';
@@ -41,7 +41,7 @@ const autopilotCommand = async (
     mode?: string;
   } = {}
 ) => {
-  let project;
+  let project: ProjectManager | undefined;
   try {
     project = await requireProjectContext();
   } catch (error) {

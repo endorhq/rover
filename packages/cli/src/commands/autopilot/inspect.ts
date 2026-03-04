@@ -9,9 +9,8 @@ import {
 import { exitWithError, exitWithSuccess } from '../../utils/exit.js';
 import { AutopilotStore } from '../../lib/autopilot/store.js';
 import { formatDuration } from '../../lib/autopilot/helpers.js';
-import type { CommandDefinition } from '../../types.js';
+import type { CLIJsonOutput, CommandDefinition } from '../../types.js';
 import type {
-  ActionStep,
   ActionTrace,
   Span,
   Action,
@@ -53,7 +52,7 @@ function stepStatusColor(status: string): (s: string) => string {
   }
 }
 
-function formatMeta(meta: Record<string, any>): Record<string, string> {
+function formatMeta(meta: Record<string, unknown>): Record<string, string> {
   const result: Record<string, string> = {};
   for (const [key, value] of Object.entries(meta)) {
     result[key] =
@@ -90,7 +89,7 @@ function displayTrace(
   );
   if (mapping) {
     traceProps['Task ID'] = mapping.taskId.toString();
-    traceProps['Branch'] = mapping.branchName;
+    traceProps.Branch = mapping.branchName;
   }
 
   showProperties(traceProps);
@@ -154,15 +153,15 @@ function buildTraceJson(
   trace: ActionTrace,
   store: AutopilotStore,
   taskMappings: Record<string, TaskMapping>
-): Record<string, any> {
+): CLIJsonOutput & Record<string, unknown> {
   const mapping = Object.values(taskMappings).find(
     m => m.traceId === trace.traceId
   );
 
-  const steps: Record<string, any>[] = [];
+  const steps: Record<string, unknown>[] = [];
 
   for (const step of trace.steps) {
-    const enriched: Record<string, any> = { ...step };
+    const enriched: Record<string, unknown> = { ...step };
     if (step.spanId) {
       const span = store.readSpan(step.spanId);
       if (span) {
@@ -208,11 +207,11 @@ function displaySpan(span: Span, parentTrace: Span[]): void {
 
   if (span.completed) {
     spanProps['Completed At'] = new Date(span.completed).toLocaleString();
-    spanProps['Duration'] = formatDuration(span.timestamp, span.completed);
+    spanProps.Duration = formatDuration(span.timestamp, span.completed);
   }
 
   if (span.summary) {
-    spanProps['Summary'] = span.summary;
+    spanProps.Summary = span.summary;
   }
 
   if (span.parent) {
@@ -256,7 +255,7 @@ function displaySpan(span: Span, parentTrace: Span[]): void {
   ]);
 }
 
-function buildSpanJson(span: Span, parentTrace: Span[]): Record<string, any> {
+function buildSpanJson(span: Span, parentTrace: Span[]): CLIJsonOutput & Record<string, unknown> {
   return {
     success: true,
     type: 'span',
@@ -280,7 +279,7 @@ function displayAction(action: Action, linkedSpan: Span | null): void {
   };
 
   if (action.reasoning) {
-    actionProps['Reasoning'] = action.reasoning;
+    actionProps.Reasoning = action.reasoning;
   }
 
   showProperties(actionProps);
@@ -302,7 +301,7 @@ function displayAction(action: Action, linkedSpan: Span | null): void {
         : colors.gray('unknown'),
     };
     if (linkedSpan.summary) {
-      spanProps['Summary'] = linkedSpan.summary;
+      spanProps.Summary = linkedSpan.summary;
     }
     showProperties(spanProps);
   }
@@ -317,7 +316,7 @@ function displayAction(action: Action, linkedSpan: Span | null): void {
 function buildActionJson(
   action: Action,
   linkedSpan: Span | null
-): Record<string, any> {
+): CLIJsonOutput & Record<string, unknown> {
   return {
     success: true,
     type: 'action',
@@ -367,7 +366,7 @@ const inspectAutopilotCommand = async (
   }
 
   // Require project context (use --project-id override if provided)
-  let project;
+  let project: Awaited<ReturnType<typeof requireProjectContext>> | undefined;
   try {
     project = await requireProjectContext(options.projectId);
   } catch (error) {
