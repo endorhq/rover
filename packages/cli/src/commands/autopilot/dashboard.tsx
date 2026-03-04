@@ -4,7 +4,7 @@ import colors from 'ansi-colors';
 import { requireProjectContext } from '../../lib/context.js';
 import { ProjectConfigManager } from 'rover-core';
 import { exitWithError } from '../../utils/exit.js';
-import { AutopilotApp } from '../../lib/autopilot/app.js';
+import { LaunchableApp } from '../../lib/autopilot/launch.js';
 import { ensureTraceDirs } from '../../lib/autopilot/helpers.js';
 import type { CommandDefinition } from '../../types.js';
 
@@ -96,7 +96,7 @@ const autopilotCommand = async (
   });
 
   const { waitUntilExit } = render(
-    <AutopilotApp
+    <LaunchableApp
       project={project}
       refreshInterval={refreshInterval}
       fromDate={fromDate}
