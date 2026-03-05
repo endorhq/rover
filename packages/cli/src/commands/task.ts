@@ -22,6 +22,9 @@ import {
   ContextFetchError,
   registerBuiltInProviders,
   type ContextIndexOptions,
+  getRepoInfo,
+  GitHubProvider,
+  GitLabProvider,
 } from 'rover-core';
 import type { NetworkConfig, NetworkMode } from 'rover-schemas';
 import {
@@ -37,7 +40,6 @@ import { NewTaskProvider } from 'rover-telemetry';
 import { readFromStdin, stdinIsAvailable } from '../utils/stdin.js';
 import type { TaskTaskOutput } from '../output-types.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
-import { GitHub, GitHubError } from '../lib/github.js';
 import { copyEnvironmentFiles } from '../utils/env-files.js';
 import { initWorkflowStore } from '../lib/workflow.js';
 import {
@@ -114,7 +116,7 @@ const validations = (selectedAiAgent?: string): validationResult => {
       };
     }
   } else if (selectedAiAgent === 'qwen') {
-    // Check Gemini credentials if needed
+    // Check Qwen credentials if needed
     const qwenFile = join(homedir(), '.qwen', 'settings.json');
     const qwenCreds = join(homedir(), '.qwen', 'oauth_creds.json');
 
@@ -190,6 +192,7 @@ const updateTaskMetadata = (
 interface TaskOptions {
   workflow?: string;
   fromGithub?: string;
+  fromGitlab?: string;
   includeComments?: boolean;
   yes?: boolean;
   sourceBranch?: string;
@@ -206,35 +209,38 @@ interface TaskOptions {
 }
 
 /**
- * Format a date string to a more readable format (YYYY-MM-DD)
+ * Parse an issue URI (GitHub or GitLab) from context URIs.
+ * Returns the provider, issue number, and optional project path, or null if no issue is found.
+ *
+ * Supported formats:
+ * - github:issue/N
+ * - github:owner/repo/issue/N
+ * - gitlab:issue/N
+ * - gitlab:path/to/repo/issue/N
  */
-const formatCommentDate = (dateString: string): string => {
-  if (!dateString) return '';
-  try {
-    const date = new Date(dateString);
-    return date.toISOString().split('T')[0];
-  } catch {
-    return dateString;
+export const parseIssueFromContext = (
+  contextUris: string[]
+): {
+  provider: 'github' | 'gitlab';
+  number: number;
+  projectPath?: string;
+} | null => {
+  for (const uri of contextUris) {
+    // Match github:issue/N, github:owner/repo/issue/N,
+    //       gitlab:issue/N, gitlab:path/to/repo/issue/N
+    const match = uri.match(/^(github|gitlab):(.+\/)?issue\/(\d+)$/);
+    if (match) {
+      const projectPath = match[2]
+        ? match[2].replace(/\/$/, '') // Remove trailing slash
+        : undefined;
+      return {
+        provider: match[1] as 'github' | 'gitlab',
+        number: parseInt(match[3], 10),
+        projectPath,
+      };
+    }
   }
-};
-
-/**
- * Format GitHub comments as markdown to append to the issue body
- */
-const formatCommentsAsMarkdown = (
-  comments: Array<{ author: string; body: string; createdAt: string }>
-): string => {
-  if (!comments || comments.length === 0) return '';
-
-  const formattedComments = comments
-    .map(comment => {
-      const date = formatCommentDate(comment.createdAt);
-      const dateStr = date ? ` (${date})` : '';
-      return `**@${comment.author}**${dateStr}:\n${comment.body}`;
-    })
-    .join('\n\n');
-
-  return `\n\n---\n## Comments\n\n${formattedComments}`;
+  return null;
 };
 
 /**
@@ -293,7 +299,7 @@ const createTaskForAgent = async (
   jsonMode: boolean,
   networkConfig?: NetworkConfig,
   source?: {
-    type: 'github' | 'manual';
+    type: 'github' | 'gitlab' | 'manual';
     id?: string;
     url?: string;
     title?: string;
@@ -316,7 +322,7 @@ const createTaskForAgent = async (
   savedTo: string;
   context?: Array<{ name: string; uri: string; description: string }>;
 } | null> => {
-  const { sourceBranch, targetBranch, fromGithub } = options;
+  const { sourceBranch, targetBranch } = options;
 
   const processManager = jsonMode
     ? undefined
@@ -444,9 +450,9 @@ const createTaskForAgent = async (
 
     // Read context content for AI expansion
     // Skip PRs to avoid huge context.
-    const expansionEntries = entries.filter(entry => {
-      !(entry.metadata?.type || '').includes('pr');
-    });
+    const expansionEntries = entries.filter(
+      entry => !(entry.metadata?.type || '').includes('pr')
+    );
     const storedContent = contextManager.readStoredContent(expansionEntries);
     if (storedContent) {
       contextContent = storedContent;
@@ -577,12 +583,11 @@ const createTaskForAgent = async (
  * the task description using AI, sets up an isolated git worktree, creates
  * iteration tracking, and launches a sandboxed container running the specified
  * AI agent. Supports multiple agents working on the same task in parallel,
- * GitHub issue integration, custom workflows, and network filtering.
+ * GitHub/GitLab issue integration via --context, custom workflows, and network filtering.
  *
  * @param initPrompt - Initial task description (prompts if not provided)
  * @param options - Command options
  * @param options.workflow - Workflow name to use (defaults to 'swe')
- * @param options.fromGithub - GitHub issue number to fetch description from
  * @param options.yes - Skip interactive prompts
  * @param options.sourceBranch - Base branch for git worktree creation
  * @param options.targetBranch - Custom name for the task branch
@@ -600,6 +605,7 @@ const taskCommand = async (initPrompt?: string, options: TaskOptions = {}) => {
     yes,
     json,
     fromGithub,
+    fromGitlab,
     includeComments,
     sourceBranch,
     targetBranch,
@@ -630,11 +636,9 @@ const taskCommand = async (initPrompt?: string, options: TaskOptions = {}) => {
       );
     }
 
-    // Translate to context URI
     context = context ?? [];
     context.push(`github:issue/${fromGithub}`);
 
-    // Translate --include-comments to --context-trust-all-authors
     if (includeComments) {
       if (!json) {
         console.warn(
@@ -647,15 +651,42 @@ const taskCommand = async (initPrompt?: string, options: TaskOptions = {}) => {
     }
   }
 
-  // Validate --include-comments requires --from-github
-  if (includeComments && !fromGithub) {
+  // Deprecation: translate --from-gitlab to --context
+  if (fromGitlab) {
+    if (!json) {
+      console.warn(
+        colors.yellow(
+          'Warning: --from-gitlab is deprecated. Use --context gitlab:issue/<number> instead.'
+        )
+      );
+    }
+
+    context = context ?? [];
+    context.push(`gitlab:issue/${fromGitlab}`);
+
+    if (includeComments) {
+      if (!json) {
+        console.warn(
+          colors.yellow(
+            'Warning: --include-comments is deprecated. Use --context-trust-all-authors instead.'
+          )
+        );
+      }
+      contextTrustAllAuthors = contextTrustAllAuthors || includeComments;
+    }
+  }
+
+  // Validate --include-comments requires --from-github (or --from-gitlab)
+  if (includeComments && !fromGithub && !fromGitlab) {
     jsonOutput.error =
-      '--include-comments requires --from-github to be specified';
+      '--include-comments requires --from-github or --from-gitlab to be specified';
     await exitWithError(jsonOutput, {
       tips: [
         'Use ' +
-          colors.cyan('rover task --from-github <issue> --include-comments') +
-          ' to include issue comments',
+          colors.cyan(
+            'rover task --context github:issue/<number> --context-trust-all-authors'
+          ) +
+          ' instead (--include-comments and --from-github/--from-gitlab are deprecated)',
       ],
       telemetry: getTelemetry(),
     });
@@ -779,10 +810,10 @@ const taskCommand = async (initPrompt?: string, options: TaskOptions = {}) => {
     requiredInputs.length === 1 && requiredInputs[0] === 'description';
   const inputsData: Map<string, string> = new Map();
 
-  // Task source (populated when --from-github is used)
+  // Task source (populated when --context has a github: or gitlab: issue URI)
   let taskSource:
     | {
-        type: 'github' | 'manual';
+        type: 'github' | 'gitlab' | 'manual';
         id?: string;
         url?: string;
         title?: string;
@@ -842,122 +873,145 @@ const taskCommand = async (initPrompt?: string, options: TaskOptions = {}) => {
 
   // We need to process the workflow inputs. We will ask users to provide this
   // information or load it as a JSON from the stdin.
-  if (inputs && inputs.length > 0) {
-    if (fromGithub != null) {
-      // Load the inputs from GitHub
-      const github = new GitHub({ cwd: project.path });
-      const remoteUrl = git.remoteUrl();
+  const issueCtx = context?.length ? parseIssueFromContext(context) : null;
 
-      // Extract repo info for storing with the task
-      const repoInfo = github.getGitHubRepoInfo(remoteUrl);
-      if (repoInfo) {
-        const issueNumber = parseInt(fromGithub, 10);
+  if (inputs && inputs.length > 0) {
+    if (issueCtx) {
+      // Unified issue handling for both GitHub and GitLab context URIs
+      const remoteUrl = git.remoteUrl();
+      let resolvedOwner: string | undefined;
+      let resolvedRepo: string | undefined;
+      let resolvedPath = issueCtx.projectPath;
+      let host = issueCtx.provider === 'github' ? 'github.com' : 'gitlab.com';
+
+      // Resolve project path / owner+repo from URI or git remote
+      if (remoteUrl) {
+        const repoInfo = getRepoInfo(remoteUrl);
+        if (repoInfo) {
+          if (!resolvedPath) {
+            resolvedPath = repoInfo.projectPath;
+          }
+          if (issueCtx.provider === 'github') {
+            // For GitHub, extract owner/repo from projectPath
+            const parts = (issueCtx.projectPath || repoInfo.projectPath).split(
+              '/'
+            );
+            if (parts.length >= 2) {
+              resolvedOwner = parts[0];
+              resolvedRepo = parts[1];
+            }
+          }
+          if (repoInfo.provider === issueCtx.provider) {
+            host = repoInfo.host;
+          }
+        }
+      } else if (issueCtx.projectPath && issueCtx.provider === 'github') {
+        const parts = issueCtx.projectPath.split('/');
+        if (parts.length >= 2) {
+          resolvedOwner = parts[0];
+          resolvedRepo = parts[1];
+        }
+      }
+
+      // Build taskSource
+      if (issueCtx.provider === 'github' && resolvedOwner && resolvedRepo) {
         taskSource = {
           type: 'github',
-          id: fromGithub,
-          url: `https://github.com/${repoInfo.owner}/${repoInfo.repo}/issues/${issueNumber}`,
+          id: String(issueCtx.number),
+          url: `https://${host}/${resolvedOwner}/${resolvedRepo}/issues/${issueCtx.number}`,
           ref: {
-            owner: repoInfo.owner,
-            repo: repoInfo.repo,
-            number: issueNumber,
+            owner: resolvedOwner,
+            repo: resolvedRepo,
+            number: issueCtx.number,
+          },
+        };
+      } else if (issueCtx.provider === 'gitlab' && resolvedPath) {
+        taskSource = {
+          type: 'gitlab',
+          id: String(issueCtx.number),
+          url: `https://${host}/${resolvedPath}/-/issues/${issueCtx.number}`,
+          ref: {
+            projectPath: resolvedPath,
+            number: issueCtx.number,
           },
         };
       }
 
-      try {
-        const issueData = await github.fetchIssue(fromGithub, remoteUrl, {
-          includeComments,
-        });
-        if (issueData) {
-          // Start with the issue body
-          description = issueData.body;
+      // Fetch issue description
+      let issueBody: string | null = null;
+      if (issueCtx.provider === 'github' && resolvedOwner && resolvedRepo) {
+        issueBody = GitHubProvider.fetchIssueDescription(
+          issueCtx.number,
+          resolvedOwner,
+          resolvedRepo
+        );
+      } else if (issueCtx.provider === 'gitlab' && resolvedPath) {
+        issueBody = GitLabProvider.fetchIssueDescription(
+          issueCtx.number,
+          resolvedPath
+        );
+      } else {
+        const formatHint =
+          issueCtx.provider === 'github'
+            ? 'github:owner/repo/issue/N'
+            : 'gitlab:namespace/repo/issue/N';
+        jsonOutput.error = `Could not determine project path. Use explicit format: ${formatHint}`;
+        await exitWithError(jsonOutput, { telemetry });
+        return;
+      }
 
-          // Append comments if they were included
-          if (
-            includeComments &&
-            issueData.comments &&
-            issueData.comments.length > 0
-          ) {
-            description += formatCommentsAsMarkdown(issueData.comments);
-          }
+      if (!issueBody || issueBody.length === 0) {
+        const providerLabel =
+          issueCtx.provider === 'github' ? 'GitHub' : 'GitLab';
+        jsonOutput.error = `The ${providerLabel} issue description is empty. Add more details to the issue so the Agent can complete it successfully.`;
+        await exitWithError(jsonOutput, { telemetry });
+        return;
+      }
 
-          inputsData.set('description', description);
+      description = issueBody;
+      inputsData.set('description', description);
 
-          if (!issueData.body || issueData.body.length == 0) {
-            jsonOutput.error =
-              'The GitHub issue description is empty. Add more details to the issue so the Agent can complete it successfully.';
-            await exitWithError(jsonOutput, { telemetry });
-            return;
-          }
+      // Extract workflow inputs from the issue body
+      if (descriptionOnlyWorkflow) {
+        if (!json) {
+          showProperties({ Description: description }, { addLineBreak: false });
+        }
+      } else {
+        if (!json) {
+          console.log(
+            colors.gray('\nExtracting workflow inputs from issue...')
+          );
+        }
 
-          // Now, let's ask an agent to extract the required inputs from the issue body.
-          if (inputs && inputs.length > 0) {
-            if (descriptionOnlyWorkflow) {
-              // We already have the description!
-              inputsData.set('description', description);
-              if (!json) {
-                showProperties(
-                  {
-                    Description: description,
-                  },
-                  { addLineBreak: false }
-                );
-              }
-            } else {
-              if (!json) {
-                console.log(
-                  colors.gray('\nExtracting workflow inputs from issue...')
-                );
-              }
+        const agentTool = getAIAgentTool(selectedAgents[0].agent);
+        const extractedInputs = await agentTool.extractIssueInputs(
+          issueBody,
+          inputs.filter(el => el.name !== 'description')
+        );
 
-              const agentTool = getAIAgentTool(selectedAgents[0].agent);
-              const extractedInputs = await agentTool.extractGithubInputs(
-                issueData.body,
-                inputs.filter(el => el.name !== 'description')
-              );
-
-              if (extractedInputs) {
-                for (const key in extractedInputs) {
-                  if (extractedInputs[key] !== null) {
-                    inputsData.set(key, String(extractedInputs[key]));
-                  }
-                }
-
-                if (!json) {
-                  console.log(
-                    colors.green('✓ Workflow inputs extracted successfully')
-                  );
-                }
-              } else {
-                if (!json) {
-                  console.log(
-                    colors.yellow(
-                      '⚠ Could not extract workflow inputs from issue'
-                    )
-                  );
-                }
-
-                jsonOutput.error =
-                  'Failed to fetch the workflow inputs from issue';
-                await exitWithError(jsonOutput, { telemetry });
-                return;
-              }
+        if (extractedInputs) {
+          for (const key in extractedInputs) {
+            if (extractedInputs[key] !== null) {
+              inputsData.set(key, String(extractedInputs[key]));
             }
           }
+
+          if (!json) {
+            console.log(
+              colors.green('✓ Workflow inputs extracted successfully')
+            );
+          }
         } else {
-          jsonOutput.error = 'Failed to fetch issue from GitHub';
+          if (!json) {
+            console.log(
+              colors.yellow('⚠ Could not extract workflow inputs from issue')
+            );
+          }
+
+          jsonOutput.error = 'Failed to extract workflow inputs from issue';
           await exitWithError(jsonOutput, { telemetry });
           return;
         }
-      } catch (err) {
-        if (err instanceof GitHubError) {
-          jsonOutput.error = `Failed to fetch issue from GitHub: ${err.message}`;
-        } else {
-          jsonOutput.error = `Failed to fetch issue from GitHub: ${err}`;
-        }
-
-        await exitWithError(jsonOutput, { telemetry });
-        return;
       }
     } else if (stdinIsAvailable()) {
       const stdinInput = await readFromStdin();
@@ -1146,8 +1200,14 @@ const taskCommand = async (initPrompt?: string, options: TaskOptions = {}) => {
     // Track new task event (send only once for all agents)
     const isMultiAgent = selectedAgents.length > 1;
     const agentNames = selectedAgents.map(a => a.agent);
+    const taskProvider =
+      taskSource?.type === 'github'
+        ? NewTaskProvider.GITHUB
+        : taskSource?.type === 'gitlab'
+          ? NewTaskProvider.GITLAB
+          : NewTaskProvider.INPUT;
     telemetry?.eventNewTask(
-      fromGithub != null ? NewTaskProvider.GITHUB : NewTaskProvider.INPUT,
+      taskProvider,
       workflowName,
       isMultiAgent,
       agentNames

@@ -23,7 +23,7 @@ export const TaskStatusSchema = z.enum([
  * Source type schema for task origin tracking.
  * @deprecated Use iteration context instead. Will be removed in a future version.
  */
-export const SourceTypeSchema = z.enum(['github', 'manual']);
+export const SourceTypeSchema = z.enum(['github', 'gitlab', 'manual']);
 
 /**
  * Task source schema - tracks where a task originated from.

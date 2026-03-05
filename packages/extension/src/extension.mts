@@ -1167,8 +1167,8 @@ export function activate(context: vscode.ExtensionContext) {
                 roverPath,
                 [
                   'task',
-                  '--from-github',
-                  issueNumber.toString(),
+                  '--context',
+                  `github:issue/${issueNumber}`,
                   '--yes',
                   '--json',
                 ],

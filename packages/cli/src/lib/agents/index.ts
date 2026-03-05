@@ -63,8 +63,8 @@ export interface AIAgentTool {
     conflictedContent: string
   ): Promise<string | null>;
 
-  // Extract workflow input values from a GitHub issue description
-  extractGithubInputs(
+  // Extract workflow input values from an issue description
+  extractIssueInputs(
     issueDescription: string,
     inputs: WorkflowInput[]
   ): Promise<Record<string, any> | null>;
