@@ -9,6 +9,7 @@ import {
   IterationManager,
 } from 'rover-core';
 import { inspectCommand } from '../inspect.js';
+import { isStdoutTTY } from '../../utils/stdout.js';
 
 // Store testDir for context mock
 let testDir: string;
@@ -47,6 +48,11 @@ vi.mock('../../lib/telemetry.js', () => ({
 // Mock display utilities to suppress output during tests
 vi.mock('../../utils/display.js', () => ({
   showTips: vi.fn(),
+}));
+
+// Mock stdout TTY detection so we can test piped vs interactive behavior
+vi.mock('../../utils/stdout.js', () => ({
+  isStdoutTTY: vi.fn(() => true),
 }));
 
 describe('inspect command', () => {
@@ -349,6 +355,60 @@ describe('inspect command', () => {
       const output = capturedOutput.join('\n');
       expect(output).toContain('Human Readable Task');
       expect(output).toContain('Details');
+    });
+  });
+
+  describe('Piped stdout (content-only output)', () => {
+    it('should output only raw file content when stdout is piped', async () => {
+      createTestTask(1, 'Piped Task');
+      vi.mocked(isStdoutTTY).mockReturnValue(false);
+
+      await inspectCommand('1');
+
+      const output = capturedOutput.join('\n');
+      // Should contain the raw file content (summary.md from createTestTask)
+      expect(output).toContain('# Test Summary');
+      // Should not contain decorated output
+      expect(output).not.toContain('Details');
+      expect(output).not.toContain('Workspace');
+      expect(output).not.toContain('Workflow Output');
+      // Should not contain box-drawing characters from showFile
+      expect(output).not.toMatch(/┌|└|│/);
+
+      vi.mocked(isStdoutTTY).mockReturnValue(true);
+    });
+
+    it('should output nothing when stdout is piped and task has no iteration files', async () => {
+      const taskPath = join(testDir, '.rover', 'tasks', '2');
+      const task = TaskDescriptionManager.create(taskPath, {
+        id: 2,
+        title: 'Empty Task',
+        description: 'No iterations',
+        inputs: new Map(),
+        workflowName: 'swe',
+      });
+      const worktreePath = join('.rover', 'tasks', '2', 'workspace');
+      launchSync('git', [
+        'worktree',
+        'add',
+        worktreePath,
+        '-b',
+        'rover-task-2',
+      ]);
+      task.setWorkspace(join(testDir, worktreePath), 'rover-task-2');
+      task.markInProgress();
+      task.markCompleted();
+      // No iteration directory with markdown files
+
+      vi.mocked(isStdoutTTY).mockReturnValue(false);
+
+      await inspectCommand('2');
+
+      const output = capturedOutput.join('\n');
+      expect(output).not.toContain('Details');
+      expect(output).not.toContain('Workspace');
+
+      vi.mocked(isStdoutTTY).mockReturnValue(true);
     });
   });
 });
