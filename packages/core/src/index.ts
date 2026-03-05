@@ -60,6 +60,7 @@ export {
   getCacheDir,
   getProjectLogsDir,
   ensureDirectories,
+  getProjectPath,
 } from './paths.js';
 
 export {
