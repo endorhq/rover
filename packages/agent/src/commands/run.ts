@@ -449,17 +449,16 @@ export const runCommand = async (
           _stepIndex: number,
           stepsOutput: Map<string, Map<string, string>>
         ): Promise<StepResult> => {
+          const sessionId = await acpRunner.createSession();
           try {
-            await acpRunner.createSession();
-
             // Inject previous step outputs before running
             for (const [prevStepId, prevOutputs] of stepsOutput.entries()) {
               acpRunner.stepsOutput.set(prevStepId, prevOutputs);
             }
 
-            return await acpRunner.runStep(step.id);
+            return await acpRunner.runStep(sessionId, step.id);
           } finally {
-            acpRunner.closeSession();
+            acpRunner.closeSession(sessionId);
           }
         },
       };

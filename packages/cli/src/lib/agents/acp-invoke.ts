@@ -248,7 +248,7 @@ export async function acpInvoke(config: ACPInvokeConfig): Promise<string> {
     }
 
     // 7. Send prompt and capture response
-    client.startCapturing();
+    client.startCapturing(sessionId);
 
     if (VERBOSE) {
       console.error(
@@ -270,7 +270,7 @@ export async function acpInvoke(config: ACPInvokeConfig): Promise<string> {
       );
     }
 
-    const response = client.stopCapturing();
+    const response = client.stopCapturing(sessionId);
 
     return response;
   } catch (error) {
