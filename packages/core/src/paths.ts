@@ -1,6 +1,6 @@
+import { existsSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { mkdirSync, existsSync } from 'node:fs';
 
 /**
  * Get the base Rover directory based on platform
@@ -60,6 +60,14 @@ export function getConfigDir(): string {
  */
 export function getDataDir(): string {
   return join(getRoverBaseDir(), 'data');
+}
+
+/**
+ * Get the data directory for a specific project.
+ * Returns `{dataDir}/projects/{projectId}`.
+ */
+export function getProjectPath(projectId: string): string {
+  return join(getDataDir(), 'projects', projectId);
 }
 
 /**
