@@ -59,26 +59,51 @@ interface TerminalState {
 
 const terminals = new Map<string, TerminalState>();
 
+interface SessionCaptureState {
+  capturedMessages: string;
+  isCapturing: boolean;
+}
+
 export class ACPClient implements Client {
-  private capturedMessages: string = '';
-  private isCapturing: boolean = false;
+  private sessions = new Map<string, SessionCaptureState>();
+
+  private getOrCreateSession(sessionId: string): SessionCaptureState {
+    let session = this.sessions.get(sessionId);
+    if (!session) {
+      session = {
+        capturedMessages: '',
+        isCapturing: false,
+      };
+      this.sessions.set(sessionId, session);
+    }
+    return session;
+  }
 
   /**
    * Start capturing agent messages from session updates
    */
-  startCapturing(): void {
-    this.capturedMessages = '';
-    this.isCapturing = true;
+  startCapturing(sessionId: string): void {
+    const session = this.getOrCreateSession(sessionId);
+    session.capturedMessages = '';
+    session.isCapturing = true;
   }
 
   /**
    * Stop capturing and return accumulated messages
    */
-  stopCapturing(): string {
-    this.isCapturing = false;
-    const messages = this.capturedMessages;
-    this.capturedMessages = '';
+  stopCapturing(sessionId: string): string {
+    const session = this.getOrCreateSession(sessionId);
+    session.isCapturing = false;
+    const messages = session.capturedMessages;
+    session.capturedMessages = '';
     return messages;
+  }
+
+  /**
+   * Remove session capture state (cleanup after session close)
+   */
+  removeSession(sessionId: string): void {
+    this.sessions.delete(sessionId);
   }
 
   requestPermission(
@@ -119,6 +144,7 @@ export class ACPClient implements Client {
 
   async sessionUpdate(params: SessionNotification): Promise<void> {
     const update = params.update;
+    const session = this.getOrCreateSession(params.sessionId);
 
     // Always log session updates for debugging
     console.error(
@@ -130,8 +156,8 @@ export class ACPClient implements Client {
       case 'agent_message_chunk':
         if (update.content.type === 'text') {
           // Capture agent messages when capturing is enabled
-          if (this.isCapturing) {
-            this.capturedMessages += update.content.text;
+          if (session.isCapturing) {
+            session.capturedMessages += update.content.text;
           }
           if (VERBOSE) {
             process.stderr.write(update.content.text);
@@ -180,8 +206,8 @@ export class ACPClient implements Client {
           }
         }
 
-        if (this.isCapturing && update.content.type === 'text') {
-          this.capturedMessages += `[THINKING] ${update.content.text}`;
+        if (session.isCapturing && update.content.type === 'text') {
+          session.capturedMessages += `[THINKING] ${update.content.text}`;
         }
         break;
       case 'usage_update':

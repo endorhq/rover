@@ -59,31 +59,50 @@ interface TerminalState {
 
 const terminals = new Map<string, TerminalState>();
 
-export class ACPClient implements Client {
-  private capturedMessages: string = '';
-  private isCapturing: boolean = false;
+interface SessionCaptureState {
+  capturedMessages: string;
+  isCapturing: boolean;
+  cumulativeCostAmount: number;
+  cumulativeCostCurrency: string;
+  costAtCaptureStart: number;
+}
 
-  // Cost tracking: cumulative cost reported by the agent via usage_update events
-  private cumulativeCostAmount: number = 0;
-  private cumulativeCostCurrency: string = 'USD';
-  private costAtCaptureStart: number = 0;
+export class ACPClient implements Client {
+  private sessions = new Map<string, SessionCaptureState>();
+
+  private getOrCreateSession(sessionId: string): SessionCaptureState {
+    let session = this.sessions.get(sessionId);
+    if (!session) {
+      session = {
+        capturedMessages: '',
+        isCapturing: false,
+        cumulativeCostAmount: 0,
+        cumulativeCostCurrency: 'USD',
+        costAtCaptureStart: 0,
+      };
+      this.sessions.set(sessionId, session);
+    }
+    return session;
+  }
 
   /**
    * Start capturing agent messages from session updates
    */
-  startCapturing(): void {
-    this.capturedMessages = '';
-    this.isCapturing = true;
-    this.costAtCaptureStart = this.cumulativeCostAmount;
+  startCapturing(sessionId: string): void {
+    const session = this.getOrCreateSession(sessionId);
+    session.capturedMessages = '';
+    session.isCapturing = true;
+    session.costAtCaptureStart = session.cumulativeCostAmount;
   }
 
   /**
    * Stop capturing and return accumulated messages
    */
-  stopCapturing(): string {
-    this.isCapturing = false;
-    const messages = this.capturedMessages;
-    this.capturedMessages = '';
+  stopCapturing(sessionId: string): string {
+    const session = this.getOrCreateSession(sessionId);
+    session.isCapturing = false;
+    const messages = session.capturedMessages;
+    session.capturedMessages = '';
     return messages;
   }
 
@@ -92,11 +111,19 @@ export class ACPClient implements Client {
    * startCapturing and stopCapturing). Returns the delta in the
    * cumulative cost reported by the agent via usage_update events.
    */
-  getLastPromptCost(): { amount: number; currency: string } {
+  getLastPromptCost(sessionId: string): { amount: number; currency: string } {
+    const session = this.getOrCreateSession(sessionId);
     return {
-      amount: this.cumulativeCostAmount - this.costAtCaptureStart,
-      currency: this.cumulativeCostCurrency,
+      amount: session.cumulativeCostAmount - session.costAtCaptureStart,
+      currency: session.cumulativeCostCurrency,
     };
+  }
+
+  /**
+   * Remove session capture state (cleanup after session close)
+   */
+  removeSession(sessionId: string): void {
+    this.sessions.delete(sessionId);
   }
 
   requestPermission(
@@ -140,6 +167,7 @@ export class ACPClient implements Client {
 
   async sessionUpdate(params: SessionNotification): Promise<void> {
     const update = params.update;
+    const session = this.getOrCreateSession(params.sessionId);
 
     if (VERBOSE) {
       console.log(
@@ -152,8 +180,8 @@ export class ACPClient implements Client {
       case 'agent_message_chunk':
         if (update.content.type === 'text') {
           // Capture agent messages when capturing is enabled
-          if (this.isCapturing) {
-            this.capturedMessages += update.content.text;
+          if (session.isCapturing) {
+            session.capturedMessages += update.content.text;
           }
           if (VERBOSE) {
             process.stdout.write(update.content.text);
@@ -204,15 +232,15 @@ export class ACPClient implements Client {
           }
         }
 
-        if (this.isCapturing && update.content.type === 'text') {
-          this.capturedMessages += `[THINKING] ${update.content.text}`;
+        if (session.isCapturing && update.content.type === 'text') {
+          session.capturedMessages += `[THINKING] ${update.content.text}`;
         }
         break;
       case 'usage_update':
         // Track cumulative cost reported by the agent
         if (update.cost) {
-          this.cumulativeCostAmount = update.cost.amount;
-          this.cumulativeCostCurrency = update.cost.currency;
+          session.cumulativeCostAmount = update.cost.amount;
+          session.cumulativeCostCurrency = update.cost.currency;
         }
         break;
       case 'available_commands_update':

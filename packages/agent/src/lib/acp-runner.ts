@@ -81,9 +81,8 @@ export class ACPRunner {
   private agentProcess: ChildProcess | null = null;
   private connection: ClientSideConnection | null = null;
   private client: ACPClient | null = null;
-  private sessionId: string | null = null;
+  private activeSessions = new Set<string>();
   private isConnectionInitialized: boolean = false;
-  private isSessionCreated: boolean = false;
   private tool: string;
 
   constructor(config: ACPRunnerConfig) {
@@ -222,12 +221,6 @@ export class ACPRunner {
       );
     }
 
-    if (this.isSessionCreated) {
-      throw new Error(
-        'Session already created. Use the existing session or close it first.'
-      );
-    }
-
     try {
       // Create a new session
       const sessionRequest = {
@@ -251,12 +244,12 @@ export class ACPRunner {
         );
       }
 
-      this.sessionId = sessionResult.sessionId;
-      this.isSessionCreated = true;
+      const sessionId = sessionResult.sessionId;
+      this.activeSessions.add(sessionId);
 
-      console.log(colors.gray(`📝 Created session: ${this.sessionId}`));
+      console.log(colors.gray(`📝 Created session: ${sessionId}`));
 
-      return sessionResult.sessionId;
+      return sessionId;
     } catch (error) {
       console.log(
         colors.red('[ACP] newSession failed:'),
@@ -273,6 +266,7 @@ export class ACPRunner {
    * Supports text, images (base64 or file:// URIs), and embedded resources.
    */
   async sendPrompt(
+    sessionId: string,
     prompt: string,
     options?: {
       /** Image attachments (base64 data or file:// URIs) */
@@ -301,8 +295,10 @@ export class ACPRunner {
       );
     }
 
-    if (!this.isSessionCreated || !this.sessionId) {
-      throw new Error('No active session. Call createSession() first.');
+    if (!this.activeSessions.has(sessionId)) {
+      throw new Error(
+        `Session '${sessionId}' not found. Call createSession() first.`
+      );
     }
 
     if (!this.client) {
@@ -311,7 +307,7 @@ export class ACPRunner {
 
     try {
       // Start capturing agent messages
-      this.client.startCapturing();
+      this.client.startCapturing(sessionId);
 
       // Build prompt content array
       const promptContent: ContentBlock[] = [
@@ -369,7 +365,7 @@ export class ACPRunner {
       }
 
       const promptResult = await this.connection.prompt({
-        sessionId: this.sessionId,
+        sessionId,
         prompt: promptContent,
       });
 
@@ -381,7 +377,7 @@ export class ACPRunner {
       }
 
       // Stop capturing and get the accumulated response
-      const response = this.client.stopCapturing();
+      const response = this.client.stopCapturing(sessionId);
 
       // Extract usage stats from the ACP response
       const tokens = promptResult.usage
@@ -392,7 +388,7 @@ export class ACPRunner {
         : undefined;
 
       // Get per-prompt cost delta from the client's tracked usage_update events
-      const promptCost = this.client.getLastPromptCost();
+      const promptCost = this.client.getLastPromptCost(sessionId);
       const cost = promptCost.amount > 0 ? promptCost.amount : undefined;
 
       return { stopReason: promptResult.stopReason, response, tokens, cost };
@@ -402,7 +398,7 @@ export class ACPRunner {
         colors.red(formatError(error))
       );
       // Stop capturing on error too
-      this.client.stopCapturing();
+      this.client.stopCapturing(sessionId);
       throw new Error(`Failed to send prompt: ${formatError(error)}`);
     }
   }
@@ -413,20 +409,22 @@ export class ACPRunner {
    *
    * Allows changing the AI model used for subsequent prompts in the session.
    */
-  async setModel(modelId: string): Promise<void> {
+  async setModel(sessionId: string, modelId: string): Promise<void> {
     if (!this.isConnectionInitialized || !this.connection) {
       throw new Error(
         'Connection not initialized. Call initializeConnection() first.'
       );
     }
 
-    if (!this.isSessionCreated || !this.sessionId) {
-      throw new Error('No active session. Call createSession() first.');
+    if (!this.activeSessions.has(sessionId)) {
+      throw new Error(
+        `Session '${sessionId}' not found. Call createSession() first.`
+      );
     }
 
     try {
       await this.connection.unstable_setSessionModel({
-        sessionId: this.sessionId,
+        sessionId,
         modelId,
       });
 
@@ -442,24 +440,26 @@ export class ACPRunner {
    *
    * Aborts any running language model requests and tool calls.
    */
-  async cancelPrompt(): Promise<void> {
+  async cancelPrompt(sessionId: string): Promise<void> {
     if (!this.isConnectionInitialized || !this.connection) {
       throw new Error(
         'Connection not initialized. Call initializeConnection() first.'
       );
     }
 
-    if (!this.isSessionCreated || !this.sessionId) {
-      throw new Error('No active session. Call createSession() first.');
+    if (!this.activeSessions.has(sessionId)) {
+      throw new Error(
+        `Session '${sessionId}' not found. Call createSession() first.`
+      );
     }
 
     try {
       await this.connection.cancel({
-        sessionId: this.sessionId,
+        sessionId,
       });
 
       console.log(
-        colors.yellow(`⚠️  Prompt cancelled for session: ${this.sessionId}`)
+        colors.yellow(`⚠️  Prompt cancelled for session: ${sessionId}`)
       );
     } catch (error) {
       throw new Error(`Failed to cancel prompt: ${formatError(error)}`);
@@ -469,15 +469,20 @@ export class ACPRunner {
   /**
    * Run a single workflow step using the ACP session
    */
-  async runStep(stepId: string): Promise<ACPRunnerStepResult> {
+  async runStep(
+    sessionId: string,
+    stepId: string
+  ): Promise<ACPRunnerStepResult> {
     if (!this.isConnectionInitialized || !this.connection) {
       throw new Error(
         'Connection not initialized. Call initializeConnection() first.'
       );
     }
 
-    if (!this.isSessionCreated || !this.sessionId) {
-      throw new Error('No active session. Call createSession() first.');
+    if (!this.activeSessions.has(sessionId)) {
+      throw new Error(
+        `Session '${sessionId}' not found. Call createSession() first.`
+      );
     }
 
     const start = performance.now();
@@ -498,7 +503,7 @@ export class ACPRunner {
 
       // Log step start
       this.logger?.info('step_start', `Starting step: ${step.name}`, {
-        sessionId: this.sessionId ?? undefined,
+        sessionId,
         stepId: step.id,
         stepName: step.name,
         agent: this.tool,
@@ -514,7 +519,7 @@ export class ACPRunner {
         (isAgentStep(step) && step.model) || this.defaultModel || undefined;
       if (stepModel) {
         try {
-          await this.setModel(stepModel);
+          await this.setModel(sessionId, stepModel);
         } catch (error) {
           console.log(
             colors.yellow(
@@ -540,7 +545,7 @@ export class ACPRunner {
       }
 
       // Send the prompt via ACP session
-      const promptResult = await this.sendPrompt(prompt);
+      const promptResult = await this.sendPrompt(sessionId, prompt);
 
       // Track usage stats from ACP response
       const tokens = promptResult.tokens;
@@ -578,7 +583,7 @@ export class ACPRunner {
 
       // Log step completion
       this.logger?.info('step_complete', `Step completed: ${step.name}`, {
-        sessionId: this.sessionId ?? undefined,
+        sessionId,
         stepId: step.id,
         stepName: step.name,
         agent: this.tool,
@@ -608,7 +613,7 @@ export class ACPRunner {
 
       // Log step failure
       this.logger?.error('step_fail', `Step failed: ${step.name}`, {
-        sessionId: this.sessionId ?? undefined,
+        sessionId,
         stepId: step.id,
         stepName: step.name,
         agent: this.tool,
@@ -1053,13 +1058,13 @@ export class ACPRunner {
    * Close just the current session without closing the connection
    * This allows creating a new session on the same connection
    */
-  closeSession(): void {
-    if (this.sessionId) {
+  closeSession(sessionId: string): void {
+    if (this.activeSessions.has(sessionId)) {
       if (VERBOSE) {
-        console.log(colors.gray(`🔌 Closing session: ${this.sessionId}`));
+        console.log(colors.gray(`🔌 Closing session: ${sessionId}`));
       }
-      this.sessionId = null;
-      this.isSessionCreated = false;
+      this.activeSessions.delete(sessionId);
+      this.client?.removeSession(sessionId);
     }
   }
 
@@ -1075,8 +1080,7 @@ export class ACPRunner {
       this.agentProcess = null;
     }
     this.connection = null;
-    this.sessionId = null;
+    this.activeSessions.clear();
     this.isConnectionInitialized = false;
-    this.isSessionCreated = false;
   }
 }
