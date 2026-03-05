@@ -127,6 +127,8 @@ export interface ACPInvokeConfig {
   cwd?: string;
   /** Model override (bridge agents use unstable_setSessionModel, native agents use CLI --model). */
   model?: string;
+  /** System prompt to prepend to the user prompt (ACP has no native system prompt support). */
+  systemPrompt?: string;
 }
 
 /**
@@ -135,7 +137,7 @@ export interface ACPInvokeConfig {
  * Returns the captured agent response text.
  */
 export async function acpInvoke(config: ACPInvokeConfig): Promise<string> {
-  const { agentName, prompt, cwd, model } = config;
+  const { agentName, prompt, cwd, model, systemPrompt } = config;
 
   const agentConfig = getAgentACPConfig(agentName, model);
 
@@ -250,17 +252,22 @@ export async function acpInvoke(config: ACPInvokeConfig): Promise<string> {
     // 7. Send prompt and capture response
     client.startCapturing();
 
+    // ACP has no native system prompt support, so prepend it to the user prompt
+    const fullPrompt = systemPrompt
+      ? `${systemPrompt}\n\n---\n\n${prompt}`
+      : prompt;
+
     if (VERBOSE) {
       console.error(
         colors.gray(
-          `[ACP] Sending prompt request (prompt length: ${prompt.length} chars)`
+          `[ACP] Sending prompt request (prompt length: ${fullPrompt.length} chars${systemPrompt ? `, includes system prompt: ${systemPrompt.length} chars` : ''})`
         )
       );
     }
 
     const promptResult = await connection.prompt({
       sessionId,
-      prompt: [{ type: 'text', text: prompt }],
+      prompt: [{ type: 'text', text: fullPrompt }],
     });
 
     if (VERBOSE) {

@@ -140,7 +140,8 @@ const AGENT_CONFIGS: Record<AgentName, AgentConfig> = {
 };
 
 const SUPPORTED_AGENTS: AgentName[] = ['claude', 'codex', 'gemini'];
-const DEFAULT_TOOLS = 'Read,Glob,Grep,Bash(gh:*),Bash(git:*),Bash(qmd:*)';
+const DEFAULT_TOOLS =
+  'Read,Glob,Grep,Bash(gh:*),Bash(git:*),Bash(qmd:*),Bash(rover:*)';
 
 // ── Generic agent invocation ────────────────────────────────────────────────
 
@@ -277,7 +278,8 @@ interface CoordinateContext {
 async function gatherCoordinateContext(
   meta: Record<string, any>,
   projectId: string,
-  projectPath: string
+  projectPath: string,
+  opts?: { botName?: string; maintainers?: string[] }
 ): Promise<CoordinateContext> {
   // 1. Memory collection
   header('Memory');
@@ -293,11 +295,14 @@ async function gatherCoordinateContext(
   dim(`  Loaded ${entries.length} workflow(s)`);
   const systemPrompt = buildCoordinatorPrompt(
     workflowCatalog,
-    memoryStore.collectionName
+    memoryStore.collectionName,
+    opts?.botName,
+    projectPath,
+    opts?.maintainers
   );
   dim(`  System prompt: ${systemPrompt.length} characters`);
 
-  // 3. Build user message
+  // 3. Build user message (same structure as coordinator.ts)
   const userMessage =
     '## Event\n\n```json\n' + JSON.stringify(meta, null, 2) + '\n```\n';
   dim(`  User message: ${userMessage.length} characters`);
@@ -315,11 +320,16 @@ async function runCoordinate(
     interactive?: boolean;
     model?: string;
     agent?: AgentName;
+    botName?: string;
+    maintainers?: string[];
   },
   projectId: string,
   projectPath: string
 ): Promise<void> {
-  const ctx = await gatherCoordinateContext(meta, projectId, projectPath);
+  const ctx = await gatherCoordinateContext(meta, projectId, projectPath, {
+    botName: options.botName,
+    maintainers: options.maintainers,
+  });
   const agentName = options.agent || 'claude';
 
   const fullPrompt = `${ctx.systemPrompt}\n\n---\n\n${ctx.userMessage}`;
@@ -563,6 +573,14 @@ program
   )
   .option('--agent <name>', 'Agent to use: claude, codex, gemini', 'claude')
   .option(
+    '--bot-name <name>',
+    'GitHub bot account name (for bot-event filtering)'
+  )
+  .option(
+    '--maintainers <names>',
+    'Comma-separated list of maintainer GitHub handles'
+  )
+  .option(
     '--spans <path>',
     'Path to JSON file with span trace (array of Span objects, used by plan step)'
   )
@@ -575,6 +593,8 @@ program
         interactive?: boolean;
         model?: string;
         agent?: string;
+        botName?: string;
+        maintainers?: string;
         spans?: string;
       }
     ) => {
@@ -632,11 +652,23 @@ program
       dim(`Event type: ${meta.type || '(unknown)'}`);
       dim(`Agent: ${agentName}`);
 
+      const maintainersList = options.maintainers
+        ? options.maintainers
+            .split(',')
+            .map(m => m.trim())
+            .filter(Boolean)
+        : undefined;
+
       switch (step) {
         case 'coordinate':
           await runCoordinate(
             meta,
-            { ...options, agent: agentName },
+            {
+              ...options,
+              agent: agentName,
+              botName: options.botName,
+              maintainers: maintainersList,
+            },
             projectId,
             projectPath
           );

@@ -29,7 +29,7 @@ class CopilotAI implements AIAgentTool {
   }
 
   async invoke(prompt: string, options: InvokeOptions = {}): Promise<string> {
-    const { json = false, cwd, model } = options;
+    const { json = false, cwd, model, systemPrompt } = options;
 
     if (json) {
       prompt = `${prompt}
@@ -43,6 +43,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
         prompt,
         cwd,
         model,
+        systemPrompt,
       });
 
       return result;

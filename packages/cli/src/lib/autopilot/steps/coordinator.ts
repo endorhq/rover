@@ -136,6 +136,11 @@ export const coordinatorStep: Step = {
       ],
     });
 
+    // Normalize action aliases
+    if (decision.action === 'no_op' || decision.action === 'no-op') {
+      decision.action = 'noop';
+    }
+
     // Safety: prevent recursive coordinate
     if (decision.action === 'coordinate') {
       decision.action = 'noop';
@@ -153,6 +158,20 @@ export const coordinatorStep: Step = {
     if (decision.action === 'flag') {
       decision.action = 'notify';
       decision.meta = { ...decision.meta, intent: 'flag' };
+    }
+
+    // Catch-all: reject unknown actions to prevent stuck pending entries
+    const VALID_ACTIONS = new Set([
+      'plan',
+      'notify',
+      'workflow',
+      'wait',
+      'noop',
+      'cleanup',
+    ]);
+    if (!VALID_ACTIONS.has(decision.action)) {
+      decision.reasoning = `Unknown action "${decision.action}" forced to noop. Original reasoning: ${decision.reasoning}`;
+      decision.action = 'noop';
     }
 
     // Remove satisfied wait entries

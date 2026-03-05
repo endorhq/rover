@@ -44,11 +44,9 @@ class GeminiAI implements AIAgentTool {
   }
 
   async invoke(prompt: string, options: InvokeOptions = {}): Promise<string> {
-    const { json = false, cwd, model } = options;
+    const { json = false, cwd, model, systemPrompt } = options;
 
     if (json) {
-      // Gemini does not have any way to force the JSON output at CLI level.
-      // Trying to force it via prompting
       prompt = `${prompt}
 
 You MUST output a valid JSON string as an output. Just output the JSON string and nothing else. If you had any error, still return a JSON string with an "error" property.`;
@@ -60,6 +58,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
         prompt,
         cwd,
         model,
+        systemPrompt,
       });
 
       return result;

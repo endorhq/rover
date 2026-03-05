@@ -86,31 +86,7 @@ class ClaudeAI implements AIAgentTool {
   }
 
   async invoke(prompt: string, options: InvokeOptions = {}): Promise<string> {
-    const {
-      json = false,
-      cwd,
-      model,
-      systemPrompt,
-      tools,
-      maxBudget,
-    } = options;
-    const claudeArgs = ['-p'];
-
-    if (model) {
-      claudeArgs.push('--model', model);
-    }
-
-    if (systemPrompt) {
-      claudeArgs.push('--system-prompt', systemPrompt);
-    }
-
-    if (tools && tools.length > 0) {
-      claudeArgs.push('--allowedTools', tools.join(','));
-    }
-
-    if (maxBudget !== undefined) {
-      claudeArgs.push('--max-budget-usd', String(maxBudget));
-    }
+    const { json = false, cwd, model, systemPrompt } = options;
 
     if (json) {
       prompt = `${prompt}
@@ -124,6 +100,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
         prompt,
         cwd,
         model,
+        systemPrompt,
       });
 
       return result;
