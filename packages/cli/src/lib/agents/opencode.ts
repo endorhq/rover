@@ -116,6 +116,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
       const response = await this.invoke(prompt, {
         json: true,
         cwd: projectPath,
+        model: this.model,
       });
       return parseJsonResponse<IPromptTask>(response);
     } catch (error) {
@@ -138,7 +139,10 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
     );
 
     try {
-      const response = await this.invoke(prompt, { json: true });
+      const response = await this.invoke(prompt, {
+        json: true,
+        model: this.model,
+      });
       return parseJsonResponse<IPromptTask>(response);
     } catch (error) {
       console.error(
@@ -162,7 +166,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
         recentCommits,
         summaries
       );
-      const response = await this.invoke(prompt);
+      const response = await this.invoke(prompt, { model: this.model });
 
       if (!response) {
         return null;
@@ -207,7 +211,10 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
     );
 
     try {
-      const response = await this.invoke(prompt, { json: true });
+      const response = await this.invoke(prompt, {
+        json: true,
+        model: this.model,
+      });
       return parseJsonResponse<Record<string, any>>(response);
     } catch (error) {
       console.error('Failed to extract GitHub inputs with OpenCode:', error);

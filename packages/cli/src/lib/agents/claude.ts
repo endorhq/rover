@@ -150,6 +150,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
       const response = await this.invoke(prompt, {
         json: true,
         cwd: projectPath,
+        model: this.model,
       });
       return parseJsonResponse<IPromptTask>(response);
     } catch (error) {
@@ -172,7 +173,10 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
     );
 
     try {
-      const response = await this.invoke(prompt, { json: true });
+      const response = await this.invoke(prompt, {
+        json: true,
+        model: this.model,
+      });
       return parseJsonResponse<IPromptTask>(response);
     } catch (error) {
       console.error(
@@ -196,7 +200,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
         recentCommits,
         summaries
       );
-      const response = await this.invoke(prompt);
+      const response = await this.invoke(prompt, { model: this.model });
 
       if (!response) {
         return null;
@@ -224,7 +228,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
         diffContext,
         conflictedContent
       );
-      const response = await this.invoke(prompt);
+      const response = await this.invoke(prompt, { model: this.model });
 
       return response;
     } catch (err) {
@@ -245,7 +249,9 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
         conflictedContent,
         regionCount
       );
-      const response = await this.invoke(prompt, false);
+      const response = await this.invoke(prompt, {
+        model: this.model,
+      });
 
       return response;
     } catch (err) {
@@ -263,7 +269,10 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
     );
 
     try {
-      const response = await this.invoke(prompt, { json: true });
+      const response = await this.invoke(prompt, {
+        json: true,
+        model: this.model,
+      });
       return parseJsonResponse<Record<string, any>>(response);
     } catch (error) {
       console.error('Failed to extract GitHub inputs with Claude:', error);
@@ -319,17 +328,19 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
 
   getEnvironmentVariables(): string[] {
     const envVars: string[] = [];
+    const addedKeys = new Set<string>();
 
     // Look for any ANTHROPIC_* and CLAUDE_CODE_* env vars
     for (const key in process.env) {
       if (key.startsWith('ANTHROPIC_') || key.startsWith('CLAUDE_CODE_')) {
+        addedKeys.add(key);
         envVars.push('-e', key);
       }
     }
 
     // Add other specific environment variables from CLAUDE_CODE_ENV_VARS
     for (const key of CLAUDE_CODE_ENV_VARS) {
-      if (process.env[key] !== undefined) {
+      if (process.env[key] !== undefined && !addedKeys.has(key)) {
         envVars.push('-e', key);
       }
     }
