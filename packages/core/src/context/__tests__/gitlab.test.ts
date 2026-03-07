@@ -217,7 +217,7 @@ describe('GitLabProvider', () => {
           return { exitCode: 0 } as ReturnType<typeof launchSync>;
         }
         if (cmd === 'glab' && args?.[0] === 'issue' && args?.[1] === 'view') {
-          expect(args).toContain('owner/repo');
+          expect(args).toContain('gitlab.com/owner/repo');
           return {
             exitCode: 0,
             stdout: JSON.stringify(issueResponse),
@@ -267,7 +267,7 @@ describe('GitLabProvider', () => {
           return { exitCode: 0 } as ReturnType<typeof launchSync>;
         }
         if (cmd === 'glab' && args?.[0] === 'issue' && args?.[1] === 'view') {
-          expect(args).toContain('https-owner/https-repo');
+          expect(args).toContain('gitlab.com/https-owner/https-repo');
           return {
             exitCode: 0,
             stdout: JSON.stringify(issueResponse),
@@ -317,7 +317,7 @@ describe('GitLabProvider', () => {
           return { exitCode: 0 } as ReturnType<typeof launchSync>;
         }
         if (cmd === 'glab' && args?.[0] === 'issue' && args?.[1] === 'view') {
-          expect(args).toContain('group/subgroup/repo');
+          expect(args).toContain('gitlab.com/group/subgroup/repo');
           return {
             exitCode: 0,
             stdout: JSON.stringify(issueResponse),
@@ -368,7 +368,7 @@ describe('GitLabProvider', () => {
           return { exitCode: 0 } as ReturnType<typeof launchSync>;
         }
         if (cmd === 'glab' && args?.[0] === 'issue' && args?.[1] === 'view') {
-          expect(args).toContain('group/subgroup/repo');
+          expect(args).toContain('gitlab.com/group/subgroup/repo');
           return {
             exitCode: 0,
             stdout: JSON.stringify(issueResponse),
@@ -435,13 +435,14 @@ describe('GitLabProvider', () => {
           return { exitCode: 0 } as ReturnType<typeof launchSync>;
         }
         if (cmd === 'glab' && args?.[0] === 'issue' && args?.[1] === 'view') {
-          expect(args).toContain('team/project');
+          expect(args).toContain('gitlab.mycompany.com/team/project');
           return {
             exitCode: 0,
             stdout: JSON.stringify(issueResponse),
           } as ReturnType<typeof launchSync>;
         }
         if (cmd === 'glab' && args?.[0] === 'api') {
+          expect(args).toContain('gitlab.mycompany.com/team/project');
           return {
             exitCode: 0,
             stdout: '[]',
@@ -487,13 +488,14 @@ describe('GitLabProvider', () => {
           return { exitCode: 0 } as ReturnType<typeof launchSync>;
         }
         if (cmd === 'glab' && args?.[0] === 'issue' && args?.[1] === 'view') {
-          expect(args).toContain('team/project');
+          expect(args).toContain('code.internal.com/team/project');
           return {
             exitCode: 0,
             stdout: JSON.stringify(issueResponse),
           } as ReturnType<typeof launchSync>;
         }
         if (cmd === 'glab' && args?.[0] === 'api') {
+          expect(args).toContain('code.internal.com/team/project');
           return {
             exitCode: 0,
             stdout: '[]',

@@ -18,6 +18,11 @@ type ParsedGitLabUri = {
   projectPath?: string;
 };
 
+type ResolvedGitLabRepo = {
+  host?: string;
+  projectPath: string;
+};
+
 /**
  * Note (comment) from GitLab API response.
  */
@@ -108,12 +113,12 @@ export class GitLabProvider implements ContextProvider {
     }
 
     // Resolve project path (namespace/repo)
-    const projectPath = this.resolveRepo();
+    const repo = this.resolveRepo();
 
     if (this.parsed.type === 'issue') {
-      return this.buildIssue(projectPath);
+      return this.buildIssue(repo);
     } else {
-      return this.buildMR(projectPath);
+      return this.buildMR(repo);
     }
   }
 
@@ -168,10 +173,10 @@ export class GitLabProvider implements ContextProvider {
   /**
    * Resolve the project path from the URI or from the current working directory.
    */
-  private resolveRepo(): string {
+  private resolveRepo(): ResolvedGitLabRepo {
     // If project path in URI, use that
     if (this.parsed.projectPath) {
-      return this.parsed.projectPath;
+      return { projectPath: this.parsed.projectPath };
     }
 
     // Otherwise, detect from cwd using Git remote
@@ -205,19 +210,27 @@ export class GitLabProvider implements ContextProvider {
    * If the remote isn't actually a GitLab repo (or glab CLI isn't configured for it),
    * the `glab` command will fail with a clear error message.
    */
-  private parseGitLabRepoInfo(remoteUrl: string): string {
+  private parseGitLabRepoInfo(remoteUrl: string): ResolvedGitLabRepo {
     // SCP-style: git@host:path/to/repo.git
-    const scpMatch = remoteUrl.match(/^[^@]+@[^:]+:(.+?)(?:\.git)?$/);
+    const scpMatch = remoteUrl.match(
+      /^[^@]+@(?<host>[^:]+):(?<projectPath>.+?)(?:\.git)?$/
+    );
     if (scpMatch && !remoteUrl.includes('://')) {
-      return scpMatch[1];
+      return {
+        host: scpMatch.groups?.host,
+        projectPath: scpMatch.groups?.projectPath ?? '',
+      };
     }
 
     // URL-style: https://host/path or ssh://git@host/path
     const urlMatch = remoteUrl.match(
-      /^(?:https?|ssh):\/\/(?:[^@]+@)?[^/:]+(?::\d+)?\/(.+?)(?:\.git)?$/
+      /^(?:https?|ssh):\/\/(?:[^@]+@)?(?<host>[^/:]+)(?::\d+)?\/(?<projectPath>.+?)(?:\.git)?$/
     );
     if (urlMatch) {
-      return urlMatch[1];
+      return {
+        host: urlMatch.groups?.host,
+        projectPath: urlMatch.groups?.projectPath ?? '',
+      };
     }
 
     throw new ContextFetchError(
@@ -230,7 +243,7 @@ export class GitLabProvider implements ContextProvider {
   /**
    * Build context entries for a GitLab issue.
    */
-  private buildIssue(projectPath: string): ContextEntry[] {
+  private buildIssue(repo: ResolvedGitLabRepo): ContextEntry[] {
     const result = launchSync(
       'glab',
       [
@@ -238,7 +251,7 @@ export class GitLabProvider implements ContextProvider {
         'view',
         String(this.parsed.number),
         '-R',
-        projectPath,
+        this.getRepoRef(repo),
         '-F',
         'json',
       ],
@@ -258,7 +271,7 @@ export class GitLabProvider implements ContextProvider {
     );
 
     // Fetch comments via API
-    const notes = this.fetchNotes(projectPath, 'issues', this.parsed.number);
+    const notes = this.fetchNotes(repo, 'issues', this.parsed.number);
 
     // Format content as markdown
     const content = this.formatIssueContent(issue, notes);
@@ -279,7 +292,7 @@ export class GitLabProvider implements ContextProvider {
     return [
       {
         name: `Issue #${issue.iid}: ${issue.title}`,
-        description: `GitLab Issue #${issue.iid} from ${projectPath}`,
+        description: `GitLab Issue #${issue.iid} from ${repo.projectPath}`,
         filename: `gitlab-issue-${issue.iid}.md`,
         content,
         source: this.uri,
@@ -354,7 +367,7 @@ export class GitLabProvider implements ContextProvider {
    * Build context entries for a GitLab MR.
    * Returns two entries: one for the MR description and one for the diff.
    */
-  private buildMR(projectPath: string): ContextEntry[] {
+  private buildMR(repo: ResolvedGitLabRepo): ContextEntry[] {
     const result = launchSync(
       'glab',
       [
@@ -362,7 +375,7 @@ export class GitLabProvider implements ContextProvider {
         'view',
         String(this.parsed.number),
         '-R',
-        projectPath,
+        this.getRepoRef(repo),
         '-F',
         'json',
       ],
@@ -387,7 +400,7 @@ export class GitLabProvider implements ContextProvider {
         'diff',
         String(this.parsed.number),
         '-R',
-        projectPath,
+        this.getRepoRef(repo),
         '--color=never',
       ],
       { reject: false }
@@ -397,16 +410,12 @@ export class GitLabProvider implements ContextProvider {
       diffResult.exitCode === 0 ? diffResult.stdout?.toString() || '' : '';
 
     // Fetch comments via API
-    const notes = this.fetchNotes(
-      projectPath,
-      'merge_requests',
-      this.parsed.number
-    );
+    const notes = this.fetchNotes(repo, 'merge_requests', this.parsed.number);
 
     // Fetch approvals for reviewer state
     const approvedUsers =
       mr.reviewers.length > 0
-        ? this.fetchApprovals(projectPath, this.parsed.number)
+        ? this.fetchApprovals(repo, this.parsed.number)
         : null;
 
     // Format MR content as markdown
@@ -445,7 +454,7 @@ export class GitLabProvider implements ContextProvider {
     return [
       {
         name: `MR !${mr.iid}: ${mr.title}`,
-        description: `GitLab MR !${mr.iid} from ${projectPath}`,
+        description: `GitLab MR !${mr.iid} from ${repo.projectPath}`,
         filename: `gitlab-mr-${mr.iid}.md`,
         content: mrContent,
         source: this.uri,
@@ -454,7 +463,7 @@ export class GitLabProvider implements ContextProvider {
       },
       {
         name: `MR !${mr.iid} Diff: ${mr.title}`,
-        description: `Diff for GitLab MR !${mr.iid} from ${projectPath}`,
+        description: `Diff for GitLab MR !${mr.iid} from ${repo.projectPath}`,
         filename: `gitlab-mr-${mr.iid}-diff.md`,
         content: diffContent,
         source: this.uri,
@@ -569,16 +578,18 @@ export class GitLabProvider implements ContextProvider {
    * System-generated notes are filtered out.
    */
   private fetchNotes(
-    projectPath: string,
+    repo: ResolvedGitLabRepo,
     type: 'issues' | 'merge_requests',
     number: number
   ): GitLabNote[] {
-    const encodedPath = encodeURIComponent(projectPath);
+    const encodedPath = encodeURIComponent(repo.projectPath);
     const result = launchSync(
       'glab',
       [
         'api',
         `projects/${encodedPath}/${type}/${number}/notes?sort=asc&per_page=100`,
+        '-R',
+        this.getRepoRef(repo),
       ],
       { reject: false }
     );
@@ -601,13 +612,18 @@ export class GitLabProvider implements ContextProvider {
    * Returns a Set of approved usernames, or null on any failure.
    */
   private fetchApprovals(
-    projectPath: string,
+    repo: ResolvedGitLabRepo,
     mrNumber: number
   ): Set<string> | null {
-    const encodedPath = encodeURIComponent(projectPath);
+    const encodedPath = encodeURIComponent(repo.projectPath);
     const result = launchSync(
       'glab',
-      ['api', `projects/${encodedPath}/merge_requests/${mrNumber}/approvals`],
+      [
+        'api',
+        `projects/${encodedPath}/merge_requests/${mrNumber}/approvals`,
+        '-R',
+        this.getRepoRef(repo),
+      ],
       { reject: false }
     );
 
@@ -671,5 +687,9 @@ export class GitLabProvider implements ContextProvider {
       return [];
     }
     return comments.filter(c => this.options.trustAuthors!.includes(c.author));
+  }
+
+  private getRepoRef(repo: ResolvedGitLabRepo): string {
+    return repo.host ? `${repo.host}/${repo.projectPath}` : repo.projectPath;
   }
 }
