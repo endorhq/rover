@@ -58,6 +58,11 @@ class OpenCodeAI implements AIAgentTool {
   // constants
   public AGENT_BIN = 'opencode';
   private promptBuilder = new PromptBuilder('opencode');
+  private model?: string;
+
+  constructor(model?: string) {
+    this.model = model;
+  }
 
   async checkAgent(): Promise<void> {
     try {
@@ -193,7 +198,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
         diffContext,
         conflictedContent
       );
-      const response = await this.invoke(prompt);
+      const response = await this.invoke(prompt, { model: this.model });
 
       return response;
     } catch (err) {

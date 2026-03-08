@@ -18,6 +18,11 @@ const COPILOT_ENV_VARS = ['GITHUB_TOKEN', 'GH_TOKEN'];
 class CopilotAI implements AIAgentTool {
   public AGENT_BIN = 'copilot';
   private promptBuilder = new PromptBuilder('copilot');
+  private model?: string;
+
+  constructor(model?: string) {
+    this.model = model;
+  }
 
   async checkAgent(): Promise<void> {
     try {
@@ -140,7 +145,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
         diffContext,
         conflictedContent
       );
-      const response = await this.invoke(prompt);
+      const response = await this.invoke(prompt, { model: this.model });
 
       return response;
     } catch (err) {
