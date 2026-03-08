@@ -79,6 +79,18 @@
         "category": "Rover"
       },
       {
+        "command": "rover.resumeTask",
+        "title": "Resume a paused task",
+        "icon": "$(debug-continue)",
+        "category": "Rover"
+      },
+      {
+        "command": "rover.restartTask",
+        "title": "Restart a failed task",
+        "icon": "$(debug-restart)",
+        "category": "Rover"
+      },
+      {
         "command": "rover.gitCompareTask",
         "title": "Git Compare Task Workspace",
         "icon": "$(info)",

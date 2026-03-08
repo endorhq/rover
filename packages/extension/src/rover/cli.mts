@@ -2,6 +2,8 @@ import * as vscode from 'vscode';
 import {
   MergeResult,
   PushResult,
+  RestartResult,
+  ResumeResult,
   RoverTask,
   TaskDetails,
   IterateResult,
@@ -346,6 +348,40 @@ export class RoverCLI {
   }
 
   /**
+   * Resume a paused or failed task.
+   */
+  async resumeTask(taskId: string): Promise<ResumeResult> {
+    const { stdout, stderr, exitCode } = await launch(
+      this.roverPath,
+      ['resume', taskId.toString(), '--json'],
+      this.getLaunchOptions()
+    );
+    if (exitCode != 0 || !stdout) {
+      throw new Error(
+        `error resuming task (stdout: ${stdout}; stderr: ${stderr}; exit code: ${exitCode})`
+      );
+    }
+    return JSON.parse(stdout.toString()) as ResumeResult;
+  }
+
+  /**
+   * Restart a failed task.
+   */
+  async restartTask(taskId: string): Promise<RestartResult> {
+    const { stdout, stderr, exitCode } = await launch(
+      this.roverPath,
+      ['restart', taskId.toString(), '--json'],
+      this.getLaunchOptions()
+    );
+    if (exitCode != 0 || !stdout) {
+      throw new Error(
+        `error restarting task (stdout: ${stdout}; stderr: ${stderr}; exit code: ${exitCode})`
+      );
+    }
+    return JSON.parse(stdout.toString()) as RestartResult;
+  }
+
+  /**
    * Get detailed information about a task
    */
   async inspectTask(taskId: string): Promise<TaskDetails> {
@@ -381,7 +417,7 @@ export class RoverCLI {
       this.getLaunchOptions()
     );
 
-    if (exitCode != 0 || !stdout) {
+    if (exitCode != 0) {
       throw new Error(
         `error deleting task (stdout: ${stdout}; stderr: ${stderr}; exit code: ${exitCode})`
       );
@@ -395,11 +431,18 @@ export class RoverCLI {
     if (!this.workspaceRoot) {
       throw new Error('invalid workspace root');
     }
+    // Sanitize taskId: strip all shell metacharacters including newlines and redirects
+    const sanitizedId = String(taskId).replace(/[;&|`$(){}#!<>\n\r\\'"]/g, '');
+    if (!sanitizedId || sanitizedId !== String(taskId).trim()) {
+      throw new Error(`Invalid task ID: ${taskId}`);
+    }
     const terminal = vscode.window.createTerminal({
-      name: `Rover: ${taskId}`,
+      name: `Rover: ${sanitizedId}`,
       cwd: this.workspaceRoot.fsPath,
     });
-    terminal.sendText(`${this.roverPath} shell ${taskId}`);
+    terminal.sendText(
+      [this.roverPath, 'shell', sanitizedId].join(' ')
+    );
     terminal.show();
   }
 
@@ -418,7 +461,7 @@ export class RoverCLI {
     try {
       const { stdout, stderr, exitCode } = await launch(
         this.roverPath,
-        ['logs', `${taskId}${follow ? ' --follow' : ''}`],
+        ['logs', taskId, ...(follow ? ['--follow'] : [])],
         this.getLaunchOptions()
       );
 
@@ -489,12 +532,12 @@ export class RoverCLI {
       }
 
       // Fallback: construct expected path
-      const workspaceRoot = this.workspaceRoot || findProjectRoot();
-      return `${workspaceRoot}/.rover/tasks/${taskId}/workspace`;
+      const root = this.workspaceRoot?.fsPath || findProjectRoot();
+      return `${root}/.rover/tasks/${taskId}/workspace`;
     } catch (error) {
       // Fallback: construct expected path
-      const workspaceRoot = this.workspaceRoot || findProjectRoot();
-      return `${workspaceRoot}/.rover/tasks/${taskId}/workspace`;
+      const root = this.workspaceRoot?.fsPath || findProjectRoot();
+      return `${root}/.rover/tasks/${taskId}/workspace`;
     }
   }
 

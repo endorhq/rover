@@ -201,6 +201,17 @@ export class TaskDetailsPanel {
 
   private async openFile(filePath: string) {
     try {
+      // Validate that the file path is within the workspace or task directory
+      const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      if (workspaceRoot) {
+        const resolvedPath = path.resolve(filePath);
+        const resolvedRoot = path.resolve(workspaceRoot);
+        if (!resolvedPath.startsWith(resolvedRoot + path.sep) && resolvedPath !== resolvedRoot) {
+          vscode.window.showErrorMessage('Cannot open files outside the workspace');
+          return;
+        }
+      }
+
       const uri = vscode.Uri.file(filePath);
 
       // Check if it's a markdown file
@@ -255,6 +266,20 @@ export class TaskDetailsPanel {
       case 'refresh':
         this.loadTaskDetails(taskId);
         break;
+      case 'resumeTask':
+        await vscode.commands.executeCommand('rover.resumeTask', {
+          id: taskId,
+          task: { id: taskId },
+        });
+        await this.loadTaskDetails(taskId);
+        break;
+      case 'restartTask':
+        await vscode.commands.executeCommand('rover.restartTask', {
+          id: taskId,
+          task: { id: taskId },
+        });
+        await this.loadTaskDetails(taskId);
+        break;
       case 'openWorkspace':
         vscode.commands.executeCommand('rover.openWorkspace', {
           id: taskId,
@@ -285,6 +310,8 @@ export class TaskDetailsPanel {
   }
 
   private _getHtmlForWebview(): string {
+    const nonce = getNonce();
+
     // Get Codicons URI
     const codiconsUri = this._panel.webview.asWebviewUri(
       vscode.Uri.joinPath(this._extensionUri, 'dist', 'codicons', 'codicon.css')
@@ -305,6 +332,7 @@ export class TaskDetailsPanel {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${this._panel.webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; font-src ${this._panel.webview.cspSource};">
     <title>Task Details</title>
     <link href="${codiconsUri}" rel="stylesheet" />
     <style>
@@ -317,8 +345,17 @@ export class TaskDetailsPanel {
     </style>
 </head>
 <body>
-    <script src="${taskDetailsUri}"></script>
+    <script nonce="${nonce}" src="${taskDetailsUri}"></script>
 </body>
 </html>`;
   }
+}
+
+function getNonce(): string {
+  let text = '';
+  const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  for (let i = 0; i < 32; i++) {
+    text += possible.charAt(Math.floor(Math.random() * possible.length));
+  }
+  return text;
 }

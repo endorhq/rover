@@ -71,6 +71,12 @@ export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
         case 'iterateTask':
           await this.handleIterateTask(data.taskId);
           break;
+        case 'resumeTask':
+          await this.handleResumeTask(data.taskId);
+          break;
+        case 'restartTask':
+          await this.handleRestartTask(data.taskId);
+          break;
         case 'mergeTask':
           await this.handleMergeTask(data.taskId);
           break;
@@ -172,6 +178,20 @@ export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
     });
   }
 
+  private async handleResumeTask(taskId: string) {
+    await vscode.commands.executeCommand('rover.resumeTask', {
+      id: taskId,
+      task: { id: taskId },
+    });
+  }
+
+  private async handleRestartTask(taskId: string) {
+    await vscode.commands.executeCommand('rover.restartTask', {
+      id: taskId,
+      task: { id: taskId },
+    });
+  }
+
   private async handleMergeTask(taskId: string) {
     await vscode.commands.executeCommand('rover.mergeTask', {
       id: taskId,
@@ -195,9 +215,6 @@ export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
   }
 
   private async handleViewLogs(taskId: string, taskStatus: string) {
-    const shouldFollow = ['running', 'initializing', 'installing'].includes(
-      taskStatus
-    );
     await vscode.commands.executeCommand('rover.logs', {
       id: taskId,
       task: { id: taskId, status: taskStatus },
@@ -293,9 +310,11 @@ export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
   }
 
   private startAutoRefresh(): void {
-    const interval = vscode.workspace
+    const MIN_REFRESH_INTERVAL_MS = 1000;
+    const raw = vscode.workspace
       .getConfiguration('rover')
       .get<number>('autoRefreshInterval', 5000);
+    const interval = Math.max(raw ?? 5000, MIN_REFRESH_INTERVAL_MS);
     if (interval > 0) {
       this.autoRefreshInterval = setInterval(() => {
         this.refreshTasks();
@@ -379,6 +398,8 @@ export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
   }
 
   private _getHtmlForWebview(webview: vscode.Webview) {
+    const nonce = getNonce();
+
     // Get Codicons URI
     const codiconsUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.extensionUri, 'dist', 'codicons', 'codicon.css')
@@ -399,6 +420,7 @@ export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; font-src ${webview.cspSource};">
     <title>Rover Tasks</title>
     <link href="${codiconsUri}" rel="stylesheet" />
     <style>
@@ -411,8 +433,17 @@ export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
     </style>
 </head>
 <body>
-    <script src="${tasksWebviewUri}"></script>
+    <script nonce="${nonce}" src="${tasksWebviewUri}"></script>
 </body>
 </html>`;
   }
+}
+
+function getNonce(): string {
+  let text = '';
+  const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  for (let i = 0; i < 32; i++) {
+    text += possible.charAt(Math.floor(Math.random() * possible.length));
+  }
+  return text;
 }

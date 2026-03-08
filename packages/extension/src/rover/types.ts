@@ -5,6 +5,7 @@ export interface RoverTask {
     | 'initializing'
     | 'installing'
     | 'running'
+    | 'paused'
     | 'completed'
     | 'merged'
     | 'pushed'
@@ -14,6 +15,8 @@ export interface RoverTask {
   currentStep: string;
   startedAt: string;
   completedAt?: string;
+  pausedAt?: string;
+  failedAt?: string;
   error?: string;
   workflowName?: string;
 }
@@ -34,7 +37,7 @@ export interface TaskDetails extends RoverTask {
 
 export interface PushResult {
   success: boolean;
-  taskId: number;
+  taskId: string;
   taskTitle: string;
   branchName: string;
   hasChanges: boolean;
@@ -51,7 +54,7 @@ export interface PushResult {
 
 export interface MergeResult {
   success: boolean;
-  taskId: number;
+  taskId: string;
   taskTitle: string;
   branchName: string;
   currentBranch: string;
@@ -67,7 +70,7 @@ export interface MergeResult {
 
 export interface IterateResult {
   success: boolean;
-  taskId: number;
+  taskId: string;
   taskTitle: string;
   iterationNumber: number;
   expandedTitle?: string;
@@ -75,5 +78,26 @@ export interface IterateResult {
   refinements: string;
   worktreePath?: string;
   iterationPath?: string;
+  error?: string;
+}
+
+export interface ResumeResult {
+  success: boolean;
+  taskId?: string;
+  title?: string;
+  description?: string;
+  status?: string;
+  resumedAt?: string;
+  hasCheckpoint?: boolean;
+  error?: string;
+}
+
+export interface RestartResult {
+  success: boolean;
+  taskId?: string;
+  title?: string;
+  description?: string;
+  status?: string;
+  restartedAt?: string;
   error?: string;
 }
