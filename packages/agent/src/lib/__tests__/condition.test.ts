@@ -49,7 +49,7 @@ describe('evaluateCondition', () => {
     ).toBe(false);
   });
 
-  it('returns true when step does not exist (!=  operator)', () => {
+  it('returns false when step does not exist (!= operator)', () => {
     const stepsOutput = new Map<string, Map<string, string>>();
 
     expect(
@@ -57,7 +57,7 @@ describe('evaluateCondition', () => {
         'steps.missing_step.outputs.exit_code != 0',
         stepsOutput
       )
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it('returns false when output key does not exist (== operator)', () => {
@@ -69,13 +69,24 @@ describe('evaluateCondition', () => {
     ).toBe(false);
   });
 
-  it('returns true when output key does not exist (!= operator)', () => {
+  it('returns false when output key does not exist (!= operator)', () => {
     const stepsOutput = new Map<string, Map<string, string>>();
     stepsOutput.set('run_tests', new Map());
 
     expect(
       evaluateCondition('steps.run_tests.outputs.exit_code != 0', stepsOutput)
-    ).toBe(true);
+    ).toBe(false);
+  });
+
+  it('returns false when OR clauses only reference missing outputs', () => {
+    const stepsOutput = new Map<string, Map<string, string>>();
+
+    expect(
+      evaluateCondition(
+        'steps.build.outputs.exit_code != 0 || steps.checkpoint.outputs.exit_code != 0',
+        stepsOutput
+      )
+    ).toBe(false);
   });
 
   it('returns false and warns for invalid condition format', () => {

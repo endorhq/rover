@@ -59,14 +59,14 @@ function evaluateSingleCondition(
 
   const stepOutputs = stepsOutput.get(stepId);
   if (!stepOutputs) {
-    // Step hasn't produced output yet — treat as undefined.
-    // `== X` → false, `!= X` → true (undefined is not equal to anything).
-    return operator === '!=';
+    // A missing step/output means the prerequisite did not run, so the
+    // condition cannot be satisfied regardless of operator.
+    return false;
   }
 
   const actualValue = stepOutputs.get(outputName);
   if (actualValue === undefined) {
-    return operator === '!=';
+    return false;
   }
 
   // Normalize known boolean strings so "True"/"TRUE"/"yes" match "true", etc.

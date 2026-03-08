@@ -1,5 +1,21 @@
 import type { Git } from 'rover-core';
 
+export function resolveTaskCollapseRef(
+  git: Pick<Git, 'getCommitHash'>,
+  worktreePath: string,
+  baseCommit?: string,
+  preferredRef?: string
+): string | undefined {
+  if (preferredRef) {
+    const preferredHash = git.getCommitHash(preferredRef, { worktreePath });
+    if (preferredHash) {
+      return preferredRef;
+    }
+  }
+
+  return baseCommit;
+}
+
 /**
  * Collapse **all** commits made since `baseCommit` into a single set of staged
  * changes via `git reset --soft`. This includes both checkpoint commits and any

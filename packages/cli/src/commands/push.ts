@@ -21,7 +21,7 @@ import { showRoverChat, TIP_TITLES } from '../utils/display.js';
 import { statusColor } from '../utils/task-status.js';
 import { executeHooks } from '../lib/hooks.js';
 import type { CommandDefinition } from '../types.js';
-import { collapseTaskCommits } from '../lib/squash.js';
+import { collapseTaskCommits, resolveTaskCollapseRef } from '../lib/squash.js';
 
 const { prompt } = enquirer;
 
@@ -171,12 +171,18 @@ const pushCommand = async (taskId: string, options: PushOptions) => {
       });
     }
 
-    // Collapse all task commits into staged changes before evaluating state
-    const squashed = collapseTaskCommits(
+    // Collapse only commits that have not been pushed yet. Once the remote task
+    // branch exists, keep its published history intact so subsequent pushes stay
+    // fast-forward.
+    const collapseRef = resolveTaskCollapseRef(
       git,
+      task.worktreePath,
       task.baseCommit,
-      task.worktreePath
+      `origin/${task.branchName}`
     );
+    const squashed = collapseRef
+      ? collapseTaskCommits(git, collapseRef, task.worktreePath)
+      : false;
 
     // Check for changes
     const fileChanges = git.uncommittedChanges({
