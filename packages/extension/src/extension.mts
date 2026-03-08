@@ -693,89 +693,6 @@ export function activate(context: vscode.ExtensionContext) {
   );
   context.subscriptions.push(iterateTaskCommand);
 
-  const resumeTaskCommand = vscode.commands.registerCommand(
-    'rover.resumeTask',
-    async (item: TaskItem | any) => {
-      const taskId = item?.task?.id || item?.id;
-      if (!taskId) {
-        vscode.window.showErrorMessage('Invalid task item - missing task ID');
-        return;
-      }
-
-      let statusBarItem: vscode.StatusBarItem | undefined;
-      try {
-        statusBarItem = vscode.window.createStatusBarItem(
-          vscode.StatusBarAlignment.Left,
-          100
-        );
-        statusBarItem.text = '$(loading~spin) Resuming task...';
-        statusBarItem.show();
-
-        const resumeResult = await vscode.window.withProgress(
-          {
-            location: vscode.ProgressLocation.Notification,
-            title: 'Resuming task',
-            cancellable: false,
-          },
-          async progress => {
-            progress.report({
-              increment: 30,
-              message: 'Restarting the task container from its checkpoint...',
-            });
-            statusBarItem!.text =
-              '$(loading~spin) Restoring task checkpoint...';
-
-            const resumeResult = await cli.resumeTask(taskId);
-
-            progress.report({
-              increment: 70,
-              message: 'Refreshing task state...',
-            });
-            statusBarItem!.text = '$(loading~spin) Refreshing task state...';
-
-            return resumeResult;
-          }
-        );
-
-        if (resumeResult.success) {
-          statusBarItem.text = '$(check) Task resumed successfully';
-          statusBarItem.tooltip = `Task: ${resumeResult.title || taskId}`;
-          setTimeout(() => {
-            statusBarItem?.dispose();
-          }, 3000);
-
-          vscode.window.showInformationMessage(
-            `Task resumed successfully${resumeResult.title ? `: ${resumeResult.title}` : ''}`
-          );
-        } else {
-          statusBarItem.text = '$(error) Task resume failed';
-          statusBarItem.tooltip = `Error: ${resumeResult.error}`;
-          setTimeout(() => {
-            statusBarItem?.dispose();
-          }, 5000);
-
-          vscode.window.showErrorMessage(
-            `Failed to resume task: ${resumeResult.error}`
-          );
-        }
-
-        tasksWebviewProvider.refresh();
-      } catch (error) {
-        console.error('Error in resumeTask command:', error);
-        if (statusBarItem) {
-          statusBarItem.text = '$(error) Task resume failed';
-          statusBarItem.tooltip = `Error: ${error}`;
-          setTimeout(() => {
-            statusBarItem?.dispose();
-          }, 5000);
-        }
-
-        vscode.window.showErrorMessage(`Failed to resume task: ${error}`);
-      }
-    }
-  );
-  context.subscriptions.push(resumeTaskCommand);
-
   const restartTaskCommand = vscode.commands.registerCommand(
     'rover.restartTask',
     async (item: TaskItem | any) => {
@@ -805,8 +722,7 @@ export function activate(context: vscode.ExtensionContext) {
               increment: 30,
               message: 'Preparing a fresh task run...',
             });
-            statusBarItem!.text =
-              '$(loading~spin) Preparing fresh task run...';
+            statusBarItem!.text = '$(loading~spin) Preparing fresh task run...';
 
             const restartResult = await cli.restartTask(taskId);
 

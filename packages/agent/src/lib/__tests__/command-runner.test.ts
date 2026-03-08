@@ -159,6 +159,7 @@ describe('runCommandStep', () => {
 
     expect(result.id).toBe('test_cmd');
     expect(result.success).toBe(true);
+    expect(result.exitCode).toBe(0);
     expect(result.outputs.get('exit_code')).toBe('0');
     expect(result.outputs.get('stdout')).toBe('test output');
     expect(result.outputs.get('success')).toBe('true');
@@ -187,10 +188,41 @@ describe('runCommandStep', () => {
 
     expect(result.id).toBe('failing_cmd');
     expect(result.success).toBe(false);
+    expect(result.exitCode).toBe(1);
     expect(result.outputs.get('exit_code')).toBe('1');
     expect(result.outputs.get('stderr')).toBe('test failed');
     expect(result.outputs.get('success')).toBe('false');
     expect(result.error).toBeDefined();
+  });
+
+  it('treats non-zero exit codes as success when allow_failure is true', async () => {
+    const { launch } = await import('rover-core');
+    const mockedLaunch = vi.mocked(launch);
+
+    mockedLaunch.mockResolvedValue({
+      exitCode: 1,
+      stdout: '',
+      stderr: 'expected failure',
+    } as any);
+
+    const { runCommandStep } = await import('../command-runner.js');
+
+    const step = {
+      id: 'allowed_failure_cmd',
+      name: 'Allowed Failure Command',
+      type: 'command' as const,
+      command: 'false',
+      allow_failure: true,
+    };
+
+    const result = await runCommandStep(step, new Map(), new Map());
+
+    expect(result.success).toBe(true);
+    expect(result.exitCode).toBe(1);
+    expect(result.error).toBeUndefined();
+    expect(result.outputs.get('exit_code')).toBe('1');
+    expect(result.outputs.get('stderr')).toBe('expected failure');
+    expect(result.outputs.get('success')).toBe('true');
   });
 
   it('passes timeoutSeconds to launch as milliseconds', async () => {

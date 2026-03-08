@@ -117,13 +117,13 @@ export const getAIAgentTool = (agent: string, model?: string): AIAgentTool => {
     case 'codex':
       return new CodexAI(model);
     case 'copilot':
-      return new CopilotAI();
+      return new CopilotAI(model);
     case 'cursor':
       return new CursorAI(model);
     case 'gemini':
       return new GeminiAI(model);
     case 'opencode':
-      return new OpenCodeAI();
+      return new OpenCodeAI(model);
     case 'qwen':
       return new QwenAI(model);
     default:

@@ -36,6 +36,7 @@ export interface StepExecutorConfig {
   logger?: JsonlLogger;
   output?: string;
   acpRunner?: ACPRunner;
+  acpSessionActive?: boolean;
 }
 
 export type StepResult =
@@ -69,17 +70,18 @@ export async function executeStep(
 ): Promise<StepResult> {
   if (isAgentStep(step)) {
     if (config.acpRunner) {
-      // Reuse the warm ACP connection for agent sub-steps inside loops
-      await config.acpRunner.createSession();
-
       // Sync current stepsOutput into the acpRunner so prompt placeholders resolve
       for (const [stepId, outputs] of config.stepsOutput.entries()) {
         config.acpRunner.stepsOutput.set(stepId, outputs);
       }
 
+      if (config.acpSessionActive) {
+        return config.acpRunner.runStep(step.id);
+      }
+
+      await config.acpRunner.createSession();
       try {
-        const result = await config.acpRunner.runStep(step.id);
-        return result;
+        return await config.acpRunner.runStep(step.id);
       } finally {
         config.acpRunner.closeSession();
       }
@@ -128,6 +130,7 @@ async function executeLoopStep(
   let conditionMet = false;
   let lastIteration = 0;
   let lastError: string | undefined;
+  const ownsAcpSession = Boolean(config.acpRunner && !config.acpSessionActive);
 
   console.log(
     colors.blue(
@@ -135,58 +138,71 @@ async function executeLoopStep(
     )
   );
 
-  for (let iteration = 1; iteration <= maxIterations; iteration++) {
-    lastIteration = iteration;
-    console.log(
-      colors.cyan(`\n  ↻ Loop iteration ${iteration}/${maxIterations}`)
-    );
-
-    for (const subStep of loopStep.steps) {
-      // Check `if` condition on sub-steps (mirrors top-level skip in run.ts)
-      if (shouldSkipStep(subStep, config.stepsOutput)) {
-        console.log(
-          colors.gray(`  ⏭ Skipping step "${subStep.name}" (condition not met)`)
-        );
-        config.stepsOutput.set(subStep.id, new Map());
-        continue;
-      }
-
-      const subResult = await executeStep(subStep, {
-        ...config,
-        // Preserve parent context for progress reporting; sub-steps use the
-        // loop's position within the overall workflow, not their own index.
-      });
-
-      // Store sub-step outputs
-      config.stepsOutput.set(subStep.id, subResult.outputs);
-
-      if (!subResult.success) {
-        lastError = subResult.error;
-        console.log(
-          colors.yellow(
-            `  ⚠ Sub-step "${subStep.id}" failed: ${subResult.error}`
-          )
-        );
-        // NOTE: Loop sub-steps intentionally continue past failures.
-        // The `until` condition (checked at the end of each iteration)
-        // determines when the loop exits.  This differs from top-level
-        // `continueOnError` handling because loops are designed for retry
-        // patterns (e.g. TDD: tests fail → fix agent runs → tests re-run).
-      }
+  try {
+    if (ownsAcpSession) {
+      await config.acpRunner!.createSession();
     }
 
-    // Check the `until` condition after all sub-steps in this iteration
-    // have completed.  We intentionally do NOT check after each sub-step
-    // because the condition may reference steps that haven't run yet in
-    // the current iteration (e.g. `steps.checkpoint.outputs.exit_code != 0`
-    // would be true for an undefined step, causing premature exit).
-    // Individual sub-steps already have `if` guards to skip unnecessary work.
-    if (evaluateCondition(loopStep.until, config.stepsOutput)) {
-      conditionMet = true;
-      console.log(colors.green(`  ✓ Loop condition met, exiting loop`));
-    }
+    for (let iteration = 1; iteration <= maxIterations; iteration++) {
+      lastIteration = iteration;
+      console.log(
+        colors.cyan(`\n  ↻ Loop iteration ${iteration}/${maxIterations}`)
+      );
 
-    if (conditionMet) break;
+      for (const subStep of loopStep.steps) {
+        // Check `if` condition on sub-steps (mirrors top-level skip in run.ts)
+        if (shouldSkipStep(subStep, config.stepsOutput)) {
+          console.log(
+            colors.gray(
+              `  ⏭ Skipping step "${subStep.name}" (condition not met)`
+            )
+          );
+          config.stepsOutput.set(subStep.id, new Map());
+          continue;
+        }
+
+        const subResult = await executeStep(subStep, {
+          ...config,
+          acpSessionActive: Boolean(config.acpRunner),
+          // Preserve parent context for progress reporting; sub-steps use the
+          // loop's position within the overall workflow, not their own index.
+        });
+
+        // Store sub-step outputs
+        config.stepsOutput.set(subStep.id, subResult.outputs);
+
+        if (!subResult.success) {
+          lastError = subResult.error;
+          console.log(
+            colors.yellow(
+              `  ⚠ Sub-step "${subStep.id}" failed: ${subResult.error}`
+            )
+          );
+          // NOTE: Loop sub-steps intentionally continue past failures.
+          // The `until` condition (checked at the end of each iteration)
+          // determines when the loop exits.  This differs from top-level
+          // `continueOnError` handling because loops are designed for retry
+          // patterns (e.g. TDD: tests fail → fix agent runs → tests re-run).
+        }
+      }
+
+      // Check the `until` condition after all sub-steps in this iteration
+      // have completed.  We intentionally do NOT check after each sub-step
+      // because the condition may reference steps that haven't run yet in
+      // the current iteration (e.g. `steps.checkpoint.outputs.exit_code != 0`
+      // would be true for an undefined step, causing premature exit).
+      // Individual sub-steps already have `if` guards to skip unnecessary work.
+      if (evaluateCondition(loopStep.until, config.stepsOutput)) {
+        conditionMet = true;
+        console.log(colors.green(`  ✓ Loop condition met, exiting loop`));
+      }
+
+      if (conditionMet) break;
+    }
+  } finally {
+    if (ownsAcpSession) {
+      config.acpRunner!.closeSession();
+    }
   }
 
   const duration = (performance.now() - start) / 1000;

@@ -3,7 +3,6 @@ import {
   MergeResult,
   PushResult,
   RestartResult,
-  ResumeResult,
   RoverTask,
   TaskDetails,
   IterateResult,
@@ -348,23 +347,6 @@ export class RoverCLI {
   }
 
   /**
-   * Resume a paused or failed task.
-   */
-  async resumeTask(taskId: string): Promise<ResumeResult> {
-    const { stdout, stderr, exitCode } = await launch(
-      this.roverPath,
-      ['resume', taskId.toString(), '--json'],
-      this.getLaunchOptions()
-    );
-    if (exitCode != 0 || !stdout) {
-      throw new Error(
-        `error resuming task (stdout: ${stdout}; stderr: ${stderr}; exit code: ${exitCode})`
-      );
-    }
-    return JSON.parse(stdout.toString()) as ResumeResult;
-  }
-
-  /**
    * Restart a failed task.
    */
   async restartTask(taskId: string): Promise<RestartResult> {
@@ -440,9 +422,7 @@ export class RoverCLI {
       name: `Rover: ${sanitizedId}`,
       cwd: this.workspaceRoot.fsPath,
     });
-    terminal.sendText(
-      [this.roverPath, 'shell', sanitizedId].join(' ')
-    );
+    terminal.sendText([this.roverPath, 'shell', sanitizedId].join(' '));
     terminal.show();
   }
 

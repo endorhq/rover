@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { RoverCLI } from '../rover/cli.mjs';
+import { getNonce } from '../lib/nonce.mjs';
 
 export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'roverTasks';
@@ -70,9 +71,6 @@ export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
           break;
         case 'iterateTask':
           await this.handleIterateTask(data.taskId);
-          break;
-        case 'resumeTask':
-          await this.handleResumeTask(data.taskId);
           break;
         case 'restartTask':
           await this.handleRestartTask(data.taskId);
@@ -173,13 +171,6 @@ export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
 
   private async handleIterateTask(taskId: string) {
     await vscode.commands.executeCommand('rover.iterateTask', {
-      id: taskId,
-      task: { id: taskId },
-    });
-  }
-
-  private async handleResumeTask(taskId: string) {
-    await vscode.commands.executeCommand('rover.resumeTask', {
       id: taskId,
       task: { id: taskId },
     });
@@ -314,11 +305,18 @@ export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
     const raw = vscode.workspace
       .getConfiguration('rover')
       .get<number>('autoRefreshInterval', 5000);
-    const interval = Math.max(raw ?? 5000, MIN_REFRESH_INTERVAL_MS);
+    const interval = raw ?? 5000;
+    if (interval === 0) {
+      return;
+    }
+
     if (interval > 0) {
-      this.autoRefreshInterval = setInterval(() => {
-        this.refreshTasks();
-      }, interval);
+      this.autoRefreshInterval = setInterval(
+        () => {
+          this.refreshTasks();
+        },
+        Math.max(interval, MIN_REFRESH_INTERVAL_MS)
+      );
     }
   }
 
@@ -437,13 +435,4 @@ export class TasksLitWebviewProvider implements vscode.WebviewViewProvider {
 </body>
 </html>`;
   }
-}
-
-function getNonce(): string {
-  let text = '';
-  const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  for (let i = 0; i < 32; i++) {
-    text += possible.charAt(Math.floor(Math.random() * possible.length));
-  }
-  return text;
 }

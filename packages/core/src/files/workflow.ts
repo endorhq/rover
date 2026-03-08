@@ -490,11 +490,13 @@ export class WorkflowManager {
     let stdout = '';
     let stderr = '';
     let success = false;
+    let exitCode = -1;
     let error: string | undefined;
 
     const result = launchSync(step.command, step.args, { reject: false });
     stdout = String(result.stdout ?? '');
     stderr = String(result.stderr ?? '');
+    exitCode = result.exitCode ?? -1;
 
     if (!result.failed) {
       success = true;
@@ -525,6 +527,8 @@ export class WorkflowManager {
 
     const duration = (Date.now() - startTime) / 1000;
     const outputs = new Map<string, string>();
+    outputs.set('exit_code', String(exitCode));
+    outputs.set('success', String(success));
     if (stdout) {
       outputs.set('stdout', stdout);
     }
@@ -586,6 +590,10 @@ export class WorkflowManager {
       if (isLoopStep(step) && runner.runStep) {
         // Loop steps are handled by the agent package's step executor
         result = await runner.runStep(step, stepIndex, stepsOutput);
+      } else if (isLoopStep(step)) {
+        workflowSuccess = false;
+        workflowError = `Workflow step '${step.name}' requires a generic step executor (runner.runStep)`;
+        break;
       } else if (isCommandStep(step)) {
         if (runner.runStep) {
           // Prefer the agent package's command runner (supports placeholders, shell-escaping)
@@ -678,10 +686,13 @@ export class WorkflowManager {
     const [, stepId, outputName, operator, rawValue] = match;
     const expectedValue = rawValue.trim();
     const stepOutputs = stepsOutput.get(stepId);
-    const actualValue = stepOutputs?.get(outputName);
+    if (!stepOutputs) {
+      return false;
+    }
 
+    const actualValue = stepOutputs.get(outputName);
     if (actualValue === undefined) {
-      return operator === '!=';
+      return false;
     }
 
     // Normalize booleans for comparison

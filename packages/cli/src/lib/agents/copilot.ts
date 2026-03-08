@@ -63,9 +63,13 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
 
   async expandTask(
     briefDescription: string,
-    projectPath: string
+    projectPath: string,
+    contextContent?: string
   ): Promise<IPromptTask | null> {
-    const prompt = this.promptBuilder.expandTaskPrompt(briefDescription);
+    const prompt = this.promptBuilder.expandTaskPrompt(
+      briefDescription,
+      contextContent
+    );
 
     try {
       const response = await this.invoke(prompt, {
@@ -83,12 +87,14 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
   async expandIterationInstructions(
     instructions: string,
     previousPlan?: string,
-    previousChanges?: string
+    previousChanges?: string,
+    contextContent?: string
   ): Promise<IPromptTask | null> {
     const prompt = this.promptBuilder.expandIterationInstructionsPrompt(
       instructions,
       previousPlan,
-      previousChanges
+      previousChanges,
+      contextContent
     );
 
     try {
@@ -150,6 +156,29 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
       return response;
     } catch (err) {
       return null;
+    }
+  }
+
+  async resolveMergeConflictsRegions(
+    filePath: string,
+    diffContext: string,
+    conflictedContent: string,
+    regionCount: number
+  ): Promise<string | null> {
+    try {
+      const prompt = this.promptBuilder.resolveMergeConflictsRegionsPrompt(
+        filePath,
+        diffContext,
+        conflictedContent,
+        regionCount
+      );
+      const response = await this.invoke(prompt, {
+        model: this.model,
+      });
+
+      return response;
+    } catch (err) {
+      throw err;
     }
   }
 

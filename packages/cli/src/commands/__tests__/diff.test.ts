@@ -491,7 +491,8 @@ describe('diff command', () => {
       const headResult = launchSync('git', ['rev-parse', 'HEAD'], {
         cwd: worktreePath,
       });
-      const baseCommit = headResult.stdout.toString().trim();
+      expect(headResult.exitCode).toBe(0);
+      const baseCommit = String(headResult.stdout ?? '').trim();
       task.setBaseCommit(baseCommit);
 
       // Create only untracked files (no modifications to tracked files)
@@ -523,7 +524,8 @@ describe('diff command', () => {
       const headResult = launchSync('git', ['rev-parse', 'HEAD'], {
         cwd: worktreePath,
       });
-      task.setBaseCommit(headResult.stdout.toString().trim());
+      expect(headResult.exitCode).toBe(0);
+      task.setBaseCommit(String(headResult.stdout ?? '').trim());
 
       // Create only untracked files
       writeFileSync(

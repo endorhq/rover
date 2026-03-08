@@ -310,11 +310,14 @@ export function getWorktreeGitMounts(worktreePath: string): string[] {
 
     return [
       // Mount parent .git dir read-only (refs, config, hooks, etc.)
-      '-v', `${parentGitDir}:${parentGitDir}:Z,ro`,
+      '-v',
+      `${parentGitDir}:${parentGitDir}:Z,ro`,
       // Mount object store read-write (append-only, needed for creating commits)
-      '-v', `${join(parentGitDir, 'objects')}:${join(parentGitDir, 'objects')}:Z,rw`,
+      '-v',
+      `${join(parentGitDir, 'objects')}:${join(parentGitDir, 'objects')}:Z,rw`,
       // Mount worktree metadata subdir read-write (HEAD, index, etc.)
-      '-v', `${gitdirPath}:${gitdirPath}:Z,rw`,
+      '-v',
+      `${gitdirPath}:${gitdirPath}:Z,rw`,
     ];
   } catch {
     return [];

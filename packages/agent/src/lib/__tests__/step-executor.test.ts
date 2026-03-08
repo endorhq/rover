@@ -316,6 +316,109 @@ describe('executeStep', () => {
     expect(Runner).not.toHaveBeenCalled();
   });
 
+  it('reuses one ACP session across loop agent sub-steps and iterations', async () => {
+    const { launch } = await import('rover-core');
+
+    let commandCalls = 0;
+    vi.mocked(launch).mockImplementation((() => {
+      commandCalls++;
+      if (commandCalls < 2) {
+        return Promise.resolve({
+          exitCode: 1,
+          stdout: 'FAIL',
+          stderr: `test error ${commandCalls}`,
+        });
+      }
+      return Promise.resolve({ exitCode: 0, stdout: 'PASS', stderr: '' });
+    }) as any);
+
+    const mockAcpRunner = {
+      createSession: vi.fn().mockResolvedValue('session-loop'),
+      runStep: vi
+        .fn()
+        .mockResolvedValueOnce({
+          id: 'analyze_failures',
+          success: true,
+          duration: 0.1,
+          outputs: new Map([['result', 'analysis']]),
+        })
+        .mockResolvedValueOnce({
+          id: 'fix_code',
+          success: true,
+          duration: 0.1,
+          outputs: new Map([['result', 'fix-1']]),
+        })
+        .mockResolvedValueOnce({
+          id: 'analyze_failures',
+          success: true,
+          duration: 0.1,
+          outputs: new Map([['result', 'analysis-2']]),
+        })
+        .mockResolvedValueOnce({
+          id: 'fix_code',
+          success: true,
+          duration: 0.1,
+          outputs: new Map([['result', 'fix-2']]),
+        }),
+      closeSession: vi.fn(),
+      stepsOutput: new Map<string, Map<string, string>>(),
+    } as unknown as ACPRunner;
+
+    const loopStep: WorkflowLoopStep = {
+      id: 'test_fix_loop',
+      name: 'Test Fix Loop',
+      type: 'loop',
+      until: 'steps.run_tests.outputs.exit_code == 0',
+      maxIterations: 3,
+      steps: [
+        {
+          id: 'run_tests',
+          name: 'Run Tests',
+          type: 'command',
+          command: 'npm test',
+        } as WorkflowCommandStep,
+        {
+          id: 'analyze_failures',
+          name: 'Analyze Failures',
+          type: 'agent',
+          prompt: 'Analyze',
+          outputs: [],
+        } as WorkflowAgentStep,
+        {
+          id: 'fix_code',
+          name: 'Fix Code',
+          type: 'agent',
+          prompt: 'Fix',
+          outputs: [],
+        } as WorkflowAgentStep,
+      ],
+    };
+
+    const result = await executeStep(loopStep, {
+      workflow: createMockWorkflowManager(),
+      inputs: new Map(),
+      stepsOutput: new Map(),
+      totalSteps: 1,
+      currentStepIndex: 0,
+      acpRunner: mockAcpRunner,
+    });
+
+    expect(result.success).toBe(true);
+    expect(mockAcpRunner.createSession).toHaveBeenCalledOnce();
+    expect(mockAcpRunner.runStep).toHaveBeenCalledTimes(4);
+    expect(mockAcpRunner.runStep).toHaveBeenNthCalledWith(
+      1,
+      'analyze_failures'
+    );
+    expect(mockAcpRunner.runStep).toHaveBeenNthCalledWith(2, 'fix_code');
+    expect(mockAcpRunner.runStep).toHaveBeenNthCalledWith(
+      3,
+      'analyze_failures'
+    );
+    expect(mockAcpRunner.runStep).toHaveBeenNthCalledWith(4, 'fix_code');
+    expect(mockAcpRunner.closeSession).toHaveBeenCalledOnce();
+  });
+
   it('skips loop sub-steps whose if condition is not met', async () => {
     const { launch } = await import('rover-core');
     const { Runner } = await import('../runner.js');

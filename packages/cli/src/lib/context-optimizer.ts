@@ -162,7 +162,7 @@ export function sanitizeAIOutput(
     s = s.replace(/\n?---[A-Z_]*END[A-Z_]*---\s*$/i, '');
   }
 
-  return s.trim();
+  return s;
 }
 
 /** Returns true if content still has conflict markers */

@@ -1864,5 +1864,139 @@ steps:
       expect(result.stepResults[0].success).toBe(true);
       expect(result.runSteps).toBe(2);
     });
+
+    it('should expose exit_code and success outputs for fallback command execution', async () => {
+      const yamlContent = `
+version: '1.0'
+name: conditional-command-workflow
+description: Conditional command workflow
+inputs: []
+outputs: []
+steps:
+  - id: build
+    type: command
+    name: Build
+    command: /bin/sh
+    args:
+      - -c
+      - "printf ready"
+  - id: verify
+    type: agent
+    name: Verify
+    if: steps.build.outputs.exit_code == 0 || steps.build.outputs.success == true
+    prompt: Verify build output
+`;
+
+      writeFileSync(workflowPath, yamlContent, 'utf8');
+      const workflow = WorkflowManager.load(workflowPath);
+
+      let agentCalls = 0;
+      const runner: WorkflowRunner = {
+        runAgentStep: async step => {
+          agentCalls++;
+          return {
+            id: step.id,
+            success: true,
+            duration: 0.1,
+            outputs: new Map(),
+          };
+        },
+      };
+
+      const result = await workflow.run(runner);
+
+      expect(result.success).toBe(true);
+      expect(agentCalls).toBe(1);
+      expect(result.stepsOutput.get('build')?.get('exit_code')).toBe('0');
+      expect(result.stepsOutput.get('build')?.get('success')).toBe('true');
+    });
+
+    it('should skip != step conditions when prerequisite outputs are missing', async () => {
+      const yamlContent = `
+version: '1.0'
+name: missing-output-guard
+description: Missing output guard
+inputs: []
+outputs: []
+steps:
+  - id: build
+    type: command
+    name: Build
+    command: /bin/sh
+    args:
+      - -c
+      - "printf ready"
+  - id: fix
+    type: agent
+    name: Fix
+    if: steps.missing.outputs.exit_code != 0 || steps.build.outputs.missing != 0
+    prompt: Attempt fix
+`;
+
+      writeFileSync(workflowPath, yamlContent, 'utf8');
+      const workflow = WorkflowManager.load(workflowPath);
+
+      let agentCalls = 0;
+      const runner: WorkflowRunner = {
+        runAgentStep: async step => {
+          agentCalls++;
+          return {
+            id: step.id,
+            success: true,
+            duration: 0.1,
+            outputs: new Map(),
+          };
+        },
+      };
+
+      const result = await workflow.run(runner);
+
+      expect(result.success).toBe(true);
+      expect(agentCalls).toBe(0);
+      expect(result.stepResults).toHaveLength(1);
+      expect(result.stepsOutput.get('build')?.get('exit_code')).toBe('0');
+    });
+
+    it('should fail fast when loop execution requires runStep but it is missing', async () => {
+      const steps: WorkflowStep[] = [
+        {
+          id: 'retry',
+          type: 'loop',
+          name: 'Retry',
+          until: 'steps.check.outputs.exit_code == 0',
+          steps: [
+            {
+              id: 'check',
+              type: 'command',
+              name: 'Check',
+              command: '/bin/sh',
+              args: ['-c', 'exit 0'],
+            } as WorkflowCommandStep,
+          ],
+        } as WorkflowLoopStep,
+      ];
+
+      const workflow = WorkflowManager.create(
+        workflowPath,
+        'loop-workflow',
+        'Loop workflow',
+        [],
+        [],
+        steps
+      );
+
+      const runner: WorkflowRunner = {
+        runAgentStep: async () => {
+          throw new Error('Should not be called for loop steps');
+        },
+      };
+
+      const result = await workflow.run(runner);
+
+      expect(result.success).toBe(false);
+      expect(result.stepResults).toHaveLength(0);
+      expect(result.error).toContain('requires a generic step executor');
+      expect(result.runSteps).toBe(1);
+    });
   });
 });

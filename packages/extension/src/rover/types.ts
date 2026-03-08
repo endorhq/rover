@@ -81,17 +81,6 @@ export interface IterateResult {
   error?: string;
 }
 
-export interface ResumeResult {
-  success: boolean;
-  taskId?: string;
-  title?: string;
-  description?: string;
-  status?: string;
-  resumedAt?: string;
-  hasCheckpoint?: boolean;
-  error?: string;
-}
-
 export interface RestartResult {
   success: boolean;
   taskId?: string;

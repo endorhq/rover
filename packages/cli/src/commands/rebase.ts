@@ -26,7 +26,7 @@ import {
 } from '../lib/context.js';
 import type { CommandDefinition } from '../types.js';
 import { parseAgentString } from '../utils/agent-parser.js';
-import { collapseTaskCommits } from '../lib/squash.js';
+import { collapseTaskCommits, resolveTaskCollapseRef } from '../lib/squash.js';
 import {
   truncateConflictContext,
   getBlameContext,
@@ -35,6 +35,7 @@ import {
   sanitizeAIOutput,
   hasConflictMarkers,
 } from '../lib/context-optimizer.js';
+import { resolveRebaseConflictSequence } from '../lib/rebase-conflict-sequence.js';
 
 const { prompt } = enquirer;
 
@@ -125,6 +126,41 @@ const generateCommitMessage = async (
   }
 };
 
+const promptToContinueRebase = async (
+  git: Git,
+  worktreePath: string
+): Promise<boolean> => {
+  if (isJsonMode()) {
+    return true;
+  }
+
+  showRoverChat([
+    'The rebase conflicts are fixed. You can check the file content to confirm it.',
+  ]);
+
+  let applyChanges = false;
+
+  try {
+    const { confirmResolution } = await prompt<{
+      confirmResolution: boolean;
+    }>({
+      type: 'confirm',
+      name: 'confirmResolution',
+      message: 'Do you want to continue with the rebase?',
+      initial: false,
+    });
+    applyChanges = confirmResolution;
+  } catch (_error) {
+    // Ignore the error as it's a regular CTRL+C
+  }
+
+  if (!applyChanges) {
+    git.abortRebase({ worktreePath });
+  }
+
+  return applyChanges;
+};
+
 /**
  * AI-powered rebase conflict resolver
  */
@@ -137,7 +173,7 @@ const resolveRebaseConflicts = async (
   contextLines: number = 50,
   sendFullFile: boolean = false
 ): Promise<{ success: boolean; failureReason?: string }> => {
-  let spinner;
+  let spinner: ReturnType<typeof yoctoSpinner> | undefined;
 
   if (!isJsonMode()) {
     spinner = yoctoSpinner({
@@ -161,6 +197,27 @@ const resolveRebaseConflicts = async (
     const failures: string[] = [];
     let resolvedCount = 0;
     const executing: Promise<void>[] = [];
+    let gitAddQueue = Promise.resolve();
+
+    const stageResolvedFile = async (filePath: string): Promise<boolean> => {
+      let addSucceeded = false;
+
+      await (gitAddQueue = gitAddQueue.then(() => {
+        addSucceeded = git.add(filePath, { worktreePath });
+
+        if (!addSucceeded) {
+          failures.push(`Error adding ${filePath} to the git commit`);
+          return;
+        }
+
+        resolvedCount++;
+        if (spinner) {
+          spinner.text = `Resolved ${resolvedCount}/${conflictedFiles.length} file(s)...`;
+        }
+      }));
+
+      return addSucceeded;
+    };
 
     for (const filePath of conflictedFiles) {
       const task = (async () => {
@@ -272,14 +329,8 @@ const resolveRebaseConflicts = async (
 
           writeFileSync(fullPath, finalContent);
 
-          if (!git.add(filePath, { worktreePath })) {
-            failures.push(`Error adding ${filePath} to the git commit`);
+          if (!(await stageResolvedFile(filePath))) {
             return;
-          }
-
-          resolvedCount++;
-          if (spinner) {
-            spinner.text = `Resolved ${resolvedCount}/${conflictedFiles.length} file(s)...`;
           }
         } catch (error) {
           failures.push(`Error resolving ${filePath}: ${error}`);
@@ -463,11 +514,15 @@ const rebaseCommand = async (taskId: string, options: RebaseOptions = {}) => {
     jsonOutput.currentBranch = currentBranch;
 
     // Collapse all task commits into staged changes before evaluating state
-    const squashed = collapseTaskCommits(
+    const collapseRef = resolveTaskCollapseRef(
       git,
+      task.worktreePath,
       task.baseCommit,
-      task.worktreePath
+      `origin/${task.branchName}`
     );
+    const squashed = collapseRef
+      ? collapseTaskCommits(git, collapseRef, task.worktreePath)
+      : false;
 
     // Check if worktree has changes to commit
     const hasWorktreeChanges =
@@ -589,97 +644,44 @@ const rebaseCommand = async (taskId: string, options: RebaseOptions = {}) => {
         if (rebaseConflicts.length > 0) {
           if (spinner) spinner.error('Rebase conflicts detected');
 
-          if (!isJsonMode()) {
-            console.log(
-              colors.yellow(
-                `\n⚠ Rebase conflicts detected in ${rebaseConflicts.length} file(s):`
-              )
-            );
-            rebaseConflicts.forEach((file, index) => {
-              const isLast = index === rebaseConflicts.length - 1;
-              const connector = isLast ? '└──' : '├──';
-              console.log(colors.gray(connector), file);
-            });
-          }
-
-          if (!isJsonMode()) {
-            showRoverChat([
-              'I noticed some rebase conflicts. I will try to solve them',
-            ]);
-          }
-
           const concurrency = parseInt(options.concurrency || '4', 10);
           const contextLinesNum = parseInt(options.contextLines || '50', 10);
-          const resolution = await resolveRebaseConflicts(
+          const resolution = await resolveRebaseConflictSequence(
             git,
-            rebaseConflicts,
             aiAgent,
             task.worktreePath,
-            concurrency,
-            contextLinesNum,
-            options.sendFullFile === true
+            rebaseConflicts,
+            {
+              concurrency,
+              contextLines: contextLinesNum,
+              sendFullFile: options.sendFullFile === true,
+              resolveConflicts: resolveRebaseConflicts,
+              confirmContinue: promptToContinueRebase,
+            },
+            jsonOutput
           );
 
           if (resolution.success) {
-            jsonOutput.conflictsResolved = true;
+            jsonOutput.rebased = true;
 
             if (!isJsonMode()) {
-              showRoverChat([
-                'The rebase conflicts are fixed. You can check the file content to confirm it.',
-              ]);
-
-              let applyChanges = false;
-
-              try {
-                const { confirmResolution } = await prompt<{
-                  confirmResolution: boolean;
-                }>({
-                  type: 'confirm',
-                  name: 'confirmResolution',
-                  message: 'Do you want to continue with the rebase?',
-                  initial: false,
-                });
-                applyChanges = confirmResolution;
-              } catch (error) {
-                // Ignore the error as it's a regular CTRL+C
-              }
-
-              if (!applyChanges) {
-                git.abortRebase({ worktreePath: task.worktreePath });
-                await exitWithWarn(
-                  'User rejected AI resolution. Rebase aborted',
-                  jsonOutput,
-                  { telemetry }
-                );
-                return;
-              }
-            }
-
-            // Continue the rebase with resolved conflicts
-            try {
-              git.continueRebase({ worktreePath: task.worktreePath });
-
-              jsonOutput.rebased = true;
-
-              if (!isJsonMode()) {
-                console.log(
-                  colors.green(
-                    '\n✓ Rebase conflicts resolved and rebase completed'
-                  )
-                );
-              }
-            } catch (continueError) {
-              git.abortRebase({ worktreePath: task.worktreePath });
-
-              jsonOutput.error = `Error completing rebase after conflict resolution: ${continueError}`;
-              await exitWithError(jsonOutput, { telemetry });
-              return;
+              console.log(
+                colors.green(
+                  '\n✓ Rebase conflicts resolved and rebase completed'
+                )
+              );
             }
           } else {
-            jsonOutput.error =
-              resolution.failureReason ||
-              'AI failed to resolve rebase conflicts';
-            git.abortRebase({ worktreePath: task.worktreePath });
+            if (
+              resolution.error === 'User rejected AI resolution. Rebase aborted'
+            ) {
+              await exitWithWarn(resolution.error, jsonOutput, {
+                telemetry,
+              });
+              return;
+            }
+
+            jsonOutput.error = resolution.error;
 
             if (!isJsonMode()) {
               console.log(

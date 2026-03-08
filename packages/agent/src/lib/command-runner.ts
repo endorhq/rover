@@ -24,6 +24,7 @@ export function shellEscape(arg: string): string {
 export interface CommandStepResult {
   id: string;
   success: boolean;
+  exitCode: number;
   error?: string;
   duration: number;
   outputs: Map<string, string>;
@@ -111,19 +112,21 @@ export async function runCommandStep(
     const exitCode = result.exitCode ?? -1;
     const stdout = truncateOutput(result.stdout?.toString() ?? '');
     const stderr = truncateOutput(result.stderr?.toString() ?? '');
+    const success = exitCode === 0 || step.allow_failure === true;
 
     outputs.set('exit_code', String(exitCode));
     outputs.set('stdout', stdout);
     outputs.set('stderr', stderr);
-    outputs.set('success', String(exitCode === 0));
+    outputs.set('success', String(success));
 
     const duration = (performance.now() - start) / 1000;
 
     return {
       id: step.id,
-      success: exitCode === 0,
+      success,
+      exitCode,
       error:
-        exitCode !== 0
+        exitCode !== 0 && !step.allow_failure
           ? stderr || `Command exited with code ${exitCode}`
           : undefined,
       duration,
@@ -141,6 +144,7 @@ export async function runCommandStep(
     return {
       id: step.id,
       success: false,
+      exitCode: -1,
       error: errorMsg,
       duration,
       outputs,
