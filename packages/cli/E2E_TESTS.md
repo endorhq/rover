@@ -131,6 +131,13 @@ checkout). Rover must be initialized in the main repository.
 - Does not display the notification when running in `--json` mode
 - Does not display the notification when `--project` is explicitly set
 
+#### Non-worktree directory handling
+
+<!-- category: error -->
+
+- Does not display any worktree notification when the current directory is the main checkout
+- Resolves operations against the current directory normally
+
 ### Postconditions
 
 All Rover operations must have been resolved against the main repository
@@ -344,6 +351,20 @@ The specified task ID must exist in the current project's task store.
 - Produces a complete JSON representation of the task with `--json`
 - Includes all metadata, iteration data, and file information
 
+#### Invalid task ID handling
+
+<!-- category: error -->
+
+- Produces a clear error message when the specified task ID does not exist
+- Exits with a non-zero status code
+
+#### Missing iteration directory
+
+<!-- category: error -->
+
+- Handles gracefully when the requested iteration number does not exist
+- Produces a clear error message indicating the iteration was not found
+
 ### Postconditions
 
 The inspect output must accurately reflect the task's current state and
@@ -495,6 +516,20 @@ The specified task ID must exist. The task must not be currently running
 - Preserves the iteration directory structure
 - Keeps all previous iteration outputs accessible
 
+#### Iterating a running task
+
+<!-- category: error -->
+
+- Produces a clear error message when attempting to iterate a task that is currently in `IN_PROGRESS` or `ITERATING` status
+- Does not create a new iteration or launch a container
+
+#### Invalid task ID for iteration
+
+<!-- category: error -->
+
+- Produces a clear error message when the specified task ID does not exist
+- Exits with a non-zero status code
+
 ### Postconditions
 
 After a successful iteration, the task must have a new iteration
@@ -622,6 +657,13 @@ All specified task IDs must exist in the project.
 - Displays a summary of the tasks to be deleted (ID, title, status) before proceeding
 - Prompts for confirmation
 - Skips the confirmation prompt when `--yes` or `--json` mode is used
+
+#### Invalid task ID for deletion
+
+<!-- category: error -->
+
+- Produces a clear error message when a specified task ID does not exist
+- Does not delete any tasks when validation fails for any of the specified IDs
 
 ### Postconditions
 
@@ -762,6 +804,20 @@ The specified task ID must exist and have a valid worktree.
 - Starts a sandbox container and opens a shell inside it with `--container`
 - Matches the task's execution environment
 
+#### Invalid task ID for shell
+
+<!-- category: error -->
+
+- Produces a clear error message when the specified task ID does not exist
+- Exits with a non-zero status code
+
+#### Missing worktree for shell
+
+<!-- category: error -->
+
+- Produces a clear error message when the task's worktree directory no longer exists
+- Does not open a shell session
+
 ### Postconditions
 
 The shell session must have operated in the correct directory (local
@@ -833,6 +889,27 @@ or global store.
 - Executes mixed workflows (both `agent` and `command` steps) according to each step's type
 - Respects the step ordering defined in the workflow
 
+#### Invalid workflow YAML
+
+<!-- category: error -->
+
+- Produces a clear error message when the workflow definition is not valid YAML
+- Does not save the invalid workflow to the store
+
+#### Unreachable workflow URL
+
+<!-- category: error -->
+
+- Produces a clear error message when the URL cannot be reached or returns an error
+- Does not save any workflow to the store
+
+#### Missing workflow file
+
+<!-- category: error -->
+
+- Produces a clear error message when the specified local file path does not exist
+- Does not save any workflow to the store
+
 ### Postconditions
 
 After adding a workflow, the workflow definition must be persisted in
@@ -862,6 +939,13 @@ registered for meaningful output.
 - Lists all registered projects
 - Shows the project ID, name, path, and total task count for each project
 - Produces a JSON representation of the same information with `--json`
+
+#### Empty store handling
+
+<!-- category: error -->
+
+- Handles gracefully when no projects are registered in the global store
+- Displays the data directory path and an empty project list without errors
 
 ### Postconditions
 
@@ -953,3 +1037,11 @@ cost control.
 
 - Reports the total token usage after executing a workflow
 - Sums all token usage and cost across all steps within the workflow
+
+#### Agent without cost reporting
+
+<!-- category: edge -->
+
+- Handles gracefully when the agent does not report token usage or cost information
+- Does not fail the workflow or step execution
+- Omits cost fields from the output rather than showing zeros or errors
