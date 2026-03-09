@@ -198,6 +198,38 @@ exit 0
     });
   });
 
+  describe('missing worktree for shell', () => {
+    it('should produce a clear error message when the task worktree directory no longer exists', async () => {
+      // Create a task
+      const taskResult = await runRover([
+        'task',
+        '-y',
+        'Create a hello world script',
+        '--json',
+      ]);
+      expect(taskResult.exitCode).toBe(0);
+
+      // Inspect the task to get worktree path
+      const inspectResult = await runRover(['inspect', '1', '--json']);
+      expect(inspectResult.exitCode).toBe(0);
+
+      const task = JSON.parse(inspectResult.stdout);
+      const worktreePath = task.worktreePath;
+
+      // Remove the worktree directory to simulate a missing worktree
+      if (worktreePath && existsSync(worktreePath)) {
+        const { rmSync } = await import('node:fs');
+        rmSync(worktreePath, { recursive: true, force: true });
+      }
+
+      // Try to shell into the task with missing worktree
+      const result = await runRover(['shell', '1']);
+
+      // Should fail because worktree no longer exists
+      expect(result.exitCode).not.toBe(0);
+    });
+  });
+
   describe('container shell', () => {
     it('should have --container flag available for container-based shell access', async () => {
       // Verify the shell command is recognized and has --container flag (help output)

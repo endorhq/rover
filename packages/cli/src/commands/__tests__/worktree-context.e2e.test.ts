@@ -200,6 +200,27 @@ exit 0
       expect(result.stdout).not.toContain('git worktree');
     });
 
+    it('should not show worktree notification when --project is explicitly set', async () => {
+      // Create a git worktree manually
+      const worktreeDir = join(testDir, 'my-worktree-project');
+      await execa(
+        'git',
+        ['worktree', 'add', worktreeDir, '-b', 'test-branch-project'],
+        {
+          cwd: testDir,
+        }
+      );
+
+      // Run a rover command from inside the worktree with --project flag
+      const result = await runRover(
+        ['list', '--project', testDir],
+        worktreeDir
+      );
+
+      // Verify: No worktree notification when --project is explicitly set
+      expect(result.stdout).not.toContain('git worktree');
+    });
+
     it('should resolve operations against the main repository root from a worktree', async () => {
       // Create a task from the main checkout
       const taskResult = await runRover([

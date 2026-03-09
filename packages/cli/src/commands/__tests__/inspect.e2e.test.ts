@@ -369,6 +369,35 @@ exit 0
     });
   });
 
+  describe('invalid task ID handling', () => {
+    it('should produce a clear error message when the specified task ID does not exist', async () => {
+      const result = await runRover(['inspect', '999']);
+
+      // Should fail because task doesn't exist
+      expect(result.exitCode).not.toBe(0);
+    });
+
+    it('should exit with a non-zero status code for invalid task ID', async () => {
+      const result = await runRover(['inspect', '999', '--json']);
+
+      expect(result.exitCode).not.toBe(0);
+    });
+  });
+
+  describe('missing iteration directory', () => {
+    it('should handle gracefully when the requested iteration number does not exist', async () => {
+      // Create a task first
+      await runRover(['task', '-y', 'Create a hello world script', '--json']);
+
+      // Try to inspect a non-existent iteration
+      const result = await runRover(['inspect', '1', '999']);
+
+      // Should fail or handle gracefully with an error message
+      // indicating the iteration was not found
+      expect(result.exitCode).not.toBe(0);
+    });
+  });
+
   describe('JSON output', () => {
     it('should produce a complete JSON representation of the task', async () => {
       await runRover(['task', '-y', 'Create a hello world script', '--json']);

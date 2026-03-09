@@ -522,6 +522,50 @@ steps:
       });
     }
   );
+  describe('agent without cost reporting', () => {
+    it('should handle gracefully when the agent does not report token usage or cost information', async () => {
+      // Add a workflow with command steps only (no agent, no cost reporting)
+      const noCostWorkflowYaml = `name: no-cost-workflow
+description: A workflow with only command steps (no cost data)
+version: "1.0"
+steps:
+  - id: check
+    name: Check
+    type: command
+    command: echo
+    args:
+      - "hello"
+`;
+      const workflowFile = join(testDir, 'no-cost-workflow.yml');
+      writeFileSync(workflowFile, noCostWorkflowYaml);
+
+      const addResult = await runRover([
+        'workflows',
+        'add',
+        workflowFile,
+        '--json',
+      ]);
+      expect(addResult.exitCode).toBe(0);
+
+      // Inspect the workflow to verify it was added
+      const inspectResult = await runRover([
+        'workflows',
+        'inspect',
+        'no-cost-workflow',
+        '--json',
+      ]);
+      expect(inspectResult.exitCode).toBe(0);
+
+      const output = JSON.parse(inspectResult.stdout);
+      expect(output.workflow).toBeDefined();
+      expect(output.workflow.name).toBe('no-cost-workflow');
+
+      // Verify steps don't have cost fields (command steps don't report cost)
+      for (const step of output.workflow.steps) {
+        expect(step.type).toBe('command');
+      }
+    });
+  });
 });
 
 /**

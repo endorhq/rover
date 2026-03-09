@@ -212,6 +212,41 @@ exit 0
       expect(output.projects).toBeDefined();
     });
   });
+  describe('empty store handling', () => {
+    it('should handle gracefully when no projects are registered in the global store', async () => {
+      // Create a fresh temp directory without any rover initialization
+      const emptyDir = mkdtempSync(join(tmpdir(), 'rover-info-empty-e2e-'));
+      const emptyHomeDir = join(emptyDir, '.mock-home');
+      mkdirSync(emptyHomeDir, { recursive: true });
+
+      try {
+        const result = await execa('node', [roverBin, 'info', '--json'], {
+          cwd: emptyDir,
+          env: {
+            PATH: `${mockBinDir}:${originalPath}`,
+            HOME: emptyHomeDir,
+            USER: process.env.USER,
+            TMPDIR: process.env.TMPDIR,
+            ROVER_NO_TELEMETRY: '1',
+          },
+          reject: false,
+        });
+
+        expect(result.exitCode).toBe(0);
+
+        const output = JSON.parse(result.stdout);
+        // Should display the data directory path
+        expect(output.storePath).toBeDefined();
+        // Should have an empty project list
+        expect(output.projects).toBeDefined();
+        expect(Array.isArray(output.projects)).toBe(true);
+        expect(output.projects.length).toBe(0);
+        expect(output.projectCount).toBe(0);
+      } finally {
+        safeCleanup(emptyDir);
+      }
+    });
+  });
 });
 
 /**

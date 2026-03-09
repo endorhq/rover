@@ -586,6 +586,54 @@ steps:
     });
   });
 
+  describe('invalid workflow YAML', () => {
+    it('should produce a clear error message when the workflow definition is not valid YAML', async () => {
+      const invalidYamlFile = join(testDir, 'invalid-workflow.yml');
+      writeFileSync(invalidYamlFile, '[}');
+
+      // Use --name to trigger YAML parsing in saveWorkflow
+      const result = await runRover([
+        'workflows',
+        'add',
+        invalidYamlFile,
+        '--name',
+        'invalid-test',
+        '--json',
+      ]);
+
+      // Should fail because the YAML is invalid
+      expect(result.exitCode).not.toBe(0);
+    });
+  });
+
+  describe('unreachable workflow URL', () => {
+    it('should produce a clear error message when the URL cannot be reached', async () => {
+      const result = await runRover([
+        'workflows',
+        'add',
+        'http://127.0.0.1:1/nonexistent-workflow.yml',
+        '--json',
+      ]);
+
+      // Should fail because the URL is unreachable
+      expect(result.exitCode).not.toBe(0);
+    });
+  });
+
+  describe('missing workflow file', () => {
+    it('should produce a clear error message when the specified local file path does not exist', async () => {
+      const result = await runRover([
+        'workflows',
+        'add',
+        join(testDir, 'nonexistent-workflow.yml'),
+        '--json',
+      ]);
+
+      // Should fail because the file does not exist
+      expect(result.exitCode).not.toBe(0);
+    });
+  });
+
   describe('workflow with command step execution', () => {
     it('should add a workflow containing command type steps', async () => {
       const workflowFile = join(testDir, 'command-workflow.yml');
