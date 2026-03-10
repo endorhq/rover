@@ -100,7 +100,8 @@ describe('ensureTraceDirs (real filesystem)', () => {
 });
 
 describe('autopilot command action', () => {
-  let stdoutWriteSpy: ReturnType<typeof vi.spyOn>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let stdoutWriteSpy: any;
   let exitListeners: ((...args: any[]) => void)[] = [];
   let sigintListeners: ((...args: any[]) => void)[] = [];
 
@@ -198,7 +199,7 @@ describe('autopilot command action', () => {
 
     await dashboardCmd.action();
 
-    const writes = stdoutWriteSpy.mock.calls.map(c => c[0]);
+    const writes = stdoutWriteSpy.mock.calls.map((c: any[]) => c[0]);
 
     // First write enters alt screen + hides cursor
     expect(writes[0]).toContain('\x1b[?1049h');
