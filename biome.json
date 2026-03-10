@@ -49,6 +49,7 @@
       "packages/telemetry/**",
       "packages/core/src/project/**",
       "packages/schemas/**",
+      "packages/cli/src/lib/autopilot/**",
       "!.direnv",
       "!**/node_modules/",
       "!**/dist/",
