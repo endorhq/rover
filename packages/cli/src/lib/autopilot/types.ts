@@ -30,12 +30,7 @@ export interface Action {
   reasoning: string;
 }
 
-export type ActionStepStatus =
-  | 'completed'
-  | 'running'
-  | 'pending'
-  | 'failed'
-  | 'error';
+export type ActionStepStatus = 'completed' | 'running' | 'pending' | 'error';
 
 /** A single entry in an ActionTrace representing one step's execution. */
 export interface ActionStep {
