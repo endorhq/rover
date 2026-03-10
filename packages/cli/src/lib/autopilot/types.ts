@@ -116,3 +116,20 @@ export interface AutopilotLogEntry {
   action: string;
   summary: string;
 }
+
+export type ViewMode = 'main' | 'inspector';
+
+export interface LogEntry {
+  timestamp: string;
+  message: string;
+}
+
+export interface TaskInfo {
+  id: number;
+  title: string;
+  status: string;
+  progress: number;
+  agent: string;
+  duration: string;
+  iteration: number;
+}
