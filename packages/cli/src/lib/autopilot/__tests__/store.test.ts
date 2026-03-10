@@ -306,13 +306,14 @@ describe('AutopilotStore', () => {
       const logPath = join(projectDir, 'autopilot', 'log.jsonl');
       writeFileSync(
         logPath,
-        `${JSON.stringify(makeLogEntry({ summary: 'good' }))}\nBAD LINE\n`,
+        `${JSON.stringify(makeLogEntry({ summary: 'good' }))}\nBAD LINE\n${JSON.stringify(makeLogEntry({ summary: 'good again' }))}\n`,
         'utf8'
       );
 
       const logs = store.readLogs();
-      expect(logs).toHaveLength(1);
+      expect(logs).toHaveLength(2);
       expect(logs[0].summary).toBe('good');
+      expect(logs[1].summary).toBe('good again');
     });
   });
 
