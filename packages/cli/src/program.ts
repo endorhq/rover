@@ -30,6 +30,8 @@ import { addWorkflowCommands } from './commands/workflows/index.js';
 import workflowAddCmd from './commands/workflows/add.js';
 import workflowListCmd from './commands/workflows/list.js';
 import workflowInspectCmd from './commands/workflows/inspect.js';
+import { addAutopilotCommands } from './commands/autopilot/index.js';
+import dashboardCmd from './commands/autopilot/dashboard.js';
 import {
   getCLIContext,
   getProjectPath,
@@ -64,6 +66,7 @@ const commands: CommandDefinition[] = [
   workflowAddCmd,
   workflowListCmd,
   workflowInspectCmd,
+  dashboardCmd,
 ];
 
 /**
@@ -207,7 +210,11 @@ export function createProgram(
           agentName = agent.toString();
         }
 
-        if (isJsonMode() || commandName === 'mcp') {
+        if (
+          isJsonMode() ||
+          commandName === 'mcp' ||
+          commandName === 'autopilot'
+        ) {
           // Do not print anything for JSON or MCP mode
           return;
         }
@@ -486,6 +493,10 @@ export function createProgram(
 
   // Add all subcommands
   addWorkflowCommands(program);
+
+  program.commandsGroup(colors.cyan('Autopilot:'));
+
+  addAutopilotCommands(program);
 
   program.commandsGroup(colors.cyan('Model Context Protocol:'));
 
