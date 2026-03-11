@@ -29,7 +29,7 @@ function printLandingMessage() {
 }
 
 const autopilotCommand = async (
-  options: { mode?: string; allowEvents?: string } = {}
+  options: { mode?: string; allowEvents?: string; botName?: string } = {}
 ) => {
   const project = getDefaultProject();
   if (!project) {
@@ -80,6 +80,7 @@ const autopilotCommand = async (
       project={project}
       mode={resolvedMode}
       allowEvents={resolvedAllowEvents}
+      botName={options.botName}
     />
   );
 

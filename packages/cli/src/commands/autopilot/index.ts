@@ -18,5 +18,9 @@ export const addAutopilotCommands = (program: Command) => {
       '--allow-events <value>',
       'Filter events by actor: "maintainers" (default), "all", or comma-separated usernames'
     )
+    .option(
+      '--bot-name <name>',
+      'Bot account name used by the autopilot (events from this actor are ignored)'
+    )
     .action(dashboardCmd.action);
 };

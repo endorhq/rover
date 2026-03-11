@@ -11,6 +11,7 @@ export function AutopilotApp({
   project: ProjectManager;
   mode: string;
   allowEvents: string;
+  botName?: string;
 }) {
   const { exit } = useApp();
   const { columns, rows } = useTerminalSize();
