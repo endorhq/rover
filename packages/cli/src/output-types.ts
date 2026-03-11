@@ -298,3 +298,48 @@ export interface InspectWorkflowOutput extends CLIJsonOutput {
   workflow?: Workflow;
   source?: string;
 }
+
+// ---------------------------------------------------------------------------
+// autopilot inspect command
+// ---------------------------------------------------------------------------
+
+export interface AutopilotTraceInspectionOutput extends CLIJsonOutput {
+  type: 'trace';
+  traceId: string;
+  summary: string;
+  createdAt: string;
+  retryCount: number;
+  taskMapping: import('./lib/autopilot/types.js').TaskMapping | null;
+  steps: Record<string, unknown>[];
+}
+
+export interface AutopilotSpanInspectionOutput extends CLIJsonOutput {
+  type: 'span';
+  id: string;
+  step: string;
+  status?: string;
+  timestamp: string;
+  completed?: string | null;
+  summary: string | null;
+  parent: string | null;
+  meta: Record<string, unknown>;
+  originAction: string | null;
+  newActions: string[];
+  parentTrace?: import('./lib/autopilot/types.js').Span[];
+}
+
+export interface AutopilotActionInspectionOutput extends CLIJsonOutput {
+  type: 'action';
+  id: string;
+  action: string;
+  timestamp: string;
+  spanId: string;
+  reasoning: string;
+  meta: Record<string, unknown>;
+  linkedSpan: import('./lib/autopilot/types.js').Span | null;
+}
+
+export type AutopilotInspectionOutput =
+  | AutopilotTraceInspectionOutput
+  | AutopilotSpanInspectionOutput
+  | AutopilotActionInspectionOutput;

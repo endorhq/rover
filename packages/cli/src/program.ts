@@ -32,6 +32,7 @@ import workflowListCmd from './commands/workflows/list.js';
 import workflowInspectCmd from './commands/workflows/inspect.js';
 import { addAutopilotCommands } from './commands/autopilot/index.js';
 import dashboardCmd from './commands/autopilot/dashboard.js';
+import autopilotInspectCmd from './commands/autopilot/inspect.js';
 import {
   getCLIContext,
   getProjectPath,
@@ -67,6 +68,7 @@ const commands: CommandDefinition[] = [
   workflowListCmd,
   workflowInspectCmd,
   dashboardCmd,
+  autopilotInspectCmd,
 ];
 
 /**
