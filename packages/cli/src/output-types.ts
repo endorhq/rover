@@ -9,6 +9,7 @@ import type {
   TaskStatus as SchemaTaskStatus,
   Workflow,
 } from 'rover-schemas';
+import type { Span, TaskMapping } from './lib/autopilot/types.js';
 
 // ---------------------------------------------------------------------------
 // Base types (used by exit helpers and extended by command outputs)
@@ -309,7 +310,7 @@ export interface AutopilotTraceInspectionOutput extends CLIJsonOutput {
   summary: string;
   createdAt: string;
   retryCount: number;
-  taskMapping: import('./lib/autopilot/types.js').TaskMapping | null;
+  taskMapping: TaskMapping | null;
   steps: Record<string, unknown>[];
 }
 
@@ -325,7 +326,7 @@ export interface AutopilotSpanInspectionOutput extends CLIJsonOutput {
   meta: Record<string, unknown>;
   originAction: string | null;
   newActions: string[];
-  parentTrace?: import('./lib/autopilot/types.js').Span[];
+  parentTrace?: Span[];
 }
 
 export interface AutopilotActionInspectionOutput extends CLIJsonOutput {
@@ -336,7 +337,7 @@ export interface AutopilotActionInspectionOutput extends CLIJsonOutput {
   spanId: string;
   reasoning: string;
   meta: Record<string, unknown>;
-  linkedSpan: import('./lib/autopilot/types.js').Span | null;
+  linkedSpan: Span | null;
 }
 
 export type AutopilotInspectionOutput =
