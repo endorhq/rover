@@ -5,14 +5,16 @@ import { Header, Legend } from '../components/index.js';
 import { useTerminalSize } from '../hooks/index.js';
 import { getUserAIAgent } from '../../agents/index.js';
 
-export function AutopilotApp({
-  project,
-}: {
+export interface AutopilotAppProps {
   project: ProjectManager;
   mode: string;
   allowEvents: string;
+  refreshInterval: number;
   botName?: string;
-}) {
+  maintainers?: string[];
+}
+
+export function AutopilotApp({ project }: AutopilotAppProps) {
   const { exit } = useApp();
   const { columns, rows } = useTerminalSize();
 

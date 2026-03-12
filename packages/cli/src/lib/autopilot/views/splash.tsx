@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Box, Text } from 'ink';
-import type { ProjectManager } from 'rover-core';
 import { getVersion } from 'rover-core';
-import { AutopilotApp } from './dashboard.js';
+import { AutopilotApp, type AutopilotAppProps } from './dashboard.js';
 import { useTerminalSize } from '../hooks/index.js';
 import { Logo, TEAL_400 } from '../components/logo.js';
 
@@ -93,12 +92,7 @@ function SplashScreen({
   );
 }
 
-export function LaunchableApp(props: {
-  project: ProjectManager;
-  mode: string;
-  allowEvents: string;
-  botName?: string;
-}) {
+export function LaunchableApp(props: AutopilotAppProps) {
   const [launched, setLaunched] = useState(false);
   const version = getVersion();
   const projectName = props.project.name ?? 'unknown';
