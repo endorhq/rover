@@ -2,7 +2,11 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { ActionTrace, Span, Action } from '../../../lib/autopilot/types.js';
+import type {
+  ActionTrace,
+  Span,
+  Action,
+} from '../../../lib/autopilot/types.js';
 
 // ---------- shared state for mocks ----------
 
@@ -162,9 +166,7 @@ describe('autopilot inspect command', () => {
       writeTracesFile(testBaseDir, new Map([['trace-001', trace]]));
       writeStateFile(testBaseDir, {});
 
-      const { inspectAutopilotCommand } = await import(
-        '../inspect.js'
-      );
+      const { inspectAutopilotCommand } = await import('../inspect.js');
       const { exitWithSuccess } = await import('../../../utils/exit.js');
       const { showTitle } = await import('rover-core');
 
@@ -180,9 +182,7 @@ describe('autopilot inspect command', () => {
       writeSpanFile(testBaseDir, span);
       writeStateFile(testBaseDir, {});
 
-      const { inspectAutopilotCommand } = await import(
-        '../inspect.js'
-      );
+      const { inspectAutopilotCommand } = await import('../inspect.js');
       const { exitWithSuccess } = await import('../../../utils/exit.js');
       const { showTitle } = await import('rover-core');
 
@@ -202,9 +202,7 @@ describe('autopilot inspect command', () => {
       writeSpanFile(testBaseDir, span);
       writeStateFile(testBaseDir, {});
 
-      const { inspectAutopilotCommand } = await import(
-        '../inspect.js'
-      );
+      const { inspectAutopilotCommand } = await import('../inspect.js');
       const { exitWithSuccess } = await import('../../../utils/exit.js');
       const { showTitle } = await import('rover-core');
 
@@ -220,9 +218,7 @@ describe('autopilot inspect command', () => {
       writeTracesFile(testBaseDir, new Map());
       writeStateFile(testBaseDir, {});
 
-      const { inspectAutopilotCommand } = await import(
-        '../inspect.js'
-      );
+      const { inspectAutopilotCommand } = await import('../inspect.js');
       const { exitWithError } = await import('../../../utils/exit.js');
 
       await inspectAutopilotCommand('nonexistent');
@@ -249,9 +245,7 @@ describe('autopilot inspect command', () => {
       writeSpanFile(testBaseDir, span);
       writeStateFile(testBaseDir, {});
 
-      const { inspectAutopilotCommand } = await import(
-        '../inspect.js'
-      );
+      const { inspectAutopilotCommand } = await import('../inspect.js');
       const { exitWithSuccess } = await import('../../../utils/exit.js');
       const { showTitle, showProperties } = await import('rover-core');
 
@@ -286,9 +280,7 @@ describe('autopilot inspect command', () => {
         },
       });
 
-      const { inspectAutopilotCommand } = await import(
-        '../inspect.js'
-      );
+      const { inspectAutopilotCommand } = await import('../inspect.js');
       const { showProperties } = await import('rover-core');
 
       await inspectAutopilotCommand('trace-001');
@@ -315,9 +307,7 @@ describe('autopilot inspect command', () => {
       const { isJsonMode } = await import('../../../lib/context.js');
       vi.mocked(isJsonMode).mockReturnValue(true);
 
-      const { inspectAutopilotCommand } = await import(
-        '../inspect.js'
-      );
+      const { inspectAutopilotCommand } = await import('../inspect.js');
       const { exitWithSuccess } = await import('../../../utils/exit.js');
 
       await inspectAutopilotCommand('trace-001', { json: true });
@@ -348,9 +338,7 @@ describe('autopilot inspect command', () => {
       writeSpanFile(testBaseDir, span);
       writeStateFile(testBaseDir, {});
 
-      const { inspectAutopilotCommand } = await import(
-        '../inspect.js'
-      );
+      const { inspectAutopilotCommand } = await import('../inspect.js');
       const { exitWithSuccess } = await import('../../../utils/exit.js');
       const { showTitle, showProperties } = await import('rover-core');
 
@@ -381,9 +369,7 @@ describe('autopilot inspect command', () => {
       writeSpanFile(testBaseDir, childSpan);
       writeStateFile(testBaseDir, {});
 
-      const { inspectAutopilotCommand } = await import(
-        '../inspect.js'
-      );
+      const { inspectAutopilotCommand } = await import('../inspect.js');
       const { showTitle, showList } = await import('rover-core');
 
       await inspectAutopilotCommand('span-child');
@@ -405,9 +391,7 @@ describe('autopilot inspect command', () => {
       writeSpanFile(testBaseDir, span);
       writeStateFile(testBaseDir, {});
 
-      const { inspectAutopilotCommand } = await import(
-        '../inspect.js'
-      );
+      const { inspectAutopilotCommand } = await import('../inspect.js');
       const { showTitle, showProperties } = await import('rover-core');
 
       await inspectAutopilotCommand('span-001');
@@ -436,9 +420,7 @@ describe('autopilot inspect command', () => {
       const { isJsonMode } = await import('../../../lib/context.js');
       vi.mocked(isJsonMode).mockReturnValue(true);
 
-      const { inspectAutopilotCommand } = await import(
-        '../inspect.js'
-      );
+      const { inspectAutopilotCommand } = await import('../inspect.js');
       const { exitWithSuccess } = await import('../../../utils/exit.js');
 
       await inspectAutopilotCommand('span-child', { json: true });
@@ -470,9 +452,7 @@ describe('autopilot inspect command', () => {
       writeSpanFile(testBaseDir, span);
       writeStateFile(testBaseDir, {});
 
-      const { inspectAutopilotCommand } = await import(
-        '../inspect.js'
-      );
+      const { inspectAutopilotCommand } = await import('../inspect.js');
       const { exitWithSuccess } = await import('../../../utils/exit.js');
       const { showTitle, showProperties } = await import('rover-core');
 
@@ -505,9 +485,7 @@ describe('autopilot inspect command', () => {
       const { isJsonMode } = await import('../../../lib/context.js');
       vi.mocked(isJsonMode).mockReturnValue(true);
 
-      const { inspectAutopilotCommand } = await import(
-        '../inspect.js'
-      );
+      const { inspectAutopilotCommand } = await import('../inspect.js');
       const { exitWithSuccess } = await import('../../../utils/exit.js');
 
       await inspectAutopilotCommand('action-001', { json: true });
@@ -533,9 +511,7 @@ describe('autopilot inspect command', () => {
 
       const { requireProjectContext } = await import('../../../lib/context.js');
 
-      const { inspectAutopilotCommand } = await import(
-        '../inspect.js'
-      );
+      const { inspectAutopilotCommand } = await import('../inspect.js');
 
       // Will fail to find the UUID but we're testing the project resolution
       await inspectAutopilotCommand('any-id', {
