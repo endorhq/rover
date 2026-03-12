@@ -304,7 +304,17 @@ export interface InspectWorkflowOutput extends CLIJsonOutput {
 // autopilot inspect command
 // ---------------------------------------------------------------------------
 
-export interface AutopilotTraceInspectionOutput extends CLIJsonOutput {
+/** Discriminator for autopilot resource types returned by `inspect`. */
+export type AutopilotResourceType = 'trace' | 'span' | 'action';
+
+/** Common base for all autopilot inspect JSON outputs. The `type` field
+ *  tells the consumer which resource kind was resolved from the UUID. */
+export interface AutopilotInspectionBase extends CLIJsonOutput {
+  type: AutopilotResourceType;
+}
+
+export interface AutopilotTraceInspectionOutput
+  extends AutopilotInspectionBase {
   type: 'trace';
   traceId: string;
   summary: string;
@@ -314,7 +324,7 @@ export interface AutopilotTraceInspectionOutput extends CLIJsonOutput {
   steps: Record<string, unknown>[];
 }
 
-export interface AutopilotSpanInspectionOutput extends CLIJsonOutput {
+export interface AutopilotSpanInspectionOutput extends AutopilotInspectionBase {
   type: 'span';
   id: string;
   step: string;
@@ -329,7 +339,8 @@ export interface AutopilotSpanInspectionOutput extends CLIJsonOutput {
   parentTrace?: Span[];
 }
 
-export interface AutopilotActionInspectionOutput extends CLIJsonOutput {
+export interface AutopilotActionInspectionOutput
+  extends AutopilotInspectionBase {
   type: 'action';
   id: string;
   action: string;

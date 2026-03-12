@@ -130,11 +130,8 @@ export function displayTrace(
 
   showTips([
     'Use ' +
-      colors.cyan('rover autopilot inspect span <spanId>') +
-      ' to inspect a specific span',
-    'Use ' +
-      colors.cyan('rover autopilot inspect action <actionId>') +
-      ' to inspect a specific action',
+      colors.cyan('rover autopilot inspect <uuid>') +
+      ' to inspect a specific span or action',
   ]);
 }
 
@@ -239,7 +236,7 @@ export function displaySpan(span: Span, parentTrace: Span[]): void {
 
   showTips([
     'Use ' +
-      colors.cyan('rover autopilot inspect trace <traceId>') +
+      colors.cyan('rover autopilot inspect <traceId>') +
       ' to inspect the full trace',
   ]);
 }
@@ -300,7 +297,7 @@ export function displayAction(action: Action, linkedSpan: Span | null): void {
 
   showTips([
     'Use ' +
-      colors.cyan(`rover autopilot inspect span ${action.spanId}`) +
+      colors.cyan(`rover autopilot inspect ${action.spanId}`) +
       ' to inspect the linked span',
   ]);
 }

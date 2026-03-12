@@ -17,10 +17,7 @@ import {
 } from '../../lib/autopilot/display.js';
 import type { CommandDefinition } from '../../types.js';
 
-type InspectType = 'trace' | 'span' | 'action';
-
 const inspectAutopilotCommand = async (
-  type: InspectType,
   uuid: string,
   options: { json?: boolean; projectId?: string } = {}
 ) => {
@@ -47,107 +44,64 @@ const inspectAutopilotCommand = async (
 
   const store = new AutopilotStore(project.id);
 
-  switch (type) {
-    case 'trace': {
-      const traces = store.loadTraces();
-      const trace = traces.get(uuid);
+  // Auto-detect: try trace, then span, then action
+  const traces = store.loadTraces();
+  const trace = traces.get(uuid);
+  if (trace) {
+    const taskMappings = store.getAllTaskMappings();
 
-      if (!trace) {
-        exitWithError(
-          {
-            success: false,
-            error: `Trace "${uuid}" not found in project "${project.name}" (${project.id})`,
-          },
-          {
-            tips: [
-              'Use ' +
-                colors.cyan('rover autopilot') +
-                ' to view all active traces in the dashboard',
-            ],
-            telemetry,
-          }
-        );
-        return;
-      }
-
-      const taskMappings = store.getAllTaskMappings();
-
-      if (isJsonMode()) {
-        const json = buildTraceJson(trace, store, taskMappings);
-        await exitWithSuccess(null, json, { telemetry });
-      } else {
-        displayTrace(trace, store, taskMappings);
-        await exitWithSuccess(null, { success: true }, { telemetry });
-      }
-      break;
+    if (isJsonMode()) {
+      const json = buildTraceJson(trace, store, taskMappings);
+      await exitWithSuccess(null, json, { telemetry });
+    } else {
+      displayTrace(trace, store, taskMappings);
+      await exitWithSuccess(null, { success: true }, { telemetry });
     }
-
-    case 'span': {
-      const span = store.readSpan(uuid);
-
-      if (!span) {
-        exitWithError(
-          {
-            success: false,
-            error: `Span "${uuid}" not found in project "${project.name}" (${project.id})`,
-          },
-          {
-            tips: [
-              'Use ' +
-                colors.cyan('rover autopilot inspect trace <traceId>') +
-                ' to find span IDs within a trace',
-            ],
-            telemetry,
-          }
-        );
-        return;
-      }
-
-      const parentTrace = store.getSpanTrace(uuid);
-
-      if (isJsonMode()) {
-        const json = buildSpanJson(span, parentTrace);
-        await exitWithSuccess(null, json, { telemetry });
-      } else {
-        displaySpan(span, parentTrace);
-        await exitWithSuccess(null, { success: true }, { telemetry });
-      }
-      break;
-    }
-
-    case 'action': {
-      const action = store.readAction(uuid);
-
-      if (!action) {
-        exitWithError(
-          {
-            success: false,
-            error: `Action "${uuid}" not found in project "${project.name}" (${project.id})`,
-          },
-          {
-            tips: [
-              'Use ' +
-                colors.cyan('rover autopilot inspect trace <traceId>') +
-                ' to find action IDs within a trace',
-            ],
-            telemetry,
-          }
-        );
-        return;
-      }
-
-      const linkedSpan = store.readSpan(action.spanId);
-
-      if (isJsonMode()) {
-        const json = buildActionJson(action, linkedSpan);
-        await exitWithSuccess(null, json, { telemetry });
-      } else {
-        displayAction(action, linkedSpan);
-        await exitWithSuccess(null, { success: true }, { telemetry });
-      }
-      break;
-    }
+    return;
   }
+
+  const span = store.readSpan(uuid);
+  if (span) {
+    const parentTrace = store.getSpanTrace(uuid);
+
+    if (isJsonMode()) {
+      const json = buildSpanJson(span, parentTrace);
+      await exitWithSuccess(null, json, { telemetry });
+    } else {
+      displaySpan(span, parentTrace);
+      await exitWithSuccess(null, { success: true }, { telemetry });
+    }
+    return;
+  }
+
+  const action = store.readAction(uuid);
+  if (action) {
+    const linkedSpan = store.readSpan(action.spanId);
+
+    if (isJsonMode()) {
+      const json = buildActionJson(action, linkedSpan);
+      await exitWithSuccess(null, json, { telemetry });
+    } else {
+      displayAction(action, linkedSpan);
+      await exitWithSuccess(null, { success: true }, { telemetry });
+    }
+    return;
+  }
+
+  exitWithError(
+    {
+      success: false,
+      error: `UUID "${uuid}" not found as a trace, span, or action in project "${project.name}" (${project.id})`,
+    },
+    {
+      tips: [
+        'Use ' +
+          colors.cyan('rover autopilot') +
+          ' to view all active traces in the dashboard',
+      ],
+      telemetry,
+    }
+  );
 };
 
 // Named export for testing
@@ -156,7 +110,7 @@ export { inspectAutopilotCommand };
 export default {
   name: 'inspect',
   parent: 'autopilot',
-  description: 'Inspect autopilot traces, spans, or actions by UUID',
+  description: 'Inspect an autopilot trace, span, or action by UUID',
   requireProject: true,
   action: inspectAutopilotCommand,
 } satisfies CommandDefinition;

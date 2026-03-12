@@ -1,7 +1,7 @@
 /**
  * Defines the autopilot subcommands for the CLI.
  */
-import { Argument, type Command } from 'commander';
+import type { Command } from 'commander';
 import dashboardCmd from './dashboard.js';
 import inspectCmd from './inspect.js';
 
@@ -23,14 +23,7 @@ export const addAutopilotCommands = (program: Command) => {
 
   command
     .command('inspect')
-    .description('Inspect autopilot traces, spans, or actions by UUID')
-    .addArgument(
-      new Argument('<type>', 'Type to inspect').choices([
-        'trace',
-        'span',
-        'action',
-      ])
-    )
+    .description('Inspect an autopilot trace, span, or action by UUID')
     .argument('<uuid>', 'UUID of the trace, span, or action')
     .option('--json', 'Output in JSON format')
     .option('--project-id <id>', 'Override project context by ID')
