@@ -18,5 +18,12 @@ export const addAutopilotCommands = (program: Command) => {
       '--allow-events <value>',
       'Filter events by actor: "maintainers" (default), "all", or comma-separated usernames'
     )
+    .option(
+      '-r, --refresh <seconds>',
+      'Refresh interval in seconds for polling GitHub events'
+    )
+    .option('--bot-name <name>', 'GitHub bot account name')
+    .option('--bot <name>', 'GitHub bot account name (alias for --bot-name)')
+    .option('--maintainers <names...>', 'GitHub handles of project maintainers')
     .action(dashboardCmd.action);
 };

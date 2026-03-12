@@ -32,7 +32,11 @@ pnpm build            # Build all packages
 # Testing
 pnpm test             # Run tests for all packages
 
-# Formatting
+# Type checking
+pnpm check            # TypeScript type checking for all packages
+
+# Linting & Formatting
+pnpm lint             # Lint all files (with auto-fix)
 pnpm format           # Format all files
 ```
 
@@ -193,9 +197,16 @@ pnpm --filter rover-core test
 pnpm --filter rover-schemas test
 ```
 
-### Formatting
+### Validation
 
-When you have finished implementing changes, run `pnpm format` to ensure all files follow the correct format. You can focus on files that you have changed by running `pnpm exec biome format --changed` to format only those files.
+After implementing changes, always run these commands before considering the work complete:
+
+1. `pnpm check` — TypeScript type checking across all packages
+2. `pnpm lint` — Lint all files (with auto-fix)
+3. `pnpm format` — Format all files
+4. `pnpm test` — Run tests for all packages
+
+You can focus formatting/linting on changed files by running `pnpm exec biome format --changed` or `pnpm exec biome lint --changed`.
 
 ## AI Agent Guidelines
 

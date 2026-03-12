@@ -19,6 +19,7 @@ import {
   type TaskManager,
   type HooksConfig,
   type NetworkConfig,
+  type AutopilotConfig,
 } from 'rover-schemas';
 import { GlobalConfigManager } from './global-config.js';
 
@@ -203,6 +204,7 @@ export class ProjectConfigManager {
       ...(data.excludePatterns !== undefined
         ? { excludePatterns: data.excludePatterns }
         : {}),
+      ...(data.autopilot !== undefined ? { autopilot: data.autopilot } : {}),
     };
 
     return migrated;
@@ -277,6 +279,9 @@ export class ProjectConfigManager {
   }
   get excludePatterns(): string[] | undefined {
     return this.data.excludePatterns;
+  }
+  get autopilot(): AutopilotConfig | undefined {
+    return this.data.autopilot;
   }
 
   // Data Modification (Setters)
