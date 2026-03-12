@@ -41,6 +41,7 @@ commit. No prior Rover configuration should exist unless testing
 re-initialization behavior.
 
 ### Feature: Prerequisite detection
+<!-- category: core -->
 
 Rover must verify that required system tools are available before
 proceeding with initialization. Docker (or Podman) is mandatory. At
@@ -53,6 +54,7 @@ be detected and recorded. The first available agent is selected as the
 default when running non-interactively with the `--yes` flag.
 
 ### Feature: Project environment detection
+<!-- category: core -->
 
 Rover must inspect the repository to identify the programming languages,
 package managers, and task managers in use. For languages, it must
@@ -69,6 +71,7 @@ multiple languages, package managers, and task managers must be detected
 correctly.
 
 ### Feature: Configuration file creation
+<!-- category: core -->
 
 On successful initialization, Rover must create `rover.json` at the
 project root containing detected languages, package managers, task
@@ -78,6 +81,7 @@ selected default agent. Both files must be valid JSON and reflect the
 actual project environment accurately.
 
 ### Feature: Gitignore management
+<!-- category: core -->
 
 Rover must ensure that `.rover/` is listed in `.gitignore`. If no
 `.gitignore` exists, one must be created containing `.rover/`. If a
@@ -86,6 +90,7 @@ disturbing existing entries. If `.rover/` is already present in
 `.gitignore`, it must not be duplicated.
 
 ### Feature: Re-initialization prevention
+<!-- category: idempotency -->
 
 If Rover is already initialized in the project (both `rover.json` and
 `.rover/settings.json` exist), running `rover init` again must detect
@@ -93,6 +98,7 @@ this and report that the project is already initialized. The existing
 configuration must not be overwritten.
 
 ### Feature: Cloned repository initialization
+<!-- category: core -->
 
 When a repository that was previously initialized with Rover is cloned,
 running `rover init` in the clone must succeed. The existing
@@ -119,6 +125,7 @@ state are resolved consistently regardless of which worktree the user is
 in.
 
 ### Feature: Worktree detection and notification
+<!-- category: core -->
 
 When a user runs a Rover command from inside a git worktree and has not
 specified a `--project` option, Rover must detect that the current
@@ -144,6 +151,8 @@ Docker must be running and accessible. Rover does **not** need to be
 initialized with `rover init` before running `rover task`.
 
 ### Feature: Basic task creation
+<!-- category: core -->
+<!-- skip: requires-real-agent -->
 
 Running `rover task` with a description (either as an argument or via
 interactive prompt) must create a new task with an incrementing numeric
@@ -155,6 +164,8 @@ task ID, title, and workspace information. The task must initially be in
 `IN_PROGRESS` status.
 
 ### Feature: Task isolation via git worktrees
+<!-- category: core -->
+<!-- skip: requires-real-agent -->
 
 Each task must operate in its own git worktree with a dedicated branch.
 Changes made by the AI agent in the task worktree must not affect the
@@ -163,6 +174,8 @@ deterministic and identifiable. After task completion, the main branch
 must have the same commit history it had before the task was created.
 
 ### Feature: Multi-agent task creation
+<!-- category: core -->
+<!-- skip: requires-real-agent -->
 
 When multiple `--agent` flags are provided (e.g.,
 `--agent claude --agent gemini`), Rover must create separate tasks for
@@ -171,6 +184,7 @@ All tasks must work on the same description but independently. The
 resulting task IDs must be sequential.
 
 ### Feature: Non-interactive mode
+<!-- category: core -->
 
 The `--yes` flag must allow task creation without any interactive
 prompts. The `--json` flag must produce structured JSON output containing
@@ -178,6 +192,7 @@ the task metadata. When both flags are used together, the command must be
 fully automatable without any user interaction.
 
 ### Feature: Source and target branch control
+<!-- category: core -->
 
 The `--source-branch` flag must allow specifying which branch the
 worktree is based on, instead of defaulting to the current branch. The
@@ -185,6 +200,7 @@ worktree is based on, instead of defaulting to the current branch. The
 branch.
 
 ### Feature: Container failure handling
+<!-- category: error -->
 
 If the Docker container fails to start or the AI agent cannot be
 launched, the task must be reset to `NEW` status. The error must be
@@ -192,6 +208,7 @@ reported clearly to the user. A suggestion to use `rover restart` must
 be provided.
 
 ### Feature: Task creation without prior initialization
+<!-- category: core -->
 
 Running `rover task` in a project that has not been initialized with
 `rover init` must succeed. Rover configuration is optional and the
@@ -221,6 +238,7 @@ project-scoped listing, Rover must be initialized in the current
 project.
 
 ### Feature: Project-scoped task listing
+<!-- category: core -->
 
 When run inside an initialized project, `rover list` must display only
 the tasks belonging to that project. Each task entry must show the task
@@ -229,6 +247,7 @@ and duration. Completed tasks must be visually distinguished from
 in-progress and failed tasks.
 
 ### Feature: Global task listing
+<!-- category: core -->
 
 When run outside any project, or with the `--project` flag,
 `rover list` must display tasks from all registered projects, grouped by
@@ -236,6 +255,7 @@ project name. This provides a unified view across all Rover-managed
 work.
 
 ### Feature: Watch mode
+<!-- category: core -->
 
 The `--watch` flag must enable continuous refresh of the task list. The
 default refresh interval must be 3 seconds. A custom interval (1-60
@@ -244,12 +264,15 @@ update in place without scrolling. Watch mode must be exitable with
 Ctrl+C.
 
 ### Feature: JSON output
+<!-- category: core -->
 
 The `--json` flag must produce a JSON array of task objects, each
 containing the full task metadata including ID, title, status,
 timestamps, agent, workflow, and workspace information.
 
 ### Feature: Hook triggering on status change
+<!-- category: side-effect -->
+<!-- skip: requires-real-agent -->
 
 When `rover list` detects that a task has transitioned to a terminal
 status (COMPLETED or FAILED), it must trigger the `onComplete` hook if
@@ -276,6 +299,7 @@ results of a completed task.
 The specified task ID must exist in the current project's task store.
 
 ### Feature: Task metadata display
+<!-- category: core -->
 
 `rover inspect <taskId>` must display the task ID, title, status,
 creation and completion timestamps, agent, workflow, source branch,
@@ -283,6 +307,8 @@ worktree path, and branch name. If the task originated from a GitHub
 issue, the source must be shown.
 
 ### Feature: Iteration output file listing
+<!-- category: core -->
+<!-- skip: requires-real-agent -->
 
 The inspect output must list all files produced by the task's iterations
 (e.g., `summary.md`, `changes.md`, `plan.md`). By default, the content
@@ -290,6 +316,8 @@ of `summary.md` (or the last file if no summary exists) must be
 displayed.
 
 ### Feature: Specific file display
+<!-- category: core -->
+<!-- skip: requires-real-agent -->
 
 The `--file` flag must allow displaying the formatted content of one or
 more specific iteration output files. The `--raw-file` flag must display
@@ -297,18 +325,22 @@ the raw, unformatted content of the specified files. These two flags
 must be mutually exclusive.
 
 ### Feature: Iteration selection
+<!-- category: core -->
 
 An optional second argument must allow inspecting a specific iteration
 number instead of the latest one. This enables reviewing the output of
 earlier iterations.
 
 ### Feature: File change statistics
+<!-- category: core -->
+<!-- skip: requires-real-agent -->
 
 For completed tasks, the inspect output must include file change
 statistics showing the number of insertions and deletions per changed
 file.
 
 ### Feature: JSON output
+<!-- category: core -->
 
 The `--json` flag must produce a complete JSON representation of the
 task including all metadata, iteration data, and file information.
@@ -327,23 +359,30 @@ The specified task ID must exist. The task must have been launched at
 least once (a container ID must be associated with it).
 
 ### Feature: Log retrieval
+<!-- category: core -->
+<!-- skip: requires-real-agent -->
 
 `rover logs <taskId>` must display the Docker container logs for the
 specified task. If no iteration number is specified, the latest
 iteration's logs must be shown.
 
 ### Feature: Iteration-specific logs
+<!-- category: core -->
+<!-- skip: requires-real-agent -->
 
 An optional iteration number argument must allow viewing logs from a
 specific iteration instead of the latest one.
 
 ### Feature: Log following
+<!-- category: core -->
+<!-- skip: requires-real-agent -->
 
 The `--follow` flag must stream logs in real-time, similar to
 `tail -f`. New log output must appear as it is generated. The stream
 must be interruptible with Ctrl+C.
 
 ### Feature: Missing container handling
+<!-- category: error -->
 
 If the container no longer exists (e.g., it was removed), the command
 must display a clear message indicating that logs are not available
@@ -362,29 +401,39 @@ allows reviewing the changes an AI agent has made.
 The specified task ID must exist and have a valid worktree.
 
 ### Feature: Default diff
+<!-- category: core -->
+<!-- skip: requires-real-agent -->
 
 `rover diff <taskId>` without additional flags must show all uncommitted
 and committed changes in the task worktree relative to the source
 branch.
 
 ### Feature: Base commit comparison
+<!-- category: core -->
+<!-- skip: requires-real-agent -->
 
 The `--base` flag must compare the current worktree state against the
 base commit captured when the task was created. This shows the full set
 of changes made during the task's lifetime.
 
 ### Feature: Branch comparison
+<!-- category: core -->
+<!-- skip: requires-real-agent -->
 
 The `--branch` flag must compare the task worktree against a specified
 branch. The `--base` and `--branch` flags must be mutually exclusive;
 using both must result in an error.
 
 ### Feature: File-specific diff
+<!-- category: core -->
+<!-- skip: requires-real-agent -->
 
 An optional file path argument must restrict the diff output to a
 single file.
 
 ### Feature: File list mode
+<!-- category: core -->
+<!-- skip: requires-real-agent -->
 
 The `--only-files` flag must display only the list of changed files with
 insertion and deletion counts, without showing the actual diff content.
@@ -404,6 +453,8 @@ The specified task ID must exist. The task must not be currently running
 (its status must be NEW, COMPLETED, or FAILED).
 
 ### Feature: Instruction-based iteration
+<!-- category: core -->
+<!-- skip: requires-real-agent -->
 
 `rover iterate <taskId> [instructions]` must create a new iteration with
 the provided refinement instructions. The instructions can be passed as
@@ -413,12 +464,15 @@ the new instructions. The task must transition to `ITERATING` status and
 a new container must be launched.
 
 ### Feature: Interactive iteration
+<!-- category: core -->
 
 The `--interactive` flag must open a shell session inside the sandbox
 container, allowing real-time collaboration with the AI agent rather
 than providing instructions upfront.
 
 ### Feature: Iteration numbering
+<!-- category: core -->
+<!-- skip: requires-real-agent -->
 
 Each iteration must have an incrementing iteration number. The iteration
 directory structure must be preserved, and all previous iteration
@@ -442,18 +496,24 @@ container. It optionally cleans up associated resources.
 The specified task ID must exist.
 
 ### Feature: Container stop
+<!-- category: core -->
+<!-- skip: requires-real-agent -->
 
 `rover stop <taskId>` must stop the Docker container running the task.
 The task status must be reset to `NEW`. The container information must be
 cleared from the task metadata.
 
 ### Feature: Full cleanup
+<!-- category: core -->
+<!-- skip: requires-real-agent -->
 
 The `--remove-all` flag must remove the Docker container, the git
 worktree, and the task branch. Iteration directories must also be
 removed.
 
 ### Feature: Selective cleanup
+<!-- category: core -->
+<!-- skip: requires-real-agent -->
 
 The `--remove-container` flag must remove only the Docker container. The
 `--remove-git-worktree-and-branch` flag must remove only the git
@@ -479,6 +539,8 @@ The specified task ID must exist. The task must be in `NEW` or `FAILED`
 status.
 
 ### Feature: Task restart
+<!-- category: core -->
+<!-- skip: requires-real-agent -->
 
 `rover restart <taskId>` must reset the task, ensure the git worktree
 exists (creating it if missing), copy environment files, and launch a
@@ -486,11 +548,15 @@ new container. On success, the task must transition to `IN_PROGRESS`
 status.
 
 ### Feature: Status validation
+<!-- category: error -->
+<!-- skip: requires-real-agent -->
 
 Attempting to restart a task that is in any status other than `NEW` or
 `FAILED` must result in an error.
 
 ### Feature: Container failure on restart
+<!-- category: error -->
+<!-- skip: requires-real-agent -->
 
 If the new container fails to start, the task must be reset back to
 `NEW` status and the error must be reported.
@@ -507,12 +573,16 @@ or more tasks, including all associated metadata.
 All specified task IDs must exist in the project.
 
 ### Feature: Single task deletion
+<!-- category: core -->
+<!-- skip: requires-real-agent -->
 
 `rover delete <taskId>` must remove the task metadata from the store and
 prune the associated git worktree. A confirmation prompt must be shown
 before deletion unless the `--yes` flag is used.
 
 ### Feature: Bulk deletion
+<!-- category: core -->
+<!-- skip: requires-real-agent -->
 
 Multiple task IDs can be specified (e.g., `rover delete 1 2 3`). All
 specified tasks must be validated before any deletion begins. If some
@@ -520,6 +590,8 @@ deletions fail, the command must report partial failures while still
 deleting the tasks that can be deleted.
 
 ### Feature: Deletion confirmation
+<!-- category: core -->
+<!-- skip: requires-real-agent -->
 
 Before deleting, the command must display a summary of the tasks to be
 deleted (ID, title, status) and prompt for confirmation. The `--yes`
@@ -544,6 +616,8 @@ The specified task ID must exist and be in `COMPLETED` status. The main
 repository must have a clean working tree (no uncommitted changes).
 
 ### Feature: Successful merge
+<!-- category: core -->
+<!-- skip: requires-real-agent -->
 
 `rover merge <taskId>` must merge the task branch into the current
 branch. A commit message must be generated (using AI or falling back to
@@ -552,6 +626,8 @@ commit must include a `Co-Authored-By` trailer. After successful merge,
 the task status must transition to `MERGED`.
 
 ### Feature: Conflict resolution
+<!-- category: core -->
+<!-- skip: requires-real-agent -->
 
 If the merge produces conflicts, Rover must detect the conflicted files
 and attempt AI-powered resolution. The user must be prompted to review
@@ -559,12 +635,16 @@ the proposed resolutions before they are applied. After conflicts are
 resolved, the merge must continue to completion.
 
 ### Feature: Uncommitted changes detection
+<!-- category: edge -->
+<!-- skip: requires-real-agent -->
 
 If the task worktree has uncommitted changes at the time of merge, Rover
 must detect and handle them appropriately (either by committing them
 first or warning the user).
 
 ### Feature: Hook execution
+<!-- category: side-effect -->
+<!-- skip: requires-real-agent -->
 
 After a successful merge, the `onMerge` hook must be executed if
 configured in `rover.json`.
@@ -587,6 +667,8 @@ The specified task ID must exist. The task must have a valid worktree
 with a branch. A git remote must be configured.
 
 ### Feature: Push with pending changes
+<!-- category: core -->
+<!-- skip: requires-real-agent -->
 
 If the task worktree has uncommitted changes, `rover push` must prompt
 for a commit message (or accept one via `--message`), stage all changes,
@@ -594,21 +676,29 @@ create a commit with optional `Co-Authored-By` attribution, and push
 the branch to the remote.
 
 ### Feature: Push without pending changes
+<!-- category: core -->
+<!-- skip: requires-real-agent -->
 
 If the task worktree has no uncommitted changes, `rover push` must push
 the existing branch to the remote without creating a new commit.
 
 ### Feature: Upstream branch creation
+<!-- category: core -->
+<!-- skip: requires-real-agent -->
 
 If the branch does not exist on the remote, `rover push` must
 automatically create the upstream tracking branch.
 
 ### Feature: GitHub PR link
+<!-- category: side-effect -->
+<!-- skip: requires-real-agent -->
 
 If the remote is a GitHub repository, after a successful push Rover must
 provide a link for creating a pull request.
 
 ### Feature: Hook execution
+<!-- category: side-effect -->
+<!-- skip: requires-real-agent -->
 
 After a successful push, the `onPush` hook must be executed if
 configured in `rover.json`.
@@ -632,6 +722,7 @@ environment.
 The specified task ID must exist and have a valid worktree.
 
 ### Feature: Local shell
+<!-- category: core -->
 
 `rover shell <taskId>` without additional flags must open a shell in the
 local worktree directory. The shell must be the user's default shell
@@ -639,6 +730,7 @@ local worktree directory. The shell must be the user's default shell
 working directory must be set to the task's worktree path.
 
 ### Feature: Container shell
+<!-- category: core -->
 
 The `--container` flag must start a sandbox container and open a shell
 inside it, matching the task's execution environment. This allows
@@ -653,6 +745,7 @@ predefined step sequences that AI agents follow when completing tasks.
 Workflows can be stored at the project level or globally.
 
 ### Feature: Add workflow from URL
+<!-- category: core -->
 
 `rover workflows add <url>` must fetch a workflow definition from an
 HTTP/HTTPS URL and save it. The workflow must be validated as proper
@@ -661,17 +754,20 @@ name. The `--global` flag must save the workflow to the global store
 instead of the project store.
 
 ### Feature: Add workflow from file
+<!-- category: core -->
 
 `rover workflows add <path>` must read a workflow definition from a
 local file path and save it with the same validation and naming options
 as URL sources.
 
 ### Feature: Add workflow from stdin
+<!-- category: core -->
 
 `rover workflows add -` must read a workflow definition from standard
 input.
 
 ### Feature: List workflows
+<!-- category: core -->
 
 `rover workflows list` must display all available workflows from both
 project and global stores. Each entry must show the workflow name,
@@ -679,6 +775,7 @@ description, number of steps, inputs, and source. The `--json` flag must
 produce a JSON array with full workflow details.
 
 ### Feature: Inspect workflow
+<!-- category: core -->
 
 `rover workflows inspect <workflow>` must display detailed information
 about a specific workflow, including its name, description, inputs, and
@@ -686,6 +783,7 @@ a step-by-step diagram of the workflow flow. The `--raw` flag must show
 the raw YAML content of the workflow definition.
 
 ### Feature: Workflow with command step execution
+<!-- category: core -->
 
 Workflows can contain steps of type `command` in addition to the usual
 `agent` steps. A command step runs a shell command directly (without
@@ -717,6 +815,7 @@ store, providing an overview of all registered projects and their task
 counts.
 
 ### Feature: Store information display
+<!-- category: core -->
 
 `rover info` must display the Rover data directory path and list all
 registered projects. Each project entry must show the project ID, name,
@@ -737,6 +836,8 @@ The project must be initialized and have hooks configured in
 `rover.json`. At least one task must exist.
 
 ### Feature: onComplete hook
+<!-- category: side-effect -->
+<!-- skip: requires-real-agent -->
 
 When a task transitions to `COMPLETED` or `FAILED` status and this
 transition is detected by `rover list`, the `onComplete` hook commands
@@ -745,24 +846,32 @@ must be executed. The hook must receive the environment variables
 `ROVER_TASK_STATUS` (set to `completed` or `failed`).
 
 ### Feature: onMerge hook
+<!-- category: side-effect -->
+<!-- skip: requires-real-agent -->
 
 After a successful `rover merge`, the `onMerge` hook commands must be
 executed. The hook must receive `ROVER_TASK_ID`, `ROVER_TASK_BRANCH`,
 and `ROVER_TASK_TITLE` as environment variables.
 
 ### Feature: onPush hook
+<!-- category: side-effect -->
+<!-- skip: requires-real-agent -->
 
 After a successful `rover push`, the `onPush` hook commands must be
 executed. The hook must receive `ROVER_TASK_ID`, `ROVER_TASK_BRANCH`,
 and `ROVER_TASK_TITLE` as environment variables.
 
 ### Feature: Hook failure isolation
+<!-- category: error -->
+<!-- skip: requires-real-agent -->
 
 If a hook command fails (exits with a non-zero status), the failure must
 be logged as a warning but must not block or roll back the operation that
 triggered the hook.
 
 ### Feature: Multiple hook commands
+<!-- category: core -->
+<!-- skip: requires-real-agent -->
 
 Each hook type accepts an array of commands. All commands in the array
 must be executed when the hook is triggered.
@@ -780,12 +889,16 @@ The agent that runs the task supports reporting token usage and/or
 cost control.
 
 ### Feature: Step token and/or cost usage
+<!-- category: core -->
+<!-- skip: requires-real-agent -->
 
 After executing a step of type agent within a workflow, Rover should
 report the token consumption on that step, as well as the cost of that
 step (if available).
 
 ### Feature: Workflow token and/or cost usage
+<!-- category: core -->
+<!-- skip: requires-real-agent -->
 
 After executing a workflow, Rover should report the total usage of
 that workflow (sum of all token usage/cost of all steps within that

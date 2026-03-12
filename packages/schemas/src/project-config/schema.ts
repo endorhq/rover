@@ -5,7 +5,7 @@
 import { z } from 'zod';
 
 // Current schema version
-export const CURRENT_PROJECT_SCHEMA_VERSION = '1.3';
+export const CURRENT_PROJECT_SCHEMA_VERSION = '1.4';
 
 // Filename constant
 export const PROJECT_CONFIG_FILENAME = 'rover.json';
@@ -125,6 +125,32 @@ export const HooksConfigSchema = z.object({
 });
 
 /**
+ * Autopilot operating mode
+ */
+export const AutopilotModeSchema = z.enum(['self-driving', 'assistant']);
+
+/**
+ * Autopilot mode values as an array for CLI choices
+ */
+export const AUTOPILOT_MODE_VALUES = AutopilotModeSchema.options;
+
+/**
+ * Autopilot configuration for autonomous event-driven pipeline
+ */
+export const AutopilotConfigSchema = z.object({
+  /** Operating mode: "self-driving" (default) or "assistant" (dry-run write steps) */
+  mode: AutopilotModeSchema.optional(),
+  /** Filter events by actor: "maintainers" (default), "all", or comma-separated usernames */
+  allowEvents: z.string().optional(),
+  /** Refresh interval in seconds for polling GitHub events */
+  refreshInterval: z.number().optional(),
+  /** GitHub bot account name used by the autopilot for self-detection */
+  botName: z.string().optional(),
+  /** GitHub handles of project maintainers */
+  maintainers: z.array(z.string()).optional(),
+});
+
+/**
  * Complete project configuration schema
  * Defines the structure of a rover.json file
  */
@@ -151,4 +177,6 @@ export const ProjectConfigSchema = z.object({
   hooks: HooksConfigSchema.optional(),
   /** Optional glob patterns for files to exclude from agent context */
   excludePatterns: z.array(z.string()).optional(),
+  /** Optional autopilot configuration */
+  autopilot: AutopilotConfigSchema.optional(),
 });

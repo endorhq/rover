@@ -17,7 +17,7 @@
     llm-agents-pkgs = llm-agents.packages.${system};
   in {
     devShell = pkgs.mkShell {
-      buildInputs = with pkgs; [nodejs_22 pnpm vhs bashInteractive llm-agents-pkgs.qmd];
+      buildInputs = with pkgs; [nodejs_22 pnpm vhs bashInteractive nerd-fonts.fira-code llm-agents-pkgs.qmd];
     };
   });
 }

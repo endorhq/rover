@@ -13,6 +13,9 @@ vi.mock('rover-core', async () => {
   return {
     ...actual,
     getProjectPath: vi.fn().mockImplementation(() => testBaseDir),
+    ProjectConfigManager: {
+      load: vi.fn().mockReturnValue({ autopilot: undefined }),
+    },
   };
 });
 
@@ -173,6 +176,11 @@ describe('autopilot command action', () => {
     const { getDefaultProject } = await import('../../lib/context.js');
     vi.mocked(getDefaultProject).mockReturnValue(fakeProject());
 
+    const { ProjectConfigManager } = await import('rover-core');
+    vi.mocked(ProjectConfigManager.load).mockReturnValue({
+      autopilot: { maintainers: ['alice'] },
+    } as any);
+
     const { ensureTraceDirs } = await import('../../lib/autopilot/helpers.js');
     const { render } = await import('ink');
 
@@ -195,6 +203,11 @@ describe('autopilot command action', () => {
     const { getDefaultProject } = await import('../../lib/context.js');
     vi.mocked(getDefaultProject).mockReturnValue(fakeProject());
 
+    const { ProjectConfigManager } = await import('rover-core');
+    vi.mocked(ProjectConfigManager.load).mockReturnValue({
+      autopilot: { maintainers: ['alice'] },
+    } as any);
+
     const dashboardCmd = (await import('../autopilot/dashboard.js')).default;
 
     await dashboardCmd.action();
@@ -209,6 +222,127 @@ describe('autopilot command action', () => {
         (w: any) => typeof w === 'string' && w.includes('\x1b[?1049l')
       )
     ).toBe(true);
+  });
+
+  it('exits with error when allow-events is "maintainers" but none configured', async () => {
+    const { getDefaultProject } = await import('../../lib/context.js');
+    vi.mocked(getDefaultProject).mockReturnValue(fakeProject());
+
+    const { ProjectConfigManager } = await import('rover-core');
+    vi.mocked(ProjectConfigManager.load).mockReturnValue({
+      autopilot: undefined,
+    } as any);
+
+    const { exitWithError } = await import('../../utils/exit.js');
+
+    const dashboardCmd = (await import('../autopilot/dashboard.js')).default;
+
+    await dashboardCmd.action();
+
+    expect(exitWithError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        error: expect.stringContaining('maintainer'),
+        success: false,
+      })
+    );
+  });
+
+  it('reads autopilot config from rover.json as defaults', async () => {
+    const { getDefaultProject } = await import('../../lib/context.js');
+    vi.mocked(getDefaultProject).mockReturnValue(fakeProject());
+
+    const { ProjectConfigManager } = await import('rover-core');
+    vi.mocked(ProjectConfigManager.load).mockReturnValue({
+      autopilot: {
+        mode: 'assistant',
+        allowEvents: 'all',
+        refreshInterval: 60,
+        botName: 'rover-bot',
+        maintainers: ['alice', 'bob'],
+      },
+    } as any);
+
+    const { render } = await import('ink');
+
+    const dashboardCmd = (await import('../autopilot/dashboard.js')).default;
+
+    await dashboardCmd.action();
+
+    expect(render).toHaveBeenCalledWith(
+      expect.objectContaining({
+        props: expect.objectContaining({
+          mode: 'assistant',
+          allowEvents: 'all',
+          refreshInterval: 60,
+          botName: 'rover-bot',
+          maintainers: ['alice', 'bob'],
+        }),
+      })
+    );
+  });
+
+  it('CLI flags override rover.json config', async () => {
+    const { getDefaultProject } = await import('../../lib/context.js');
+    vi.mocked(getDefaultProject).mockReturnValue(fakeProject());
+
+    const { ProjectConfigManager } = await import('rover-core');
+    vi.mocked(ProjectConfigManager.load).mockReturnValue({
+      autopilot: {
+        mode: 'assistant',
+        allowEvents: 'all',
+        refreshInterval: 60,
+        botName: 'rover-bot',
+        maintainers: ['alice'],
+      },
+    } as any);
+
+    const { render } = await import('ink');
+
+    const dashboardCmd = (await import('../autopilot/dashboard.js')).default;
+
+    await dashboardCmd.action({
+      mode: 'self-driving',
+      allowEvents: 'maintainers',
+      refresh: '10',
+      botName: 'other-bot',
+      maintainers: ['charlie'],
+    });
+
+    expect(render).toHaveBeenCalledWith(
+      expect.objectContaining({
+        props: expect.objectContaining({
+          mode: 'self-driving',
+          allowEvents: 'maintainers',
+          refreshInterval: 10,
+          botName: 'other-bot',
+          maintainers: ['charlie'],
+        }),
+      })
+    );
+  });
+
+  it('--bot flag works as alias for --bot-name', async () => {
+    const { getDefaultProject } = await import('../../lib/context.js');
+    vi.mocked(getDefaultProject).mockReturnValue(fakeProject());
+
+    const { ProjectConfigManager } = await import('rover-core');
+    vi.mocked(ProjectConfigManager.load).mockReturnValue({
+      autopilot: { maintainers: ['alice'] },
+    } as any);
+
+    const { render } = await import('ink');
+
+    const dashboardCmd = (await import('../autopilot/dashboard.js')).default;
+
+    await dashboardCmd.action({ bot: 'my-bot' });
+
+    expect(render).toHaveBeenCalledWith(
+      expect.objectContaining({
+        props: expect.objectContaining({
+          botName: 'my-bot',
+        }),
+      })
+    );
   });
 });
 
@@ -233,7 +367,7 @@ describe('autopilot command registration', () => {
     expect(cmd).toBeDefined();
   });
 
-  it('has --mode and --allow-events options', async () => {
+  it('has --mode, --allow-events, --refresh, --bot-name, --bot, and --maintainers options', async () => {
     const { createProgram } = await import('../../program.js');
     const program = createProgram({ excludeRuntimeHooks: true });
 
@@ -242,5 +376,9 @@ describe('autopilot command registration', () => {
 
     expect(optionFlags).toContain('--mode');
     expect(optionFlags).toContain('--allow-events');
+    expect(optionFlags).toContain('--refresh');
+    expect(optionFlags).toContain('--bot-name');
+    expect(optionFlags).toContain('--bot');
+    expect(optionFlags).toContain('--maintainers');
   });
 });
