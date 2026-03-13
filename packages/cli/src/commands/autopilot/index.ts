@@ -3,9 +3,10 @@
  */
 import type { Command } from 'commander';
 import dashboardCmd from './dashboard.js';
+import inspectCmd from './inspect.js';
 
 export const addAutopilotCommands = (program: Command) => {
-  program
+  const command = program
     .command('autopilot')
     .description(
       'Launch an interactive dashboard to monitor and visualize task progress'
@@ -26,4 +27,12 @@ export const addAutopilotCommands = (program: Command) => {
     .option('--bot <name>', 'GitHub bot account name (alias for --bot-name)')
     .option('--maintainers <names...>', 'GitHub handles of project maintainers')
     .action(dashboardCmd.action);
+
+  command
+    .command('inspect')
+    .description('Inspect an autopilot trace, span, or action by UUID')
+    .argument('<uuid>', 'UUID of the trace, span, or action')
+    .option('--json', 'Output in JSON format')
+    .option('--project-id <id>', 'Override project context by ID')
+    .action(inspectCmd.action);
 };
