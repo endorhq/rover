@@ -2,7 +2,7 @@
 
 This end to end testing description focuses on the `rover` CLI.
 
-## Suite
+## Index
 
 - [Initialization](#initialization)
 - [Worktree Context Detection](#worktree-context-detection)
