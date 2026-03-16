@@ -124,7 +124,7 @@ const resolveMergeConflicts = async (
   conflictedFiles: string[],
   aiAgent: AIAgentTool,
   json: boolean
-): Promise<boolean> => {
+): Promise<{ success: boolean; failureReason?: string }> => {
   let spinner;
 
   if (!isJsonMode()) {
@@ -161,8 +161,9 @@ const resolveMergeConflicts = async (
         );
 
         if (!resolvedContent) {
-          spinner?.error(`Failed to resolve conflicts in ${filePath}`);
-          return false;
+          const reason = `AI returned empty resolution for ${filePath}`;
+          spinner?.error(reason);
+          return { success: false, failureReason: reason };
         }
 
         // Write the resolved content back to the file
@@ -170,20 +171,23 @@ const resolveMergeConflicts = async (
 
         // Stage the resolved file
         if (!git.add(filePath)) {
-          spinner?.error(`Error adding ${filePath} to the git commit`);
-          return false;
+          const reason = `Error adding ${filePath} to the git commit`;
+          spinner?.error(reason);
+          return { success: false, failureReason: reason };
         }
       } catch (error) {
-        spinner?.error(`Error resolving ${filePath}: ${error}`);
-        return false;
+        const reason = `Error resolving ${filePath}: ${error}`;
+        spinner?.error(reason);
+        return { success: false, failureReason: reason };
       }
     }
 
     spinner?.success('All conflicts resolved by AI');
-    return true;
+    return { success: true };
   } catch (error) {
-    spinner?.error('Failed to resolve merge conflicts');
-    return false;
+    const reason = `Failed to resolve merge conflicts: ${error}`;
+    spinner?.error(reason);
+    return { success: false, failureReason: reason };
   }
 };
 
@@ -516,14 +520,14 @@ const mergeCommand = async (taskId: string, options: MergeOptions = {}) => {
             ]);
           }
 
-          const resolutionSuccessful = await resolveMergeConflicts(
+          const resolution = await resolveMergeConflicts(
             git,
             mergeConflicts,
             aiAgent,
             options.json === true
           );
 
-          if (resolutionSuccessful) {
+          if (resolution.success) {
             jsonOutput.conflictsResolved = true;
 
             if (!isJsonMode()) {
@@ -583,7 +587,9 @@ const mergeCommand = async (taskId: string, options: MergeOptions = {}) => {
               return;
             }
           } else {
-            jsonOutput.error = 'AI failed to resolve merge conflicts';
+            jsonOutput.error =
+              resolution.failureReason ||
+              'AI failed to resolve merge conflicts';
             if (!isJsonMode()) {
               console.log(colors.yellow('\n⚠ Merge aborted due to conflicts.'));
               showList(
