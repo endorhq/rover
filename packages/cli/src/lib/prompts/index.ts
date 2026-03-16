@@ -3,7 +3,7 @@ import expandIterationPrompt from './expand-iteration-instructions.md';
 import expandTaskPrompt from './expand-task.md';
 import generateCommitPrompt from './generate-commit-message.md';
 import resolveMergePrompt from './resolve-merge-conflicts.md';
-import extractGithubInputsPrompt from './extract-github-inputs.md';
+import extractIssueInputsPrompt from './extract-issue-inputs.md';
 import type { WorkflowInput } from 'rover-schemas';
 
 enum PROMPT_ID {
@@ -12,7 +12,7 @@ enum PROMPT_ID {
   ExpandTask = 'ExpandTask',
   GenerateCommit = 'GenerateCommit',
   ResolveMerge = 'ResolveMerge',
-  ExtractGithubInputs = 'ExtractGithubInputs',
+  ExtractIssueInputs = 'ExtractIssueInputs',
 }
 
 const PROMPT_CONTENT: Record<PROMPT_ID, string> = {
@@ -20,7 +20,7 @@ const PROMPT_CONTENT: Record<PROMPT_ID, string> = {
   [PROMPT_ID.ExpandTask]: expandTaskPrompt,
   [PROMPT_ID.GenerateCommit]: generateCommitPrompt,
   [PROMPT_ID.ResolveMerge]: resolveMergePrompt,
-  [PROMPT_ID.ExtractGithubInputs]: extractGithubInputsPrompt,
+  [PROMPT_ID.ExtractIssueInputs]: extractIssueInputsPrompt,
 };
 
 /**
@@ -229,17 +229,17 @@ ${summaries.join('\n')}
   }
 
   /**
-   * Generate a prompt for extracting workflow input values from a GitHub issue description.
-   * This method helps parse and extract structured data from unstructured issue text based
-   * on the workflow's required inputs.
+   * Generate a prompt for extracting workflow input values from an issue description
+   * (GitHub or GitLab). This method helps parse and extract structured data from
+   * unstructured issue text based on the workflow's required inputs.
    *
-   * @param issueDescription - The full GitHub issue description text
+   * @param issueDescription - The full issue description text
    * @param inputs - Array of workflow input definitions that need to be extracted
    * @returns A formatted prompt string for AI processing
    *
    * @example
    * const builder = new PromptBuilder();
-   * const prompt = builder.extractGithubInputsPrompt(
+   * const prompt = builder.extractIssueInputsPrompt(
    *   'We need to add authentication to the API with JWT tokens',
    *   [
    *     { name: 'feature', description: 'Feature to implement', type: 'string', required: true },
@@ -247,7 +247,7 @@ ${summaries.join('\n')}
    *   ]
    * );
    */
-  extractGithubInputsPrompt(
+  extractIssueInputsPrompt(
     issueDescription: string,
     inputs: WorkflowInput[]
   ): string {
@@ -259,7 +259,7 @@ ${summaries.join('\n')}
       })
       .join('\n');
 
-    return this.loadTemplate(PROMPT_ID.ExtractGithubInputs, {
+    return this.loadTemplate(PROMPT_ID.ExtractIssueInputs, {
       issueDescription,
       inputsMetadata,
     });

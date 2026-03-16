@@ -109,9 +109,12 @@ export abstract class BaseAgent implements Agent {
   }
 
   async isInstalled(): Promise<boolean> {
-    const result = await launch(this.binary, ['--version']);
-
-    return result.exitCode === 0;
+    try {
+      const result = await launch(this.binary, ['--version']);
+      return result.exitCode === 0;
+    } catch {
+      return false;
+    }
   }
 
   /**

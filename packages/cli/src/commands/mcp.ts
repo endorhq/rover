@@ -99,12 +99,23 @@ const mcpCommand = async () => {
   // Task command schema
   const taskSchema = z.object({
     initPrompt: z.string(),
-    fromGithub: z.string().optional(),
-    includeComments: z.boolean().optional(),
+    fromGithub: z
+      .string()
+      .optional()
+      .describe('Deprecated. Use context with github:issue/<number> instead.'),
+    fromGitlab: z
+      .string()
+      .optional()
+      .describe('Deprecated. Use context with gitlab:issue/<number> instead.'),
+    includeComments: z
+      .boolean()
+      .optional()
+      .describe(
+        'Deprecated. Use contextTrustAllAuthors instead. Requires fromGithub.'
+      ),
     sourceBranch: z.string().optional(),
     targetBranch: z.string().optional(),
     agent: z.nativeEnum(AI_AGENT).optional(),
-    // New context fields
     context: z.array(z.string()).optional(),
     contextTrustAuthors: z.string().optional(),
     contextTrustAllAuthors: z.boolean().optional(),
@@ -114,13 +125,15 @@ const mcpCommand = async () => {
     'create-task',
     {
       title: 'Create task',
-      description: 'Create a new Rover task for AI agents to work on',
+      description:
+        'Create a new Rover task for AI agents to work on. Supports GitHub and GitLab context (e.g., github:issue/15, gitlab:mr/42).',
       inputSchema: taskSchema.shape,
     },
     async args => {
       const parsed = taskSchema.parse(args);
       return runCommand(taskCmd.action, [parsed.initPrompt], {
         fromGithub: parsed.fromGithub,
+        fromGitlab: parsed.fromGitlab,
         includeComments: parsed.includeComments,
         yes: true,
         sourceBranch: parsed.sourceBranch,
@@ -129,7 +142,6 @@ const mcpCommand = async () => {
         context: parsed.context,
         contextTrustAuthors: parsed.contextTrustAuthors,
         contextTrustAllAuthors: parsed.contextTrustAllAuthors,
-        debug: false,
       });
     }
   );
@@ -297,7 +309,7 @@ const mcpCommand = async () => {
     {
       title: 'Iterate task',
       description:
-        'Add a new iteration to an existing task with additional instructions',
+        'Add a new iteration to an existing task with additional instructions. Supports GitHub and GitLab context (e.g., github:issue/15, gitlab:mr/42).',
       inputSchema: iterateSchema.shape,
     },
     async args => {

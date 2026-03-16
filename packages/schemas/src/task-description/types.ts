@@ -16,7 +16,7 @@ export type TaskDescription = z.infer<typeof TaskDescriptionSchema>;
  * Source types for task origin tracking.
  * @deprecated Use iteration context instead. Will be removed in a future version.
  */
-export type SourceType = 'github' | 'manual';
+export type SourceType = 'github' | 'gitlab' | 'manual';
 
 /**
  * Task source - tracks where a task originated from.

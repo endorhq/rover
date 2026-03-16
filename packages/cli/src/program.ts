@@ -279,6 +279,10 @@ export function createProgram(
       '(Deprecated. Use --context) Fetch task description from a GitHub issue number'
     )
     .option(
+      '--from-gitlab <issue>',
+      '(Deprecated. Use --context) Fetch task description from a GitLab issue number'
+    )
+    .option(
       '--include-comments',
       '(Deprecated. Use --context-trust-all-authors) Include issue comments in the task description (requires --from-github)'
     )
@@ -323,7 +327,7 @@ export function createProgram(
     )
     .option(
       '-c, --context <uri>',
-      'Add context from URI (github:issue/15, file:./docs.md, https://...). Can be repeated.',
+      'Add context from URI (github:issue/15, gitlab:mr/42, file:./docs.md, https://...). Can be repeated.',
       (value: string, previous: string[] | undefined) =>
         previous ? [...previous, value] : [value]
     )
@@ -437,7 +441,7 @@ export function createProgram(
     )
     .option(
       '-c, --context <uri>',
-      'Add context from URI (github:issue/15, file:./docs.md, https://...). Can be repeated.',
+      'Add context from URI (github:issue/15, gitlab:mr/42, file:./docs.md, https://...). Can be repeated.',
       (value: string, previous: string[] | undefined) =>
         previous ? [...previous, value] : [value]
     )
@@ -481,9 +485,7 @@ export function createProgram(
 
   program
     .command('push')
-    .description(
-      'Commit and push task changes to remote, with GitHub PR support'
-    )
+    .description('Commit and push task changes to remote')
     .argument('<taskId>', 'Task ID to push')
     .option('-m, --message <message>', 'Commit message')
     .option('--json', 'Output in JSON format')

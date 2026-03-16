@@ -80,7 +80,7 @@ When adding a new agent, you need to implement two different interfaces:
    - `expandTask()`, `expandIterationInstructions()`: Enrich user descriptions
    - `generateCommitMessage()`: Create commit messages
    - `resolveMergeConflicts()`: Fix merge conflicts
-   - `extractGithubInputs()`: Extract workflow inputs
+   - `extractIssueInputs()`: Extract workflow inputs from issue descriptions
    - `getContainerMounts()`, `getEnvironmentVariables()`: Define container configuration
 
 2. **`Agent` interface** (`packages/agent/src/lib/agents`): For completing user tasks in workflows. New agents should extend the `BaseAgent` class.

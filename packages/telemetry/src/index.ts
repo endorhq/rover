@@ -18,6 +18,7 @@ import type {
 export enum NewTaskProvider {
   INPUT = 'user_input',
   GITHUB = 'github',
+  GITLAB = 'gitlab',
 }
 
 // Config is injected at build time via tsdown define
