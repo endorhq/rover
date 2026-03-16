@@ -446,6 +446,48 @@ export class Git {
   }
 
   /**
+   * Rebase the current branch onto the given branch
+   */
+  rebaseBranch(onto: string, options: GitWorktreeOptions = {}): boolean {
+    try {
+      launchSync('git', ['rebase', onto], {
+        cwd: options.worktreePath ?? this.cwd,
+      });
+
+      return true;
+    } catch (_err) {
+      // There was an error with the rebase (likely conflicts)
+      return false;
+    }
+  }
+
+  /**
+   * Abort current rebase
+   */
+  abortRebase(options: GitWorktreeOptions = {}) {
+    try {
+      launchSync('git', ['rebase', '--abort'], {
+        cwd: options.worktreePath ?? this.cwd,
+      });
+    } catch (_err) {
+      // Ignore abort errors
+    }
+  }
+
+  /**
+   * Continue current rebase after conflict resolution
+   */
+  continueRebase(options: GitWorktreeOptions = {}) {
+    launchSync('git', ['rebase', '--continue'], {
+      cwd: options.worktreePath ?? this.cwd,
+      env: {
+        ...process.env,
+        GIT_EDITOR: 'true',
+      },
+    });
+  }
+
+  /**
    * Prune worktrees that are no longer available in
    * the filesystem
    */

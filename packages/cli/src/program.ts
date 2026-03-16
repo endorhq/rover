@@ -22,6 +22,7 @@ import resetCmd from './commands/reset.js';
 import restartCmd from './commands/restart.js';
 import deleteCmd from './commands/delete.js';
 import mergeCmd from './commands/merge.js';
+import rebaseCmd from './commands/rebase.js';
 import colors from 'ansi-colors';
 import pushCmd from './commands/push.js';
 import stopCmd from './commands/stop.js';
@@ -60,6 +61,7 @@ const commands: CommandDefinition[] = [
   restartCmd,
   deleteCmd,
   mergeCmd,
+  rebaseCmd,
   pushCmd,
   stopCmd,
   mcpCmd,
@@ -478,6 +480,19 @@ export function createProgram(
     .option('-f, --force', 'Force merge without confirmation')
     .option('--json', 'Output in JSON format')
     .action(mergeCmd.action);
+
+  program
+    .command('rebase')
+    .description('Rebase the task branch onto the current branch')
+    .argument('<taskId>', 'Task ID to rebase')
+    .option(
+      '--onto <taskId>',
+      'Rebase onto another task branch instead of the current branch'
+    )
+    .option('-f, --force', 'Force rebase without confirmation')
+    .option('--commit', 'Commit uncommitted worktree changes before rebasing')
+    .option('--json', 'Output in JSON format')
+    .action(rebaseCmd.action);
 
   program
     .command('push')
