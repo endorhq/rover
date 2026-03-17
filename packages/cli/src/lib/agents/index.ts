@@ -10,6 +10,8 @@ import { UserSettingsManager, AI_AGENT, launchSync } from 'rover-core';
 import type { WorkflowInput } from 'rover-schemas';
 import { getProjectPath } from '../context.js';
 
+export { ACPAgentBase } from './acp-agent-base.js';
+
 export const findKeychainCredentials = (key: string): string => {
   const result = launchSync(
     'security',

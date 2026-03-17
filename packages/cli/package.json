@@ -67,6 +67,7 @@
     "@types/tmp": "^0.2.6",
     "@vitest/ui": "catalog:build",
     "execa": "catalog:runtime",
+    "@endorhq/agent": "workspace:*",
     "rover-core": "workspace:*",
     "rover-schemas": "workspace:*",
     "rover-telemetry": "workspace:*",

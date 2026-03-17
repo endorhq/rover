@@ -137,6 +137,9 @@ importers:
         specifier: catalog:runtime
         version: 4.1.12
     devDependencies:
+      '@endorhq/agent':
+        specifier: workspace:*
+        version: link:../agent
       '@types/node':
         specifier: catalog:build
         version: 24.2.0

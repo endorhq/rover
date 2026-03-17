@@ -4,7 +4,7 @@
   "version": "0.0.0-dev",
   "description": "Provide a library to define and manage AI agent workflows for Rover",
   "main": "dist/index.mjs",
-  "types": "dist/index.d.mts",
+  "types": "src/index.ts",
   "type": "module",
   "bin": {
     "rover-agent": "dist/cli.mjs"
