@@ -16,7 +16,7 @@ vi.mock('rover-core', async () => {
 });
 
 import { AutopilotStore } from '../../store.js';
-import type { ActionTrace, Span } from '../../types.js';
+import type { TraceItem, Span } from '../../types.js';
 import type { MemoryStore } from '../store.js';
 import {
   buildMemoryEntry,
@@ -41,11 +41,12 @@ function makeSpan(overrides: Partial<Span> = {}): Span {
   };
 }
 
-function makeTrace(overrides: Partial<ActionTrace> = {}): ActionTrace {
+function makeTrace(overrides: Partial<TraceItem> = {}): TraceItem {
   return {
     traceId: 'trace-1',
     summary: 'test trace',
-    steps: [],
+    spanIds: [],
+    nextActions: [],
     createdAt: new Date().toISOString(),
     ...overrides,
   };
@@ -107,6 +108,7 @@ describe('buildMemoryEntry', () => {
   it('extracts files changed from commit spans', () => {
     const commitSpan = makeSpan({
       id: 'commit-span',
+      step: 'commit',
       parent: 'root',
       meta: { filesChanged: ['src/a.ts', 'src/b.ts'] },
     });
@@ -116,15 +118,7 @@ describe('buildMemoryEntry', () => {
     );
 
     const trace = makeTrace({
-      steps: [
-        {
-          originAction: 'a-1',
-          action: 'commit',
-          status: 'completed',
-          timestamp: new Date().toISOString(),
-          spanId: 'commit-span',
-        },
-      ],
+      spanIds: ['commit-span'],
     });
 
     const entry = buildMemoryEntry(trace, [makeSpan()], store);
@@ -135,6 +129,7 @@ describe('buildMemoryEntry', () => {
   it('prefers extra.prUrl over push span URL', () => {
     const pushSpan = makeSpan({
       id: 'push-span',
+      step: 'push',
       parent: 'root',
       meta: { pullRequestUrl: 'https://github.com/org/repo/pull/10' },
     });
@@ -144,15 +139,7 @@ describe('buildMemoryEntry', () => {
     );
 
     const trace = makeTrace({
-      steps: [
-        {
-          originAction: 'a-1',
-          action: 'push',
-          status: 'completed',
-          timestamp: new Date().toISOString(),
-          spanId: 'push-span',
-        },
-      ],
+      spanIds: ['push-span'],
     });
 
     const entry = buildMemoryEntry(trace, [makeSpan()], store, {
@@ -165,6 +152,7 @@ describe('buildMemoryEntry', () => {
   it('falls back to push span URL when no extra.prUrl', () => {
     const pushSpan = makeSpan({
       id: 'push-span',
+      step: 'push',
       parent: 'root',
       meta: { pullRequestUrl: 'https://github.com/org/repo/pull/10' },
     });
@@ -174,15 +162,7 @@ describe('buildMemoryEntry', () => {
     );
 
     const trace = makeTrace({
-      steps: [
-        {
-          originAction: 'a-1',
-          action: 'push',
-          status: 'completed',
-          timestamp: new Date().toISOString(),
-          spanId: 'push-span',
-        },
-      ],
+      spanIds: ['push-span'],
     });
 
     const entry = buildMemoryEntry(trace, [makeSpan()], store);

@@ -198,7 +198,6 @@ export function enqueueAction(
     action: ActionWriter;
     step: string;
     summary: string;
-    meta?: Record<string, unknown>;
   }
 ): void {
   const { action } = opts;
@@ -206,11 +205,7 @@ export function enqueueAction(
   store.addPending({
     traceId: opts.traceId,
     actionId: action.id,
-    spanId: action.data.spanId,
     action: action.data.action,
-    summary: opts.summary,
-    createdAt: new Date().toISOString(),
-    meta: opts.meta ?? action.data.meta,
   });
 
   store.appendLog({

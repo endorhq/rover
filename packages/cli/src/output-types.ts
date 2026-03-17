@@ -321,7 +321,8 @@ export interface AutopilotTraceInspectionOutput
   createdAt: string;
   retryCount: number;
   taskMapping: TaskMapping | null;
-  steps: Record<string, unknown>[];
+  spans: Record<string, unknown>[];
+  pendingActions: Record<string, unknown>[];
 }
 
 export interface AutopilotSpanInspectionOutput extends AutopilotInspectionBase {

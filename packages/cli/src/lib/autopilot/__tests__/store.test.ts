@@ -23,7 +23,7 @@ vi.mock('rover-core', async () => {
 
 import { AutopilotStore } from '../store.js';
 import type {
-  ActionTrace,
+  TraceItem,
   AutopilotLogEntry,
   PendingAction,
   Span,
@@ -34,10 +34,7 @@ function makePending(overrides: Partial<PendingAction> = {}): PendingAction {
   return {
     traceId: 'trace-1',
     actionId: overrides.actionId ?? 'action-1',
-    spanId: 'span-1',
     action: 'plan',
-    summary: 'test action',
-    createdAt: new Date().toISOString(),
     ...overrides,
   };
 }
@@ -509,11 +506,12 @@ describe('AutopilotStore', () => {
     beforeEach(() => store.ensureDir());
 
     it('saves and loads traces round-trip', () => {
-      const traces = new Map<string, ActionTrace>();
+      const traces = new Map<string, TraceItem>();
       traces.set('t-1', {
         traceId: 't-1',
         summary: 'test trace',
-        steps: [],
+        spanIds: [],
+        nextActions: [],
         createdAt: new Date().toISOString(),
       });
 

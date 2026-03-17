@@ -6,7 +6,7 @@ import type {
   AutopilotSpanInspectionOutput,
   AutopilotActionInspectionOutput,
 } from '../../output-types.js';
-import type { ActionTrace, Span, Action, TaskMapping } from './types.js';
+import type { TraceItem, Action, Span, TaskMapping } from './types.js';
 
 export function stepStatusIcon(status: string): string {
   switch (status) {
@@ -71,7 +71,7 @@ function formatMeta(meta: Record<string, unknown>): Record<string, string> {
 // ---------------------------------------------------------------------------
 
 export function displayTrace(
-  trace: ActionTrace,
+  trace: TraceItem,
   store: AutopilotStore,
   taskMappings: Record<string, TaskMapping>
 ): void {
@@ -81,7 +81,8 @@ export function displayTrace(
     'Trace ID': trace.traceId,
     Summary: trace.summary,
     'Created At': new Date(trace.createdAt).toLocaleString(),
-    Steps: trace.steps.length.toString(),
+    Spans: trace.spanIds.length.toString(),
+    'Pending Actions': trace.nextActions.length.toString(),
   };
 
   if (trace.retryCount != null && trace.retryCount > 0) {
@@ -99,46 +100,63 @@ export function displayTrace(
 
   showProperties(traceProps);
 
-  // Show steps
-  showTitle('Steps');
+  // Show spans (completed steps)
+  if (trace.spanIds.length > 0) {
+    showTitle('Spans');
 
-  for (let i = 0; i < trace.steps.length; i++) {
-    const step = trace.steps[i];
-    const icon = stepStatusIcon(step.status);
-    const colorFn = stepStatusColor(step.status);
-    const index = colors.gray(`[${i}]`);
-    const duration =
-      i + 1 < trace.steps.length
-        ? formatDuration(step.timestamp, trace.steps[i + 1].timestamp)
-        : formatDuration(step.timestamp);
-
-    console.log(
-      `  ${index} ${icon} ${colorFn(step.action)} ${colors.gray(`(${step.status})`)} ${colors.gray(`- ${duration}`)}`
-    );
-
-    if (step.reasoning) {
-      console.log(colors.gray(`       ${step.reasoning}`));
+    const spans: Span[] = [];
+    for (const spanId of trace.spanIds) {
+      const span = store.readSpan(spanId);
+      if (span) spans.push(span);
     }
 
-    // Show origin action and span UUIDs on separate lines
-    console.log(
-      colors.gray(`       Origin Action: ${step.originAction ?? '(none)'}`)
-    );
-    if (step.spanId) {
-      console.log(colors.gray(`       Span:   ${step.spanId}`));
+    for (let i = 0; i < spans.length; i++) {
+      const span = spans[i];
+      const status = span.status ?? 'unknown';
+      const icon = stepStatusIcon(status);
+      const colorFn = stepStatusColor(status);
+      const index = colors.gray(`[${i}]`);
+      const duration =
+        i + 1 < spans.length
+          ? formatDuration(span.timestamp, spans[i + 1].timestamp)
+          : formatDuration(span.timestamp);
 
-      // Enrich with span summary if available
-      const span = store.readSpan(step.spanId);
-      if (span?.summary) {
-        console.log(colors.gray(`       Span summary: ${span.summary}`));
+      console.log(
+        `  ${index} ${icon} ${colorFn(span.step)} ${colors.gray(`(${status})`)} ${colors.gray(`- ${duration}`)}`
+      );
+
+      if (span.summary) {
+        console.log(colors.gray(`       ${span.summary}`));
+      }
+
+      console.log(colors.gray(`       Span: ${span.id}`));
+
+      if (span.originAction) {
+        console.log(colors.gray(`       Origin Action: ${span.originAction}`));
+      }
+
+      if (span.newActions.length > 0) {
+        console.log(
+          colors.gray(`       New actions: ${span.newActions.join(', ')}`)
+        );
       }
     }
+  }
 
-    // Show newActions if present
-    if (step.newActions && step.newActions.length > 0) {
-      console.log(
-        colors.gray(`       New actions: ${step.newActions.join(', ')}`)
-      );
+  // Show pending next actions
+  if (trace.nextActions.length > 0) {
+    showTitle('Pending Actions');
+
+    for (const actionId of trace.nextActions) {
+      const action = store.readAction(actionId);
+      if (action) {
+        const icon = stepStatusIcon('pending');
+        console.log(
+          `  ${icon} ${colors.gray(action.action)} ${colors.gray(`(${actionId})`)}`
+        );
+      } else {
+        console.log(`  ${stepStatusIcon('pending')} ${colors.gray(actionId)}`);
+      }
     }
   }
 
@@ -152,7 +170,7 @@ export function displayTrace(
 }
 
 export function buildTraceJson(
-  trace: ActionTrace,
+  trace: TraceItem,
   store: AutopilotStore,
   taskMappings: Record<string, TaskMapping>
 ): AutopilotTraceInspectionOutput {
@@ -160,23 +178,20 @@ export function buildTraceJson(
     m => m.traceId === trace.traceId
   );
 
-  const steps: Record<string, unknown>[] = [];
+  const spans: Record<string, unknown>[] = [];
+  for (const spanId of trace.spanIds) {
+    const span = store.readSpan(spanId);
+    if (span) {
+      spans.push({ ...span });
+    }
+  }
 
-  for (const step of trace.steps) {
-    const enriched: Record<string, unknown> = { ...step };
-    if (step.spanId) {
-      const span = store.readSpan(step.spanId);
-      if (span) {
-        enriched.span = span;
-      }
+  const pendingActions: Record<string, unknown>[] = [];
+  for (const actionId of trace.nextActions) {
+    const action = store.readAction(actionId);
+    if (action) {
+      pendingActions.push({ ...action });
     }
-    if (step.originAction) {
-      const action = store.readAction(step.originAction);
-      if (action) {
-        enriched.actionDetail = action;
-      }
-    }
-    steps.push(enriched);
   }
 
   return {
@@ -187,7 +202,8 @@ export function buildTraceJson(
     createdAt: trace.createdAt,
     retryCount: trace.retryCount ?? 0,
     taskMapping: mapping ?? null,
-    steps,
+    spans,
+    pendingActions,
   };
 }
 

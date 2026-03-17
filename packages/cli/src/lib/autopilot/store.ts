@@ -12,7 +12,7 @@ import { join } from 'node:path';
 import { getProjectPath } from 'rover-core';
 import type {
   Action,
-  ActionTrace,
+  TraceItem,
   AutopilotLogEntry,
   AutopilotState,
   EventCursor,
@@ -305,16 +305,16 @@ export class AutopilotStore {
   }
 
   /** Serialize the in-memory trace map to disk. */
-  saveTraces(traces: Map<string, ActionTrace>): void {
+  saveTraces(traces: Map<string, TraceItem>): void {
     const data = Object.fromEntries(traces);
     writeFileSync(this.tracesPath, JSON.stringify(data), 'utf8');
   }
 
   /** Load traces from disk into a Map. Returns an empty map on failure. */
-  loadTraces(): Map<string, ActionTrace> {
+  loadTraces(): Map<string, TraceItem> {
     try {
       const raw = readFileSync(this.tracesPath, 'utf8');
-      const data = JSON.parse(raw) as Record<string, ActionTrace>;
+      const data = JSON.parse(raw) as Record<string, TraceItem>;
       return new Map(Object.entries(data));
     } catch {
       return new Map();
