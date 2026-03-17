@@ -26,7 +26,9 @@ import {
 import { GitHubFetcher } from '../sources/github.js';
 import { GitLabFetcher } from '../sources/gitlab.js';
 import { ROVER_FOOTER_MARKER } from '../helpers.js';
-import type { RepoInfo } from '../sources/types.js';
+import type { FetchStopCondition, RepoInfo } from '../sources/types.js';
+
+const noStop: FetchStopCondition = { isProcessed: () => false };
 
 const mockLaunch = launch as unknown as ReturnType<typeof vi.fn>;
 
@@ -340,10 +342,11 @@ describe('GitHubFetcher', () => {
 
   beforeEach(() => {
     mockLaunch.mockReset();
+    mockLaunch.mockResolvedValue({ failed: false, stdout: '' } as MockResult);
   });
 
   it('maps IssuesEvent opened to issue.opened', async () => {
-    mockLaunch.mockResolvedValue({
+    mockLaunch.mockResolvedValueOnce({
       failed: false,
       stdout: JSON.stringify({
         id: '1',
@@ -365,7 +368,7 @@ describe('GitHubFetcher', () => {
       }),
     } as MockResult);
 
-    const events = await fetcher.fetchEvents(repo);
+    const events = await fetcher.fetchEvents(repo, noStop);
     expect(events).toHaveLength(1);
     expect(events[0].kind).toBe('issue.opened');
     expect(events[0].actor).toBe('alice');
@@ -373,7 +376,7 @@ describe('GitHubFetcher', () => {
   });
 
   it('maps PullRequestEvent closed+merged to pr.merged', async () => {
-    mockLaunch.mockResolvedValue({
+    mockLaunch.mockResolvedValueOnce({
       failed: false,
       stdout: JSON.stringify({
         id: '2',
@@ -399,14 +402,14 @@ describe('GitHubFetcher', () => {
       }),
     } as MockResult);
 
-    const events = await fetcher.fetchEvents(repo);
+    const events = await fetcher.fetchEvents(repo, noStop);
     expect(events).toHaveLength(1);
     expect(events[0].kind).toBe('pr.merged');
     expect(events[0].summary).toBe('PR merged #10');
   });
 
   it('maps PushEvent to push', async () => {
-    mockLaunch.mockResolvedValue({
+    mockLaunch.mockResolvedValueOnce({
       failed: false,
       stdout: JSON.stringify({
         id: '3',
@@ -425,14 +428,14 @@ describe('GitHubFetcher', () => {
       }),
     } as MockResult);
 
-    const events = await fetcher.fetchEvents(repo);
+    const events = await fetcher.fetchEvents(repo, noStop);
     expect(events).toHaveLength(1);
     expect(events[0].kind).toBe('push');
     expect(events[0].meta.commitCount).toBe(2);
   });
 
   it('filters out IssueCommentEvent with Rover footer marker', async () => {
-    mockLaunch.mockResolvedValue({
+    mockLaunch.mockResolvedValueOnce({
       failed: false,
       stdout: JSON.stringify({
         id: '4',
@@ -451,12 +454,12 @@ describe('GitHubFetcher', () => {
       }),
     } as MockResult);
 
-    const events = await fetcher.fetchEvents(repo);
+    const events = await fetcher.fetchEvents(repo, noStop);
     expect(events).toHaveLength(0);
   });
 
   it('passes through IssueCommentEvent without Rover footer', async () => {
-    mockLaunch.mockResolvedValue({
+    mockLaunch.mockResolvedValueOnce({
       failed: false,
       stdout: JSON.stringify({
         id: '5',
@@ -475,13 +478,13 @@ describe('GitHubFetcher', () => {
       }),
     } as MockResult);
 
-    const events = await fetcher.fetchEvents(repo);
+    const events = await fetcher.fetchEvents(repo, noStop);
     expect(events).toHaveLength(1);
     expect(events[0].kind).toBe('comment.created');
   });
 
   it('filters out PullRequestReviewEvent with Rover footer marker', async () => {
-    mockLaunch.mockResolvedValue({
+    mockLaunch.mockResolvedValueOnce({
       failed: false,
       stdout: JSON.stringify({
         id: '6',
@@ -500,12 +503,12 @@ describe('GitHubFetcher', () => {
       }),
     } as MockResult);
 
-    const events = await fetcher.fetchEvents(repo);
+    const events = await fetcher.fetchEvents(repo, noStop);
     expect(events).toHaveLength(0);
   });
 
   it('drops events with irrelevant actions', async () => {
-    mockLaunch.mockResolvedValue({
+    mockLaunch.mockResolvedValueOnce({
       failed: false,
       stdout: JSON.stringify({
         id: '7',
@@ -516,12 +519,12 @@ describe('GitHubFetcher', () => {
       }),
     } as MockResult);
 
-    const events = await fetcher.fetchEvents(repo);
+    const events = await fetcher.fetchEvents(repo, noStop);
     expect(events).toHaveLength(0);
   });
 
   it('maps PullRequestReviewCommentEvent to review_comment.created', async () => {
-    mockLaunch.mockResolvedValue({
+    mockLaunch.mockResolvedValueOnce({
       failed: false,
       stdout: JSON.stringify({
         id: '8',
@@ -541,13 +544,13 @@ describe('GitHubFetcher', () => {
       }),
     } as MockResult);
 
-    const events = await fetcher.fetchEvents(repo);
+    const events = await fetcher.fetchEvents(repo, noStop);
     expect(events).toHaveLength(1);
     expect(events[0].kind).toBe('review_comment.created');
   });
 
   it('resolves collaborators as actors', async () => {
-    mockLaunch.mockResolvedValue({
+    mockLaunch.mockResolvedValueOnce({
       failed: false,
       stdout: 'alice\nbob\n',
     } as MockResult);
@@ -594,12 +597,12 @@ describe('GitHubFetcher', () => {
         },
       },
     });
-    mockLaunch.mockResolvedValue({
+    mockLaunch.mockResolvedValueOnce({
       failed: false,
       stdout: `${botEvent}\n${humanEvent}`,
     } as MockResult);
 
-    const events = await botFetcher.fetchEvents(repo);
+    const events = await botFetcher.fetchEvents(repo, noStop);
     expect(events).toHaveLength(1);
     expect(events[0].actor).toBe('alice');
   });
@@ -616,6 +619,7 @@ describe('GitLabFetcher', () => {
 
   beforeEach(() => {
     mockLaunch.mockReset();
+    mockLaunch.mockResolvedValue({ failed: false, stdout: '[]' } as MockResult);
   });
 
   it('maps opened Issue to issue.opened with enriched data', async () => {
@@ -649,7 +653,7 @@ describe('GitLabFetcher', () => {
         }),
       } as MockResult);
 
-    const events = await fetcher.fetchEvents(repo);
+    const events = await fetcher.fetchEvents(repo, noStop);
     expect(events).toHaveLength(1);
     expect(events[0].kind).toBe('issue.opened');
     expect(events[0].id).toBe('100');
@@ -696,7 +700,7 @@ describe('GitLabFetcher', () => {
         }),
       } as MockResult);
 
-    const events = await fetcher.fetchEvents(repo);
+    const events = await fetcher.fetchEvents(repo, noStop);
     expect(events).toHaveLength(1);
     expect(events[0].kind).toBe('pr.merged');
     expect(events[0].summary).toBe('MR merged !10');
@@ -741,13 +745,13 @@ describe('GitLabFetcher', () => {
         }),
       } as MockResult);
 
-    const events = await fetcher.fetchEvents(repo);
+    const events = await fetcher.fetchEvents(repo, noStop);
     expect(events).toHaveLength(1);
     expect(events[0].kind).toBe('pr.approved');
   });
 
   it('maps push event with push_data', async () => {
-    mockLaunch.mockResolvedValue({
+    mockLaunch.mockResolvedValueOnce({
       failed: false,
       stdout: JSON.stringify([
         {
@@ -769,7 +773,7 @@ describe('GitLabFetcher', () => {
       ]),
     } as MockResult);
 
-    const events = await fetcher.fetchEvents(repo);
+    const events = await fetcher.fetchEvents(repo, noStop);
     expect(events).toHaveLength(1);
     expect(events[0].kind).toBe('push');
     expect(events[0].meta.commitCount).toBe(3);
@@ -777,7 +781,7 @@ describe('GitLabFetcher', () => {
   });
 
   it('maps DiffNote comment to review_comment.created', async () => {
-    mockLaunch.mockResolvedValue({
+    mockLaunch.mockResolvedValueOnce({
       failed: false,
       stdout: JSON.stringify([
         {
@@ -794,13 +798,13 @@ describe('GitLabFetcher', () => {
       ]),
     } as MockResult);
 
-    const events = await fetcher.fetchEvents(repo);
+    const events = await fetcher.fetchEvents(repo, noStop);
     expect(events).toHaveLength(1);
     expect(events[0].kind).toBe('review_comment.created');
   });
 
   it('maps Note comment to comment.created', async () => {
-    mockLaunch.mockResolvedValue({
+    mockLaunch.mockResolvedValueOnce({
       failed: false,
       stdout: JSON.stringify([
         {
@@ -817,13 +821,13 @@ describe('GitLabFetcher', () => {
       ]),
     } as MockResult);
 
-    const events = await fetcher.fetchEvents(repo);
+    const events = await fetcher.fetchEvents(repo, noStop);
     expect(events).toHaveLength(1);
     expect(events[0].kind).toBe('comment.created');
   });
 
   it('skips system notes', async () => {
-    mockLaunch.mockResolvedValue({
+    mockLaunch.mockResolvedValueOnce({
       failed: false,
       stdout: JSON.stringify([
         {
@@ -839,12 +843,12 @@ describe('GitLabFetcher', () => {
       ]),
     } as MockResult);
 
-    const events = await fetcher.fetchEvents(repo);
+    const events = await fetcher.fetchEvents(repo, noStop);
     expect(events).toHaveLength(0);
   });
 
   it('skips self-generated Rover comments', async () => {
-    mockLaunch.mockResolvedValue({
+    mockLaunch.mockResolvedValueOnce({
       failed: false,
       stdout: JSON.stringify([
         {
@@ -863,12 +867,12 @@ describe('GitLabFetcher', () => {
       ]),
     } as MockResult);
 
-    const events = await fetcher.fetchEvents(repo);
+    const events = await fetcher.fetchEvents(repo, noStop);
     expect(events).toHaveLength(0);
   });
 
   it('resolves members with Developer+ access', async () => {
-    mockLaunch.mockResolvedValue({
+    mockLaunch.mockResolvedValueOnce({
       failed: false,
       stdout: JSON.stringify([
         { username: 'dev', access_level: 30 },
@@ -911,7 +915,7 @@ describe('GitLabFetcher', () => {
         }),
       } as MockResult);
 
-    const events = await fetcher.fetchEvents(repo);
+    const events = await fetcher.fetchEvents(repo, noStop);
     expect(events).toHaveLength(1);
     expect(events[0].kind).toBe('issue.closed');
     expect(events[0].meta.state).toBe('closed');
@@ -947,7 +951,7 @@ describe('GitLabFetcher', () => {
         }),
       } as MockResult);
 
-    const events = await fetcher.fetchEvents(repo);
+    const events = await fetcher.fetchEvents(repo, noStop);
     expect(events).toHaveLength(1);
     expect(events[0].kind).toBe('issue.closed');
   });
@@ -971,7 +975,7 @@ describe('GitLabFetcher', () => {
       } as MockResult)
       .mockResolvedValueOnce({ failed: true, stdout: '' } as MockResult);
 
-    const events = await fetcher.fetchEvents(repo);
+    const events = await fetcher.fetchEvents(repo, noStop);
     expect(events).toHaveLength(1);
     expect(events[0].kind).toBe('pr.opened');
     // Falls back to event-level title
@@ -1020,10 +1024,10 @@ describe('GitLabFetcher', () => {
         }),
       } as MockResult);
 
-    const events = await botFetcher.fetchEvents(repo);
+    const events = await botFetcher.fetchEvents(repo, noStop);
     expect(events).toHaveLength(1);
     expect(events[0].actor).toBe('alice');
-    // launch called twice: events list + 1 issue detail (not 3 which would mean MR detail was also called)
-    expect(mockLaunch).toHaveBeenCalledTimes(2);
+    // launch called 3 times: events page 1 + 1 issue detail + events page 2 (empty, stops pagination)
+    expect(mockLaunch).toHaveBeenCalledTimes(3);
   });
 });

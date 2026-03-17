@@ -1,7 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import type { AutopilotStore } from './store.js';
 import { SpanWriter, ActionWriter, enqueueAction } from './logging.js';
-import type { EventFetcher, NormEvent, RepoInfo } from './sources/types.js';
+import type {
+  EventFetcher,
+  FetchStopCondition,
+  NormEvent,
+  RepoInfo,
+} from './sources/types.js';
 
 export const POLL_INTERVAL_MS = 60_000; // 1 minute
 
@@ -66,20 +71,21 @@ export class EventPoller {
   async poll(): Promise<PollResult> {
     const { fromDate, allowedActors, onNewEvents } = this.opts;
 
-    // 1. Fetch events from the platform (bot actor filtering already applied by fetcher)
-    const raw = await this.fetcher.fetchEvents(this.repo);
+    // 1. Build stop condition for the fetcher (pagination + date + cursor)
+    const stop: FetchStopCondition = {
+      isProcessed: (id: string) => this.store.isEventProcessed(id),
+      fromDate,
+    };
 
-    // 2. Date filter
-    const afterDate = fromDate
-      ? raw.filter(e => new Date(e.createdAt) >= fromDate)
-      : raw;
+    // 2. Fetch events — fetcher handles pagination, date cutoff, bot filtering, and cursor stop
+    const fetched = await this.fetcher.fetchEvents(this.repo, stop);
 
-    // 3. Allowed actor filter
+    // 3. Allowed actor filter (doesn't affect pagination, stays here)
     let filtered = 0;
     let actorFiltered: NormEvent[];
     if (allowedActors) {
       actorFiltered = [];
-      for (const e of afterDate) {
+      for (const e of fetched) {
         if (allowedActors.has(e.actor.toLowerCase())) {
           actorFiltered.push(e);
         } else {
@@ -87,29 +93,24 @@ export class EventPoller {
         }
       }
     } else {
-      actorFiltered = afterDate;
+      actorFiltered = fetched;
     }
 
-    // 4. Dedup against cursor
-    const newEvents = actorFiltered.filter(
-      e => !this.store.isEventProcessed(e.id)
-    );
-
-    // 5. Write spans and actions
-    for (const event of newEvents) {
+    // 4. Write spans and actions
+    for (const event of actorFiltered) {
       writeSpanAndAction(this.projectId, event, this.store);
     }
 
-    // 6. Mark processed
-    if (newEvents.length > 0) {
-      this.store.markEventsProcessed(newEvents.map(e => e.id));
+    // 5. Mark processed
+    if (actorFiltered.length > 0) {
+      this.store.markEventsProcessed(actorFiltered.map(e => e.id));
       onNewEvents?.();
     }
 
     return {
-      fetched: raw.length,
-      relevant: afterDate.length,
-      new: newEvents.length,
+      fetched: fetched.length,
+      relevant: fetched.length,
+      new: actorFiltered.length,
       filtered,
     };
   }

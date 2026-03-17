@@ -9,9 +9,10 @@ vi.mock('rover-core', async () => {
 import { launch } from 'rover-core';
 import { GitHubFetcher } from '../github.js';
 import { ROVER_FOOTER_MARKER } from '../../helpers.js';
-import type { RepoInfo } from '../types.js';
+import type { RepoInfo, FetchStopCondition } from '../types.js';
 
 const mockLaunch = launch as unknown as ReturnType<typeof vi.fn>;
+const noStop: FetchStopCondition = { isProcessed: () => false };
 type MockResult = { failed: boolean; stdout: string };
 
 const repo: RepoInfo = {
@@ -45,7 +46,8 @@ function ghEvent(overrides: Record<string, unknown> = {}) {
 
 function mockStdout(...events: Record<string, unknown>[]) {
   const stdout = events.map(e => JSON.stringify(e)).join('\n');
-  mockLaunch.mockResolvedValue({ failed: false, stdout } as MockResult);
+  mockLaunch.mockResolvedValueOnce({ failed: false, stdout } as MockResult);
+  mockLaunch.mockResolvedValueOnce({ failed: false, stdout: '' } as MockResult);
 }
 
 describe('GitHubFetcher', () => {
@@ -59,11 +61,11 @@ describe('GitHubFetcher', () => {
   describe('fetchEvents() — API interaction', () => {
     it('calls gh api with correct URL and jq filter', async () => {
       mockStdout(ghEvent());
-      await fetcher.fetchEvents(repo);
+      await fetcher.fetchEvents(repo, noStop);
 
       expect(mockLaunch).toHaveBeenCalledWith('gh', [
         'api',
-        'repos/owner/repo/events?per_page=25',
+        'repos/owner/repo/events?per_page=100&page=1',
         '--jq',
         '.[] | {id, type, actor: {login: .actor.login}, created_at, payload}',
       ]);
@@ -75,37 +77,33 @@ describe('GitHubFetcher', () => {
         stdout: '',
       } as MockResult);
 
-      await expect(fetcher.fetchEvents(repo)).rejects.toThrow(
+      await expect(fetcher.fetchEvents(repo, noStop)).rejects.toThrow(
         'gh api call failed'
       );
     });
 
-    it('throws on empty stdout', async () => {
-      mockLaunch.mockResolvedValue({
+    it('returns empty array on empty stdout', async () => {
+      mockLaunch.mockResolvedValueOnce({
         failed: false,
         stdout: '',
       } as MockResult);
-
-      await expect(fetcher.fetchEvents(repo)).rejects.toThrow(
-        'gh api call failed'
-      );
+      const events = await fetcher.fetchEvents(repo, noStop);
+      expect(events).toEqual([]);
     });
 
     it('returns empty array when stdout contains only whitespace', async () => {
-      mockLaunch.mockResolvedValue({
+      mockLaunch.mockResolvedValueOnce({
         failed: false,
         stdout: '  \n\n  \n',
       } as MockResult);
 
-      // stdout is truthy (non-empty string), so no throw.
-      // trim() → "", split → [""], filter(l => l.length > 0) → [], loop runs 0 times.
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toEqual([]);
     });
 
     it('handles a single valid event', async () => {
       mockStdout(ghEvent());
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
     });
   });
@@ -131,7 +129,7 @@ describe('GitHubFetcher', () => {
         })
       );
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
       expect(events[0].kind).toBe('issue.opened');
       expect(events[0].summary).toBe('issue opened #42');
@@ -158,7 +156,7 @@ describe('GitHubFetcher', () => {
         })
       );
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
       expect(events[0].kind).toBe('issue.closed');
       expect(events[0].summary).toBe('issue closed #10');
@@ -182,7 +180,7 @@ describe('GitHubFetcher', () => {
         })
       );
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
       expect(events[0].kind).toBe('issue.reopened');
     });
@@ -195,7 +193,7 @@ describe('GitHubFetcher', () => {
       'pinned',
     ])('drops irrelevant action "%s"', async action => {
       mockStdout(ghEvent({ payload: { action } }));
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(0);
     });
 
@@ -218,7 +216,7 @@ describe('GitHubFetcher', () => {
         })
       );
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       const meta = events[0].meta;
       expect(meta.type).toBe('IssuesEvent');
       expect(meta.action).toBe('opened');
@@ -246,7 +244,7 @@ describe('GitHubFetcher', () => {
         })
       );
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
       expect(events[0].meta.labels).toEqual([]);
       expect(events[0].meta.assignees).toEqual([]);
@@ -289,7 +287,7 @@ describe('GitHubFetcher', () => {
 
     it('maps opened to pr.opened', async () => {
       mockStdout(prEvent('opened'));
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
       expect(events[0].kind).toBe('pr.opened');
       expect(events[0].summary).toBe('PR opened #10');
@@ -297,7 +295,7 @@ describe('GitHubFetcher', () => {
 
     it('maps closed (not merged) to pr.closed', async () => {
       mockStdout(prEvent('closed', { merged: false }));
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
       expect(events[0].kind).toBe('pr.closed');
       expect(events[0].summary).toBe('PR closed #10');
@@ -305,7 +303,7 @@ describe('GitHubFetcher', () => {
 
     it('maps closed + merged:true to pr.merged with summary "merged"', async () => {
       mockStdout(prEvent('closed', { merged: true }));
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
       expect(events[0].kind).toBe('pr.merged');
       expect(events[0].summary).toBe('PR merged #10');
@@ -313,21 +311,21 @@ describe('GitHubFetcher', () => {
 
     it('maps reopened to pr.reopened', async () => {
       mockStdout(prEvent('reopened'));
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
       expect(events[0].kind).toBe('pr.reopened');
     });
 
     it('maps ready_for_review to pr.ready_for_review', async () => {
       mockStdout(prEvent('ready_for_review'));
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
       expect(events[0].kind).toBe('pr.ready_for_review');
     });
 
     it('maps review_requested to pr.review_requested', async () => {
       mockStdout(prEvent('review_requested'));
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
       expect(events[0].kind).toBe('pr.review_requested');
     });
@@ -339,7 +337,7 @@ describe('GitHubFetcher', () => {
       'auto_merge_enabled',
     ])('drops irrelevant PR action "%s"', async action => {
       mockStdout(prEvent(action));
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(0);
     });
 
@@ -364,7 +362,7 @@ describe('GitHubFetcher', () => {
         })
       );
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       const meta = events[0].meta;
       expect(meta.type).toBe('PullRequestEvent');
       expect(meta.action).toBe('opened');
@@ -407,7 +405,7 @@ describe('GitHubFetcher', () => {
         })
       );
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events[0].meta.draft).toBe(false);
     });
 
@@ -433,7 +431,7 @@ describe('GitHubFetcher', () => {
         })
       );
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events[0].meta.merged).toBe(false);
     });
   });
@@ -459,7 +457,7 @@ describe('GitHubFetcher', () => {
 
     it('maps created action to comment.created', async () => {
       mockStdout(commentEvent());
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
       expect(events[0].kind).toBe('comment.created');
       expect(events[0].summary).toBe('new comment on #5');
@@ -470,7 +468,7 @@ describe('GitHubFetcher', () => {
       'deleted',
     ])('drops non-created action "%s"', async action => {
       mockStdout(commentEvent({ action }));
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(0);
     });
 
@@ -485,7 +483,7 @@ describe('GitHubFetcher', () => {
         })
       );
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(0);
     });
 
@@ -500,7 +498,7 @@ describe('GitHubFetcher', () => {
         })
       );
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
       expect(events[0].kind).toBe('comment.created');
     });
@@ -519,13 +517,13 @@ describe('GitHubFetcher', () => {
         })
       );
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events[0].meta.isPullRequest).toBe(true);
     });
 
     it('sets isPullRequest to false when issue has no pull_request field', async () => {
       mockStdout(commentEvent());
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events[0].meta.isPullRequest).toBe(false);
     });
 
@@ -541,7 +539,7 @@ describe('GitHubFetcher', () => {
         })
       );
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events[0].meta.body).toHaveLength(200);
       expect(events[0].meta.body).toBe(longBody.slice(0, 200));
     });
@@ -557,7 +555,7 @@ describe('GitHubFetcher', () => {
         })
       );
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
       expect(events[0].meta.body).toBe('');
     });
@@ -573,14 +571,14 @@ describe('GitHubFetcher', () => {
         })
       );
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
       expect(events[0].meta.body).toBe('');
     });
 
     it('includes correct meta fields', async () => {
       mockStdout(commentEvent());
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       const meta = events[0].meta;
       expect(meta.type).toBe('IssueCommentEvent');
       expect(meta.issueNumber).toBe(5);
@@ -617,7 +615,7 @@ describe('GitHubFetcher', () => {
 
     it('maps submitted to pr.review_submitted', async () => {
       mockStdout(reviewEvent());
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
       expect(events[0].kind).toBe('pr.review_submitted');
       expect(events[0].summary).toBe('new review on PR #15');
@@ -629,7 +627,7 @@ describe('GitHubFetcher', () => {
       'dismissed',
     ])('drops non-submitted action "%s"', async action => {
       mockStdout(reviewEvent({ action }));
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(0);
     });
 
@@ -644,13 +642,13 @@ describe('GitHubFetcher', () => {
         })
       );
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(0);
     });
 
     it('keeps review without ROVER_FOOTER_MARKER', async () => {
       mockStdout(reviewEvent());
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
     });
 
@@ -665,7 +663,7 @@ describe('GitHubFetcher', () => {
         })
       );
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
       expect(events[0].meta.body).toBe('');
     });
@@ -681,14 +679,14 @@ describe('GitHubFetcher', () => {
         })
       );
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
       expect(events[0].meta.body).toBe('');
     });
 
     it('populates review meta fields correctly', async () => {
       mockStdout(reviewEvent());
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       const meta = events[0].meta;
       expect(meta.type).toBe('PullRequestReviewEvent');
       expect(meta.prNumber).toBe(15);
@@ -728,7 +726,7 @@ describe('GitHubFetcher', () => {
 
     it('maps created to review_comment.created', async () => {
       mockStdout(reviewCommentEvent());
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
       expect(events[0].kind).toBe('review_comment.created');
       expect(events[0].summary).toBe('new review comment on PR #20');
@@ -739,7 +737,7 @@ describe('GitHubFetcher', () => {
       'deleted',
     ])('drops non-created action "%s"', async action => {
       mockStdout(reviewCommentEvent({ action }));
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(0);
     });
 
@@ -755,19 +753,19 @@ describe('GitHubFetcher', () => {
         })
       );
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(0);
     });
 
     it('keeps comment without ROVER_FOOTER_MARKER', async () => {
       mockStdout(reviewCommentEvent());
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
     });
 
     it('includes path field in meta', async () => {
       mockStdout(reviewCommentEvent());
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events[0].meta.path).toBe('src/main.ts');
     });
 
@@ -784,13 +782,13 @@ describe('GitHubFetcher', () => {
         })
       );
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events[0].meta.body).toHaveLength(200);
     });
 
     it('populates all review comment meta fields', async () => {
       mockStdout(reviewCommentEvent());
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       const meta = events[0].meta;
       expect(meta.type).toBe('PullRequestReviewCommentEvent');
       expect(meta.prNumber).toBe(20);
@@ -824,7 +822,7 @@ describe('GitHubFetcher', () => {
 
     it('always produces a push event (no action filter)', async () => {
       mockStdout(pushEvent());
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
       expect(events[0].kind).toBe('push');
       expect(events[0].summary).toBe('new push to refs/heads/main');
@@ -832,7 +830,7 @@ describe('GitHubFetcher', () => {
 
     it('maps commit list correctly', async () => {
       mockStdout(pushEvent());
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events[0].meta.commits).toEqual([
         { sha: 'abc123', message: 'feat: add feature' },
         { sha: 'def456', message: 'fix: fix bug' },
@@ -841,7 +839,7 @@ describe('GitHubFetcher', () => {
 
     it('uses size field for commitCount', async () => {
       mockStdout(pushEvent({ size: 5 }));
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events[0].meta.commitCount).toBe(5);
     });
 
@@ -857,13 +855,13 @@ describe('GitHubFetcher', () => {
         })
       );
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events[0].meta.commitCount).toBe(3);
     });
 
     it('handles empty commits array', async () => {
       mockStdout(pushEvent({ size: 0, commits: [] }));
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
       expect(events[0].meta.commitCount).toBe(0);
       expect(events[0].meta.commits).toEqual([]);
@@ -871,7 +869,7 @@ describe('GitHubFetcher', () => {
 
     it('handles missing commits array', async () => {
       mockStdout(pushEvent({ size: undefined, commits: undefined }));
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
       expect(events[0].meta.commitCount).toBe(0);
       expect(events[0].meta.commits).toEqual([]);
@@ -879,7 +877,7 @@ describe('GitHubFetcher', () => {
 
     it('populates push meta fields', async () => {
       mockStdout(pushEvent());
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       const meta = events[0].meta;
       expect(meta.type).toBe('PushEvent');
       expect(meta.ref).toBe('refs/heads/main');
@@ -893,19 +891,19 @@ describe('GitHubFetcher', () => {
   describe('unknown event types', () => {
     it('drops unknown event types', async () => {
       mockStdout(ghEvent({ type: 'WatchEvent' }));
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(0);
     });
 
     it('drops ForkEvent', async () => {
       mockStdout(ghEvent({ type: 'ForkEvent' }));
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(0);
     });
 
     it('drops CreateEvent', async () => {
       mockStdout(ghEvent({ type: 'CreateEvent' }));
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(0);
     });
   });
@@ -916,28 +914,28 @@ describe('GitHubFetcher', () => {
     it('skips bot events before normalization', async () => {
       const botFetcher = new GitHubFetcher({ botName: 'my-bot' });
       mockStdout(ghEvent({ actor: { login: 'my-bot' } }));
-      const events = await botFetcher.fetchEvents(repo);
+      const events = await botFetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(0);
     });
 
     it('filters case-insensitively', async () => {
       const botFetcher = new GitHubFetcher({ botName: 'MY-BOT' });
       mockStdout(ghEvent({ actor: { login: 'my-bot' } }));
-      const events = await botFetcher.fetchEvents(repo);
+      const events = await botFetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(0);
     });
 
     it('filters when actor has different case than botName', async () => {
       const botFetcher = new GitHubFetcher({ botName: 'rover-bot' });
       mockStdout(ghEvent({ actor: { login: 'Rover-Bot' } }));
-      const events = await botFetcher.fetchEvents(repo);
+      const events = await botFetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(0);
     });
 
     it('passes through all events when no botName is set', async () => {
       const noBotFetcher = new GitHubFetcher();
       mockStdout(ghEvent({ actor: { login: 'rover-bot' } }));
-      const events = await noBotFetcher.fetchEvents(repo);
+      const events = await noBotFetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
     });
 
@@ -988,7 +986,7 @@ describe('GitHubFetcher', () => {
       });
 
       mockStdout(botIssue, humanIssue, botPush);
-      const events = await botFetcher.fetchEvents(repo);
+      const events = await botFetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
       expect(events[0].actor).toBe('alice');
       expect(events[0].id).toBe('2');
@@ -1090,7 +1088,7 @@ describe('GitHubFetcher', () => {
       });
 
       mockStdout(issueOpened, issueLabeled, unknownType, push);
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(2);
       expect(events[0].kind).toBe('issue.opened');
       expect(events[1].kind).toBe('push');
@@ -1129,7 +1127,7 @@ describe('GitHubFetcher', () => {
       });
 
       mockStdout(e1, e2);
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(2);
     });
 
@@ -1139,7 +1137,7 @@ describe('GitHubFetcher', () => {
       const e3 = ghEvent({ id: '3', payload: { action: 'labeled' } });
 
       mockStdout(e1, e2, e3);
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(0);
     });
   });

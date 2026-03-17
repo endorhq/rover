@@ -1,6 +1,13 @@
 import { launch } from 'rover-core';
 import { ROVER_FOOTER_MARKER } from '../helpers.js';
-import type { EventFetcher, EventKind, NormEvent, RepoInfo } from './types.js';
+import {
+  MAX_FETCH_PAGES,
+  type EventFetcher,
+  type EventKind,
+  type FetchStopCondition,
+  type NormEvent,
+  type RepoInfo,
+} from './types.js';
 
 /** Raw shape returned by `gh api repos/{owner}/{repo}/events`. */
 interface GHEvent {
@@ -22,17 +29,58 @@ export class GitHubFetcher implements EventFetcher {
     this.botNameLower = opts?.botName?.toLowerCase() ?? null;
   }
 
-  async fetchEvents(repo: RepoInfo): Promise<NormEvent[]> {
+  async fetchEvents(
+    repo: RepoInfo,
+    stop: FetchStopCondition
+  ): Promise<NormEvent[]> {
+    const allEvents: NormEvent[] = [];
+
+    for (let page = 1; page <= MAX_FETCH_PAGES; page++) {
+      const raw = await this.fetchPage(repo, page);
+      if (raw.length === 0) break;
+
+      let hitStop = false;
+      for (const event of raw) {
+        // Bot actor filtering (cheap, skip before normalize)
+        if (
+          this.botNameLower &&
+          event.actor.login.toLowerCase() === this.botNameLower
+        )
+          continue;
+
+        // Stop: already processed → we've caught up
+        if (stop.isProcessed(event.id)) {
+          hitStop = true;
+          break;
+        }
+
+        // Stop: older than the date cutoff
+        if (stop.fromDate && new Date(event.created_at) < stop.fromDate) {
+          hitStop = true;
+          break;
+        }
+
+        const norm = this.normalize(event);
+        if (norm) allEvents.push(norm);
+      }
+
+      if (hitStop) break;
+    }
+
+    return allEvents;
+  }
+
+  /** Fetch a single page of events from the GitHub API. */
+  private async fetchPage(repo: RepoInfo, page: number): Promise<GHEvent[]> {
     const result = await launch('gh', [
       'api',
-      `repos/${repo.fullPath}/events?per_page=25`,
+      `repos/${repo.fullPath}/events?per_page=100&page=${page}`,
       '--jq',
       '.[] | {id, type, actor: {login: .actor.login}, created_at, payload}',
     ]);
 
-    if (result.failed || !result.stdout) {
-      throw new Error('gh api call failed');
-    }
+    if (result.failed) throw new Error('gh api call failed');
+    if (!result.stdout) return [];
 
     const lines = result.stdout
       .toString()
@@ -40,18 +88,7 @@ export class GitHubFetcher implements EventFetcher {
       .split('\n')
       .filter(l => l.length > 0);
 
-    const events: NormEvent[] = [];
-    for (const line of lines) {
-      const raw = JSON.parse(line) as GHEvent;
-      if (
-        this.botNameLower &&
-        raw.actor.login.toLowerCase() === this.botNameLower
-      )
-        continue;
-      const norm = this.normalize(raw);
-      if (norm) events.push(norm);
-    }
-    return events;
+    return lines.map(line => JSON.parse(line) as GHEvent);
   }
 
   async resolveActors(repo: RepoInfo, _mode: 'maintainers'): Promise<string[]> {

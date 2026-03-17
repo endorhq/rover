@@ -20,7 +20,12 @@ import {
   resolveAllowedActors,
 } from '../events.js';
 import { AutopilotStore } from '../store.js';
-import type { EventFetcher, NormEvent, RepoInfo } from '../sources/types.js';
+import type {
+  EventFetcher,
+  FetchStopCondition,
+  NormEvent,
+  RepoInfo,
+} from '../sources/types.js';
 
 const repo: RepoInfo = {
   source: 'github',
@@ -86,7 +91,15 @@ describe('EventPoller', () => {
 
   it('deduplicates events on second poll', async () => {
     const events = [makeEvent({ id: 'e1' })];
-    const fetcher = makeFetcher(events);
+    const fetcher: EventFetcher = {
+      source: 'github',
+      fetchEvents: vi
+        .fn()
+        .mockImplementation((_repo: RepoInfo, stop: FetchStopCondition) => {
+          return Promise.resolve(events.filter(e => !stop.isProcessed(e.id)));
+        }),
+      resolveActors: vi.fn().mockResolvedValue(['alice', 'bob']),
+    };
 
     const poller = new EventPoller('test', store, fetcher, repo);
 
@@ -94,7 +107,7 @@ describe('EventPoller', () => {
     expect(first.new).toBe(1);
 
     const second = await poller.poll();
-    expect(second.fetched).toBe(1);
+    expect(second.fetched).toBe(0);
     expect(second.new).toBe(0);
   });
 
@@ -107,14 +120,27 @@ describe('EventPoller', () => {
       id: 'e-new',
       createdAt: '2024-06-01T00:00:00Z',
     });
-    const fetcher = makeFetcher([old, recent]);
+    const allEvents = [old, recent];
+    const fetcher: EventFetcher = {
+      source: 'github',
+      fetchEvents: vi
+        .fn()
+        .mockImplementation((_repo: RepoInfo, stop: FetchStopCondition) => {
+          const cutoff = stop.fromDate;
+          const filtered = cutoff
+            ? allEvents.filter(e => new Date(e.createdAt) >= cutoff)
+            : allEvents;
+          return Promise.resolve(filtered);
+        }),
+      resolveActors: vi.fn().mockResolvedValue(['alice', 'bob']),
+    };
 
     const poller = new EventPoller('test', store, fetcher, repo, {
       fromDate: new Date('2024-03-01T00:00:00Z'),
     });
 
     const result = await poller.poll();
-    expect(result.fetched).toBe(2);
+    expect(result.fetched).toBe(1);
     expect(result.relevant).toBe(1);
     expect(result.new).toBe(1);
   });

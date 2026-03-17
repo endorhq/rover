@@ -9,10 +9,12 @@ vi.mock('rover-core', async () => {
 import { launch } from 'rover-core';
 import { GitLabFetcher } from '../gitlab.js';
 import { ROVER_FOOTER_MARKER } from '../../helpers.js';
-import type { RepoInfo } from '../types.js';
+import type { FetchStopCondition, RepoInfo } from '../types.js';
 
 const mockLaunch = launch as unknown as ReturnType<typeof vi.fn>;
 type MockResult = { failed: boolean; stdout: string };
+
+const noStop: FetchStopCondition = { isProcessed: () => false };
 
 const repo: RepoInfo = {
   source: 'gitlab',
@@ -95,6 +97,9 @@ describe('GitLabFetcher', () => {
 
   beforeEach(() => {
     mockLaunch.mockReset();
+    // Default fallback: any unmocked call (e.g. page-2 pagination) returns empty.
+    // Individual mockResolvedValueOnce calls take priority over this default.
+    mockLaunch.mockResolvedValue({ failed: false, stdout: '[]' } as MockResult);
     fetcher = new GitLabFetcher('/tmp/test');
   });
 
@@ -104,11 +109,11 @@ describe('GitLabFetcher', () => {
     it('calls glab api with correct URL and cwd', async () => {
       mockEventsList([]);
 
-      await fetcher.fetchEvents(repo);
+      await fetcher.fetchEvents(repo, noStop);
 
       expect(mockLaunch).toHaveBeenCalledWith(
         'glab',
-        ['api', 'projects/:id/events?per_page=25'],
+        ['api', 'projects/:id/events?per_page=100&page=1'],
         { cwd: '/tmp/test' }
       );
     });
@@ -119,26 +124,26 @@ describe('GitLabFetcher', () => {
         stdout: '',
       } as MockResult);
 
-      await expect(fetcher.fetchEvents(repo)).rejects.toThrow(
+      await expect(fetcher.fetchEvents(repo, noStop)).rejects.toThrow(
         'glab api call failed'
       );
     });
 
-    it('throws on empty stdout', async () => {
+    it('returns empty array on empty stdout', async () => {
+      mockLaunch.mockReset();
       mockLaunch.mockResolvedValueOnce({
         failed: false,
         stdout: '',
       } as MockResult);
 
-      await expect(fetcher.fetchEvents(repo)).rejects.toThrow(
-        'glab api call failed'
-      );
+      const events = await fetcher.fetchEvents(repo, noStop);
+      expect(events).toEqual([]);
     });
 
     it('returns empty array for empty event list', async () => {
       mockEventsList([]);
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toEqual([]);
     });
   });
@@ -150,7 +155,7 @@ describe('GitLabFetcher', () => {
       mockEventsList([glEvent()]);
       mockDetailResponse(issueDetail());
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
       expect(events[0]).toMatchObject({
         id: '1',
@@ -166,7 +171,7 @@ describe('GitLabFetcher', () => {
       mockEventsList([glEvent({ id: 2, action_name: 'closed' })]);
       mockDetailResponse(issueDetail({ state: 'closed' }));
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
       expect(events[0].kind).toBe('issue.closed');
     });
@@ -175,7 +180,7 @@ describe('GitLabFetcher', () => {
       mockEventsList([glEvent({ id: 3, action_name: 'reopened' })]);
       mockDetailResponse(issueDetail({ state: 'opened' }));
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
       expect(events[0].kind).toBe('issue.reopened');
     });
@@ -183,10 +188,10 @@ describe('GitLabFetcher', () => {
     it('drops irrelevant actions like updated', async () => {
       mockEventsList([glEvent({ action_name: 'updated' })]);
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(0);
-      // No detail fetch should be made for a dropped event
-      expect(mockLaunch).toHaveBeenCalledTimes(1);
+      // No detail fetch should be made for a dropped event (page 1 + page 2 empty)
+      expect(mockLaunch).toHaveBeenCalledTimes(2);
     });
 
     it('enriches meta with title, body, state, author, labels, assignees, url', async () => {
@@ -203,7 +208,7 @@ describe('GitLabFetcher', () => {
         })
       );
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       const meta = events[0].meta;
       expect(meta.title).toBe('Real title');
       expect(meta.body).toBe('Body content here');
@@ -222,7 +227,7 @@ describe('GitLabFetcher', () => {
       mockEventsList([glEvent()]);
       mockDetailResponse(issueDetail({ description: longBody }));
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect((events[0].meta.body as string).length).toBe(500);
     });
 
@@ -230,7 +235,7 @@ describe('GitLabFetcher', () => {
       mockEventsList([glEvent({ target_title: 'Fallback title from event' })]);
       mockDetailFailure();
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
       expect(events[0].meta.title).toBe('Fallback title from event');
       expect(events[0].meta.body).toBe('');
@@ -242,11 +247,11 @@ describe('GitLabFetcher', () => {
       mockEventsList([glEvent({ target_id: 999, target_iid: 42 })]);
       mockDetailResponse(issueDetail());
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events[0].summary).toBe('issue opened #42');
       expect(events[0].meta.issueIid).toBe(42);
-      // Verify detail API was called with the iid
-      expect(mockLaunch).toHaveBeenCalledTimes(2);
+      // Verify detail API was called with the iid (page 1 + detail + page 2 empty)
+      expect(mockLaunch).toHaveBeenCalledTimes(3);
       expect(mockLaunch).toHaveBeenNthCalledWith(
         2,
         'glab',
@@ -259,7 +264,7 @@ describe('GitLabFetcher', () => {
       mockEventsList([glEvent({ target_id: 55, target_iid: undefined })]);
       mockDetailResponse(issueDetail());
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events[0].summary).toBe('issue opened #55');
       expect(events[0].meta.issueIid).toBe(55);
     });
@@ -268,7 +273,7 @@ describe('GitLabFetcher', () => {
       mockEventsList([glEvent({ target_id: null, target_iid: undefined })]);
       mockDetailResponse(issueDetail());
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events[0].summary).toBe('issue opened #0');
       expect(events[0].meta.issueIid).toBe(0);
     });
@@ -290,7 +295,7 @@ describe('GitLabFetcher', () => {
         issueDetail({ state: 'closed', title: 'Work item task' })
       );
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
       expect(events[0].kind).toBe('issue.closed');
       expect(events[0].meta.targetType).toBe('WorkItem');
@@ -307,7 +312,7 @@ describe('GitLabFetcher', () => {
       ]);
       mockDetailResponse(issueDetail());
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
       expect(events[0].kind).toBe('issue.opened');
     });
@@ -322,8 +327,8 @@ describe('GitLabFetcher', () => {
       ]);
       mockDetailResponse(issueDetail({ state: 'opened' }));
 
-      await fetcher.fetchEvents(repo);
-      expect(mockLaunch).toHaveBeenCalledTimes(2);
+      await fetcher.fetchEvents(repo, noStop);
+      expect(mockLaunch).toHaveBeenCalledTimes(3);
       expect(mockLaunch).toHaveBeenNthCalledWith(
         2,
         'glab',
@@ -351,7 +356,7 @@ describe('GitLabFetcher', () => {
       mockEventsList([mrEvent()]);
       mockDetailResponse(mrDetail());
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
       expect(events[0]).toMatchObject({
         id: '20',
@@ -365,7 +370,7 @@ describe('GitLabFetcher', () => {
       mockEventsList([mrEvent({ id: 21, action_name: 'accepted' })]);
       mockDetailResponse(mrDetail({ state: 'merged' }));
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
       expect(events[0].kind).toBe('pr.merged');
       expect(events[0].summary).toBe('MR merged !10');
@@ -375,7 +380,7 @@ describe('GitLabFetcher', () => {
       mockEventsList([mrEvent({ id: 22, action_name: 'approved' })]);
       mockDetailResponse(mrDetail());
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
       expect(events[0].kind).toBe('pr.approved');
       expect(events[0].summary).toBe('MR approved !10');
@@ -385,7 +390,7 @@ describe('GitLabFetcher', () => {
       mockEventsList([mrEvent({ id: 23, action_name: 'closed' })]);
       mockDetailResponse(mrDetail({ state: 'closed' }));
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
       expect(events[0].kind).toBe('pr.closed');
       expect(events[0].summary).toBe('MR closed !10');
@@ -394,9 +399,9 @@ describe('GitLabFetcher', () => {
     it('drops irrelevant actions like updated', async () => {
       mockEventsList([mrEvent({ action_name: 'updated' })]);
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(0);
-      expect(mockLaunch).toHaveBeenCalledTimes(1);
+      expect(mockLaunch).toHaveBeenCalledTimes(2);
     });
 
     it('enriches meta with all MR-specific fields', async () => {
@@ -417,7 +422,7 @@ describe('GitLabFetcher', () => {
         })
       );
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       const meta = events[0].meta;
       expect(meta.title).toBe('Enriched MR');
       expect(meta.body).toBe('Detailed description');
@@ -442,7 +447,7 @@ describe('GitLabFetcher', () => {
       mockEventsList([mrEvent({ action_name: 'accepted' })]);
       mockDetailResponse(mrDetail({ state: 'merged' }));
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events[0].meta.merged).toBe(true);
     });
 
@@ -450,7 +455,7 @@ describe('GitLabFetcher', () => {
       mockEventsList([mrEvent()]);
       mockDetailResponse(mrDetail({ state: 'opened' }));
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events[0].meta.merged).toBe(false);
     });
 
@@ -459,7 +464,7 @@ describe('GitLabFetcher', () => {
       mockEventsList([mrEvent()]);
       mockDetailResponse(mrDetail({ description: longDesc }));
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect((events[0].meta.body as string).length).toBe(500);
     });
 
@@ -467,7 +472,7 @@ describe('GitLabFetcher', () => {
       mockEventsList([mrEvent({ target_title: 'Fallback MR' })]);
       mockDetailFailure();
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
       expect(events[0].kind).toBe('pr.opened');
       expect(events[0].meta.title).toBe('Fallback MR');
@@ -482,7 +487,7 @@ describe('GitLabFetcher', () => {
       mockEventsList([mrEvent({ target_iid: 77 })]);
       mockDetailResponse(mrDetail());
 
-      await fetcher.fetchEvents(repo);
+      await fetcher.fetchEvents(repo, noStop);
       expect(mockLaunch).toHaveBeenNthCalledWith(
         2,
         'glab',
@@ -510,18 +515,18 @@ describe('GitLabFetcher', () => {
     it('maps Note with "commented on" to comment.created', async () => {
       mockEventsList([noteEvent()]);
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
       expect(events[0].kind).toBe('comment.created');
       expect(events[0].summary).toBe('new comment on #15');
-      // No detail fetch for comments
-      expect(mockLaunch).toHaveBeenCalledTimes(1);
+      // No detail fetch for comments (page 1 + page 2 empty)
+      expect(mockLaunch).toHaveBeenCalledTimes(2);
     });
 
     it('maps DiscussionNote with "commented on" to comment.created', async () => {
       mockEventsList([noteEvent({ id: 31, target_type: 'DiscussionNote' })]);
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
       expect(events[0].kind).toBe('comment.created');
     });
@@ -529,7 +534,7 @@ describe('GitLabFetcher', () => {
     it('drops Note events whose action does not start with "commented on"', async () => {
       mockEventsList([noteEvent({ action_name: 'updated' })]);
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(0);
     });
 
@@ -538,7 +543,7 @@ describe('GitLabFetcher', () => {
         noteEvent({ note: { body: 'added ~bug label', system: true } }),
       ]);
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(0);
     });
 
@@ -552,7 +557,7 @@ describe('GitLabFetcher', () => {
         }),
       ]);
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(0);
     });
 
@@ -560,14 +565,14 @@ describe('GitLabFetcher', () => {
       const longBody = 'z'.repeat(400);
       mockEventsList([noteEvent({ note: { body: longBody, system: false } })]);
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect((events[0].meta.body as string).length).toBe(200);
     });
 
     it('handles null/missing note body gracefully', async () => {
       mockEventsList([noteEvent({ note: { system: false } })]);
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
       expect(events[0].meta.body).toBe('');
     });
@@ -575,7 +580,7 @@ describe('GitLabFetcher', () => {
     it('handles missing note object gracefully', async () => {
       mockEventsList([noteEvent({ note: undefined })]);
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
       expect(events[0].meta.body).toBe('');
     });
@@ -583,14 +588,14 @@ describe('GitLabFetcher', () => {
     it('includes noteId in meta from target_id', async () => {
       mockEventsList([noteEvent({ target_id: 555 })]);
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events[0].meta.noteId).toBe(555);
     });
 
     it('uses target_id when target_iid is missing for summary', async () => {
       mockEventsList([noteEvent({ target_id: 77, target_iid: undefined })]);
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events[0].summary).toBe('new comment on #77');
     });
   });
@@ -613,7 +618,7 @@ describe('GitLabFetcher', () => {
     it('maps DiffNote with "commented on" to review_comment.created', async () => {
       mockEventsList([diffNoteEvent()]);
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
       expect(events[0].kind).toBe('review_comment.created');
       expect(events[0].summary).toBe('new comment on #20');
@@ -624,7 +629,7 @@ describe('GitLabFetcher', () => {
         diffNoteEvent({ note: { body: 'system change', system: true } }),
       ]);
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(0);
     });
 
@@ -638,14 +643,14 @@ describe('GitLabFetcher', () => {
         }),
       ]);
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(0);
     });
 
     it('drops DiffNote when action is not "commented on"', async () => {
       mockEventsList([diffNoteEvent({ action_name: 'created' })]);
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(0);
     });
   });
@@ -673,18 +678,18 @@ describe('GitLabFetcher', () => {
     it('maps "pushed to" to push kind', async () => {
       mockEventsList([pushEvent()]);
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
       expect(events[0].kind).toBe('push');
       expect(events[0].summary).toBe('new push to main');
-      // No detail fetch for push events
-      expect(mockLaunch).toHaveBeenCalledTimes(1);
+      // No detail fetch for push events (page 1 + page 2 empty)
+      expect(mockLaunch).toHaveBeenCalledTimes(2);
     });
 
     it('maps "pushed new" to push kind', async () => {
       mockEventsList([pushEvent({ id: 51, action_name: 'pushed new' })]);
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
       expect(events[0].kind).toBe('push');
     });
@@ -692,7 +697,7 @@ describe('GitLabFetcher', () => {
     it('maps push_data fields correctly', async () => {
       mockEventsList([pushEvent()]);
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       const meta = events[0].meta;
       expect(meta.ref).toBe('main');
       expect(meta.refType).toBe('branch');
@@ -706,7 +711,7 @@ describe('GitLabFetcher', () => {
     it('handles missing push_data — ref shows "unknown", empty commits', async () => {
       mockEventsList([pushEvent({ push_data: undefined })]);
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
       expect(events[0].summary).toBe('new push to unknown');
       expect(events[0].meta.ref).toBeUndefined();
@@ -727,7 +732,7 @@ describe('GitLabFetcher', () => {
         }),
       ]);
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       // Empty string is falsy, so commits should be empty
       expect(events[0].meta.commits).toEqual([]);
     });
@@ -745,7 +750,7 @@ describe('GitLabFetcher', () => {
         }),
       ]);
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events[0].meta.commits).toEqual([
         { sha: 'sha999', message: 'fix: resolve issue' },
       ]);
@@ -763,7 +768,7 @@ describe('GitLabFetcher', () => {
         }),
       ]);
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(0);
     });
 
@@ -775,7 +780,7 @@ describe('GitLabFetcher', () => {
         }),
       ]);
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(0);
     });
   });
@@ -798,10 +803,10 @@ describe('GitLabFetcher', () => {
         }),
       ]);
 
-      const events = await botFetcher.fetchEvents(repo);
+      const events = await botFetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(0);
-      // Only the events list call — no detail fetch for the bot's MR
-      expect(mockLaunch).toHaveBeenCalledTimes(1);
+      // Only the events list call — no detail fetch for the bot's MR (+ page 2 empty)
+      expect(mockLaunch).toHaveBeenCalledTimes(2);
     });
 
     it('matches bot name case-insensitively', async () => {
@@ -816,7 +821,7 @@ describe('GitLabFetcher', () => {
         }),
       ]);
 
-      const events = await botFetcher.fetchEvents(repo);
+      const events = await botFetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(0);
     });
 
@@ -831,7 +836,7 @@ describe('GitLabFetcher', () => {
       ]);
       mockDetailResponse(issueDetail());
 
-      const events = await noBotFetcher.fetchEvents(repo);
+      const events = await noBotFetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
     });
 
@@ -859,11 +864,11 @@ describe('GitLabFetcher', () => {
       // Only one detail call for the human event
       mockDetailResponse(issueDetail({ title: 'Human issue' }));
 
-      const events = await botFetcher.fetchEvents(repo);
+      const events = await botFetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
       expect(events[0].actor).toBe('human');
-      // events list + 1 detail = 2 calls total (not 3)
-      expect(mockLaunch).toHaveBeenCalledTimes(2);
+      // events list + 1 detail + page 2 empty = 3 calls total
+      expect(mockLaunch).toHaveBeenCalledTimes(3);
     });
   });
 
@@ -941,7 +946,7 @@ describe('GitLabFetcher', () => {
       mockEventsList([glEvent({ id: 12345 })]);
       mockDetailResponse(issueDetail());
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events[0].id).toBe('12345');
       expect(typeof events[0].id).toBe('string');
     });
@@ -994,14 +999,14 @@ describe('GitLabFetcher', () => {
       // Detail for MR (id 81)
       mockDetailResponse(mrDetail({ title: 'MR 2' }));
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(4);
       expect(events[0].kind).toBe('issue.opened');
       expect(events[1].kind).toBe('pr.opened');
       expect(events[2].kind).toBe('comment.created');
       expect(events[3].kind).toBe('push');
-      // 1 events list + 2 detail calls (issue + MR)
-      expect(mockLaunch).toHaveBeenCalledTimes(3);
+      // 1 events list + 2 detail calls (issue + MR) + page 2 empty
+      expect(mockLaunch).toHaveBeenCalledTimes(4);
     });
 
     it('drops unmappable events while keeping valid ones', async () => {
@@ -1026,11 +1031,11 @@ describe('GitLabFetcher', () => {
         }),
       ]);
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
       expect(events[0].kind).toBe('comment.created');
-      // Only the events list call — no detail fetches since Issue was dropped and MR was dropped
-      expect(mockLaunch).toHaveBeenCalledTimes(1);
+      // Only the events list call + page 2 empty — no detail fetches since Issue was dropped and MR was dropped
+      expect(mockLaunch).toHaveBeenCalledTimes(2);
     });
 
     it('each issue/MR triggers its own detail fetch', async () => {
@@ -1052,10 +1057,10 @@ describe('GitLabFetcher', () => {
       mockDetailResponse(issueDetail({ title: 'First' }));
       mockDetailResponse(issueDetail({ title: 'Second', state: 'closed' }));
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(2);
-      // 1 events list + 2 detail calls
-      expect(mockLaunch).toHaveBeenCalledTimes(3);
+      // 1 events list + 2 detail calls + page 2 empty
+      expect(mockLaunch).toHaveBeenCalledTimes(4);
       expect(mockLaunch).toHaveBeenNthCalledWith(
         2,
         'glab',
@@ -1094,7 +1099,7 @@ describe('GitLabFetcher', () => {
         }),
       ]);
 
-      const events = await fetcher.fetchEvents(repo);
+      const events = await fetcher.fetchEvents(repo, noStop);
       expect(events[0].source).toBe('gitlab');
     });
   });
@@ -1106,7 +1111,7 @@ describe('GitLabFetcher', () => {
       const customFetcher = new GitLabFetcher('/custom/path');
       mockEventsList([]);
 
-      await customFetcher.fetchEvents(repo);
+      await customFetcher.fetchEvents(repo, noStop);
 
       expect(mockLaunch).toHaveBeenCalledWith('glab', expect.any(Array), {
         cwd: '/custom/path',
@@ -1118,7 +1123,7 @@ describe('GitLabFetcher', () => {
       mockEventsList([glEvent({ author: { username: 'anyone' } })]);
       mockDetailResponse(issueDetail());
 
-      const events = await noOptsFetcher.fetchEvents(repo);
+      const events = await noOptsFetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
     });
 
@@ -1127,7 +1132,7 @@ describe('GitLabFetcher', () => {
       mockEventsList([glEvent({ author: { username: 'anyone' } })]);
       mockDetailResponse(issueDetail());
 
-      const events = await emptyOptsFetcher.fetchEvents(repo);
+      const events = await emptyOptsFetcher.fetchEvents(repo, noStop);
       expect(events).toHaveLength(1);
     });
   });

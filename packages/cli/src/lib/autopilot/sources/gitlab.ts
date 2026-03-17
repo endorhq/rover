@@ -1,6 +1,13 @@
 import { launch } from 'rover-core';
 import { ROVER_FOOTER_MARKER } from '../helpers.js';
-import type { EventFetcher, EventKind, NormEvent, RepoInfo } from './types.js';
+import {
+  MAX_FETCH_PAGES,
+  type EventFetcher,
+  type EventKind,
+  type FetchStopCondition,
+  type NormEvent,
+  type RepoInfo,
+} from './types.js';
 
 /** Raw shape returned by `glab api projects/:id/events`. */
 interface GLEvent {
@@ -34,30 +41,62 @@ export class GitLabFetcher implements EventFetcher {
     this.botNameLower = opts?.botName?.toLowerCase() ?? null;
   }
 
-  async fetchEvents(_repo: RepoInfo): Promise<NormEvent[]> {
+  async fetchEvents(
+    _repo: RepoInfo,
+    stop: FetchStopCondition
+  ): Promise<NormEvent[]> {
+    const allEvents: NormEvent[] = [];
+
+    for (let page = 1; page <= MAX_FETCH_PAGES; page++) {
+      const raw = await this.fetchPage(page);
+      if (raw.length === 0) break;
+
+      let hitStop = false;
+      for (const entry of raw) {
+        // Bot actor filtering (cheap, skip before normalize)
+        if (
+          this.botNameLower &&
+          entry.author.username.toLowerCase() === this.botNameLower
+        )
+          continue;
+
+        const id = entry.id.toString();
+
+        // Stop: already processed → we've caught up
+        if (stop.isProcessed(id)) {
+          hitStop = true;
+          break;
+        }
+
+        // Stop: older than the date cutoff
+        if (stop.fromDate && new Date(entry.created_at) < stop.fromDate) {
+          hitStop = true;
+          break;
+        }
+
+        const norm = await this.normalize(entry);
+        if (norm) allEvents.push(norm);
+      }
+
+      if (hitStop) break;
+    }
+
+    return allEvents;
+  }
+
+  /** Fetch a single page of events from the GitLab API. */
+  private async fetchPage(page: number): Promise<GLEvent[]> {
     const result = await launch(
       'glab',
-      ['api', 'projects/:id/events?per_page=25'],
+      ['api', `projects/:id/events?per_page=100&page=${page}`],
       { cwd: this.cwd }
     );
 
-    if (result.failed || !result.stdout) {
-      throw new Error('glab api call failed');
-    }
+    if (result.failed) throw new Error('glab api call failed');
+    if (!result.stdout) return [];
 
-    const raw = JSON.parse(result.stdout.toString()) as GLEvent[];
-
-    const events: NormEvent[] = [];
-    for (const entry of raw) {
-      if (
-        this.botNameLower &&
-        entry.author.username.toLowerCase() === this.botNameLower
-      )
-        continue;
-      const norm = await this.normalize(entry);
-      if (norm) events.push(norm);
-    }
-    return events;
+    const parsed = JSON.parse(result.stdout.toString());
+    return Array.isArray(parsed) ? parsed : [];
   }
 
   async resolveActors(
