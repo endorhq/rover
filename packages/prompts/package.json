@@ -1,0 +1,33 @@
+{
+  "name": "rover-prompts",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Shared prompt templates and builder for Rover AI agents",
+  "main": "dist/index.mjs",
+  "types": "src/index.ts",
+  "type": "module",
+  "files": ["LICENSE.md", "dist/*"],
+  "scripts": {
+    "build": "tsdown --env.TSUP_DEV=false --config-loader unrun src/index.ts",
+    "build-dev": "TSUP_DEV=true tsdown --env.TSUP_DEV=true --config-loader unrun src/index.ts",
+    "dev": "TSUP_DEV=true tsdown --env.TSUP_DEV=true --watch src/ src/index.ts",
+    "start": "node dist/index.js",
+    "clean": "rm -rf dist",
+    "check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage"
+  },
+  "author": "The Endor team",
+  "dependencies": {
+    "rover-schemas": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:build",
+    "@vitest/ui": "catalog:build",
+    "tsdown": "catalog:build",
+    "typescript": "catalog:build",
+    "vitest": "catalog:build"
+  }
+}

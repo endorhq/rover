@@ -4,10 +4,7 @@
 
 export { ACPProvider, type ACPProviderConfig } from './lib/acp-provider.js';
 export { acpInvoke, type ACPInvokeConfig } from './lib/acp-invoke.js';
-export {
-  PromptBuilder,
-  type IPromptTask,
-} from './lib/prompts/index.js';
+export { PromptBuilder, type IPromptTask } from 'rover-prompts';
 export {
   parseJsonResponse,
   JsonParseError,

@@ -36,6 +36,7 @@
     "@types/node": "catalog:build",
     "@vitest/ui": "catalog:build",
     "rover-core": "workspace:*",
+    "rover-prompts": "workspace:*",
     "rover-schemas": "workspace:*",
     "tsdown": "catalog:build",
     "typescript": "catalog:build",

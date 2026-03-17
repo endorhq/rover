@@ -12,7 +12,7 @@
 import type { WorkflowInput } from 'rover-schemas';
 import { acpInvoke } from './acp-invoke.js';
 import { parseJsonResponse } from './json-parser.js';
-import { PromptBuilder, type IPromptTask } from './prompts/index.js';
+import { PromptBuilder, type IPromptTask } from 'rover-prompts';
 
 export interface ACPProviderConfig {
   /** Agent name (claude, codex, cursor, gemini, qwen, copilot, opencode). */
