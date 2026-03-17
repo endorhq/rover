@@ -9,6 +9,7 @@ import type {
   TaskStatus as SchemaTaskStatus,
   Workflow,
 } from 'rover-schemas';
+import type { Span, TaskMapping } from './lib/autopilot/types.js';
 
 // ---------------------------------------------------------------------------
 // Base types (used by exit helpers and extended by command outputs)
@@ -298,3 +299,59 @@ export interface InspectWorkflowOutput extends CLIJsonOutput {
   workflow?: Workflow;
   source?: string;
 }
+
+// ---------------------------------------------------------------------------
+// autopilot inspect command
+// ---------------------------------------------------------------------------
+
+/** Discriminator for autopilot resource types returned by `inspect`. */
+export type AutopilotResourceType = 'trace' | 'span' | 'action';
+
+/** Common base for all autopilot inspect JSON outputs. The `type` field
+ *  tells the consumer which resource kind was resolved from the UUID. */
+export interface AutopilotInspectionBase extends CLIJsonOutput {
+  type: AutopilotResourceType;
+}
+
+export interface AutopilotTraceInspectionOutput
+  extends AutopilotInspectionBase {
+  type: 'trace';
+  traceId: string;
+  summary: string;
+  createdAt: string;
+  retryCount: number;
+  taskMapping: TaskMapping | null;
+  steps: Record<string, unknown>[];
+}
+
+export interface AutopilotSpanInspectionOutput extends AutopilotInspectionBase {
+  type: 'span';
+  id: string;
+  step: string;
+  status?: string;
+  timestamp: string;
+  completed?: string | null;
+  summary: string | null;
+  parent: string | null;
+  meta: Record<string, unknown>;
+  originAction: string | null;
+  newActions: string[];
+  parentTrace?: Span[];
+}
+
+export interface AutopilotActionInspectionOutput
+  extends AutopilotInspectionBase {
+  type: 'action';
+  id: string;
+  action: string;
+  timestamp: string;
+  spanId: string;
+  reasoning: string;
+  meta: Record<string, unknown>;
+  linkedSpan: Span | null;
+}
+
+export type AutopilotInspectionOutput =
+  | AutopilotTraceInspectionOutput
+  | AutopilotSpanInspectionOutput
+  | AutopilotActionInspectionOutput;
