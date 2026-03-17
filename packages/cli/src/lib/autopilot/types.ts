@@ -58,7 +58,9 @@ export interface ActionTrace {
   retryCount?: number;
 }
 
-/** Tracks which GitHub event IDs have been processed to prevent duplicates.
+export type FetchStatus = 'idle' | 'fetching' | 'done' | 'error';
+
+/** Tracks which event IDs have been processed to prevent duplicates.
  *  Capped at 200 entries with FIFO eviction. */
 export interface EventCursor {
   version: string;
