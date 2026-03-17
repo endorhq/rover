@@ -16,14 +16,9 @@ import {
 import { TaskNotFoundError } from 'rover-schemas';
 import { executeHooks } from '../lib/hooks.js';
 import { getTelemetry } from '../lib/telemetry.js';
-import { showRoverChat } from '../utils/display.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
 import type { TaskRebaseOutput } from '../output-types.js';
-import {
-  isJsonMode,
-  setJsonMode,
-  requireProjectContext,
-} from '../lib/context.js';
+import { isJsonMode, requireProjectContext } from '../lib/context.js';
 import type { CommandDefinition } from '../types.js';
 
 const { prompt } = enquirer;
@@ -134,6 +129,7 @@ interface RebaseOptions {
   commit?: boolean;
   json?: boolean;
   onto?: string;
+  ontoTask?: string;
 }
 
 /**
@@ -150,13 +146,10 @@ interface RebaseOptions {
  * @param options - Command options
  * @param options.force - Skip confirmation prompt
  * @param options.json - Output results in JSON format
- * @param options.onto - Another task ID whose branch to rebase onto (defaults to current branch)
+ * @param options.onto - A branch name to rebase onto (defaults to current branch)
+ * @param options.ontoTask - Another task ID whose branch to rebase onto
  */
 const rebaseCommand = async (taskId: string, options: RebaseOptions = {}) => {
-  if (options.json !== undefined) {
-    setJsonMode(options.json);
-  }
-
   const telemetry = getTelemetry();
   const jsonOutput: TaskRebaseOutput = {
     success: false,
@@ -186,13 +179,6 @@ const rebaseCommand = async (taskId: string, options: RebaseOptions = {}) => {
     jsonOutput.error = 'Not a git repository';
     await exitWithError(jsonOutput, { telemetry });
     return;
-  }
-
-  if (!isJsonMode()) {
-    showRoverChat([
-      'We are ready to go',
-      "Let's rebase the task branch to keep it up to date!",
-    ]);
   }
 
   jsonOutput.taskId = numericTaskId;
@@ -244,16 +230,25 @@ const rebaseCommand = async (taskId: string, options: RebaseOptions = {}) => {
     // Resolve the branch to rebase onto
     let ontoBranch: string;
 
-    if (options.onto) {
-      // --onto <taskId>: rebase onto another task's branch
-      const ontoTaskId = parseInt(options.onto, 10);
+    if (options.onto && options.ontoTask) {
+      jsonOutput.error =
+        'Cannot specify both --onto and --onto-task at the same time';
+      await exitWithError(jsonOutput, { telemetry });
+      return;
+    }
+
+    let ontoTask: ReturnType<typeof project.getTask> | undefined;
+
+    if (options.ontoTask) {
+      // --onto-task <taskId>: rebase onto another task's branch
+      const ontoTaskId = parseInt(options.ontoTask, 10);
       if (isNaN(ontoTaskId)) {
-        jsonOutput.error = `Invalid --onto task ID '${options.onto}' - must be a number`;
+        jsonOutput.error = `Invalid --onto-task task ID '${options.ontoTask}' - must be a number`;
         await exitWithError(jsonOutput, { telemetry });
         return;
       }
 
-      const ontoTask = project.getTask(ontoTaskId);
+      ontoTask = project.getTask(ontoTaskId);
       if (!ontoTask) {
         jsonOutput.error = `Task ${ontoTaskId} not found`;
         await exitWithError(jsonOutput, { telemetry });
@@ -261,6 +256,14 @@ const rebaseCommand = async (taskId: string, options: RebaseOptions = {}) => {
       }
 
       ontoBranch = ontoTask.branchName;
+    } else if (options.onto) {
+      // --onto <branch>: rebase onto a specific branch
+      if (!git.branchExists(options.onto)) {
+        jsonOutput.error = `Branch '${options.onto}' does not exist`;
+        await exitWithError(jsonOutput, { telemetry });
+        return;
+      }
+      ontoBranch = options.onto;
     } else {
       // Default: rebase onto current branch
       ontoBranch = git.getCurrentBranch();
@@ -282,9 +285,39 @@ const rebaseCommand = async (taskId: string, options: RebaseOptions = {}) => {
     }
 
     if (task.isPushed()) {
-      jsonOutput.error = 'The task is already pushed';
-      await exitWithError(jsonOutput, { telemetry });
-      return;
+      if (!isJsonMode()) {
+        console.log(
+          colors.yellow(
+            '\n⚠ This task has already been pushed. Rebasing will rewrite history and require a force push.'
+          )
+        );
+      }
+
+      if (!options.force && !options.json) {
+        try {
+          const { confirm } = await prompt<{ confirm: boolean }>({
+            type: 'confirm',
+            name: 'confirm',
+            message:
+              'Do you want to continue? This will require a force push afterwards.',
+            initial: false,
+          });
+
+          if (!confirm) {
+            jsonOutput.success = true;
+            await exitWithWarn('Task rebase cancelled', jsonOutput, {
+              telemetry,
+            });
+            return;
+          }
+        } catch (err) {
+          jsonOutput.success = true;
+          await exitWithWarn('Task rebase cancelled', jsonOutput, {
+            telemetry,
+          });
+          return;
+        }
+      }
     }
 
     if (task.isMerged()) {
@@ -336,17 +369,42 @@ const rebaseCommand = async (taskId: string, options: RebaseOptions = {}) => {
       await exitWithError(jsonOutput, {
         tips: [
           `Use ${colors.cyan(`rover rebase ${numericTaskId} --commit`)} to commit changes before rebasing`,
-          `Use ${colors.cyan(`rover push ${numericTaskId}`)} to commit and push changes, then ${colors.cyan(`rover rebase ${numericTaskId}`)} afterwards`,
         ],
         telemetry,
       });
       return;
     }
 
+    // Check if the onto-task worktree has uncommitted changes
+    let hasOntoTaskWorktreeChanges = false;
+    if (ontoTask?.worktreePath && existsSync(ontoTask.worktreePath)) {
+      hasOntoTaskWorktreeChanges = git.hasUncommittedChanges({
+        worktreePath: ontoTask.worktreePath,
+      });
+
+      if (hasOntoTaskWorktreeChanges && !options.commit) {
+        jsonOutput.error = `Target task ${ontoTask.id} worktree has uncommitted changes`;
+        await exitWithError(jsonOutput, {
+          tips: [
+            `Use ${colors.cyan(`rover rebase ${numericTaskId} --onto-task ${ontoTask.id} --commit`)} to commit changes in both tasks before rebasing`,
+          ],
+          telemetry,
+        });
+        return;
+      }
+    }
+
     if (!isJsonMode()) {
       // Show what will happen
       console.log('');
       const rebaseSteps = [];
+      if (hasOntoTaskWorktreeChanges) {
+        rebaseSteps.push(
+          colors.cyan(
+            `Commit uncommitted changes in task ${ontoTask!.id} worktree`
+          )
+        );
+      }
       if (hasWorktreeChanges) {
         rebaseSteps.push(
           colors.cyan('Commit uncommitted changes in the task worktree')
@@ -395,6 +453,25 @@ const rebaseCommand = async (taskId: string, options: RebaseOptions = {}) => {
       : null;
 
     try {
+      // Commit uncommitted onto-task worktree changes before rebasing
+      if (hasOntoTaskWorktreeChanges && ontoTask) {
+        if (spinner)
+          spinner.text = `Committing task ${ontoTask.id} worktree changes...`;
+
+        try {
+          git.addAndCommit(ontoTask.title, {
+            worktreePath: ontoTask.worktreePath,
+          });
+        } catch (error) {
+          spinner?.error(
+            `Failed to commit task ${ontoTask.id} worktree changes`
+          );
+          jsonOutput.error = `Failed to commit uncommitted changes in task ${ontoTask.id} worktree`;
+          await exitWithError(jsonOutput, { telemetry });
+          return;
+        }
+      }
+
       // Commit uncommitted worktree changes before rebasing
       if (hasWorktreeChanges) {
         if (spinner) spinner.text = 'Committing worktree changes...';
@@ -423,11 +500,12 @@ const rebaseCommand = async (taskId: string, options: RebaseOptions = {}) => {
       if (rebaseSuccessful) {
         spinner?.success('Task rebased successfully');
 
-        // Update baseCommit to the tip of the branch we rebased onto
+        // Update baseCommit and sourceBranch to reflect the new base
         const newBaseCommit = git.getCommitHash(ontoBranch);
         if (newBaseCommit) {
           task.setBaseCommit(newBaseCommit);
         }
+        task.setSourceBranch(ontoBranch);
 
         // Execute onRebase hooks if configured
         if (projectConfig?.hooks?.onRebase?.length) {
@@ -481,9 +559,9 @@ const rebaseCommand = async (taskId: string, options: RebaseOptions = {}) => {
 
           // Attempt to fix them with an AI
           if (!isJsonMode()) {
-            showRoverChat([
-              'I noticed some rebase conflicts. I will try to solve them',
-            ]);
+            console.log(
+              colors.cyan('\nAttempting to resolve conflicts with AI...')
+            );
           }
 
           const resolution = await resolveRebaseConflicts(
@@ -498,9 +576,21 @@ const rebaseCommand = async (taskId: string, options: RebaseOptions = {}) => {
             jsonOutput.conflictsResolved = true;
 
             if (!isJsonMode()) {
-              showRoverChat([
-                'The rebase conflicts are fixed. You can check the file content to confirm it.',
-              ]);
+              console.log(
+                colors.green('\n✓ AI resolved all conflicts successfully.')
+              );
+
+              // Show a summary of the resolved files so the user can make an informed decision
+              console.log(colors.gray('\nResolved files:'));
+              for (const file of rebaseConflicts) {
+                console.log(colors.gray(`  - ${file}`));
+              }
+
+              console.log(
+                colors.gray(
+                  `\nYou can inspect the resolved files in: ${task.worktreePath}`
+                )
+              );
 
               let applyChanges = false;
 
@@ -534,11 +624,12 @@ const rebaseCommand = async (taskId: string, options: RebaseOptions = {}) => {
             try {
               git.continueRebase({ worktreePath: task.worktreePath });
 
-              // Update baseCommit to the tip of the branch we rebased onto
+              // Update baseCommit and sourceBranch to reflect the new base
               const newBaseCommit = git.getCommitHash(ontoBranch);
               if (newBaseCommit) {
                 task.setBaseCommit(newBaseCommit);
               }
+              task.setSourceBranch(ontoBranch);
 
               // Execute onRebase hooks if configured
               if (projectConfig?.hooks?.onRebase?.length) {

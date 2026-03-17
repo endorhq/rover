@@ -486,7 +486,11 @@ export function createProgram(
     .description('Rebase the task branch onto the current branch')
     .argument('<taskId>', 'Task ID to rebase')
     .option(
-      '--onto <taskId>',
+      '--onto <branch>',
+      'Rebase onto a specific branch instead of the current branch'
+    )
+    .option(
+      '--onto-task <taskId>',
       'Rebase onto another task branch instead of the current branch'
     )
     .option('-f, --force', 'Force rebase without confirmation')
