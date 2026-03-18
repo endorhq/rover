@@ -3,7 +3,6 @@ import { createConfig } from '../../tsdown.config.js';
 
 export default defineConfig(
   createConfig({
-    entry: ['./src/index.ts', './src/cli.ts'],
     loader: {
       '.md': 'text',
     },

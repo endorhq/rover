@@ -79,6 +79,9 @@ importers:
       rover-core:
         specifier: workspace:*
         version: link:../core
+      rover-prompts:
+        specifier: workspace:*
+        version: link:../prompts
       rover-schemas:
         specifier: workspace:*
         version: link:../schemas
@@ -137,6 +140,9 @@ importers:
         specifier: catalog:runtime
         version: 4.1.12
     devDependencies:
+      '@endorhq/agent':
+        specifier: workspace:*
+        version: link:../agent
       '@types/node':
         specifier: catalog:build
         version: 24.2.0
@@ -155,6 +161,9 @@ importers:
       rover-core:
         specifier: workspace:*
         version: link:../core
+      rover-prompts:
+        specifier: workspace:*
+        version: link:../prompts
       rover-schemas:
         specifier: workspace:*
         version: link:../schemas
@@ -259,6 +268,28 @@ importers:
       typescript:
         specifier: catalog:build
         version: 5.9.3
+
+  packages/prompts:
+    dependencies:
+      rover-schemas:
+        specifier: workspace:*
+        version: link:../schemas
+    devDependencies:
+      '@types/node':
+        specifier: catalog:build
+        version: 24.2.0
+      '@vitest/ui':
+        specifier: catalog:build
+        version: 2.1.9(vitest@2.1.9)
+      tsdown:
+        specifier: catalog:build
+        version: 0.18.4(typescript@5.9.3)
+      typescript:
+        specifier: catalog:build
+        version: 5.9.3
+      vitest:
+        specifier: catalog:build
+        version: 2.1.9(@types/node@24.2.0)(@vitest/ui@2.1.9)
 
   packages/schemas:
     dependencies:

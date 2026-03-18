@@ -8,6 +8,7 @@ import { createConfig, isProd } from '../../tsdown.config.js';
 const devAliases = isProd
   ? undefined
   : {
+      '@endorhq/agent': path.resolve(__dirname, '../agent/src/index.ts'),
       'rover-core': path.resolve(__dirname, '../core/src/index.ts'),
       'rover-schemas': path.resolve(__dirname, '../schemas/src/index.ts'),
     };

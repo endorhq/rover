@@ -1,31 +1,11 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { PromptBuilder } from '../index.js';
-import { IterationManager } from 'rover-core';
-import { existsSync } from 'node:fs';
-import { join } from 'node:path';
-import { tmpdir } from 'node:os';
-import { mkdtempSync, rmSync } from 'node:fs';
 
 describe('PromptBuilder', () => {
   let builder: PromptBuilder;
-  let testIteration: IterationManager;
-  let tempDir: string;
 
   beforeEach(() => {
     builder = new PromptBuilder('claude');
-    tempDir = mkdtempSync(join(tmpdir(), 'prompt-test-'));
-    testIteration = IterationManager.createInitial(
-      tempDir,
-      1,
-      'Test Task Title',
-      'Test task description with multiple lines\nand detailed information'
-    );
-  });
-
-  afterEach(() => {
-    if (existsSync(tempDir)) {
-      rmSync(tempDir, { recursive: true, force: true });
-    }
   });
 
   describe('constructor', () => {

@@ -1,19 +1,9 @@
-import { launch } from 'rover-core';
-import {
-  AIAgentTool,
-  findKeychainCredentials,
-  InvokeAIAgentError,
-  MissingAIAgentError,
-  type InvokeOptions,
-} from './index.js';
-import { PromptBuilder, IPromptTask } from '../prompts/index.js';
-import { parseJsonResponse } from '../../utils/json-parser.js';
+import { ACPAgentBase } from './acp-agent-base.js';
+import { findKeychainCredentials } from './index.js';
 import { existsSync, writeFileSync } from 'node:fs';
 import { homedir, platform } from 'node:os';
 import { join } from 'node:path';
 import { fileSync } from 'tmp';
-import type { WorkflowInput } from 'rover-schemas';
-import { acpInvoke } from './acp-invoke.js';
 
 // Environment variables reference:
 // - https://cursor.com/docs/cli/reference/parameters
@@ -25,149 +15,9 @@ const CURSOR_ENV_VARS = [
 // macOS Keychain items for Cursor
 const CURSOR_KEYCHAIN_ITEMS = ['cursor-access-token', 'cursor-refresh-token'];
 
-class CursorAI implements AIAgentTool {
-  // constants
-  public AGENT_BIN = 'cursor-agent';
-  private promptBuilder = new PromptBuilder('cursor');
-
-  async checkAgent(): Promise<void> {
-    try {
-      await launch(this.AGENT_BIN, ['--version']);
-    } catch (_err) {
-      throw new MissingAIAgentError(this.AGENT_BIN);
-    }
-  }
-
-  async invoke(prompt: string, options: InvokeOptions = {}): Promise<string> {
-    const { json = false, cwd, model } = options;
-
-    if (json) {
-      prompt = `${prompt}
-
-You MUST output a valid JSON string as an output. Just output the JSON string and nothing else. If you had any error, still return a JSON string with an "error" property.`;
-    }
-
-    try {
-      const result = await acpInvoke({
-        agentName: 'cursor',
-        prompt,
-        cwd,
-        model,
-      });
-
-      return result;
-    } catch (error) {
-      throw new InvokeAIAgentError(this.AGENT_BIN, error);
-    }
-  }
-
-  async expandTask(
-    briefDescription: string,
-    projectPath: string,
-    contextContent?: string
-  ): Promise<IPromptTask | null> {
-    const prompt = this.promptBuilder.expandTaskPrompt(
-      briefDescription,
-      contextContent
-    );
-
-    try {
-      const response = await this.invoke(prompt, {
-        json: true,
-        cwd: projectPath,
-      });
-      return parseJsonResponse<IPromptTask>(response);
-    } catch (error) {
-      console.error('Failed to expand task with Cursor:', error);
-      return null;
-    }
-  }
-
-  async expandIterationInstructions(
-    instructions: string,
-    previousPlan?: string,
-    previousChanges?: string,
-    contextContent?: string
-  ): Promise<IPromptTask | null> {
-    const prompt = this.promptBuilder.expandIterationInstructionsPrompt(
-      instructions,
-      previousPlan,
-      previousChanges,
-      contextContent
-    );
-
-    try {
-      const response = await this.invoke(prompt, { json: true });
-      return parseJsonResponse<IPromptTask>(response);
-    } catch (error) {
-      console.error(
-        'Failed to expand iteration instructions with Cursor:',
-        error
-      );
-      return null;
-    }
-  }
-
-  async generateCommitMessage(
-    taskTitle: string,
-    taskDescription: string,
-    recentCommits: string[],
-    summaries: string[]
-  ): Promise<string | null> {
-    try {
-      const prompt = this.promptBuilder.generateCommitMessagePrompt(
-        taskTitle,
-        taskDescription,
-        recentCommits,
-        summaries
-      );
-      const response = await this.invoke(prompt);
-
-      if (!response) {
-        return null;
-      }
-
-      // Clean up the response to get just the commit message
-      const lines = response
-        .split('\n')
-        .filter((line: string) => line.trim() !== '');
-      return lines[0] || null;
-    } catch (error) {
-      console.error('Failed to generate commit message with Cursor:', error);
-      return null;
-    }
-  }
-
-  async resolveMergeConflicts(
-    filePath: string,
-    diffContext: string,
-    conflictedContent: string
-  ): Promise<string | null> {
-    const prompt = this.promptBuilder.resolveMergeConflictsPrompt(
-      filePath,
-      diffContext,
-      conflictedContent
-    );
-    return await this.invoke(prompt);
-  }
-
-  async extractGithubInputs(
-    issueDescription: string,
-    inputs: WorkflowInput[]
-  ): Promise<Record<string, any> | null> {
-    const prompt = this.promptBuilder.extractGithubInputsPrompt(
-      issueDescription,
-      inputs
-    );
-
-    try {
-      const response = await this.invoke(prompt, { json: true });
-      return parseJsonResponse<Record<string, any>>(response);
-    } catch (error) {
-      console.error('Failed to extract GitHub inputs with Cursor:', error);
-      return null;
-    }
-  }
+class CursorAI extends ACPAgentBase {
+  readonly AGENT_BIN = 'cursor-agent';
+  readonly AGENT_NAME = 'cursor';
 
   getContainerMounts(): string[] {
     const dockerMounts: string[] = [];

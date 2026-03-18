@@ -36,36 +36,6 @@ export interface TaskStatus {
   error?: string;
 }
 
-export interface TaskExpansion {
-  title: string;
-  description: string;
-}
-
-export interface AIProvider {
-  expandTask(
-    briefDescription: string,
-    projectPath: string,
-    contextContent?: string
-  ): Promise<TaskExpansion | null>;
-  expandIterationInstructions(
-    instructions: string,
-    previousPlan?: string,
-    previousChanges?: string,
-    contextContent?: string
-  ): Promise<TaskExpansion | null>;
-  generateCommitMessage(
-    taskTitle: string,
-    taskDescription: string,
-    recentCommits: string[],
-    summaries: string[]
-  ): Promise<string | null>;
-  resolveMergeConflicts(
-    filePath: string,
-    diffContext: string,
-    conflictedContent: string
-  ): Promise<string | null>;
-}
-
 /**
  * Defines the metadata for a CLI command.
  * Each command file exports a default object that satisfies this interface.
