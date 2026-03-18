@@ -792,6 +792,18 @@ const taskCommand = async (initPrompt?: string, options: TaskOptions = {}) => {
 
   // Validate branch option and check for uncommitted changes
   const git = new Git({ cwd: project.path });
+
+  if (!git.hasCommits()) {
+    jsonOutput.error = 'No commits found in git repository';
+    await exitWithError(jsonOutput, {
+      tips: [
+        'Git worktree requires at least one commit in the repository in order to have common history',
+      ],
+      telemetry,
+    });
+    return;
+  }
+
   let baseBranch = sourceBranch;
 
   if (sourceBranch) {
