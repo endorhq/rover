@@ -56,6 +56,8 @@ enum EVENT_IDS {
   LOGS = 'logs',
   // Merge a task branch
   MERGE_TASK = 'merge_task',
+  // Rebase a task branch
+  REBASE_TASK = 'rebase_task',
   // Push branch to remote
   PUSH_BRANCH = 'push_branch',
   // Reset current changes
@@ -202,6 +204,10 @@ class Telemetry {
 
   eventMergeTask() {
     this.capture(EVENT_IDS.MERGE_TASK);
+  }
+
+  eventRebaseTask() {
+    this.capture(EVENT_IDS.REBASE_TASK);
   }
 
   eventPushBranch() {

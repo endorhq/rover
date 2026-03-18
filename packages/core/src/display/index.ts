@@ -15,6 +15,9 @@ export { showTitle } from './title.js';
 // Export file content utilities
 export { showFile } from './content.js';
 
+// Export diff utilities
+export { showDiff } from './diff.js';
+
 // Export tips utilities
 export { showTips, showTip } from './tips.js';
 

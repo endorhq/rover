@@ -795,6 +795,14 @@ export class TaskDescriptionManager {
   }
 
   /**
+   * Set the source branch (the branch the worktree was created from)
+   */
+  setSourceBranch(branch: string): void {
+    this.data.sourceBranch = branch;
+    this.save();
+  }
+
+  /**
    * Set the base commit hash (the commit when the worktree was created)
    */
   setBaseCommit(commit: string): void {

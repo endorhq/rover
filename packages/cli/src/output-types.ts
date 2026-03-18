@@ -115,6 +115,20 @@ export interface TaskMergeOutput extends CLIJsonOutput {
 }
 
 // ---------------------------------------------------------------------------
+// rebase command
+// ---------------------------------------------------------------------------
+
+export interface TaskRebaseOutput extends CLIJsonOutput {
+  taskId?: number;
+  taskTitle?: string;
+  branchName?: string;
+  currentBranch?: string;
+  ontoBranch?: string;
+  rebased?: boolean;
+  conflictsResolved?: boolean;
+}
+
+// ---------------------------------------------------------------------------
 // push command
 // ---------------------------------------------------------------------------
 

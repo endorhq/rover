@@ -118,6 +118,8 @@ export const SandboxConfigSchema = z.object({
 export const HooksConfigSchema = z.object({
   /** Commands to run when a task is merged */
   onMerge: z.array(z.string()).optional(),
+  /** Commands to run when a task branch is rebased */
+  onRebase: z.array(z.string()).optional(),
   /** Commands to run when a task is pushed */
   onPush: z.array(z.string()).optional(),
   /** Commands to run when a task completes (success or failure) */
