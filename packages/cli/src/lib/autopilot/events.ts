@@ -141,7 +141,7 @@ export function writeSpanAndAction(
     action: 'coordinate',
     spanId: span.id,
     reasoning: 'Needs to take a decision about what to do with this event',
-    meta: event.meta,
+    meta: { ...event.meta, eventSpanId: span.id },
   });
 
   enqueueAction(store, {
@@ -149,7 +149,6 @@ export function writeSpanAndAction(
     action,
     step: 'event',
     summary: event.summary,
-    meta: { ...event.meta, eventSpanId: span.id },
   });
 
   return { spanId: span.id, actionId: action.id, traceId };
