@@ -2,11 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type {
-  ActionTrace,
-  Span,
-  Action,
-} from '../../../lib/autopilot/types.js';
+import type { TraceItem, Span, Action } from '../../../lib/autopilot/types.js';
 
 // ---------- shared state for mocks ----------
 
@@ -78,30 +74,12 @@ function makeAction(overrides: Partial<Action> = {}): Action {
   };
 }
 
-function makeTrace(overrides: Partial<ActionTrace> = {}): ActionTrace {
+function makeTrace(overrides: Partial<TraceItem> = {}): TraceItem {
   return {
     traceId: 'trace-001',
     summary: 'Handle issue #42',
-    steps: [
-      {
-        originAction: null,
-        action: 'coordinate',
-        status: 'completed',
-        timestamp: '2026-03-01T10:00:00.000Z',
-        spanId: 'span-001',
-        newActions: ['action-001'],
-      },
-      {
-        originAction: 'action-001',
-        action: 'plan',
-        status: 'completed',
-        timestamp: '2026-03-01T10:00:05.000Z',
-        reasoning: 'Creating implementation plan',
-        spanId: 'span-002',
-        newActions: [],
-        terminal: true,
-      },
-    ],
+    spanIds: ['span-001', 'span-002'],
+    nextActions: [],
     createdAt: '2026-03-01T10:00:00.000Z',
     ...overrides,
   };
@@ -119,7 +97,7 @@ function writeActionFile(dir: string, action: Action): void {
   writeFileSync(join(actionsDir, `${action.id}.json`), JSON.stringify(action));
 }
 
-function writeTracesFile(dir: string, traces: Map<string, ActionTrace>): void {
+function writeTracesFile(dir: string, traces: Map<string, TraceItem>): void {
   const autopilotDir = join(dir, 'autopilot');
   mkdirSync(autopilotDir, { recursive: true });
   writeFileSync(
@@ -319,12 +297,10 @@ describe('autopilot inspect command', () => {
           type: 'trace',
           traceId: 'trace-001',
           summary: 'Handle issue #42',
-          steps: expect.arrayContaining([
-            expect.objectContaining({
-              action: 'coordinate',
-              span: expect.objectContaining({ id: 'span-001' }),
-            }),
+          spans: expect.arrayContaining([
+            expect.objectContaining({ id: 'span-001' }),
           ]),
+          pendingActions: [],
         }),
         expect.any(Object)
       );

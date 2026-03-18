@@ -391,7 +391,7 @@ describe('enqueueAction', () => {
     expect(logs[0].action).toBe('plan');
   });
 
-  it('uses custom meta when provided', () => {
+  it('stores only traceId, actionId, and action in pending', () => {
     const span = new SpanWriter('test', {
       step: 'test',
       parentId: null,
@@ -408,11 +408,14 @@ describe('enqueueAction', () => {
       action,
       step: 'test',
       summary: 'test',
-      meta: { overrideMeta: true },
     });
 
     const pending = store.getPending();
-    expect(pending[0].meta).toEqual({ overrideMeta: true });
+    expect(pending[0]).toEqual({
+      traceId: 'trace-1',
+      actionId: action.id,
+      action: 'plan',
+    });
   });
 });
 
@@ -465,10 +468,7 @@ describe('emitAction', () => {
     store.addPending({
       traceId: 'trace-1',
       actionId: 'old-action',
-      spanId: 'old-span',
       action: 'coordinate',
-      summary: 'old',
-      createdAt: new Date().toISOString(),
     });
 
     emitAction(store, {
@@ -497,10 +497,7 @@ describe('emitAction', () => {
     store.addPending({
       traceId: 'trace-1',
       actionId: 'existing',
-      spanId: 'span-1',
       action: 'coordinate',
-      summary: 'existing',
-      createdAt: new Date().toISOString(),
     });
 
     emitAction(store, {

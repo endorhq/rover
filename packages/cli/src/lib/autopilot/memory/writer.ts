@@ -1,5 +1,5 @@
 import type { AutopilotStore } from '../store.js';
-import type { ActionTrace, Span } from '../types.js';
+import type { TraceItem, Span } from '../types.js';
 import type { MemoryStore } from './store.js';
 
 export interface MemoryEntry {
@@ -15,7 +15,7 @@ export interface MemoryEntry {
  * Build a MemoryEntry from a completed trace by extracting data from spans.
  */
 export function buildMemoryEntry(
-  trace: ActionTrace,
+  trace: TraceItem,
   spans: Span[],
   store: AutopilotStore,
   extra?: { prUrl?: string; summary?: string }
@@ -39,31 +39,24 @@ export function buildMemoryEntry(
   // Chain summary from the terminal step (summarizer or notify)
   const summary = extra?.summary ?? null;
 
-  // Extract files changed from commit spans
+  // Extract files changed from commit spans and resolve reference URL
   const filesChanged: string[] = [];
-  for (const step of trace.steps) {
-    if (step.action === 'commit' && step.spanId) {
-      const commitSpan = store.readSpan(step.spanId);
-      if (
-        commitSpan?.meta?.filesChanged &&
-        Array.isArray(commitSpan.meta.filesChanged)
-      ) {
-        filesChanged.push(...(commitSpan.meta.filesChanged as string[]));
-      }
-    }
-  }
-
-  // Resolve reference URL: prefer PR URL from extra, then push spans, then root event URL
   let referenceUrl = extra?.prUrl ?? null;
-  if (!referenceUrl) {
-    for (const step of trace.steps) {
-      if (step.action === 'push' && step.spanId) {
-        const pushSpan = store.readSpan(step.spanId);
-        if (pushSpan?.meta?.pullRequestUrl) {
-          referenceUrl = pushSpan.meta.pullRequestUrl as string;
-          break;
-        }
-      }
+
+  for (const spanId of trace.spanIds) {
+    const span = store.readSpan(spanId);
+    if (!span) continue;
+
+    if (
+      span.step === 'commit' &&
+      span.meta?.filesChanged &&
+      Array.isArray(span.meta.filesChanged)
+    ) {
+      filesChanged.push(...(span.meta.filesChanged as string[]));
+    }
+
+    if (!referenceUrl && span.step === 'push' && span.meta?.pullRequestUrl) {
+      referenceUrl = span.meta.pullRequestUrl as string;
     }
   }
   if (!referenceUrl) {
@@ -112,7 +105,7 @@ export function formatDailyEntry(entry: MemoryEntry): string {
  */
 export async function recordTraceCompletion(
   memoryStore: MemoryStore | undefined,
-  trace: ActionTrace,
+  trace: TraceItem,
   spans: Span[],
   store: AutopilotStore,
   extra?: { prUrl?: string; summary?: string }
