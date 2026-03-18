@@ -28,6 +28,7 @@ export {
 
 export {
   showTitle,
+  showDiff,
   showDiagram,
   showFile,
   showTips,

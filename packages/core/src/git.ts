@@ -14,6 +14,7 @@ export type GitDiffOptions = {
   filePath?: string;
   onlyFiles?: boolean;
   branch?: string;
+  cached?: boolean;
   includeUntracked?: boolean;
 };
 
@@ -194,6 +195,10 @@ export class Git {
 
   diff(options: GitDiffOptions = {}): ReturnType<typeof launchSync> {
     const args = ['diff'];
+
+    if (options.cached) {
+      args.push('--cached');
+    }
 
     if (options.onlyFiles) {
       args.push('--name-only');
@@ -443,6 +448,48 @@ export class Git {
     } catch (_err) {
       // Ignore abort errors
     }
+  }
+
+  /**
+   * Rebase the current branch onto the given branch
+   */
+  rebaseBranch(onto: string, options: GitWorktreeOptions = {}): boolean {
+    try {
+      launchSync('git', ['rebase', onto], {
+        cwd: options.worktreePath ?? this.cwd,
+      });
+
+      return true;
+    } catch (_err) {
+      // There was an error with the rebase (likely conflicts)
+      return false;
+    }
+  }
+
+  /**
+   * Abort current rebase
+   */
+  abortRebase(options: GitWorktreeOptions = {}) {
+    try {
+      launchSync('git', ['rebase', '--abort'], {
+        cwd: options.worktreePath ?? this.cwd,
+      });
+    } catch (_err) {
+      // Ignore abort errors
+    }
+  }
+
+  /**
+   * Continue current rebase after conflict resolution
+   */
+  continueRebase(options: GitWorktreeOptions = {}) {
+    launchSync('git', ['rebase', '--continue'], {
+      cwd: options.worktreePath ?? this.cwd,
+      env: {
+        ...process.env,
+        GIT_EDITOR: 'true',
+      },
+    });
   }
 
   /**

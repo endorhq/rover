@@ -1,6 +1,6 @@
 import colors from 'ansi-colors';
 import { existsSync } from 'node:fs';
-import { Git, showList, showTitle, showProperties } from 'rover-core';
+import { Git, showDiff, showList, showTitle, showProperties } from 'rover-core';
 import { TaskNotFoundError } from 'rover-schemas';
 import { getTelemetry } from '../lib/telemetry.js';
 import { showTips } from '../utils/display.js';
@@ -269,26 +269,7 @@ const diffCommand = async (
           } else {
             // Display full diff with syntax highlighting
             console.log('');
-            const lines = diffOutput?.split('\n') || [];
-            lines.forEach(line => {
-              if (line.startsWith('@@')) {
-                console.log(colors.magenta(line));
-              } else if (line.startsWith('+') && !line.startsWith('+++')) {
-                console.log(colors.green(line));
-              } else if (line.startsWith('-') && !line.startsWith('---')) {
-                console.log(colors.red(line));
-              } else if (line.startsWith('diff --git')) {
-                console.log(colors.bold(line));
-              } else if (
-                line.startsWith('index ') ||
-                line.startsWith('+++') ||
-                line.startsWith('---')
-              ) {
-                console.log(colors.gray(line));
-              } else {
-                console.log(line);
-              }
-            });
+            showDiff(diffOutput || '');
           }
         }
       } catch (gitError: any) {

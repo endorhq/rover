@@ -32,7 +32,7 @@
   "scripts": {
     "build": "tsdown --config-loader unrun",
     "build-dev": "TSUP_DEV=true tsdown --config-loader unrun",
-    "dev": "TSUP_DEV=true tsdown --watch src/",
+    "dev": "TSUP_DEV=true tsdown --config-loader unrun --watch src/",
     "start": "node --enable-source-maps dist/index.mjs",
     "clean": "rm -rf dist",
     "check": "tsc --noEmit",
