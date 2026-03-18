@@ -9,6 +9,7 @@ import {
   Git,
   ProjectConfigManager,
   UserSettingsManager,
+  showDiff,
   showTitle,
   showProperties,
   showList,
@@ -580,15 +581,21 @@ const rebaseCommand = async (taskId: string, options: RebaseOptions = {}) => {
                 colors.green('\n✓ AI resolved all conflicts successfully.')
               );
 
-              // Show a summary of the resolved files so the user can make an informed decision
-              console.log(colors.gray('\nResolved files:'));
-              for (const file of rebaseConflicts) {
-                console.log(colors.gray(`  - ${file}`));
+              // Show the staged diff so the user can review the AI's resolutions
+              const diffResult = git.diff({
+                cached: true,
+                worktreePath: task.worktreePath,
+              });
+              if (diffResult.stdout) {
+                console.log(
+                  colors.yellow('\nChanges applied by AI to resolve conflicts:')
+                );
+                showDiff(diffResult.stdout.toString());
               }
 
               console.log(
                 colors.gray(
-                  `\nYou can inspect the resolved files in: ${task.worktreePath}`
+                  `\nYou can also inspect the resolved files in: ${task.worktreePath}`
                 )
               );
 

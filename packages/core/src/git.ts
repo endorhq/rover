@@ -14,6 +14,7 @@ export type GitDiffOptions = {
   filePath?: string;
   onlyFiles?: boolean;
   branch?: string;
+  cached?: boolean;
   includeUntracked?: boolean;
 };
 
@@ -194,6 +195,10 @@ export class Git {
 
   diff(options: GitDiffOptions = {}): ReturnType<typeof launchSync> {
     const args = ['diff'];
+
+    if (options.cached) {
+      args.push('--cached');
+    }
 
     if (options.onlyFiles) {
       args.push('--name-only');
