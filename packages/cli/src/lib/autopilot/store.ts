@@ -93,7 +93,7 @@ export class AutopilotStore {
     writeFileSync(this.cursorPath, JSON.stringify(cursor, null, 2), 'utf8');
   }
 
-  /** Check whether a GitHub event ID has already been processed. */
+  /** Check whether an event ID has already been processed. */
   isEventProcessed(eventId: string): boolean {
     const cursor = this.loadCursor();
     return cursor.processedEventIds.includes(eventId);
