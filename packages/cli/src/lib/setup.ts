@@ -211,7 +211,8 @@ export class SetupBuilder {
     // For Docker rootless, force it to return the permissions to the right users.
     if (this.isDockerRootless) {
       recoverPermissions = `\n    sudo chown -R root:root /workspace || true
-    sudo chown -R root:root /output || true\n`;
+    sudo chown -R root:root /output || true
+    sudo chown -R root:root /logs || true\n`;
     }
 
     // --- apt-get update ---
@@ -229,6 +230,7 @@ fi`;
       // Cached image already has HOME dirs; just fix ownership of bind-mounts
       homeSetup = `sudo chown -R $(id -u):$(id -g) /workspace
 sudo chown -R $(id -u):$(id -g) /output
+sudo chown -R $(id -u):$(id -g) /logs
 
 source $HOME/.profile`;
     } else {
