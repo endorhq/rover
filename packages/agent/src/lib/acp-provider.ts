@@ -9,7 +9,8 @@
  * through the CLI.
  */
 
-import type { WorkflowInput } from 'rover-schemas';
+import { AI_AGENT, type WorkflowInput } from 'rover-schemas';
+import { UserSettingsManager } from 'rover-core';
 import { acpInvoke } from './acp-invoke.js';
 import { parseJsonResponse } from './json-parser.js';
 import { PromptBuilder, type IPromptTask } from 'rover-prompts';
@@ -30,6 +31,23 @@ export class ACPProvider {
     this.agentName = config.agentName;
     this.model = config.model;
     this.promptBuilder = new PromptBuilder(config.agentName);
+  }
+
+  /**
+   * Create an ACPProvider configured from the project's user settings
+   * (.rover/settings.json). Resolves the default agent and model for the
+   * given project path.
+   */
+  static fromProject(projectPath: string): ACPProvider {
+    if (!UserSettingsManager.exists(projectPath)) {
+      return new ACPProvider({ agentName: AI_AGENT.Claude });
+    }
+
+    const settings = UserSettingsManager.load(projectPath);
+    const agentName = settings.defaultAiAgent ?? AI_AGENT.Claude;
+    const model = settings.getDefaultModel(agentName as AI_AGENT);
+
+    return new ACPProvider({ agentName, model });
   }
 
   /**
