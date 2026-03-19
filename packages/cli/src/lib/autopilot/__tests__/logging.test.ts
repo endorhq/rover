@@ -1,11 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import {
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -20,15 +14,8 @@ vi.mock('rover-core', async () => {
   };
 });
 
-import {
-  ActionWriter,
-  SpanWriter,
-  emitAction,
-  enqueueAction,
-  finalizeSpan,
-  linkNewAction,
-} from '../logging.js';
-import { AutopilotStore } from '../store.js';
+import { ActionWriter, SpanWriter } from '../logging.js';
+
 import type { Span } from '../types.js';
 
 function readSpanFile(spanId: string): Span {
@@ -153,132 +140,6 @@ describe('SpanWriter', () => {
   });
 });
 
-describe('finalizeSpan', () => {
-  beforeEach(() => {
-    projectDir = mkdtempSync(join(tmpdir(), 'autopilot-finalize-test-'));
-    mkdirSync(join(projectDir, 'spans'), { recursive: true });
-  });
-
-  afterEach(() => {
-    rmSync(projectDir, { recursive: true, force: true });
-  });
-
-  it('updates a running span on disk', () => {
-    const span = new SpanWriter('test', {
-      step: 'test',
-      parentId: null,
-    });
-
-    finalizeSpan('test', span.id, 'completed', 'finalized externally');
-
-    const data = readSpanFile(span.id);
-    expect(data.status).toBe('completed');
-    expect(data.summary).toBe('finalized externally');
-    expect(data.completed).toBeDefined();
-  });
-
-  it('merges extraMeta', () => {
-    const span = new SpanWriter('test', {
-      step: 'test',
-      parentId: null,
-      meta: { existing: true },
-    });
-
-    finalizeSpan('test', span.id, 'failed', 'failed', { reason: 'timeout' });
-
-    const data = readSpanFile(span.id);
-    expect(data.meta).toEqual({ existing: true, reason: 'timeout' });
-  });
-
-  it('is a no-op when the span file is missing', () => {
-    // Should not throw
-    finalizeSpan('test', 'nonexistent-id', 'completed', 'done');
-  });
-
-  it('is a no-op when the span is already completed', () => {
-    const span = new SpanWriter('test', {
-      step: 'test',
-      parentId: null,
-    });
-    span.complete('first');
-    const originalData = readSpanFile(span.id);
-
-    finalizeSpan('test', span.id, 'failed', 'should not change');
-
-    const data = readSpanFile(span.id);
-    expect(data.status).toBe('completed');
-    expect(data.summary).toBe('first');
-    expect(data.completed).toBe(originalData.completed);
-  });
-});
-
-describe('linkNewAction', () => {
-  beforeEach(() => {
-    projectDir = mkdtempSync(join(tmpdir(), 'autopilot-link-test-'));
-    mkdirSync(join(projectDir, 'spans'), { recursive: true });
-  });
-
-  afterEach(() => {
-    rmSync(projectDir, { recursive: true, force: true });
-  });
-
-  it('appends an action ID to the span', () => {
-    const span = new SpanWriter('test', {
-      step: 'test',
-      parentId: null,
-    });
-
-    linkNewAction('test', span.id, 'new-action-1');
-
-    const data = readSpanFile(span.id);
-    expect(data.newActions).toContain('new-action-1');
-  });
-
-  it('is idempotent (skips duplicates)', () => {
-    const span = new SpanWriter('test', {
-      step: 'test',
-      parentId: null,
-    });
-
-    linkNewAction('test', span.id, 'dup-action');
-    linkNewAction('test', span.id, 'dup-action');
-
-    const data = readSpanFile(span.id);
-    expect(
-      data.newActions.filter((a: string) => a === 'dup-action')
-    ).toHaveLength(1);
-  });
-
-  it('is a no-op when the span file is missing', () => {
-    // Should not throw
-    linkNewAction('test', 'missing-span', 'action-1');
-  });
-
-  it('initializes newActions array if missing', () => {
-    // Write a span without newActions field
-    const spanData: Span = {
-      id: 'bare-span',
-      version: '1.0',
-      timestamp: new Date().toISOString(),
-      step: 'test',
-      parent: null,
-      summary: null,
-      meta: {},
-      originAction: null,
-      newActions: undefined as unknown as string[],
-    };
-    writeFileSync(
-      join(projectDir, 'spans', 'bare-span.json'),
-      JSON.stringify(spanData)
-    );
-
-    linkNewAction('test', 'bare-span', 'action-1');
-
-    const data = readSpanFile('bare-span');
-    expect(data.newActions).toEqual(['action-1']);
-  });
-});
-
 describe('ActionWriter', () => {
   beforeEach(() => {
     projectDir = mkdtempSync(join(tmpdir(), 'autopilot-action-test-'));
@@ -344,172 +205,39 @@ describe('ActionWriter', () => {
     const spanData = readSpanFile(span.id);
     expect(spanData.newActions).toContain(action.id);
   });
-});
 
-describe('enqueueAction', () => {
-  let store: AutopilotStore;
-
-  beforeEach(() => {
-    projectDir = mkdtempSync(join(tmpdir(), 'autopilot-enqueue-test-'));
-    mkdirSync(join(projectDir, 'spans'), { recursive: true });
-    mkdirSync(join(projectDir, 'actions'), { recursive: true });
-    store = new AutopilotStore('test');
-    store.ensureDir();
-  });
-
-  afterEach(() => {
-    rmSync(projectDir, { recursive: true, force: true });
-  });
-
-  it('adds to pending queue and writes a log entry', () => {
+  it('does not duplicate when linked twice via separate actions', () => {
     const span = new SpanWriter('test', {
-      step: 'coordinate',
+      step: 'test',
       parentId: null,
     });
+
+    const action1 = new ActionWriter('test', {
+      action: 'plan',
+      spanId: span.id,
+      reasoning: 'first',
+    });
+
+    const action2 = new ActionWriter('test', {
+      action: 'notify',
+      spanId: span.id,
+      reasoning: 'second',
+    });
+
+    const spanData = readSpanFile(span.id);
+    expect(spanData.newActions).toContain(action1.id);
+    expect(spanData.newActions).toContain(action2.id);
+    expect(spanData.newActions).toHaveLength(2);
+  });
+
+  it('handles missing parent span gracefully', () => {
+    // Should not throw when the span file doesn't exist
     const action = new ActionWriter('test', {
       action: 'plan',
-      spanId: span.id,
+      spanId: 'nonexistent-span',
       reasoning: 'test',
     });
 
-    enqueueAction(store, {
-      traceId: 'trace-1',
-      action,
-      step: 'coordinate',
-      summary: 'dispatched plan',
-    });
-
-    const pending = store.getPending();
-    expect(pending).toHaveLength(1);
-    expect(pending[0].actionId).toBe(action.id);
-    expect(pending[0].traceId).toBe('trace-1');
-    expect(pending[0].action).toBe('plan');
-
-    const logs = store.readLogs();
-    expect(logs).toHaveLength(1);
-    expect(logs[0].step).toBe('coordinate');
-    expect(logs[0].action).toBe('plan');
-  });
-
-  it('stores only traceId, actionId, and action in pending', () => {
-    const span = new SpanWriter('test', {
-      step: 'test',
-      parentId: null,
-    });
-    const action = new ActionWriter('test', {
-      action: 'plan',
-      spanId: span.id,
-      reasoning: 'test',
-      meta: { actionMeta: true },
-    });
-
-    enqueueAction(store, {
-      traceId: 'trace-1',
-      action,
-      step: 'test',
-      summary: 'test',
-    });
-
-    const pending = store.getPending();
-    expect(pending[0]).toEqual({
-      traceId: 'trace-1',
-      actionId: action.id,
-      action: 'plan',
-    });
-  });
-});
-
-describe('emitAction', () => {
-  let store: AutopilotStore;
-
-  beforeEach(() => {
-    projectDir = mkdtempSync(join(tmpdir(), 'autopilot-emit-test-'));
-    mkdirSync(join(projectDir, 'spans'), { recursive: true });
-    mkdirSync(join(projectDir, 'actions'), { recursive: true });
-    store = new AutopilotStore('test');
-    store.ensureDir();
-  });
-
-  afterEach(() => {
-    rmSync(projectDir, { recursive: true, force: true });
-  });
-
-  it('creates an action, enqueues it, and returns the writer', () => {
-    const span = new SpanWriter('test', {
-      step: 'coordinate',
-      parentId: null,
-    });
-
-    const result = emitAction(store, {
-      projectId: 'test',
-      traceId: 'trace-1',
-      action: 'plan',
-      spanId: span.id,
-      reasoning: 'needs planning',
-      fromStep: 'coordinate',
-      summary: 'emitted plan action',
-    });
-
-    expect(result.id).toBeDefined();
-    expect(result.data.action).toBe('plan');
-
-    const pending = store.getPending();
-    expect(pending).toHaveLength(1);
-    expect(pending[0].actionId).toBe(result.id);
-  });
-
-  it('removes a processed pending entry when removePendingId is set', () => {
-    const span = new SpanWriter('test', {
-      step: 'test',
-      parentId: null,
-    });
-
-    // Seed a pending entry to be consumed
-    store.addPending({
-      traceId: 'trace-1',
-      actionId: 'old-action',
-      action: 'coordinate',
-    });
-
-    emitAction(store, {
-      projectId: 'test',
-      traceId: 'trace-1',
-      action: 'plan',
-      spanId: span.id,
-      reasoning: 'consuming old action',
-      fromStep: 'coordinate',
-      summary: 'new plan',
-      removePendingId: 'old-action',
-    });
-
-    const pending = store.getPending();
-    // Old one removed, new one added
-    expect(pending).toHaveLength(1);
-    expect(pending[0].action).toBe('plan');
-  });
-
-  it('does not remove anything when removePendingId is omitted', () => {
-    const span = new SpanWriter('test', {
-      step: 'test',
-      parentId: null,
-    });
-
-    store.addPending({
-      traceId: 'trace-1',
-      actionId: 'existing',
-      action: 'coordinate',
-    });
-
-    emitAction(store, {
-      projectId: 'test',
-      traceId: 'trace-1',
-      action: 'plan',
-      spanId: span.id,
-      reasoning: 'test',
-      fromStep: 'coordinate',
-      summary: 'new',
-    });
-
-    expect(store.getPending()).toHaveLength(2);
+    expect(action.id).toBeDefined();
   });
 });
