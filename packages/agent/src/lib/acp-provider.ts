@@ -55,9 +55,14 @@ export class ACPProvider {
    */
   async invoke(
     prompt: string,
-    options: { json?: boolean; cwd?: string; model?: string } = {}
+    options: {
+      json?: boolean;
+      cwd?: string;
+      model?: string;
+      systemPrompt?: string;
+    } = {}
   ): Promise<string> {
-    const { json = false, cwd, model } = options;
+    const { json = false, cwd, model, systemPrompt } = options;
 
     let finalPrompt = prompt;
     if (json) {
@@ -71,6 +76,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
       prompt: finalPrompt,
       cwd,
       model: model ?? this.model,
+      systemPrompt,
     });
   }
 

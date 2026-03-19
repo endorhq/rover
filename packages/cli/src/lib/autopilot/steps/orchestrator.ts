@@ -7,6 +7,7 @@ import type {
   OrchestratorCallbacks,
   Step,
   StepContext,
+  StepResult,
 } from './types.js';
 
 export interface StepOrchestratorOptions {
@@ -232,16 +233,10 @@ export class StepOrchestrator {
         id => id !== action.actionId
       );
 
-      // Track newly enqueued actions
-      if (result.enqueuedActions && result.enqueuedActions.length > 0) {
-        for (const enqueued of result.enqueuedActions) {
-          if (!trace.nextActions.includes(enqueued.actionId)) {
-            trace.nextActions.push(enqueued.actionId);
-          }
-        }
-      }
+      // Enqueue new actions returned by the step
+      this.enqueueStepResults(action, result);
 
-      // Remove from pending queue
+      // Remove processed action from pending queue
       this.store.removePending(action.actionId);
 
       // Increment processed count
@@ -252,7 +247,7 @@ export class StepOrchestrator {
 
       this.callbacks.onTracesUpdated();
 
-      return (result.enqueuedActions?.length ?? 0) > 0;
+      return (result.newActions?.length ?? 0) > 0;
     } catch (_err) {
       // Remove from pending
       this.store.removePending(action.actionId);
@@ -289,6 +284,39 @@ export class StepOrchestrator {
     void reason;
 
     this.callbacks.onTracesUpdated();
+  }
+
+  /**
+   * Enqueue actions returned by a step: add to pending queue, track in
+   * the trace's nextActions, and write an audit log entry.
+   */
+  private enqueueStepResults(source: PendingAction, result: StepResult): void {
+    if (!result.newActions || result.newActions.length === 0) return;
+
+    const trace = this.traces.get(source.traceId);
+
+    for (const enqueued of result.newActions) {
+      this.store.addPending({
+        traceId: source.traceId,
+        actionId: enqueued.actionId,
+        action: enqueued.action,
+      });
+
+      const actionData = this.store.readAction(enqueued.actionId);
+      this.store.appendLog({
+        ts: new Date().toISOString(),
+        traceId: source.traceId,
+        spanId: result.spanId,
+        actionId: enqueued.actionId,
+        step: source.action,
+        action: enqueued.action,
+        summary: actionData?.reasoning ?? enqueued.action,
+      });
+
+      if (trace && !trace.nextActions.includes(enqueued.actionId)) {
+        trace.nextActions.push(enqueued.actionId);
+      }
+    }
   }
 
   /** Get or create the in-progress set for an action type. */

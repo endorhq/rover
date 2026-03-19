@@ -59,7 +59,6 @@ function makeStep(overrides: Partial<Step> = {}): Step {
     },
     process: vi.fn().mockResolvedValue({
       spanId: 'result-span-1',
-      reasoning: 'done',
     } satisfies StepResult),
     ...overrides,
   };
@@ -191,26 +190,17 @@ describe('StepOrchestrator', () => {
         config: { actionType: 'plan', maxParallel: 5 },
         process: vi.fn().mockResolvedValue({
           spanId: 'plan-span',
-          reasoning: 'planned',
         } satisfies StepResult),
       });
 
       const coordinateStep = makeStep({
         config: { actionType: 'coordinate', maxParallel: 5 },
         process: vi.fn().mockImplementation(async () => {
-          // Write the plan action file and enqueue it
+          // Write the plan action file (orchestrator handles enqueuing)
           writeActionFile('plan-action-1', { action: 'plan' });
-          store.addPending(
-            makePending({
-              traceId: 'trace-1',
-              actionId: 'plan-action-1',
-              action: 'plan',
-            })
-          );
           return {
             spanId: 'coord-span',
-            reasoning: 'coordinated',
-            enqueuedActions: [{ actionId: 'plan-action-1', action: 'plan' }],
+            newActions: [{ actionId: 'plan-action-1', action: 'plan' }],
           } satisfies StepResult;
         }),
       });
@@ -251,7 +241,7 @@ describe('StepOrchestrator', () => {
             resolvers.push(r);
           });
           running--;
-          return { spanId: 'span', reasoning: 'done' } satisfies StepResult;
+          return { spanId: 'span' } satisfies StepResult;
         }),
       });
 
@@ -368,13 +358,11 @@ describe('StepOrchestrator', () => {
           if (callCount === 1) {
             return {
               spanId: 'span',
-              reasoning: 'waiting',
               status: 'pending',
             } satisfies StepResult;
           }
           return {
             spanId: 'span',
-            reasoning: 'done',
           } satisfies StepResult;
         }),
       });
@@ -408,7 +396,7 @@ describe('StepOrchestrator', () => {
             writeActionFile('a-2');
             store.addPending(makePending({ actionId: 'a-2' }));
           }
-          return { spanId: 'span', reasoning: 'done' } satisfies StepResult;
+          return { spanId: 'span' } satisfies StepResult;
         }),
       });
 
@@ -522,7 +510,6 @@ describe('StepOrchestrator', () => {
         config: { actionType: 'plan', maxParallel: 5 },
         process: vi.fn().mockResolvedValue({
           spanId: 'plan-span',
-          reasoning: 'planned',
         } satisfies StepResult),
       });
 
@@ -530,17 +517,9 @@ describe('StepOrchestrator', () => {
         config: { actionType: 'coordinate', maxParallel: 5 },
         process: vi.fn().mockImplementation(async () => {
           writeActionFile('plan-action-1', { action: 'plan' });
-          store.addPending(
-            makePending({
-              traceId: 'trace-1',
-              actionId: 'plan-action-1',
-              action: 'plan',
-            })
-          );
           return {
             spanId: 'coord-span',
-            reasoning: 'coordinated',
-            enqueuedActions: [{ actionId: 'plan-action-1', action: 'plan' }],
+            newActions: [{ actionId: 'plan-action-1', action: 'plan' }],
           } satisfies StepResult;
         }),
       });

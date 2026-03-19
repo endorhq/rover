@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { AutopilotStore } from './store.js';
-import { SpanWriter, ActionWriter, enqueueAction } from './logging.js';
+import { SpanWriter, ActionWriter } from './logging.js';
 import type {
   EventFetcher,
   FetchStopCondition,
@@ -144,10 +144,19 @@ export function writeSpanAndAction(
     meta: { ...event.meta, eventSpanId: span.id },
   });
 
-  enqueueAction(store, {
+  store.addPending({
     traceId,
-    action,
+    actionId: action.id,
+    action: action.data.action,
+  });
+
+  store.appendLog({
+    ts: new Date().toISOString(),
+    traceId,
+    spanId: action.data.spanId,
+    actionId: action.id,
     step: 'event',
+    action: action.data.action,
     summary: event.summary,
   });
 

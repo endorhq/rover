@@ -47,10 +47,8 @@ export interface StepResult {
   spanId: string;
   /** True when this step is terminal (no follow-up actions expected). */
   terminal?: boolean;
-  /** Actions enqueued by this step for downstream processing. */
-  enqueuedActions?: Array<{ actionId: string; action: string }>;
-  /** Human-readable reasoning about what was done. */
-  reasoning?: string;
+  /** Actions created by this step for downstream processing. */
+  newActions?: Array<{ actionId: string; action: string }>;
   /** Override the step status (e.g. 'pending' to keep the action in queue). */
   status?: 'completed' | 'pending';
 }
