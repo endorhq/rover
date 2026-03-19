@@ -1,8 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  buildWorkflowCatalog,
-  replacePromptPlaceholders,
-} from '../prompts.js';
+import { buildWorkflowCatalog, replacePromptPlaceholders } from '../prompts.js';
 import type { WorkflowStore } from 'rover-core';
 
 describe('replacePromptPlaceholders', () => {
