@@ -3,7 +3,7 @@ import { SpanWriter, ActionWriter } from '../logging.js';
 import { replacePromptPlaceholders } from '../prompts.js';
 import type { Span, PendingAction } from '../types.js';
 import type { Step, StepConfig, StepContext, StepResult } from './types.js';
-import planPromptTemplate from './prompts/plan-prompt.md';
+import { planPromptTemplate } from 'rover-prompts';
 
 interface PlanTask {
   title: string;
