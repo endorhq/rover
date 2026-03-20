@@ -255,41 +255,6 @@ describe('workflowStep', () => {
     expect(spanData.summary).toContain('failed');
   });
 
-  it('returns pending when running task limit reached', async () => {
-    // Create 3 "running" task mappings (with non-terminal spans)
-    for (let i = 0; i < 3; i++) {
-      const spanId = `running-span-${i}`;
-      writeFileSync(
-        join(projectDir, 'spans', `${spanId}.json`),
-        JSON.stringify({
-          id: spanId,
-          status: 'running',
-          step: 'workflow',
-          parent: null,
-          completed: null,
-          summary: null,
-          meta: {},
-          originAction: null,
-          newActions: [],
-        })
-      );
-      store.setTaskMapping(`existing-action-${i}`, {
-        taskId: i + 10,
-        branchName: `rover/task-${i + 10}-xyz`,
-        traceId: `trace-${i}`,
-        workflowSpanId: spanId,
-      });
-    }
-
-    const pending = makePending();
-    writeActionFile('action-1');
-
-    const ctx = makeContext(store);
-    const result = await workflowStep.process(pending, ctx);
-
-    expect(result.status).toBe('pending');
-  });
-
   it('returns pending when dependency not yet processed', async () => {
     const pending = makePending();
     writeActionFile('action-1', {

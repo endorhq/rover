@@ -92,7 +92,10 @@ function createOrchestrator(
     steps,
     store,
     traces: traces ?? new Map(),
-    project: { id: 'test-project', path: projectDir } as unknown as ProjectManager,
+    project: {
+      id: 'test-project',
+      path: projectDir,
+    } as unknown as ProjectManager,
     callbacks,
     fallbackIntervalMs: 60_000, // Long interval so tests control drains
   });
@@ -268,6 +271,52 @@ describe('StepOrchestrator', () => {
 
       // Resolve them to allow the 3rd to be picked up
       for (const r of resolvers) r();
+
+      orch.stop();
+    });
+  });
+
+  describe('fire-and-forget dispatch', () => {
+    it('slow step does not block fast step', async () => {
+      let slowResolver: (() => void) | undefined;
+      const slowStep = makeStep({
+        config: { actionType: 'slow', maxParallel: 1 },
+        process: vi.fn().mockImplementation(async () => {
+          await new Promise<void>(r => {
+            slowResolver = r;
+          });
+          return { spanId: 'slow-span' } satisfies StepResult;
+        }),
+      });
+
+      const fastStep = makeStep({
+        config: { actionType: 'fast', maxParallel: 1 },
+        process: vi.fn().mockResolvedValue({
+          spanId: 'fast-span',
+        } satisfies StepResult),
+      });
+
+      const callbacks = makeCallbacks();
+      const orch = createOrchestrator(store, [slowStep, fastStep], callbacks);
+
+      writeActionFile('slow-1', { action: 'slow' });
+      writeActionFile('fast-1', { action: 'fast' });
+      store.addPending(makePending({ actionId: 'slow-1', action: 'slow' }));
+      store.addPending(makePending({ actionId: 'fast-1', action: 'fast' }));
+
+      orch.requestDrain();
+
+      // Fast step completes while slow step is still running
+      await vi.waitFor(() => {
+        expect(fastStep.process).toHaveBeenCalledTimes(1);
+      });
+
+      // Slow step started but hasn't completed
+      expect(slowStep.process).toHaveBeenCalledTimes(1);
+      expect(slowResolver).toBeDefined();
+
+      // Resolve slow step to clean up
+      slowResolver!();
 
       orch.stop();
     });

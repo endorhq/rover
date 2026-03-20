@@ -47,6 +47,7 @@ export class StepOrchestrator {
   private intervalHandle: ReturnType<typeof setInterval> | null = null;
   private draining = false;
   private drainRequested = false;
+  private stopped = false;
 
   constructor(opts: StepOrchestratorOptions) {
     this.steps = new Map<string, Step>();
@@ -83,6 +84,7 @@ export class StepOrchestrator {
 
   /** Stop the periodic fallback timer. */
   stop(): void {
+    this.stopped = true;
     if (this.intervalHandle) {
       clearInterval(this.intervalHandle);
       this.intervalHandle = null;
@@ -100,87 +102,58 @@ export class StepOrchestrator {
       this.drainRequested = true;
       return;
     }
-    this.drain().catch(() => {});
+    this.drain();
   }
 
   /**
-   * Core drain loop. Reads all pending actions, dispatches to step handlers,
-   * and cascades until no new actions are enqueued.
+   * Core drain loop. Scans pending actions synchronously, dispatches each
+   * processOne() as fire-and-forget. When a processOne completes, its
+   * .then() handler calls requestDrain() to cascade.
    */
-  private async drain(): Promise<void> {
+  private drain(): void {
+    if (this.stopped) return;
+
+    // Start the draining process.
     this.draining = true;
     this.drainRequested = false;
 
     try {
-      let cascading = true;
+      const pending = this.store.getPending();
 
-      while (cascading) {
-        cascading = false;
+      for (const [actionType, step] of this.steps) {
+        const actions = pending.filter(a => a.action === actionType);
+        if (actions.length === 0) continue;
 
-        const pending = this.store.getPending();
-        const byType = new Map<string, PendingAction[]>();
+        const inProgressSet = this.getInProgressSet(actionType);
+        const available = actions.filter(a => !inProgressSet.has(a.actionId));
+        const slots = step.config.maxParallel - inProgressSet.size;
+        // Skip if we don't have slots.
+        if (slots <= 0) continue;
 
-        for (const action of pending) {
-          const list = byType.get(action.action) ?? [];
-          list.push(action);
-          byType.set(action.action, list);
-        }
+        // Process new actions to cover the slots
+        for (const action of available.slice(0, slots)) {
+          inProgressSet.add(action.actionId);
+          this.callbacks.onStatusChanged(actionType, 'processing');
 
-        const batchPromises: Promise<boolean>[] = [];
-
-        for (const [actionType, step] of this.steps) {
-          const actions = byType.get(actionType);
-          if (!actions || actions.length === 0) continue;
-
-          const inProgressSet = this.getInProgressSet(actionType);
-
-          // Filter out actions already in progress
-          const available = actions.filter(a => !inProgressSet.has(a.actionId));
-
-          // Compute available slots
-          const slots = step.config.maxParallel - inProgressSet.size;
-          if (slots <= 0) continue;
-
-          const batch = available.slice(0, slots);
-
-          for (const action of batch) {
-            inProgressSet.add(action.actionId);
-            this.callbacks.onStatusChanged(actionType, 'processing');
-
-            batchPromises.push(
-              this.processOne(step, action)
-                .then(didEnqueue => didEnqueue)
-                .catch(() => {
-                  this.callbacks.onStatusChanged(actionType, 'error');
-                  return false;
-                })
-            );
-          }
-        }
-
-        if (batchPromises.length === 0) break;
-
-        const results = await Promise.allSettled(batchPromises);
-
-        for (const result of results) {
-          if (result.status === 'fulfilled' && result.value) {
-            cascading = true;
-          }
-        }
-      }
-
-      // Notify idle for all steps
-      for (const actionType of this.steps.keys()) {
-        const inProgressSet = this.inProgress.get(actionType);
-        if (!inProgressSet || inProgressSet.size === 0) {
-          this.callbacks.onStatusChanged(actionType, 'idle');
+          this.processOne(step, action)
+            .then(didEnqueue => {
+              if (didEnqueue) this.requestDrain();
+            })
+            .catch(() => {
+              this.callbacks.onStatusChanged(actionType, 'error');
+            })
+            .finally(() => {
+              const set = this.inProgress.get(actionType);
+              if (!set || set.size === 0) {
+                this.callbacks.onStatusChanged(actionType, 'idle');
+              }
+            });
         }
       }
     } finally {
       this.draining = false;
-
-      if (this.drainRequested) {
-        this.drain().catch(() => {});
+      if (this.drainRequested && !this.stopped) {
+        this.drain();
       }
     }
   }

@@ -10,7 +10,6 @@ import {
   type TaskDescriptionManager,
 } from 'rover-core';
 import { SpanWriter, ActionWriter } from '../logging.js';
-import type { AutopilotStore } from '../store.js';
 import type { PendingAction, TaskMapping } from '../types.js';
 import type { Step, StepConfig, StepContext, StepResult } from './types.js';
 import { createSandbox } from '../../sandbox/index.js';
@@ -56,15 +55,6 @@ export const workflowStep: Step = {
     const { store, project } = ctx;
     const projectId = project.id;
     const projectPath = project.path;
-
-    // Check running task limit
-    const allMappings = store.getAllTaskMappings();
-    const runningCount = Object.values(allMappings).filter(
-      m => m.workflowSpanId && !isTerminalMapping(m, store)
-    ).length;
-    if (runningCount >= 3) {
-      return { spanId: '', status: 'pending' };
-    }
 
     // Read action data from disk
     const actionData = store.readAction(pending.actionId);
@@ -263,21 +253,6 @@ export const workflowStep: Step = {
     return { spanId: span.id, terminal: true };
   },
 };
-
-/** Check whether a mapping's workflow span is in a terminal state. */
-function isTerminalMapping(
-  mapping: TaskMapping,
-  store: AutopilotStore
-): boolean {
-  if (!mapping.workflowSpanId) return true;
-  const spanData = store.readSpan(mapping.workflowSpanId);
-  if (!spanData) return true;
-  return (
-    spanData.status === 'completed' ||
-    spanData.status === 'failed' ||
-    spanData.status === 'error'
-  );
-}
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));

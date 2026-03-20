@@ -120,7 +120,10 @@ function makeContext(
 ): StepContext {
   return {
     store,
-    project: { id: 'test-project', path: projectDir } as unknown as ProjectManager,
+    project: {
+      id: 'test-project',
+      path: projectDir,
+    } as unknown as ProjectManager,
     owner: 'test-owner',
     repo: 'test-repo',
     workflowStore: mockWorkflowStore,
