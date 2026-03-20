@@ -1,22 +1,10 @@
-import { join } from 'node:path';
-import { mkdirSync, writeFileSync } from 'node:fs';
-import {
-  ProjectConfigManager,
-  IterationManager,
-  Git,
-  ContextManager,
-  generateContextIndex,
-  registerBuiltInProviders,
-  type TaskDescriptionManager,
-} from 'rover-core';
+import { Git, type TaskDescriptionManager } from 'rover-core';
 import { SpanWriter, ActionWriter } from '../logging.js';
 import type { PendingAction, TaskMapping } from '../types.js';
 import type { Step, StepConfig, StepContext, StepResult } from './types.js';
-import { createSandbox } from '../../sandbox/index.js';
-import { resolveAgentImage } from '../../sandbox/container-common.js';
 import { getUserAIAgent } from '../../agents/index.js';
 import { generateBranchName } from '../../../utils/branch-name.js';
-import { copyEnvironmentFiles } from '../../../utils/env-files.js';
+import { TaskSetup } from '../../task-setup.js';
 
 const POLL_INTERVAL_MS = 5_000;
 const TIMEOUT_MS = 2 * 60 * 60 * 1_000; // 2 hours
@@ -120,75 +108,21 @@ export const workflowStep: Step = {
         source: { type: 'github' },
       });
 
-      // Create worktree
-      const worktreePath = project.getWorkspacePath(task.id);
       branchName = generateBranchName(task.id);
 
-      git.createWorktree(worktreePath, branchName, baseBranch);
-
-      // Copy .env files
-      copyEnvironmentFiles(projectPath, worktreePath);
-
-      // Sparse checkout
-      const projectConfig = ProjectConfigManager.load(projectPath);
-      if (
-        projectConfig.excludePatterns &&
-        projectConfig.excludePatterns.length > 0
-      ) {
-        git.setupSparseCheckout(worktreePath, projectConfig.excludePatterns);
-      }
-
-      // Create initial iteration
-      const iterationPath = join(
-        task.iterationsPath(),
-        task.iterations.toString()
+      const setup = TaskSetup.initial(
+        project,
+        task,
+        git,
+        branchName,
+        baseBranch
       );
-      mkdirSync(iterationPath, { recursive: true });
+      setup.createIteration(title, description);
 
-      const iteration = IterationManager.createInitial(
-        iterationPath,
-        task.id,
-        title,
-        description
-      );
+      const contextUris = (meta.context_uris as string[]) ?? [];
+      await setup.fetchContext(contextUris, { bestEffort: true });
 
-      // Context injection (best-effort)
-      try {
-        const contextUris = (meta.context_uris as string[]) ?? [];
-        if (contextUris.length > 0) {
-          registerBuiltInProviders();
-          const contextManager = new ContextManager(contextUris, task, {
-            cwd: projectPath,
-          });
-          const entries = await contextManager.fetchAndStore();
-          iteration.setContext(entries);
-
-          const indexContent = generateContextIndex(entries, task.iterations);
-          writeFileSync(
-            join(contextManager.getContextDir(), 'index.md'),
-            indexContent
-          );
-        }
-      } catch {
-        // Context injection is best-effort
-      }
-
-      // Finalize task metadata
-      task.setWorkspace(worktreePath, branchName);
-      task.markInProgress();
-
-      const agentImage = resolveAgentImage(projectConfig);
-      task.setAgentImage(agentImage);
-
-      const sandbox = await createSandbox(task, undefined, {
-        projectPath,
-        iterationLogsPath: project.getTaskIterationLogsPath(
-          task.id,
-          task.iterations
-        ),
-      });
-      const containerId = await sandbox.createAndStart();
-      task.setContainerInfo(containerId, 'running');
+      await setup.start();
 
       const mapping: TaskMapping = {
         taskId: task.id,

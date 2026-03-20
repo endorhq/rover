@@ -316,7 +316,7 @@ describe('StepOrchestrator', () => {
       expect(slowResolver).toBeDefined();
 
       // Resolve slow step to clean up
-      slowResolver!();
+      slowResolver?.();
 
       orch.stop();
     });

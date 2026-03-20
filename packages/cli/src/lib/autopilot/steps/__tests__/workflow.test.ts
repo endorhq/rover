@@ -20,6 +20,7 @@ const mockTask = {
   setWorkspace: vi.fn(),
   markInProgress: vi.fn(),
   resetToNew: vi.fn(),
+  setBaseCommit: vi.fn(),
   setAgentImage: vi.fn(),
   setContainerInfo: vi.fn(),
   updateStatusFromIteration: vi.fn(),
@@ -54,6 +55,7 @@ vi.mock('rover-core', async () => {
     Git: vi.fn().mockImplementation(() => ({
       getMainBranch: () => 'main',
       createWorktree: vi.fn(),
+      getCommitHash: vi.fn(() => 'abc123'),
       setupSparseCheckout: vi.fn(),
     })),
     ContextManager: vi.fn().mockImplementation(() => ({
@@ -359,6 +361,7 @@ describe('workflowStep', () => {
         ({
           getMainBranch: () => 'main',
           createWorktree: mockCreateWorktree,
+          getCommitHash: vi.fn(() => 'abc123'),
           setupSparseCheckout: vi.fn(),
         }) as unknown as InstanceType<typeof Git>
     );
