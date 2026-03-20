@@ -56,6 +56,7 @@ const shellCommand = async (
     return;
   }
 
+  let commandOutcome: 'success' | 'error' = 'error';
   try {
     // Load task using ProjectManager
     const task = project.getTask(numericTaskId);
@@ -205,6 +206,7 @@ const shellCommand = async (
 
     if (shellProcess) {
       // Handle process completion
+      commandOutcome = 'success';
       if (shellProcess.exitCode === 0) {
         await exitWithSuccess('Shell session ended', jsonOutput, {
           telemetry,
@@ -226,7 +228,7 @@ const shellCommand = async (
       await exitWithError(jsonOutput, { telemetry });
     }
   } finally {
-    await telemetry?.shutdown();
+    await telemetry?.shutdown(commandOutcome);
   }
 };
 

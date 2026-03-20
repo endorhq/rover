@@ -92,6 +92,7 @@ const logsCommand = async (
     return;
   }
 
+  let commandOutcome: 'success' | 'error' = 'error';
   try {
     // Load task using ProjectManager
     const task = project.getTask(numericTaskId);
@@ -308,6 +309,8 @@ const logsCommand = async (
 
       showTips(tips);
     }
+
+    commandOutcome = 'success';
   } catch (error) {
     if (error instanceof TaskNotFoundError) {
       jsonOutput.error = `The task with ID ${numericTaskId} was not found`;
@@ -317,7 +320,7 @@ const logsCommand = async (
       await exitWithError(jsonOutput, { telemetry });
     }
   } finally {
-    await telemetry?.shutdown();
+    await telemetry?.shutdown(commandOutcome);
   }
 };
 

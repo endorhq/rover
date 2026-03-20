@@ -218,6 +218,7 @@ const rebaseCommand = async (taskId: string, options: RebaseOptions = {}) => {
   // Create AI agent instance
   const aiAgent = getAIAgentTool(selectedAiAgent);
 
+  let commandOutcome: 'success' | 'error' = 'error';
   try {
     // Load task using ProjectManager
     const task = project.getTask(numericTaskId);
@@ -524,6 +525,7 @@ const rebaseCommand = async (taskId: string, options: RebaseOptions = {}) => {
 
         jsonOutput.rebased = true;
         jsonOutput.success = true;
+        commandOutcome = 'success';
         await exitWithSuccess(
           `Task branch has been successfully rebased onto ${ontoBranch}`,
           jsonOutput,
@@ -654,6 +656,7 @@ const rebaseCommand = async (taskId: string, options: RebaseOptions = {}) => {
 
               jsonOutput.rebased = true;
               jsonOutput.success = true;
+              commandOutcome = 'success';
 
               if (!isJsonMode()) {
                 console.log(
@@ -733,7 +736,7 @@ const rebaseCommand = async (taskId: string, options: RebaseOptions = {}) => {
       await exitWithError(jsonOutput, { telemetry });
     }
   } finally {
-    await telemetry?.shutdown();
+    await telemetry?.shutdown(commandOutcome);
   }
 };
 
