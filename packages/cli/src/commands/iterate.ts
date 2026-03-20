@@ -205,6 +205,7 @@ const iterateCommand = async (
     showTitle('Starting interactive session in sandbox');
 
     // Start the interactive process
+    let interactiveOutcome: 'success' | 'error' = 'error';
     try {
       // Start sandbox container for task execution
       const sandbox = await createSandbox(task, undefined, {
@@ -216,6 +217,7 @@ const iterateCommand = async (
       });
       // TODO: ADD INITIAL PROMPT!
       await sandbox.runInteractive();
+      interactiveOutcome = 'success';
     } catch (error) {
       if (error instanceof TaskNotFoundError) {
         result.error = error.message;
@@ -227,7 +229,7 @@ const iterateCommand = async (
 
       console.error(colors.red(`✗ ${result.error}`));
     } finally {
-      await telemetry?.shutdown();
+      await telemetry?.shutdown(interactiveOutcome);
     }
   } else {
     // Handle missing instructions - try stdin first, then prompt
@@ -283,6 +285,7 @@ const iterateCommand = async (
 
     result.instructions = finalInstructions;
 
+    let commandOutcome: 'success' | 'error' = 'error';
     try {
       // Load AI agent selection - prefer CLI flag, then task's agent, then user settings
       let selectedAiAgent: string;
@@ -536,6 +539,7 @@ const iterateCommand = async (
       processManager?.completeLastItem();
       processManager?.finish();
 
+      commandOutcome = 'success';
       await exitWithSuccess('Iteration started successfully', result, {
         tips: [
           'Use ' +
@@ -566,7 +570,7 @@ const iterateCommand = async (
         }
       }
     } finally {
-      await telemetry?.shutdown();
+      await telemetry?.shutdown(commandOutcome);
     }
   }
 };

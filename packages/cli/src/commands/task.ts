@@ -1260,8 +1260,6 @@ const taskCommand = async (initPrompt?: string, options: TaskOptions = {}) => {
     await exitWithError(jsonOutput, { telemetry });
     return;
   }
-
-  await telemetry?.shutdown();
 };
 
 export default {

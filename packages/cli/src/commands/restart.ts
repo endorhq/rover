@@ -71,6 +71,7 @@ const restartCommand = async (
     return;
   }
 
+  let commandOutcome: 'success' | 'error' = 'error';
   try {
     // Load task using ProjectManager
     const task = project.getTask(numericTaskId);
@@ -259,6 +260,7 @@ const restartCommand = async (
       restartedAt: restartedAt,
     };
 
+    commandOutcome = 'success';
     await exitWithSuccess('Task restarted succesfully!', jsonOutput, {
       tips: [
         'Use ' + colors.cyan('rover list') + ' to check the list of tasks',
@@ -284,7 +286,7 @@ const restartCommand = async (
       return;
     }
   } finally {
-    await telemetry?.shutdown();
+    await telemetry?.shutdown(commandOutcome);
   }
 };
 

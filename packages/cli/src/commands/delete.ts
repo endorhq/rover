@@ -111,7 +111,6 @@ const deleteCommand = async (
   if (tasksToDelete.length === 0) {
     jsonOutput.success = false;
     await exitWithErrors(jsonOutput, { telemetry });
-    await telemetry?.shutdown();
     return;
   }
 
@@ -163,7 +162,6 @@ const deleteCommand = async (
   if (!confirmDeletion) {
     jsonOutput.errors?.push('Task deletion cancelled');
     await exitWithErrors(jsonOutput, { telemetry });
-    await telemetry?.shutdown();
     return;
   }
 
@@ -175,11 +173,12 @@ const deleteCommand = async (
   const failedTasks: number[] = [];
   const warningTasks: number[] = [];
 
+  telemetry?.eventDeleteTask();
+
   try {
     for (const task of tasksToDelete) {
       try {
         // Delete the task using ProjectManager
-        telemetry?.eventDeleteTask();
         project.deleteTask(task);
 
         // Prune the git workspace
@@ -222,8 +221,6 @@ const deleteCommand = async (
     } else {
       await exitWithErrors(jsonOutput, { telemetry });
     }
-
-    await telemetry?.shutdown();
   }
 };
 
