@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { WorkflowStore } from 'rover-core';
+import { type ProjectManager, WorkflowStore } from 'rover-core';
 import { AutopilotStore } from '../store.js';
 import { MemoryStore } from '../memory/store.js';
 import { StepOrchestrator } from '../steps/orchestrator.js';
@@ -15,11 +15,9 @@ export interface StepStatuses {
 
 export interface UseStepOrchestratorOptions {
   steps: Step[];
-  projectId: string;
-  projectPath: string;
+  project: ProjectManager;
   owner?: string;
   repo?: string;
-  project?: string;
   botName?: string;
   maintainers?: string[];
   customInstructions?: string;
@@ -57,13 +55,13 @@ export function useStepOrchestrator(
   }, []);
 
   useEffect(() => {
-    const store = new AutopilotStore(opts.projectId);
+    const store = new AutopilotStore(opts.project.id);
     store.ensureDir();
 
     const workflowStore = new WorkflowStore();
     const memoryStore = new MemoryStore(
-      opts.projectPath,
-      `autopilot-${opts.projectId}`
+      opts.project.path,
+      `autopilot-${opts.project.id}`
     );
 
     // Load persisted traces
@@ -73,11 +71,9 @@ export function useStepOrchestrator(
       steps: opts.steps,
       store,
       traces: tracesRef.current,
-      projectId: opts.projectId,
-      projectPath: opts.projectPath,
+      project: opts.project,
       owner: opts.owner,
       repo: opts.repo,
-      project: opts.project,
       workflowStore,
       memoryStore,
       botName: opts.botName,
@@ -120,12 +116,10 @@ export function useStepOrchestrator(
       orchestratorRef.current = null;
     };
   }, [
-    opts.projectId,
-    opts.projectPath,
+    opts.project,
     opts.steps,
     opts.owner,
     opts.repo,
-    opts.project,
     opts.botName,
     opts.maintainers,
     opts.customInstructions,

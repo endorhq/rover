@@ -1,7 +1,6 @@
 import { join } from 'node:path';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import {
-  ProjectStore,
   ProjectConfigManager,
   IterationManager,
   Git,
@@ -54,13 +53,9 @@ export const workflowStep: Step = {
   } satisfies StepConfig,
 
   async process(pending: PendingAction, ctx: StepContext): Promise<StepResult> {
-    const { store, projectId, projectPath } = ctx;
-
-    const projectStore = new ProjectStore();
-    const project = projectStore.getByPath(projectPath);
-    if (!project) {
-      throw new Error(`No ProjectManager found for path: ${projectPath}`);
-    }
+    const { store, project } = ctx;
+    const projectId = project.id;
+    const projectPath = project.path;
 
     // Check running task limit
     const allMappings = store.getAllTaskMappings();
@@ -74,6 +69,13 @@ export const workflowStep: Step = {
     // Read action data from disk
     const actionData = store.readAction(pending.actionId);
     const meta = actionData?.meta ?? {};
+
+    const span = new SpanWriter(projectId, {
+      step: 'workflow',
+      parentId: actionData?.spanId ?? null,
+      originAction: pending.actionId,
+      meta,
+    });
 
     // Dependency resolution
     const dependsOnActionId = meta.depends_on_action_id as string | undefined;
@@ -91,25 +93,12 @@ export const workflowStep: Step = {
         depSpan &&
         (depSpan.status === 'failed' || depSpan.status === 'error')
       ) {
-        const span = new SpanWriter(projectId, {
-          step: 'workflow',
-          parentId: actionData?.spanId ?? null,
-          originAction: pending.actionId,
-          meta,
-        });
         const reason = `Dependency action ${dependsOnActionId} failed`;
         span.error(reason);
         ctx.failTrace(reason);
         return { spanId: span.id, terminal: true };
       }
     }
-
-    const span = new SpanWriter(projectId, {
-      step: 'workflow',
-      parentId: actionData?.spanId ?? null,
-      originAction: pending.actionId,
-      meta,
-    });
 
     let task: TaskDescriptionManager | undefined;
     let branchName: string;

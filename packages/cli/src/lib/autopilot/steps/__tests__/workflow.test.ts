@@ -40,9 +40,6 @@ vi.mock('rover-core', async () => {
   return {
     ...actual,
     getProjectPath: () => projectDir,
-    ProjectStore: vi.fn().mockImplementation(() => ({
-      getByPath: () => mockProject,
-    })),
     ProjectConfigManager: {
       load: () => ({
         excludePatterns: undefined,
@@ -94,11 +91,11 @@ vi.mock('../../../../utils/env-files.js', () => ({
   copyEnvironmentFiles: vi.fn(() => true),
 }));
 
+import type { ProjectManager } from 'rover-core';
 import { AutopilotStore } from '../../store.js';
 import type { Action, PendingAction, TraceItem } from '../../types.js';
 import { workflowStep } from '../workflow.js';
 import type { StepContext } from '../types.js';
-import { ProjectStore } from 'rover-core';
 
 function makePending(overrides: Partial<PendingAction> = {}): PendingAction {
   return {
@@ -147,11 +144,13 @@ function makeTrace(): TraceItem {
 function makeContext(store: AutopilotStore): StepContext {
   return {
     store,
-    projectId: 'test-project',
-    projectPath: projectDir,
+    project: {
+      id: 'test-project',
+      path: projectDir,
+      ...mockProject,
+    } as unknown as ProjectManager,
     owner: 'test-owner',
     repo: 'test-repo',
-    project: undefined,
     workflowStore: undefined,
     memoryStore: undefined,
     botName: 'rover-bot',
@@ -193,13 +192,6 @@ describe('workflowStep', () => {
     mockTask.updateStatusFromIteration.mockImplementation(() => {
       mockTask.status = 'COMPLETED';
     });
-
-    vi.mocked(ProjectStore).mockImplementation(
-      () =>
-        ({
-          getByPath: () => mockProject,
-        }) as any
-    );
   });
 
   afterEach(() => {
@@ -403,7 +395,7 @@ describe('workflowStep', () => {
           getMainBranch: () => 'main',
           createWorktree: mockCreateWorktree,
           setupSparseCheckout: vi.fn(),
-        }) as any
+        }) as unknown as InstanceType<typeof Git>
     );
 
     const ctx = makeContext(store);
@@ -487,7 +479,7 @@ describe('workflowStep', () => {
         ({
           fetchAndStore: vi.fn().mockRejectedValue(new Error('fetch failed')),
           getContextDir: () => join(projectDir, 'context'),
-        }) as any
+        }) as unknown as InstanceType<typeof ContextManager>
     );
 
     const pending = makePending();
@@ -507,22 +499,5 @@ describe('workflowStep', () => {
     expect(result.spanId).toBeDefined();
     expect(result.terminal).toBe(false);
     expect(result.newActions).toHaveLength(1);
-  });
-
-  it('returns no ProjectManager error when project not found', async () => {
-    vi.mocked(ProjectStore).mockImplementationOnce(
-      () =>
-        ({
-          getByPath: () => undefined,
-        }) as any
-    );
-
-    const pending = makePending();
-    writeActionFile('action-1');
-
-    const ctx = makeContext(store);
-    await expect(workflowStep.process(pending, ctx)).rejects.toThrow(
-      'No ProjectManager found'
-    );
   });
 });

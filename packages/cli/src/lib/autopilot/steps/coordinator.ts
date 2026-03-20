@@ -43,7 +43,9 @@ export const coordinatorStep: Step = {
   } satisfies StepConfig,
 
   async process(pending: PendingAction, ctx: StepContext): Promise<StepResult> {
-    const { store, projectId, projectPath } = ctx;
+    const { store, project } = ctx;
+    const projectId = project.id;
+    const projectPath = project.path;
 
     // Read full action from disk for spanId (parent) and meta (event JSON)
     const actionData = store.readAction(pending.actionId);

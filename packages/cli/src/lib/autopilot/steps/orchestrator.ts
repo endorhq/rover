@@ -1,7 +1,7 @@
 import type { AutopilotStore } from '../store.js';
 import type { TraceItem, PendingAction } from '../types.js';
 import type { MemoryStore } from '../memory/store.js';
-import type { WorkflowStore } from 'rover-core';
+import type { ProjectManager, WorkflowStore } from 'rover-core';
 import type {
   BaseContext,
   OrchestratorCallbacks,
@@ -14,11 +14,9 @@ export interface StepOrchestratorOptions {
   steps: Step[];
   store: AutopilotStore;
   traces: Map<string, TraceItem>;
-  projectId: string;
-  projectPath: string;
+  project: ProjectManager;
   owner?: string;
   repo?: string;
-  project?: string;
   workflowStore?: WorkflowStore;
   memoryStore?: MemoryStore;
   botName?: string;
@@ -63,11 +61,9 @@ export class StepOrchestrator {
 
     this.baseContext = {
       store: opts.store,
-      projectId: opts.projectId,
-      projectPath: opts.projectPath,
+      project: opts.project,
       owner: opts.owner,
       repo: opts.repo,
-      project: opts.project,
       workflowStore: opts.workflowStore,
       memoryStore: opts.memoryStore,
       botName: opts.botName,

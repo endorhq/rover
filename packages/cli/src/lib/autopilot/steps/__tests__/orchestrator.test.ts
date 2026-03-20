@@ -14,6 +14,7 @@ vi.mock('rover-core', async () => {
   };
 });
 
+import type { ProjectManager } from 'rover-core';
 import { AutopilotStore } from '../../store.js';
 import type { Action, TraceItem, PendingAction } from '../../types.js';
 import { StepOrchestrator } from '../orchestrator.js';
@@ -91,8 +92,7 @@ function createOrchestrator(
     steps,
     store,
     traces: traces ?? new Map(),
-    projectId: 'test-project',
-    projectPath: projectDir,
+    project: { id: 'test-project', path: projectDir } as unknown as ProjectManager,
     callbacks,
     fallbackIntervalMs: 60_000, // Long interval so tests control drains
   });
