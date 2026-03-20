@@ -9,6 +9,7 @@ import {
   showTips,
   showTitle,
   type TaskDescriptionManager,
+  UserSettingsManager,
 } from 'rover-core';
 import { TaskNotFoundError, type TaskStatus } from 'rover-schemas';
 import { formatAgentWithModel } from '../utils/agent-parser.js';
@@ -78,18 +79,30 @@ const jsonErrorOutput = (
  * @param options.json - Output results in JSON format
  * @param options.file - Array of workflow output files to display (formatted)
  * @param options.rawFile - Array of files to output as raw content (no formatting)
+ * @param options.watch - Enable watch mode with optional refresh interval in seconds
+ * @param options.watching - Internal flag indicating active watch mode cycle
  */
 const inspectCommand = async (
   taskId: string,
   iterationNumber?: number,
-  options: { json?: boolean; file?: string[]; rawFile?: string[] } = {}
+  options: {
+    json?: boolean;
+    file?: string[];
+    rawFile?: string[];
+    watch?: boolean | string;
+    watching?: boolean;
+  } = {}
 ) => {
+  const isWatching = !!(options.watch || options.watching);
+
   if (options.json !== undefined) {
     setJsonMode(options.json);
   }
 
   const telemetry = getTelemetry();
-  telemetry?.eventInspectTask();
+  if (!options.watching) {
+    telemetry?.eventInspectTask();
+  }
 
   // Convert string taskId to number
   const numericTaskId = parseInt(taskId, 10);
@@ -266,8 +279,13 @@ const inspectCommand = async (
         source: task.source,
       };
 
-      await exitWithSuccess(null, jsonOutput, { telemetry });
-      return;
+      if (isWatching) {
+        // In watch mode, emit compact JSONL so consumers can parse line-by-line
+        console.log(JSON.stringify(jsonOutput));
+      } else {
+        await exitWithSuccess(null, jsonOutput, { telemetry });
+        return;
+      }
     } else {
       // Format status with user-friendly names
       const formattedStatus = formatTaskStatus(task.status);
@@ -374,32 +392,100 @@ const inspectCommand = async (
         showList(statFiles);
       }
 
-      const tips = [];
+      if (!isWatching) {
+        const tips = [];
 
-      if (task.status === 'NEW' || task.status === 'FAILED') {
-        tips.push(
-          'Use ' + colors.cyan(`rover restart ${taskId}`) + ' to retry it'
-        );
-      } else if (options.file == null && discoveredFiles.length > 0) {
-        tips.push(
+        if (task.status === 'NEW' || task.status === 'FAILED') {
+          tips.push(
+            'Use ' + colors.cyan(`rover restart ${taskId}`) + ' to retry it'
+          );
+        } else if (options.file == null && discoveredFiles.length > 0) {
+          tips.push(
+            'Use ' +
+              colors.cyan(
+                `rover inspect ${taskId} --file ${discoveredFiles[0]}`
+              ) +
+              ' to read its content'
+          );
+        }
+
+        showTips([
+          ...tips,
           'Use ' +
-            colors.cyan(
-              `rover inspect ${taskId} --file ${discoveredFiles[0]}`
-            ) +
-            ' to read its content'
+            colors.cyan(`rover iterate ${taskId}`) +
+            ' to start a new agent iteration on this task',
+        ]);
+      }
+    }
+
+    if (!isWatching) {
+      await exitWithSuccess(null, { success: true }, { telemetry });
+      return;
+    }
+
+    // Watch mode (configurable refresh interval, default 3 seconds)
+    if (options.watch) {
+      let intervalSeconds: number;
+      if (typeof options.watch === 'string') {
+        intervalSeconds = parseInt(options.watch, 10);
+        if (
+          isNaN(intervalSeconds) ||
+          intervalSeconds < 1 ||
+          intervalSeconds > 60
+        ) {
+          console.error(
+            colors.red('Watch interval must be between 1 and 60 seconds')
+          );
+          return;
+        }
+      } else {
+        const DEFAULT_WATCH_INTERVAL = 3;
+        if (project?.path) {
+          try {
+            const settings = UserSettingsManager.load(project.path);
+            intervalSeconds = settings.watchIntervalSeconds;
+          } catch {
+            intervalSeconds = DEFAULT_WATCH_INTERVAL;
+          }
+        } else {
+          intervalSeconds = DEFAULT_WATCH_INTERVAL;
+        }
+      }
+      const intervalMs = intervalSeconds * 1000;
+
+      if (!isJsonMode()) {
+        console.log(
+          colors.gray(
+            `\n⏱️  Watching for changes every ${intervalSeconds}s (Ctrl+C to exit)...`
+          )
         );
       }
 
-      showTips([
-        ...tips,
-        'Use ' +
-          colors.cyan(`rover iterate ${taskId}`) +
-          ' to start a new agent iteration on this task',
-      ]);
-    }
+      const watchInterval = setInterval(async () => {
+        if (!isJsonMode()) {
+          // Clear screen and show updated status
+          process.stdout.write('\x1b[2J\x1b[0f');
+        }
+        await inspectCommand(taskId, iterationNumber, {
+          ...options,
+          watch: false,
+          watching: true,
+        });
+        if (!isJsonMode()) {
+          console.log(
+            colors.gray(
+              `\n⏱️  Refreshing every ${intervalSeconds}s (Ctrl+C to exit)...`
+            )
+          );
+        }
+      }, intervalMs);
 
-    await exitWithSuccess(null, { success: true }, { telemetry });
-    return;
+      // Handle Ctrl+C
+      process.on('SIGINT', () => {
+        clearInterval(watchInterval);
+        process.exit(0);
+      });
+    }
   } catch (error) {
     if (error instanceof TaskNotFoundError) {
       const errorOutput = jsonErrorOutput(error.message, numericTaskId);

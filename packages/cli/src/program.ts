@@ -389,6 +389,10 @@ export function createProgram(
       'Output raw file contents without formatting (mutually exclusive with --file)'
     )
     .option('--json', 'Output in JSON format')
+    .option(
+      '-w, --watch [seconds]',
+      'Watch for changes (default 3s, or specify interval)'
+    )
     .action(inspectCmd.action);
 
   program
