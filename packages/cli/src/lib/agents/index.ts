@@ -6,7 +6,7 @@ import GeminiAI from './gemini.js';
 import OpenCodeAI from './opencode.js';
 import QwenAI from './qwen.js';
 import type { IPromptTask } from '../prompts/index.js';
-import { UserSettingsManager, AI_AGENT, launchSync } from 'rover-core';
+import { UserSettingsManager, AI_AGENT, launchSync, type InvokeResult } from 'rover-core';
 import type { WorkflowInput } from 'rover-schemas';
 import { getProjectPath } from '../context.js';
 
@@ -29,7 +29,7 @@ export interface InvokeOptions {
 
 export interface AIAgentTool {
   // Invoke the CLI tool using the SDK / direct mode with the given prompt
-  invoke(prompt: string, options?: InvokeOptions): Promise<string>;
+  invoke(prompt: string, options?: InvokeOptions): Promise<InvokeResult>;
 
   // Check if the current AI agent is available
   // It will throw an exception in other case

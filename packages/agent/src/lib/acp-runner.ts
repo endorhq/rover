@@ -31,6 +31,7 @@ import {
   showList,
   type StepResult,
 } from 'rover-core';
+import type { UsageReport } from 'rover-schemas';
 import { ACPClient } from './acp-client.js';
 import { GeminiOrQwenACPClient } from './gemini-or-qwen-acp-client.js';
 import { createAgent } from './agents/index.js';
@@ -286,8 +287,7 @@ export class ACPRunner {
   ): Promise<{
     stopReason: string;
     response: string;
-    tokens?: number;
-    cost?: number;
+    usage?: UsageReport;
   }> {
     if (!this.isConnectionInitialized || !this.connection) {
       throw new Error(
@@ -380,18 +380,43 @@ export class ACPRunner {
       const response = this.client.stopCapturing(sessionId);
 
       // Extract usage stats from the ACP response
-      const tokens = promptResult.usage
-        ? (promptResult.usage.inputTokens ?? 0) +
-          (promptResult.usage.outputTokens ?? 0) +
-          (promptResult.usage.cachedReadTokens ?? 0) +
-          (promptResult.usage.cachedWriteTokens ?? 0)
-        : undefined;
+      let usage: UsageReport | undefined;
 
-      // Get per-prompt cost delta from the client's tracked usage_update events
+      const promptUsage = promptResult.usage;
       const promptCost = this.client.getLastPromptCost(sessionId);
-      const cost = promptCost.amount > 0 ? promptCost.amount : undefined;
 
-      return { stopReason: promptResult.stopReason, response, tokens, cost };
+      if (promptUsage || promptCost.amount > 0) {
+        const inputTokens = promptUsage?.inputTokens
+          ? Number(promptUsage.inputTokens)
+          : undefined;
+        const outputTokens = promptUsage?.outputTokens
+          ? Number(promptUsage.outputTokens)
+          : undefined;
+        const cachedRead = promptUsage?.cachedReadTokens
+          ? Number(promptUsage.cachedReadTokens)
+          : 0;
+        const cachedWrite = promptUsage?.cachedWriteTokens
+          ? Number(promptUsage.cachedWriteTokens)
+          : 0;
+
+        const totalTokens =
+          inputTokens !== undefined || outputTokens !== undefined
+            ? (inputTokens ?? 0) +
+              (outputTokens ?? 0) +
+              cachedRead +
+              cachedWrite
+            : undefined;
+
+        usage = {
+          inputTokens,
+          outputTokens,
+          totalTokens,
+          cost: promptCost.amount > 0 ? promptCost.amount : undefined,
+          currency: promptCost.amount > 0 ? promptCost.currency : undefined,
+        };
+      }
+
+      return { stopReason: promptResult.stopReason, response, usage };
     } catch (error) {
       console.log(
         colors.red('[ACP] Prompt failed:'),
@@ -547,11 +572,14 @@ export class ACPRunner {
       // Send the prompt via ACP session
       const promptResult = await this.sendPrompt(sessionId, prompt);
 
-      // Track usage stats from ACP response
-      const tokens = promptResult.tokens;
-      const cost = promptResult.cost;
-      // Use the model set for this step, or the default model
+      // Build usage report from ACP response
       const model = stepModel || this.defaultModel;
+      let usage: UsageReport | undefined = promptResult.usage;
+      if (usage) {
+        usage = { ...usage, model };
+      } else if (model) {
+        usage = { model };
+      }
 
       if (VERBOSE) {
         console.log(
@@ -588,18 +616,19 @@ export class ACPRunner {
         stepName: step.name,
         agent: this.tool,
         duration,
-        tokens,
-        cost,
-        model,
+        tokens: usage?.totalTokens,
+        inputTokens: usage?.inputTokens,
+        outputTokens: usage?.outputTokens,
+        cost: usage?.cost,
+        currency: usage?.currency,
+        model: usage?.model,
       });
 
       return {
         id: step.id,
         success: true,
         duration,
-        tokens,
-        cost,
-        model,
+        usage,
         outputs,
       };
     } catch (error) {

@@ -20,6 +20,7 @@ import {
   type WorkflowDefaults,
   type WorkflowConfig,
   type WorkflowAgentTool,
+  type UsageReport,
   ZodError,
 } from 'rover-schemas';
 import { launchSync } from '../os.js';
@@ -34,10 +35,8 @@ export interface StepResult {
   error?: string;
   duration: number;
   outputs: Map<string, string>;
-  // Usage metrics (populated by agent runners)
-  tokens?: number;
-  cost?: number;
-  model?: string;
+  /** Usage metrics reported by the agent, if available. */
+  usage?: UsageReport;
 }
 
 export type AgentStepExecutor = (
@@ -69,6 +68,8 @@ export interface WorkflowRunResult {
   stepsOutput: Map<string, Map<string, string>>;
   runSteps: number;
   totalSteps: number;
+  /** Aggregated usage across all steps. */
+  usage?: UsageReport;
 }
 
 /**
@@ -563,6 +564,9 @@ export class WorkflowManager {
       }
     }
 
+    // Aggregate usage across all steps
+    const usage = aggregateUsage(stepResults);
+
     return {
       success: workflowSuccess,
       error: workflowError,
@@ -571,6 +575,7 @@ export class WorkflowManager {
       stepsOutput,
       runSteps,
       totalSteps,
+      usage,
     };
   }
 
@@ -626,4 +631,60 @@ export class WorkflowManager {
       warnings,
     };
   }
+}
+
+/**
+ * Aggregate UsageReport values across a list of step results.
+ * Returns undefined if no step reported usage.
+ */
+function aggregateUsage(stepResults: StepResult[]): UsageReport | undefined {
+  const reports = stepResults
+    .map(r => r.usage)
+    .filter((u): u is UsageReport => u !== undefined);
+
+  if (reports.length === 0) return undefined;
+
+  let inputTokens = 0;
+  let outputTokens = 0;
+  let totalTokens = 0;
+  let cost = 0;
+  let currency: string | undefined;
+  let model: string | undefined;
+
+  let hasTokens = false;
+  let hasCost = false;
+
+  for (const report of reports) {
+    if (report.inputTokens !== undefined) {
+      inputTokens += report.inputTokens;
+      hasTokens = true;
+    }
+    if (report.outputTokens !== undefined) {
+      outputTokens += report.outputTokens;
+      hasTokens = true;
+    }
+    if (report.totalTokens !== undefined) {
+      totalTokens += report.totalTokens;
+      hasTokens = true;
+    }
+    if (report.cost !== undefined) {
+      cost += report.cost;
+      hasCost = true;
+    }
+    if (report.currency !== undefined) {
+      currency = report.currency;
+    }
+    if (report.model !== undefined) {
+      model = report.model;
+    }
+  }
+
+  return {
+    inputTokens: hasTokens ? inputTokens : undefined,
+    outputTokens: hasTokens ? outputTokens : undefined,
+    totalTokens: hasTokens ? totalTokens : undefined,
+    cost: hasCost ? cost : undefined,
+    currency: hasCost ? (currency ?? 'USD') : undefined,
+    model,
+  };
 }

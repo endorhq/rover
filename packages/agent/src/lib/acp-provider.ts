@@ -14,6 +14,7 @@ import { UserSettingsManager } from 'rover-core';
 import { acpInvoke } from './acp-invoke.js';
 import { parseJsonResponse } from './json-parser.js';
 import { PromptBuilder, type IPromptTask } from 'rover-prompts';
+import type { InvokeResult } from 'rover-core';
 
 export interface ACPProviderConfig {
   /** Agent name (claude, codex, cursor, gemini, qwen, copilot, opencode). */
@@ -51,7 +52,8 @@ export class ACPProvider {
   }
 
   /**
-   * Send a prompt to the agent via ACP and return the response.
+   * Send a prompt to the agent via ACP and return the response
+   * along with usage metrics.
    */
   async invoke(
     prompt: string,
@@ -61,7 +63,7 @@ export class ACPProvider {
       model?: string;
       systemPrompt?: string;
     } = {}
-  ): Promise<string> {
+  ): Promise<InvokeResult> {
     const { json = false, cwd, model, systemPrompt } = options;
 
     let finalPrompt = prompt;
@@ -94,11 +96,11 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
     );
 
     try {
-      const response = await this.invoke(prompt, {
+      const result = await this.invoke(prompt, {
         json: true,
         cwd: projectPath,
       });
-      return parseJsonResponse<IPromptTask>(response);
+      return parseJsonResponse<IPromptTask>(result.response);
     } catch (error) {
       console.error(`Failed to expand task with ${this.agentName}:`, error);
       return null;
@@ -122,8 +124,8 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
     );
 
     try {
-      const response = await this.invoke(prompt, { json: true });
-      return parseJsonResponse<IPromptTask>(response);
+      const result = await this.invoke(prompt, { json: true });
+      return parseJsonResponse<IPromptTask>(result.response);
     } catch (error) {
       console.error(
         `Failed to expand iteration instructions with ${this.agentName}:`,
@@ -149,14 +151,14 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
         recentCommits,
         summaries
       );
-      const response = await this.invoke(prompt);
+      const result = await this.invoke(prompt);
 
-      if (!response) {
+      if (!result.response) {
         return null;
       }
 
       // Clean up the response to get just the commit message
-      const lines = response
+      const lines = result.response
         .split('\n')
         .filter((line: string) => line.trim() !== '');
       return lines[0] || null;
@@ -179,9 +181,9 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
         diffContext,
         conflictedContent
       );
-      const response = await this.invoke(prompt);
+      const result = await this.invoke(prompt);
 
-      return response;
+      return result.response;
     } catch (err) {
       return null;
     }
@@ -200,8 +202,8 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
     );
 
     try {
-      const response = await this.invoke(prompt, { json: true });
-      return parseJsonResponse<Record<string, any>>(response);
+      const result = await this.invoke(prompt, { json: true });
+      return parseJsonResponse<Record<string, any>>(result.response);
     } catch (error) {
       console.error(
         `Failed to extract GitHub inputs with ${this.agentName}:`,

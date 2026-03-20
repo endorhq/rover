@@ -12,7 +12,7 @@
  * - getEnvironmentVariables(): Docker environment variables
  */
 
-import { launch } from 'rover-core';
+import { launch, type InvokeResult } from 'rover-core';
 import type { WorkflowInput } from 'rover-schemas';
 import { ACPProvider, type IPromptTask } from '@endorhq/agent';
 
@@ -42,7 +42,7 @@ export abstract class ACPAgentBase {
   async invoke(
     prompt: string,
     options: { json?: boolean; cwd?: string; model?: string } = {}
-  ): Promise<string> {
+  ): Promise<InvokeResult> {
     try {
       return await this.provider.invoke(prompt, options);
     } catch (error) {
