@@ -6,7 +6,12 @@ import GeminiAI from './gemini.js';
 import OpenCodeAI from './opencode.js';
 import QwenAI from './qwen.js';
 import type { IPromptTask } from '../prompts/index.js';
-import { UserSettingsManager, AI_AGENT, launchSync, type InvokeResult } from 'rover-core';
+import {
+  UserSettingsManager,
+  AI_AGENT,
+  launchSync,
+  type InvokeResult,
+} from 'rover-core';
 import type { WorkflowInput } from 'rover-schemas';
 import { getProjectPath } from '../context.js';
 
