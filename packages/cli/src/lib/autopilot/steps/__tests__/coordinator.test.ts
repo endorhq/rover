@@ -96,15 +96,19 @@ function makeContext(store: AutopilotStore): StepContext {
   };
 }
 
-function makeDecisionResponse(overrides: Record<string, unknown> = {}): string {
-  return JSON.stringify({
-    action: 'plan',
-    confidence: 'high',
-    reasoning: 'This issue needs investigation.',
-    context: 'Issue #42 opened with feature request.',
-    meta: { scope: 'feature request', references: ['#42'] },
-    ...overrides,
-  });
+function makeDecisionResponse(overrides: Record<string, unknown> = {}): {
+  response: string;
+} {
+  return {
+    response: JSON.stringify({
+      action: 'plan',
+      confidence: 'high',
+      reasoning: 'This issue needs investigation.',
+      context: 'Issue #42 opened with feature request.',
+      meta: { scope: 'feature request', references: ['#42'] },
+      ...overrides,
+    }),
+  };
 }
 
 describe('coordinatorStep', () => {

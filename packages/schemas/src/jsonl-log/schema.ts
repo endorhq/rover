@@ -63,11 +63,20 @@ export const JsonlLogEntrySchema = z.object({
   /** Duration in seconds */
   duration: z.number().optional(),
 
-  /** Consumed tokens */
+  /** Consumed tokens (total) */
   tokens: z.number().optional(),
 
-  /** Cost in USD */
+  /** Input tokens consumed */
+  inputTokens: z.number().optional(),
+
+  /** Output tokens produced */
+  outputTokens: z.number().optional(),
+
+  /** Cost incurred */
   cost: z.number().optional(),
+
+  /** Currency of the cost value */
+  currency: z.string().optional(),
 
   /** Model used */
   model: z.string().optional(),

@@ -93,13 +93,13 @@ export const coordinatorStep: Step = {
 
       // Invoke AI via ACP
       const provider = ACPProvider.fromProject(projectPath);
-      const response = await provider.invoke(userMessage, {
+      const result = await provider.invoke(userMessage, {
         json: true,
         systemPrompt,
         cwd: projectPath,
       });
 
-      const decision = parseJsonResponse<CoordinatorDecision>(response);
+      const decision = parseJsonResponse<CoordinatorDecision>(result.response);
       if (!decision) {
         throw new Error(
           'Failed to parse coordinator decision from AI response'
@@ -127,11 +127,12 @@ export const coordinatorStep: Step = {
         store.removeWaitEntry(decision.meta.satisfied_wait_id as string);
       }
 
-      // Complete span
+      // Complete span (include usage in metadata if available)
       const summary = `coordinate: ${decision.action} — ${actionData?.reasoning ?? pending.action}`;
       span.complete(summary, {
         ...decision.meta,
         context: decision.context,
+        ...(result.usage ? { usage: result.usage } : {}),
       });
 
       // Create follow-up action on disk (orchestrator handles enqueuing)
@@ -151,6 +152,7 @@ export const coordinatorStep: Step = {
             action: decision.action,
           },
         ],
+        usage: result.usage,
       };
     } catch (error) {
       span.error(
