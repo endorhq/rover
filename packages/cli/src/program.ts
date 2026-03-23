@@ -27,6 +27,8 @@ import colors from 'ansi-colors';
 import pushCmd from './commands/push.js';
 import stopCmd from './commands/stop.js';
 import mcpCmd from './commands/mcp.js';
+import { tryRemoveTaskContainer } from './lib/sandbox/index.js';
+import { isTerminalStatus } from './utils/task-status.js';
 import { addWorkflowCommands } from './commands/workflows/index.js';
 import workflowAddCmd from './commands/workflows/add.js';
 import workflowListCmd from './commands/workflows/list.js';
@@ -231,6 +233,20 @@ export function createProgram(
           projectPath: getProjectPath() || process.cwd(),
           projectName: getCLIContext().project?.name,
         });
+      })
+      .hook('postAction', async () => {
+        // Opportunistically remove containers for tasks that have reached a
+        // terminal state. FAILED tasks are intentionally kept so that users
+        // can still debug the container.
+        const project = getCLIContext().project;
+        if (!project) return;
+
+        await Promise.all(
+          project
+            .listTasks()
+            .filter(t => isTerminalStatus(t.status) && t.containerId)
+            .map(t => tryRemoveTaskContainer(t).catch(() => {}))
+        );
       });
   }
 

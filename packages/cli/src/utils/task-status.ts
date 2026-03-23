@@ -1,5 +1,14 @@
 import colors, { type StyleFunction } from 'ansi-colors';
 
+const TERMINAL_STATUSES = ['COMPLETED', 'MERGED', 'PUSHED'];
+
+/**
+ * Whether a task status represents a terminal (finished successfully) state.
+ * FAILED is intentionally excluded so users can still debug the container.
+ */
+export const isTerminalStatus = (status: string): boolean =>
+  TERMINAL_STATUSES.includes(status.toUpperCase());
+
 /**
  * Format task status for user-friendly display
  */

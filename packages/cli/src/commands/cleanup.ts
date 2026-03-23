@@ -2,7 +2,10 @@ import colors from 'ansi-colors';
 import { existsSync } from 'node:fs';
 import { ProjectStore, showList, showProperties, showTitle } from 'rover-core';
 import { isJsonMode } from '../lib/context.js';
-import { getAvailableSandboxBackend } from '../lib/sandbox/index.js';
+import {
+  getAvailableSandboxBackend,
+  tryRemoveTaskContainer,
+} from '../lib/sandbox/index.js';
 import { ContainerBackend } from '../lib/sandbox/container-common.js';
 import {
   listCacheImages,
@@ -15,6 +18,7 @@ import type {
   CleanupOutputImage,
 } from '../output-types.js';
 import { exitWithError, exitWithSuccess } from '../utils/exit.js';
+import { isTerminalStatus } from '../utils/task-status.js';
 import type { CommandDefinition } from '../types.js';
 
 /**
@@ -178,6 +182,33 @@ const cleanupCommand = async (
     const store = new ProjectStore();
     const registeredPaths = new Set(store.list().map(p => p.path));
     const dockerHosts = collectDockerHosts(store);
+
+    // 2b. Remove containers for tasks in terminal states
+    let containersRemoved = 0;
+    for (const projectData of store.list()) {
+      try {
+        const projectManager = store.get(projectData.id);
+        if (!projectManager) continue;
+        for (const task of projectManager.listTasks()) {
+          if (isTerminalStatus(task.status) && task.containerId) {
+            try {
+              await tryRemoveTaskContainer(task);
+              containersRemoved++;
+            } catch {
+              // Best-effort
+            }
+          }
+        }
+      } catch {
+        // Skip projects we cannot read
+      }
+    }
+
+    if (!isJsonMode() && containersRemoved > 0) {
+      console.log(
+        colors.green(`\nRemoved ${containersRemoved} stopped container(s).`)
+      );
+    }
 
     // 3. List cache images on every known DOCKER_HOST
     const allImages: CacheImageInfo[] = [];

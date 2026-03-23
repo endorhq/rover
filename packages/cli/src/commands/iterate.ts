@@ -25,7 +25,7 @@ import {
 import { parseAgentString } from '../utils/agent-parser.js';
 import { isJsonMode, requireProjectContext } from '../lib/context.js';
 import type { IPromptTask } from '../lib/prompts/index.js';
-import { createSandbox } from '../lib/sandbox/index.js';
+import { createSandbox, tryRemoveTaskContainer } from '../lib/sandbox/index.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import type { IterateOutput } from '../output-types.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
@@ -510,6 +510,9 @@ const iterateCommand = async (
       // TODO(angel): Is this required?
       result.expandedTitle = expandedTask.title;
       result.expandedDescription = expandedTask.description;
+
+      // Remove the previous iteration's container before starting a new one
+      await tryRemoveTaskContainer(task);
 
       // Start sandbox container for task execution
       const sandbox = await createSandbox(task, processManager, {
