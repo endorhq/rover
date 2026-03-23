@@ -184,7 +184,12 @@ export const plannerStep: Step = {
       // Write workflow action files
       const newActions = writeWorkflowActions(projectId, planResult, span.id);
 
-      return { spanId: span.id, terminal: false, newActions, usage: response.usage };
+      return {
+        spanId: span.id,
+        terminal: false,
+        newActions,
+        usage: response.usage,
+      };
     } catch (error) {
       span.error(
         `Planner failed: ${error instanceof Error ? error.message : String(error)}`
