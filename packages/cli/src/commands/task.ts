@@ -363,7 +363,7 @@ const createTaskForAgent = async (
   // AI expansion with context content
   processManager?.addItem(`Expand task information using ${selectedAiAgent}`);
 
-  const expandedTask = await agentTool.expandTask(
+  const { result: expandedTask } = await agentTool.expandTask(
     description,
     projectPath,
     contextContent
@@ -786,10 +786,11 @@ const taskCommand = async (initPrompt?: string, options: TaskOptions = {}) => {
               }
 
               const agentTool = getAIAgentTool(selectedAgents[0].agent);
-              const extractedInputs = await agentTool.extractGithubInputs(
-                issueData.body,
-                inputs.filter(el => el.name !== 'description')
-              );
+              const { result: extractedInputs } =
+                await agentTool.extractGithubInputs(
+                  issueData.body,
+                  inputs.filter(el => el.name !== 'description')
+                );
 
               if (extractedInputs) {
                 for (const key in extractedInputs) {

@@ -90,7 +90,7 @@ const generateCommitMessage = async (
   options: { json?: boolean } = {}
 ): Promise<string | null> => {
   try {
-    const commitMessage = await aiAgent.generateCommitMessage(
+    const { result: commitMessage } = await aiAgent.generateCommitMessage(
       taskTitle,
       taskDescription,
       recentCommits,
@@ -154,7 +154,7 @@ const resolveMergeConflicts = async (
         .join('\n');
 
       try {
-        const resolvedContent = await aiAgent.resolveMergeConflicts(
+        const { result: resolvedContent } = await aiAgent.resolveMergeConflicts(
           filePath,
           diffContext,
           conflictedContent
