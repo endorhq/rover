@@ -14,7 +14,7 @@ import { UserSettingsManager } from 'rover-core';
 import { acpInvoke } from './acp-invoke.js';
 import { parseJsonResponse } from './json-parser.js';
 import { PromptBuilder, type IPromptTask } from 'rover-prompts';
-import type { InvokeResult } from 'rover-core';
+import type { InvokeResult, ResultWithUsage } from 'rover-core';
 
 export interface ACPProviderConfig {
   /** Agent name (claude, codex, cursor, gemini, qwen, copilot, opencode). */
@@ -89,7 +89,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
     briefDescription: string,
     projectPath: string,
     contextContent?: string
-  ): Promise<IPromptTask | null> {
+  ): Promise<ResultWithUsage<IPromptTask | null>> {
     const prompt = this.promptBuilder.expandTaskPrompt(
       briefDescription,
       contextContent
@@ -100,10 +100,13 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
         json: true,
         cwd: projectPath,
       });
-      return parseJsonResponse<IPromptTask>(result.response);
+      return {
+        result: parseJsonResponse<IPromptTask>(result.response),
+        usage: result.usage,
+      };
     } catch (error) {
       console.error(`Failed to expand task with ${this.agentName}:`, error);
-      return null;
+      return { result: null };
     }
   }
 
@@ -115,7 +118,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
     previousPlan?: string,
     previousChanges?: string,
     contextContent?: string
-  ): Promise<IPromptTask | null> {
+  ): Promise<ResultWithUsage<IPromptTask | null>> {
     const prompt = this.promptBuilder.expandIterationInstructionsPrompt(
       instructions,
       previousPlan,
@@ -125,13 +128,16 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
 
     try {
       const result = await this.invoke(prompt, { json: true });
-      return parseJsonResponse<IPromptTask>(result.response);
+      return {
+        result: parseJsonResponse<IPromptTask>(result.response),
+        usage: result.usage,
+      };
     } catch (error) {
       console.error(
         `Failed to expand iteration instructions with ${this.agentName}:`,
         error
       );
-      return null;
+      return { result: null };
     }
   }
 
@@ -143,7 +149,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
     taskDescription: string,
     recentCommits: string[],
     summaries: string[]
-  ): Promise<string | null> {
+  ): Promise<ResultWithUsage<string | null>> {
     try {
       const prompt = this.promptBuilder.generateCommitMessagePrompt(
         taskTitle,
@@ -154,16 +160,16 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
       const result = await this.invoke(prompt);
 
       if (!result.response) {
-        return null;
+        return { result: null, usage: result.usage };
       }
 
       // Clean up the response to get just the commit message
       const lines = result.response
         .split('\n')
         .filter((line: string) => line.trim() !== '');
-      return lines[0] || null;
+      return { result: lines[0] || null, usage: result.usage };
     } catch (error) {
-      return null;
+      return { result: null };
     }
   }
 
@@ -174,7 +180,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
     filePath: string,
     diffContext: string,
     conflictedContent: string
-  ): Promise<string | null> {
+  ): Promise<ResultWithUsage<string | null>> {
     try {
       const prompt = this.promptBuilder.resolveMergeConflictsPrompt(
         filePath,
@@ -183,9 +189,9 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
       );
       const result = await this.invoke(prompt);
 
-      return result.response;
+      return { result: result.response, usage: result.usage };
     } catch (err) {
-      return null;
+      return { result: null };
     }
   }
 
@@ -195,7 +201,7 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
   async extractGithubInputs(
     issueDescription: string,
     inputs: WorkflowInput[]
-  ): Promise<Record<string, any> | null> {
+  ): Promise<ResultWithUsage<Record<string, any> | null>> {
     const prompt = this.promptBuilder.extractGithubInputsPrompt(
       issueDescription,
       inputs
@@ -203,13 +209,16 @@ You MUST output a valid JSON string as an output. Just output the JSON string an
 
     try {
       const result = await this.invoke(prompt, { json: true });
-      return parseJsonResponse<Record<string, any>>(result.response);
+      return {
+        result: parseJsonResponse<Record<string, any>>(result.response),
+        usage: result.usage,
+      };
     } catch (error) {
       console.error(
         `Failed to extract GitHub inputs with ${this.agentName}:`,
         error
       );
-      return null;
+      return { result: null };
     }
   }
 }

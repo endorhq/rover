@@ -56,7 +56,11 @@ export {
 export { AI_AGENT, type UsageReport } from 'rover-schemas';
 
 // Usage tracking (InvokeResult, UsageTracker)
-export { UsageTracker, type InvokeResult } from './usage.js';
+export {
+  UsageTracker,
+  type InvokeResult,
+  type ResultWithUsage,
+} from './usage.js';
 
 export {
   getConfigDir,

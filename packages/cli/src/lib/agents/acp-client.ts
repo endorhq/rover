@@ -62,6 +62,9 @@ const terminals = new Map<string, TerminalState>();
 interface SessionCaptureState {
   capturedMessages: string;
   isCapturing: boolean;
+  cumulativeCostAmount: number;
+  cumulativeCostCurrency: string;
+  costAtCaptureStart: number;
 }
 
 export class ACPClient implements Client {
@@ -73,6 +76,9 @@ export class ACPClient implements Client {
       session = {
         capturedMessages: '',
         isCapturing: false,
+        cumulativeCostAmount: 0,
+        cumulativeCostCurrency: 'USD',
+        costAtCaptureStart: 0,
       };
       this.sessions.set(sessionId, session);
     }
@@ -86,6 +92,7 @@ export class ACPClient implements Client {
     const session = this.getOrCreateSession(sessionId);
     session.capturedMessages = '';
     session.isCapturing = true;
+    session.costAtCaptureStart = session.cumulativeCostAmount;
   }
 
   /**
@@ -97,6 +104,19 @@ export class ACPClient implements Client {
     const messages = session.capturedMessages;
     session.capturedMessages = '';
     return messages;
+  }
+
+  /**
+   * Get the cost incurred during the last capture window (between
+   * startCapturing and stopCapturing). Returns the delta in the
+   * cumulative cost reported by the agent via usage_update events.
+   */
+  getLastPromptCost(sessionId: string): { amount: number; currency: string } {
+    const session = this.getOrCreateSession(sessionId);
+    return {
+      amount: session.cumulativeCostAmount - session.costAtCaptureStart,
+      currency: session.cumulativeCostCurrency,
+    };
   }
 
   /**
@@ -211,6 +231,12 @@ export class ACPClient implements Client {
         }
         break;
       case 'usage_update':
+        // Track cumulative cost reported by the agent
+        if (update.cost) {
+          session.cumulativeCostAmount = update.cost.amount;
+          session.cumulativeCostCurrency = update.cost.currency;
+        }
+        break;
       case 'available_commands_update':
       case 'plan':
       case 'user_message_chunk':

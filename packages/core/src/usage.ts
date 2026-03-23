@@ -18,6 +18,19 @@ export interface InvokeResult {
 }
 
 /**
+ * Generic wrapper that pairs any result value with optional usage metrics.
+ *
+ * Used by higher-level methods (task expansion, commit message generation, etc.)
+ * that process the raw agent response but still want to surface cost/token data.
+ */
+export interface ResultWithUsage<T> {
+  /** The processed result. */
+  result: T;
+  /** Usage metrics reported by the underlying invocation, if available. */
+  usage?: UsageReport;
+}
+
+/**
  * Accumulates UsageReport entries across multiple operations.
  *
  * Useful for tracking total cost/tokens at the step level

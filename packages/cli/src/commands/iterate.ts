@@ -60,7 +60,7 @@ const expandIterationInstructions = async (
   contextContent?: string
 ): Promise<IPromptTask | null> => {
   try {
-    const expanded = await aiAgent.expandIterationInstructions(
+    const { result: expanded } = await aiAgent.expandIterationInstructions(
       instructions,
       previousContext.plan,
       previousContext.changes,

@@ -12,7 +12,7 @@
  * - getEnvironmentVariables(): Docker environment variables
  */
 
-import { launch, type InvokeResult } from 'rover-core';
+import { launch, type InvokeResult, type ResultWithUsage } from 'rover-core';
 import type { WorkflowInput } from 'rover-schemas';
 import { ACPProvider, type IPromptTask } from '@endorhq/agent';
 
@@ -54,7 +54,7 @@ export abstract class ACPAgentBase {
     briefDescription: string,
     projectPath: string,
     contextContent?: string
-  ): Promise<IPromptTask | null> {
+  ): Promise<ResultWithUsage<IPromptTask | null>> {
     return this.provider.expandTask(
       briefDescription,
       projectPath,
@@ -67,7 +67,7 @@ export abstract class ACPAgentBase {
     previousPlan?: string,
     previousChanges?: string,
     contextContent?: string
-  ): Promise<IPromptTask | null> {
+  ): Promise<ResultWithUsage<IPromptTask | null>> {
     return this.provider.expandIterationInstructions(
       instructions,
       previousPlan,
@@ -81,7 +81,7 @@ export abstract class ACPAgentBase {
     taskDescription: string,
     recentCommits: string[],
     summaries: string[]
-  ): Promise<string | null> {
+  ): Promise<ResultWithUsage<string | null>> {
     return this.provider.generateCommitMessage(
       taskTitle,
       taskDescription,
@@ -94,7 +94,7 @@ export abstract class ACPAgentBase {
     filePath: string,
     diffContext: string,
     conflictedContent: string
-  ): Promise<string | null> {
+  ): Promise<ResultWithUsage<string | null>> {
     return this.provider.resolveMergeConflicts(
       filePath,
       diffContext,
@@ -105,7 +105,7 @@ export abstract class ACPAgentBase {
   async extractGithubInputs(
     issueDescription: string,
     inputs: WorkflowInput[]
-  ): Promise<Record<string, any> | null> {
+  ): Promise<ResultWithUsage<Record<string, any> | null>> {
     return this.provider.extractGithubInputs(issueDescription, inputs);
   }
 

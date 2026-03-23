@@ -90,7 +90,7 @@ const resolveRebaseConflicts = async (
       const conflictedContent = readFileSync(fullPath, 'utf8');
 
       try {
-        const resolvedContent = await aiAgent.resolveMergeConflicts(
+        const { result: resolvedContent } = await aiAgent.resolveMergeConflicts(
           filePath,
           diffContext,
           conflictedContent
