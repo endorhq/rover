@@ -141,7 +141,10 @@ export const plannerStep: Step = {
       if (!planResult.tasks || planResult.tasks.length === 0) {
         span.complete(
           `plan: noop — ${planResult.reasoning || 'no tasks needed'}`,
-          { analysis: planResult.analysis }
+          {
+            analysis: planResult.analysis,
+            ...(response.usage ? { usage: response.usage } : {}),
+          }
         );
 
         const noop = new ActionWriter(projectId, {
@@ -154,6 +157,7 @@ export const plannerStep: Step = {
           spanId: span.id,
           terminal: false,
           newActions: [{ actionId: noop.id, action: 'noop' }],
+          usage: response.usage,
         };
       }
 
@@ -174,12 +178,13 @@ export const plannerStep: Step = {
         analysis: planResult.analysis,
         taskCount: planResult.tasks.length,
         executionOrder: planResult.execution_order,
+        ...(response.usage ? { usage: response.usage } : {}),
       });
 
       // Write workflow action files
       const newActions = writeWorkflowActions(projectId, planResult, span.id);
 
-      return { spanId: span.id, terminal: false, newActions };
+      return { spanId: span.id, terminal: false, newActions, usage: response.usage };
     } catch (error) {
       span.error(
         `Planner failed: ${error instanceof Error ? error.message : String(error)}`
