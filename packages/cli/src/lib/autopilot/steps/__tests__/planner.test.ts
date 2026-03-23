@@ -170,7 +170,7 @@ describe('plannerStep', () => {
     store.ensureDir();
 
     mockInvoke.mockReset();
-    mockInvoke.mockResolvedValue(makePlanResponse());
+    mockInvoke.mockResolvedValue({ response: makePlanResponse() });
     (
       mockWorkflowStore.getWorkflow as ReturnType<typeof vi.fn>
     ).mockImplementation((name: string) =>
@@ -196,8 +196,8 @@ describe('plannerStep', () => {
   });
 
   it('processes a plan action and returns workflow actions', async () => {
-    mockInvoke.mockResolvedValue(
-      makePlanResponse({
+    mockInvoke.mockResolvedValue({
+      response: makePlanResponse({
         tasks: [
           {
             title: 'Implement feature X',
@@ -214,8 +214,8 @@ describe('plannerStep', () => {
             context: { files: [], references: [], depends_on: null },
           },
         ],
-      })
-    );
+      }),
+    });
 
     const pending = makePending();
     writeActionFile('action-1');
@@ -232,12 +232,12 @@ describe('plannerStep', () => {
   });
 
   it('creates noop action when plan has no tasks', async () => {
-    mockInvoke.mockResolvedValue(
-      makePlanResponse({
+    mockInvoke.mockResolvedValue({
+      response: makePlanResponse({
         tasks: [],
         reasoning: 'No changes needed for this event.',
-      })
-    );
+      }),
+    });
 
     const pending = makePending();
     writeActionFile('action-1');
@@ -271,8 +271,8 @@ describe('plannerStep', () => {
   });
 
   it('fails trace on invalid workflow type', async () => {
-    mockInvoke.mockResolvedValue(
-      makePlanResponse({
+    mockInvoke.mockResolvedValue({
+      response: makePlanResponse({
         tasks: [
           {
             title: 'Bad task',
@@ -282,8 +282,8 @@ describe('plannerStep', () => {
             context: { files: [], references: [], depends_on: null },
           },
         ],
-      })
-    );
+      }),
+    });
 
     const pending = makePending();
     writeActionFile('action-1');
@@ -388,8 +388,8 @@ describe('plannerStep', () => {
   });
 
   it('creates action files on disk for each task', async () => {
-    mockInvoke.mockResolvedValue(
-      makePlanResponse({
+    mockInvoke.mockResolvedValue({
+      response: makePlanResponse({
         tasks: [
           {
             title: 'Task A',
@@ -406,8 +406,8 @@ describe('plannerStep', () => {
             context: { files: [], references: [], depends_on: null },
           },
         ],
-      })
-    );
+      }),
+    });
 
     const pending = makePending();
     writeActionFile('action-1');
@@ -433,8 +433,8 @@ describe('plannerStep', () => {
   });
 
   it('resolves depends_on titles to action IDs', async () => {
-    mockInvoke.mockResolvedValue(
-      makePlanResponse({
+    mockInvoke.mockResolvedValue({
+      response: makePlanResponse({
         tasks: [
           {
             title: 'Find the bug',
@@ -451,8 +451,8 @@ describe('plannerStep', () => {
             context: { files: [], references: [], depends_on: 'Find the bug' },
           },
         ],
-      })
-    );
+      }),
+    });
 
     const pending = makePending();
     writeActionFile('action-1');
