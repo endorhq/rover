@@ -130,7 +130,7 @@ export const plannerStep: Step = {
         cwd: projectPath,
       });
 
-      const planResult = parseJsonResponse<PlanResult>(response);
+      const planResult = parseJsonResponse<PlanResult>(response.response);
       if (!planResult) {
         span.fail('Failed to parse plan result from AI response');
         ctx.failTrace('Failed to parse plan result from AI response');
