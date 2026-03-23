@@ -30,6 +30,7 @@ vi.mock('@endorhq/agent', () => ({
   },
 }));
 
+import type { ProjectManager } from 'rover-core';
 import { AutopilotStore } from '../../store.js';
 import type { Action, PendingAction, Span, TraceItem } from '../../types.js';
 import { plannerStep } from '../planner.js';
@@ -119,11 +120,12 @@ function makeContext(
 ): StepContext {
   return {
     store,
-    projectId: 'test-project',
-    projectPath: projectDir,
+    project: {
+      id: 'test-project',
+      path: projectDir,
+    } as unknown as ProjectManager,
     owner: 'test-owner',
     repo: 'test-repo',
-    project: undefined,
     workflowStore: mockWorkflowStore,
     memoryStore: undefined,
     botName: 'rover-bot',

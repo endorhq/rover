@@ -1,6 +1,6 @@
 import enquirer from 'enquirer';
 import colors from 'ansi-colors';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import {
@@ -9,19 +9,13 @@ import {
   getUserDefaultModel,
 } from '../lib/agents/index.js';
 import {
-  ProjectConfigManager,
-  IterationManager,
   type WorkflowManager,
   AI_AGENT,
   ProcessManager,
   showProperties,
   Git,
   type ProjectManager,
-  ContextManager,
-  generateContextIndex,
   ContextFetchError,
-  registerBuiltInProviders,
-  type ContextIndexOptions,
 } from 'rover-core';
 import type { NetworkConfig, NetworkMode } from 'rover-schemas';
 import {
@@ -29,8 +23,6 @@ import {
   formatAgentWithModel,
   type ParsedAgent,
 } from '../utils/agent-parser.js';
-import { createSandbox } from '../lib/sandbox/index.js';
-import { resolveAgentImage } from '../lib/sandbox/container-common.js';
 import { generateBranchName } from '../utils/branch-name.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import { NewTaskProvider } from 'rover-telemetry';
@@ -38,13 +30,13 @@ import { readFromStdin, stdinIsAvailable } from '../utils/stdin.js';
 import type { TaskTaskOutput } from '../output-types.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
 import { GitHub, GitHubError } from '../lib/github.js';
-import { copyEnvironmentFiles } from '../utils/env-files.js';
 import { initWorkflowStore } from '../lib/workflow.js';
 import {
   setJsonMode,
   requireProjectContext,
   isVerbose,
 } from '../lib/context.js';
+import { TaskSetup } from '../lib/task-setup.js';
 import type { CommandDefinition } from '../types.js';
 
 const { prompt } = enquirer;
@@ -134,54 +126,6 @@ const validations = (selectedAiAgent?: string): validationResult => {
   }
 
   return null;
-};
-
-/**
- * Update task metadata with execution information
- */
-const updateTaskMetadata = (
-  project: ProjectManager,
-  taskId: number,
-  updates: any,
-  jsonMode?: boolean
-) => {
-  try {
-    const task = project.getTask(taskId);
-    if (task) {
-      // Apply updates to the task object based on the updates parameter
-      if (updates.status) {
-        task.setStatus(updates.status);
-      }
-      if (updates.title) {
-        task.updateTitle(updates.title);
-      }
-      if (updates.description) {
-        task.updateDescription(updates.description);
-      }
-      if (updates.worktreePath && updates.branchName) {
-        task.setWorkspace(updates.worktreePath, updates.branchName);
-      }
-
-      // Handle Docker execution metadata
-      if (updates.containerId && updates.executionStatus) {
-        task.setContainerInfo(
-          updates.containerId,
-          updates.executionStatus,
-          updates.sandboxMetadata
-        );
-      } else if (updates.executionStatus) {
-        task.updateExecutionStatus(updates.executionStatus, {
-          exitCode: updates.exitCode,
-          error: updates.error,
-        });
-      }
-    }
-  } catch (error) {
-    // Silently fail in JSON mode, otherwise log the error
-    if (!jsonMode) {
-      console.error(colors.red('Error updating task metadata:'), error);
-    }
-  }
 };
 
 /**
@@ -345,30 +289,11 @@ const createTaskForAgent = async (
 
   const taskId = task.id;
 
-  // Setup git worktree and branch (in central ~/.rover/data/projects/<id>/workspaces/)
-  const worktreePath = project.getWorkspacePath(taskId);
   const branchName = targetBranch || generateBranchName(taskId);
 
+  let setup: TaskSetup;
   try {
-    git.createWorktree(worktreePath, branchName, baseBranch);
-
-    // Capture the base commit hash (the commit when the worktree was created)
-    const baseCommit = git.getCommitHash('HEAD', { worktreePath });
-    if (baseCommit) {
-      task.setBaseCommit(baseCommit);
-    }
-
-    // Copy user .env development files
-    copyEnvironmentFiles(projectPath, worktreePath);
-
-    // Configure sparse checkout to exclude files matching exclude patterns
-    const sparseConfig = ProjectConfigManager.load(projectPath);
-    if (
-      sparseConfig.excludePatterns &&
-      sparseConfig.excludePatterns.length > 0
-    ) {
-      git.setupSparseCheckout(worktreePath, sparseConfig.excludePatterns);
-    }
+    setup = TaskSetup.initial(project, task, git, branchName, baseBranch);
   } catch (error) {
     processManager?.failLastItem();
     if (!jsonMode) {
@@ -384,21 +309,7 @@ const createTaskForAgent = async (
 
   processManager?.addItem('Complete task creation');
 
-  const iterationPath = join(task.iterationsPath(), task.iterations.toString());
-  mkdirSync(iterationPath, { recursive: true });
-
-  // Create initial iteration.json with raw description
-  const iteration = IterationManager.createInitial(
-    iterationPath,
-    task.id,
-    // Temporary title, we will change after the expansion
-    description,
-    description
-  );
-
-  // Update task with workspace information
-  task.setWorkspace(worktreePath, branchName);
-  task.markInProgress();
+  const iteration = setup.createIteration(description, description);
 
   processManager?.completeLastItem();
 
@@ -413,44 +324,20 @@ const createTaskForAgent = async (
   processManager?.addItem('Fetching context sources');
 
   try {
-    // Register built-in providers
-    registerBuiltInProviders();
-
     const trustedAuthors = contextOptions?.contextTrustAuthors
       ? contextOptions.contextTrustAuthors.split(',').map(s => s.trim())
       : undefined;
 
-    const contextManager = new ContextManager(
+    const { entries, content } = await setup.fetchContext(
       contextOptions?.context ?? [],
-      task,
       {
+        readContent: true,
         trustAllAuthors: contextOptions?.contextTrustAllAuthors,
         trustedAuthors,
-        cwd: projectPath,
       }
     );
 
-    const entries = await contextManager.fetchAndStore();
-
-    // Store in iteration.json
-    iteration.setContext(entries);
-
-    // Generate index.md (no previous artifacts for first iteration)
-    const indexContent = generateContextIndex(entries, task.iterations);
-    writeFileSync(
-      join(contextManager.getContextDir(), 'index.md'),
-      indexContent
-    );
-
-    // Read context content for AI expansion
-    // Skip PRs to avoid huge context.
-    const expansionEntries = entries.filter(entry => {
-      !(entry.metadata?.type || '').includes('pr');
-    });
-    const storedContent = contextManager.readStoredContent(expansionEntries);
-    if (storedContent) {
-      contextContent = storedContent;
-    }
+    contextContent = content;
 
     processManager?.updateLastItem(
       `Fetching context sources | ${entries.length} source(s) loaded`
@@ -497,36 +384,12 @@ const createTaskForAgent = async (
     }
   }
 
-  // Resolve and store the agent image that will be used for this task
-  const projectConfig = ProjectConfigManager.load(projectPath);
-  const agentImage = resolveAgentImage(projectConfig);
-  task.setAgentImage(agentImage);
-
   // Start sandbox container for task execution
   try {
-    const sandbox = await createSandbox(task, processManager, {
+    await setup.start({
+      processManager,
       extraArgs: options.sandboxExtraArgs,
-      projectPath,
-      iterationLogsPath: project.getTaskIterationLogsPath(
-        task.id,
-        task.iterations
-      ),
     });
-    const containerId = await sandbox.createAndStart();
-
-    updateTaskMetadata(
-      project,
-      task.id,
-      {
-        containerId,
-        executionStatus: 'running',
-        runningAt: new Date().toISOString(),
-        sandboxMetadata: process.env.DOCKER_HOST
-          ? { dockerHost: process.env.DOCKER_HOST }
-          : undefined,
-      },
-      jsonMode
-    );
 
     processManager?.addItem('Task started in background');
     processManager?.completeLastItem();

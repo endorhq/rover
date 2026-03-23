@@ -1,6 +1,6 @@
 import colors from 'ansi-colors';
 import enquirer from 'enquirer';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   AI_AGENT,
@@ -9,11 +9,7 @@ import {
   showProperties,
   showTitle,
   type TaskDescriptionManager,
-  ContextManager,
-  generateContextIndex,
   ContextFetchError,
-  registerBuiltInProviders,
-  type ContextIndexOptions,
 } from 'rover-core';
 import { TaskNotFoundError } from 'rover-schemas';
 import {
@@ -30,6 +26,7 @@ import { getTelemetry } from '../lib/telemetry.js';
 import type { IterateOutput } from '../output-types.js';
 import { exitWithError, exitWithSuccess, exitWithWarn } from '../utils/exit.js';
 import { readFromStdin, stdinIsAvailable } from '../utils/stdin.js';
+import { TaskSetup } from '../lib/task-setup.js';
 import type { CommandDefinition } from '../types.js';
 
 const { prompt } = enquirer;
@@ -388,65 +385,31 @@ const iterateCommand = async (
       // Fetch context and collect artifacts from previous iterations
       processManager?.addItem('Fetching context sources');
 
+      const setup = TaskSetup.iteration(project, task);
+      setup.setIteration(iteration);
+
       let contextContent: string | undefined;
 
       try {
-        // Register built-in providers
-        registerBuiltInProviders();
-
         const trustedAuthors = options.contextTrustAuthors
           ? options.contextTrustAuthors.split(',').map(s => s.trim())
           : undefined;
 
-        const contextManager = new ContextManager(options.context ?? [], task, {
-          trustAllAuthors: options.contextTrustAllAuthors,
-          trustedAuthors,
-          cwd: project.path,
-        });
-
-        const entries = await contextManager.fetchAndStore();
-
-        // Store in iteration.json
-        iteration.setContext(entries);
-
         // Gather artifacts from all previous iterations
-        const { summaries, plans } =
+        const iterationArtifacts =
           task.getPreviousIterationArtifacts(newIterationNumber);
 
-        // Copy plan files into context directory and build references
-        const iterationPlans: ContextIndexOptions['iterationPlans'] = [];
-        for (const plan of plans) {
-          const planFilename = `plan-iter-${plan.iteration}.md`;
-          writeFileSync(
-            join(contextManager.getContextDir(), planFilename),
-            plan.content
-          );
-          iterationPlans.push({
-            iteration: plan.iteration,
-            file: planFilename,
-          });
-        }
-
-        // Generate index.md with artifacts
-        const indexContent = generateContextIndex(entries, task.iterations, {
-          iterationSummaries: summaries,
-          iterationPlans,
-        });
-        writeFileSync(
-          join(contextManager.getContextDir(), 'index.md'),
-          indexContent
+        const { entries, content } = await setup.fetchContext(
+          options.context ?? [],
+          {
+            readContent: true,
+            trustAllAuthors: options.contextTrustAllAuthors,
+            trustedAuthors,
+            iterationArtifacts,
+          }
         );
 
-        // Read context content for AI expansion
-        // Skip PRs to avoid huge context.
-        const expansionEntries = entries.filter(entry => {
-          !(entry.metadata?.type || '').includes('pr');
-        });
-        const storedContent =
-          contextManager.readStoredContent(expansionEntries);
-        if (storedContent) {
-          contextContent = storedContent;
-        }
+        contextContent = content;
 
         processManager?.updateLastItem(
           `Fetching context sources | ${entries.length} source(s) loaded`
@@ -512,23 +475,7 @@ const iterateCommand = async (
       result.expandedDescription = expandedTask.description;
 
       // Start sandbox container for task execution
-      const sandbox = await createSandbox(task, processManager, {
-        projectPath: project.path,
-        iterationLogsPath: project.getTaskIterationLogsPath(
-          task.id,
-          task.iterations
-        ),
-      });
-      const containerId = await sandbox.createAndStart();
-
-      // Update task metadata with new container ID for this iteration
-      task.setContainerInfo(
-        containerId,
-        'running',
-        process.env.DOCKER_HOST
-          ? { dockerHost: process.env.DOCKER_HOST }
-          : undefined
-      );
+      await setup.start({ processManager });
 
       result.success = true;
 
