@@ -288,6 +288,7 @@ const mergeCommand = async (taskId: string, options: MergeOptions = {}) => {
   // Create AI agent instance
   const aiAgent = getAIAgentTool(selectedAiAgent);
 
+  let commandOutcome: 'success' | 'error' = 'error';
   try {
     // Load task using ProjectManager
     const task = project.getTask(numericTaskId);
@@ -630,6 +631,7 @@ const mergeCommand = async (taskId: string, options: MergeOptions = {}) => {
         }
 
         jsonOutput.success = true;
+        commandOutcome = 'success';
         await exitWithSuccess(
           'Task has been successfully merged into your current branch',
           jsonOutput,
@@ -659,7 +661,7 @@ const mergeCommand = async (taskId: string, options: MergeOptions = {}) => {
       await exitWithError(jsonOutput, { telemetry });
     }
   } finally {
-    await telemetry?.shutdown();
+    await telemetry?.shutdown(commandOutcome);
   }
 };
 

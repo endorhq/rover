@@ -73,6 +73,7 @@ const stopCommand = async (
     return;
   }
 
+  let commandOutcome: 'success' | 'error' = 'error';
   try {
     // Load task using ProjectManager
     const task = project.getTask(numericTaskId);
@@ -175,6 +176,7 @@ const stopCommand = async (
       status: task.status,
       stoppedAt: new Date().toISOString(),
     };
+    commandOutcome = 'success';
     await exitWithSuccess('Task stopped successfully!', jsonOutput, {
       tips: [
         'Use ' + colors.cyan(`rover logs ${task.id}`) + ' to check the logs',
@@ -198,7 +200,7 @@ const stopCommand = async (
       return;
     }
   } finally {
-    await telemetry?.shutdown();
+    await telemetry?.shutdown(commandOutcome);
   }
 };
 

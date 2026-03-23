@@ -1,7 +1,7 @@
 import type { AutopilotStore } from '../store.js';
 import type { TraceItem, PendingAction } from '../types.js';
 import type { MemoryStore } from '../memory/store.js';
-import type { WorkflowStore, UsageReport } from 'rover-core';
+import type { ProjectManager, UsageReport, WorkflowStore } from 'rover-core';
 
 /** Configuration that describes how a step behaves in the pipeline. */
 export interface StepConfig {
@@ -20,11 +20,9 @@ export interface StepDependencies {
 /** Shared context fields available to all steps. */
 export interface BaseContext {
   store: AutopilotStore;
-  projectId: string;
-  projectPath: string;
+  project: ProjectManager;
   owner: string | undefined;
   repo: string | undefined;
-  project: string | undefined;
   workflowStore: WorkflowStore | undefined;
   memoryStore: MemoryStore | undefined;
   botName: string | undefined;

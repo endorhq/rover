@@ -4,7 +4,7 @@ import { replacePromptPlaceholders } from '../prompts.js';
 import type { PromptPlaceholderVars } from '../prompts.js';
 import type { PendingAction } from '../types.js';
 import type { Step, StepConfig, StepContext, StepResult } from './types.js';
-import coordinatorPromptTemplate from './prompts/coordinator-prompt.md';
+import { coordinatorPromptTemplate } from 'rover-prompts';
 
 interface CoordinatorDecision {
   action: string;
@@ -43,7 +43,9 @@ export const coordinatorStep: Step = {
   } satisfies StepConfig,
 
   async process(pending: PendingAction, ctx: StepContext): Promise<StepResult> {
-    const { store, projectId, projectPath } = ctx;
+    const { store, project } = ctx;
+    const projectId = project.id;
+    const projectPath = project.path;
 
     // Read full action from disk for spanId (parent) and meta (event JSON)
     const actionData = store.readAction(pending.actionId);

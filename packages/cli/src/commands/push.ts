@@ -111,6 +111,7 @@ const pushCommand = async (taskId: string, options: PushOptions) => {
   // Load config
   projectConfig = ProjectConfigManager.load(project.path);
 
+  let commandOutcome: 'success' | 'error' = 'error';
   try {
     // Load task using ProjectManager
     const task = project.getTask(numericTaskId);
@@ -384,6 +385,7 @@ const pushCommand = async (taskId: string, options: PushOptions) => {
       );
     }
 
+    commandOutcome = 'success';
     await exitWithSuccess('Push completed successfully!', result, {
       tips,
       tipsConfig: {
@@ -400,7 +402,7 @@ const pushCommand = async (taskId: string, options: PushOptions) => {
       await exitWithError(result, { telemetry });
     }
   } finally {
-    await telemetry?.shutdown();
+    await telemetry?.shutdown(commandOutcome);
   }
 };
 

@@ -21,7 +21,6 @@ import {
   resolveProjectContext,
 } from '../lib/context.js';
 import { executeHooks } from '../lib/hooks.js';
-import { getTelemetry } from '../lib/telemetry.js';
 import { formatTaskStatus, statusColor } from '../utils/task-status.js';
 import type { ListTasksOutput } from '../output-types.js';
 import type { CommandDefinition } from '../types.js';
@@ -175,8 +174,6 @@ const listCommand = async (
     setJsonMode(options.json);
   }
 
-  const telemetry = getTelemetry();
-
   try {
     // Get project context (may be null in global mode)
     const project = await resolveProjectContext();
@@ -214,10 +211,6 @@ const listCommand = async (
           }
         }
       }
-    }
-
-    if (!options.watching) {
-      telemetry?.eventListTasks();
     }
 
     if (tasksWithProjects.length === 0) {
@@ -498,8 +491,6 @@ const listCommand = async (
     }
   } catch (error) {
     console.error(colors.red('Error getting task status:'), error);
-  } finally {
-    await telemetry?.shutdown();
   }
 };
 

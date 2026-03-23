@@ -43,6 +43,7 @@ const addWorkflowCommand = async (
 
   let tempDir: string | null = null;
   let actualSource = source;
+  let commandOutcome: 'success' | 'error' = 'error';
 
   try {
     // Handle stdin input when source is '-'
@@ -97,6 +98,7 @@ const addWorkflowCommand = async (
         `Workflow ${workflowName} added to ${storeType} store ${storePath}`,
       ].join('\n');
 
+      commandOutcome = 'success';
       await exitWithSuccess(message, output, { telemetry });
     }
   } catch (error) {
@@ -115,7 +117,7 @@ const addWorkflowCommand = async (
         // Ignore cleanup errors
       }
     }
-    await telemetry?.shutdown();
+    await telemetry?.shutdown(commandOutcome);
   }
 };
 

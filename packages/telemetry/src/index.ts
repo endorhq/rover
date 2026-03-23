@@ -20,6 +20,15 @@ export enum NewTaskProvider {
   GITHUB = 'github',
 }
 
+export type CommandOutcome = 'success' | 'error';
+
+type PendingEvent = {
+  event: EVENT_IDS;
+  properties: object;
+};
+
+type PendingEvents = PendingEvent[];
+
 // Config is injected at build time via tsdown define
 declare const __BUILD_CONFIG__: { apiKey: string; host: string };
 const config = __BUILD_CONFIG__;
@@ -84,6 +93,7 @@ enum EVENT_IDS {
 
 class Telemetry {
   private client: PostHog;
+  private pendingEvents: PendingEvents = [];
 
   constructor(
     private userId: string,
@@ -155,7 +165,7 @@ class Telemetry {
       agents,
     };
 
-    this.capture(EVENT_IDS.NEW_TASK, metadata);
+    this.queueEvent(EVENT_IDS.NEW_TASK, metadata);
   }
 
   eventIterateTask(iteration: number) {
@@ -163,15 +173,15 @@ class Telemetry {
       iteration,
     };
 
-    this.capture(EVENT_IDS.ITERATE_TASK, metadata);
+    this.queueEvent(EVENT_IDS.ITERATE_TASK, metadata);
   }
 
   eventDeleteTask() {
-    this.capture(EVENT_IDS.DELETE_TASK);
+    this.queueEvent(EVENT_IDS.DELETE_TASK);
   }
 
   eventDiff() {
-    this.capture(EVENT_IDS.DIFF);
+    this.queueEvent(EVENT_IDS.DIFF);
   }
 
   eventInit(
@@ -187,76 +197,85 @@ class Telemetry {
       attribution,
     };
 
-    this.capture(EVENT_IDS.INIT, metadata);
+    this.queueEvent(EVENT_IDS.INIT, metadata);
   }
 
   eventInspectTask() {
-    this.capture(EVENT_IDS.INSPECT_TASK);
+    this.queueEvent(EVENT_IDS.INSPECT_TASK);
   }
 
   eventListTasks() {
-    this.capture(EVENT_IDS.LIST_TASKS);
+    this.queueEvent(EVENT_IDS.LIST_TASKS);
   }
 
   eventLogs() {
-    this.capture(EVENT_IDS.LOGS);
+    this.queueEvent(EVENT_IDS.LOGS);
   }
 
   eventMergeTask() {
-    this.capture(EVENT_IDS.MERGE_TASK);
+    this.queueEvent(EVENT_IDS.MERGE_TASK);
   }
 
   eventRebaseTask() {
-    this.capture(EVENT_IDS.REBASE_TASK);
+    this.queueEvent(EVENT_IDS.REBASE_TASK);
   }
 
   eventPushBranch() {
-    this.capture(EVENT_IDS.PUSH_BRANCH);
+    this.queueEvent(EVENT_IDS.PUSH_BRANCH);
   }
 
   eventReset() {
-    this.capture(EVENT_IDS.RESET);
+    this.queueEvent(EVENT_IDS.RESET);
   }
 
   eventShell() {
-    this.capture(EVENT_IDS.SHELL);
+    this.queueEvent(EVENT_IDS.SHELL);
   }
 
   eventStopTask() {
-    this.capture(EVENT_IDS.STOP_TASK);
+    this.queueEvent(EVENT_IDS.STOP_TASK);
   }
 
   eventRestartTask() {
-    this.capture(EVENT_IDS.RESTART_TASK);
+    this.queueEvent(EVENT_IDS.RESTART_TASK);
   }
 
   eventListWorkflows() {
-    this.capture(EVENT_IDS.LIST_WORKFLOWS);
+    this.queueEvent(EVENT_IDS.LIST_WORKFLOWS);
   }
 
   eventInspectWorkflow() {
-    this.capture(EVENT_IDS.INSPECT_WORKFLOW);
+    this.queueEvent(EVENT_IDS.INSPECT_WORKFLOW);
   }
 
   eventAddWorkflow() {
-    this.capture(EVENT_IDS.ADD_WORKFLOW);
+    this.queueEvent(EVENT_IDS.ADD_WORKFLOW);
   }
 
   eventOpenWorkspace() {
-    this.capture(EVENT_IDS.OPEN_WORKSPACE);
+    this.queueEvent(EVENT_IDS.OPEN_WORKSPACE);
   }
 
   eventInfo() {
-    this.capture(EVENT_IDS.INFO);
+    this.queueEvent(EVENT_IDS.INFO);
   }
 
   eventCleanup() {
-    this.capture(EVENT_IDS.CLEANUP);
+    this.queueEvent(EVENT_IDS.CLEANUP);
   }
 
   // Other methods
 
-  async shutdown() {
+  async shutdown(outcome?: CommandOutcome) {
+    // Send all pending events with the outcome before flushing
+    for (const pending of this.pendingEvents) {
+      this.capture(pending.event, {
+        ...pending.properties,
+        ...(outcome !== undefined ? { outcome } : {}),
+      });
+    }
+    this.pendingEvents = [];
+
     // Suppress PostHog's unconditional console.error in logFlushError
     const origError = console.error;
     console.error = () => {};
@@ -292,6 +311,11 @@ class Telemetry {
       mkdirSync(CONFIG_DIR, { recursive: true });
     }
     writeFileSync(USER_CONFIG_PATH, userId);
+  }
+
+  // Store the event to be sent at shutdown time with the outcome
+  private queueEvent(event: EVENT_IDS, properties: object = {}) {
+    this.pendingEvents.push({ event, properties });
   }
 
   // Send the capture event to PostHog

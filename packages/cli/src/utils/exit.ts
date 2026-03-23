@@ -56,7 +56,7 @@ export const exitWithErrors = async (
 
   // Flush telemetry before exiting
   if (telemetry) {
-    await telemetry.shutdown();
+    await telemetry.shutdown(jsonOutput.success ? 'success' : 'error');
   }
 
   if (isJsonMode()) {
@@ -84,7 +84,7 @@ export const exitWithWarn = async (
 
   // Flush telemetry before exiting
   if (telemetry) {
-    await telemetry.shutdown();
+    await telemetry.shutdown(jsonOutput.success ? 'success' : 'error');
   }
 
   if (isJsonMode()) {
@@ -113,7 +113,7 @@ export const exitWithSuccess = async (
 
   // Flush telemetry before exiting
   if (telemetry) {
-    await telemetry.shutdown();
+    await telemetry.shutdown(jsonOutput.success ? 'success' : 'error');
   }
 
   if (isJsonMode()) {

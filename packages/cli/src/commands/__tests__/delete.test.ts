@@ -658,16 +658,26 @@ describe('delete command', () => {
       await deleteCommand(['19'], { yes: true });
 
       expect(mockTelemetry?.eventDeleteTask).toHaveBeenCalled();
-      expect(mockTelemetry?.shutdown).toHaveBeenCalled();
+
+      // Telemetry shutdown is handled by the exit functions (exitWithSuccess/exitWithWarn/exitWithErrors)
+      // which receive telemetry in their options
+      const { exitWithSuccess } = await import('../../utils/exit.js');
+      expect(exitWithSuccess).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.anything(),
+        expect.objectContaining({ telemetry: expect.anything() })
+      );
     });
 
-    it('should call telemetry shutdown even on failure', async () => {
-      const { getTelemetry } = await import('../../lib/telemetry.js');
-      const mockTelemetry = getTelemetry();
-
+    it('should pass telemetry to exit functions on failure', async () => {
       await deleteCommand(['999']);
 
-      expect(mockTelemetry?.shutdown).toHaveBeenCalled();
+      // Telemetry shutdown is handled by exitWithErrors which receives telemetry in options
+      const { exitWithErrors } = await import('../../utils/exit.js');
+      expect(exitWithErrors).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ telemetry: expect.anything() })
+      );
     });
   });
 });
