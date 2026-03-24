@@ -18,7 +18,7 @@ import type {
   CleanupOutputImage,
 } from '../output-types.js';
 import { exitWithError, exitWithSuccess } from '../utils/exit.js';
-import { isTerminalStatus } from '../utils/task-status.js';
+import { isActiveStatus } from '../utils/task-status.js';
 import type { CommandDefinition } from '../types.js';
 
 /**
@@ -190,7 +190,7 @@ const cleanupCommand = async (
         const projectManager = store.get(projectData.id);
         if (!projectManager) continue;
         for (const task of projectManager.listTasks()) {
-          if (isTerminalStatus(task.status) && task.containerId) {
+          if (!isActiveStatus(task.status) && task.containerId) {
             try {
               await tryRemoveTaskContainer(task);
               containersRemoved++;

@@ -1,6 +1,7 @@
 import colors, { type StyleFunction } from 'ansi-colors';
 
 const TERMINAL_STATUSES = ['COMPLETED', 'MERGED', 'PUSHED'];
+const ACTIVE_STATUSES = ['IN_PROGRESS', 'ITERATING'];
 
 /**
  * Whether a task status represents a terminal (finished successfully) state.
@@ -8,6 +9,12 @@ const TERMINAL_STATUSES = ['COMPLETED', 'MERGED', 'PUSHED'];
  */
 export const isTerminalStatus = (status: string): boolean =>
   TERMINAL_STATUSES.includes(status.toUpperCase());
+
+/**
+ * Whether a task status represents an active (currently running) state.
+ */
+export const isActiveStatus = (status: string): boolean =>
+  ACTIVE_STATUSES.includes(status.toUpperCase());
 
 /**
  * Format task status for user-friendly display
