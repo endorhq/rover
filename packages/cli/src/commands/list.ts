@@ -320,109 +320,120 @@ const listCommand = async (
         });
       }
 
-      console.log(JSON.stringify(jsonOutput, null, 2));
-      return;
-    }
-
-    // Prepare table data
-    const tableData: TaskRow[] = tasksWithProjects.map(
-      ({ task, project: projectData }) => buildTaskRow(task, projectData?.id)
-    );
-
-    // Define table columns
-    const columns: TableColumn<TaskRow>[] = [
-      {
-        header: 'ID',
-        key: 'id',
-        maxWidth: 4,
-        format: (value: string) => colors.cyan(value),
-      },
-      {
-        header: 'Title',
-        key: 'title',
-        minWidth: 15,
-        maxWidth: 30,
-        truncate: 'ellipsis',
-      },
-      {
-        header: 'Agent',
-        key: 'agent',
-        minWidth: 8,
-        maxWidth: 16,
-        truncate: 'ellipsis',
-        format: (value: string) => colors.gray(value),
-      },
-      {
-        header: 'Workflow',
-        key: 'workflow',
-        minWidth: 8,
-        maxWidth: 12,
-        truncate: 'ellipsis',
-        format: (value: string) => colors.gray(value),
-      },
-      {
-        header: 'Status',
-        key: 'status',
-        width: 12,
-        format: (value: string) => {
-          const colorFunc = statusColor(value);
-          return colorFunc(formatTaskStatus(value));
-        },
-      },
-      {
-        header: 'Progress',
-        key: 'progress',
-        format: (_value: string, row: TaskRow) =>
-          formatProgress(row.status, row.progress),
-        width: 10,
-      },
-      {
-        header: 'Current Step',
-        key: 'currentStep',
-        minWidth: 15,
-        maxWidth: 25,
-        truncate: 'ellipsis',
-        format: (value: string) => colors.gray(value),
-      },
-      {
-        header: 'Duration',
-        key: 'duration',
-        width: 10,
-        format: (value: string) => colors.gray(value),
-      },
-    ];
-
-    // Build groups for global mode
-    let groups: GroupDefinition[] | undefined;
-    if (!project) {
-      // Build groups from projects that have tasks (dedupe by project id)
-      const seenProjectIds = new Set<string>();
-      groups = [];
-      for (const { project: projectData } of tasksWithProjects) {
-        if (projectData && !seenProjectIds.has(projectData.id)) {
-          seenProjectIds.add(projectData.id);
-          groups.push({
-            id: projectData.id,
-            title: ` ${colors.cyan('◈')} ${colors.cyan(projectData.name)} ${colors.gray(projectData.path)}`,
-          });
-        }
+      // In watch mode, emit compact JSONL (one JSON object per line per tick)
+      // so consumers can parse the stream line-by-line.
+      // In non-watch mode, emit prettified JSON for readability.
+      if (options.watch || options.watching) {
+        console.log(JSON.stringify(jsonOutput));
+      } else {
+        console.log(JSON.stringify(jsonOutput, null, 2));
+        return;
       }
     }
 
-    // Add a breakline
-    console.log();
+    if (!isJsonMode()) {
+      // Prepare table data
+      const tableData: TaskRow[] = tasksWithProjects.map(
+        ({ task, project: projectData }) => buildTaskRow(task, projectData?.id)
+      );
 
-    // Render the table
-    const table = new Table(columns, { groups });
-    table.render(tableData);
+      // Define table columns
+      const columns: TableColumn<TaskRow>[] = [
+        {
+          header: 'ID',
+          key: 'id',
+          maxWidth: 4,
+          format: (value: string) => colors.cyan(value),
+        },
+        {
+          header: 'Title',
+          key: 'title',
+          minWidth: 15,
+          maxWidth: 30,
+          truncate: 'ellipsis',
+        },
+        {
+          header: 'Agent',
+          key: 'agent',
+          minWidth: 8,
+          maxWidth: 16,
+          truncate: 'ellipsis',
+          format: (value: string) => colors.gray(value),
+        },
+        {
+          header: 'Workflow',
+          key: 'workflow',
+          minWidth: 8,
+          maxWidth: 12,
+          truncate: 'ellipsis',
+          format: (value: string) => colors.gray(value),
+        },
+        {
+          header: 'Status',
+          key: 'status',
+          width: 12,
+          format: (value: string) => {
+            const colorFunc = statusColor(value);
+            return colorFunc(formatTaskStatus(value));
+          },
+        },
+        {
+          header: 'Progress',
+          key: 'progress',
+          format: (_value: string, row: TaskRow) =>
+            formatProgress(row.status, row.progress),
+          width: 10,
+        },
+        {
+          header: 'Current Step',
+          key: 'currentStep',
+          minWidth: 15,
+          maxWidth: 25,
+          truncate: 'ellipsis',
+          format: (value: string) => colors.gray(value),
+        },
+        {
+          header: 'Duration',
+          key: 'duration',
+          width: 10,
+          format: (value: string) => colors.gray(value),
+        },
+      ];
 
-    // Show errors in verbose mode
-    if (options.verbose) {
-      tableData.forEach(row => {
-        if (row.error) {
-          console.log(colors.red(`    Error for task ${row.id}: ${row.error}`));
+      // Build groups for global mode
+      let groups: GroupDefinition[] | undefined;
+      if (!project) {
+        // Build groups from projects that have tasks (dedupe by project id)
+        const seenProjectIds = new Set<string>();
+        groups = [];
+        for (const { project: projectData } of tasksWithProjects) {
+          if (projectData && !seenProjectIds.has(projectData.id)) {
+            seenProjectIds.add(projectData.id);
+            groups.push({
+              id: projectData.id,
+              title: ` ${colors.cyan('◈')} ${colors.cyan(projectData.name)} ${colors.gray(projectData.path)}`,
+            });
+          }
         }
-      });
+      }
+
+      // Add a breakline
+      console.log();
+
+      // Render the table
+      const table = new Table(columns, { groups });
+      table.render(tableData);
+
+      // Show errors in verbose mode
+      if (options.verbose) {
+        tableData.forEach(row => {
+          if (row.error) {
+            console.log(
+              colors.red(`    Error for task ${row.id}: ${row.error}`)
+            );
+          }
+        });
+      }
     }
 
     // Watch mode (configurable refresh interval, default 3 seconds)
@@ -457,21 +468,27 @@ const listCommand = async (
       }
       const intervalMs = intervalSeconds * 1000;
 
-      console.log(
-        colors.gray(
-          `\n⏱️  Watching for changes every ${intervalSeconds}s (Ctrl+C to exit)...`
-        )
-      );
-
-      const watchInterval = setInterval(async () => {
-        // Clear screen and show updated status
-        process.stdout.write('\x1b[2J\x1b[0f');
-        await listCommand({ ...options, watch: false, watching: true });
+      if (!isJsonMode()) {
         console.log(
           colors.gray(
-            `\n⏱️  Refreshing every ${intervalSeconds}s (Ctrl+C to exit)...`
+            `\n⏱️  Watching for changes every ${intervalSeconds}s (Ctrl+C to exit)...`
           )
         );
+      }
+
+      const watchInterval = setInterval(async () => {
+        if (!isJsonMode()) {
+          // Clear screen and show updated status
+          process.stdout.write('\x1b[2J\x1b[0f');
+        }
+        await listCommand({ ...options, watch: false, watching: true });
+        if (!isJsonMode()) {
+          console.log(
+            colors.gray(
+              `\n⏱️  Refreshing every ${intervalSeconds}s (Ctrl+C to exit)...`
+            )
+          );
+        }
       }, intervalMs);
 
       // Handle Ctrl+C
