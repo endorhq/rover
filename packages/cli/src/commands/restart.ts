@@ -14,7 +14,7 @@ import {
 } from 'rover-core';
 import { TaskNotFoundError } from 'rover-schemas';
 import { exitWithError, exitWithSuccess } from '../utils/exit.js';
-import { createSandbox, tryRemoveTaskContainer } from '../lib/sandbox/index.js';
+import { createSandbox } from '../lib/sandbox/index.js';
 import type { TaskRestartOutput } from '../output-types.js';
 import { getTelemetry } from '../lib/telemetry.js';
 import {
@@ -223,9 +223,6 @@ const restartCommand = async (
     if (process.env.ROVER_AGENT_IMAGE) {
       task.setAgentImage(process.env.ROVER_AGENT_IMAGE);
     }
-
-    // Remove the previous container before starting a new one
-    await tryRemoveTaskContainer(task);
 
     // Start sandbox container for task execution
     try {
