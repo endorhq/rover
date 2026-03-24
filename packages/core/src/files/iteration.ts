@@ -16,6 +16,7 @@ import {
   type Iteration,
   type IterationPreviousContext,
   type IterationContextEntry,
+  type UsageReport,
 } from 'rover-schemas';
 import { VERBOSE } from '../verbose.js';
 
@@ -166,10 +167,19 @@ export class IterationManager {
     // Migrate from 1.0 to 1.1
     // Add the mandatory `context` field with an empty array
     if (data.version === '1.0') {
+      data = {
+        ...data,
+        version: '1.1',
+        context: [],
+      };
+    }
+
+    // Migrate from 1.1 to 1.2
+    // usage field is optional, just bump version
+    if (data.version === '1.1') {
       return {
         ...data,
         version: CURRENT_ITERATION_SCHEMA_VERSION,
-        context: [],
       } as Iteration;
     }
 
@@ -250,6 +260,9 @@ export class IterationManager {
   get context(): IterationContextEntry[] {
     return this.data.context;
   }
+  get usage(): UsageReport | undefined {
+    return this.data.usage;
+  }
   get fileDescriptionPath(): string {
     return this.filePath;
   }
@@ -267,6 +280,14 @@ export class IterationManager {
    */
   updateDescription(description: string): void {
     this.data.description = description;
+    this.save();
+  }
+
+  /**
+   * Set the usage/cost report for this iteration.
+   */
+  setUsage(usage: UsageReport): void {
+    this.data.usage = usage;
     this.save();
   }
 

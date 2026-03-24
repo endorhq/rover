@@ -214,7 +214,8 @@ export {
 } from './jsonl-log/schema.js';
 
 // Usage reporting
-export type { UsageReport } from './usage/types.js';
+export { UsageReportSchema, StepUsageReportSchema } from './usage/schema.js';
+export type { UsageReport, StepUsageReport } from './usage/types.js';
 
 // Rexport some Zod utilities so consumers do not need to depend on Zod
 export { ZodError } from 'zod';

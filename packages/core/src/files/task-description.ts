@@ -28,6 +28,7 @@ import {
   type StatusMetadata,
   type TaskDescription,
   type TaskStatus,
+  type UsageReport,
 } from 'rover-schemas';
 import { VERBOSE } from '../verbose.js';
 import { IterationManager } from './iteration.js';
@@ -574,7 +575,13 @@ export class TaskDescriptionManager {
     const iteration = this.getLastIteration();
 
     if (iteration != null) {
-      const status = iteration.status();
+      let status: ReturnType<typeof iteration.status>;
+      try {
+        status = iteration.status();
+      } catch {
+        // status.json may not exist yet (iteration just started)
+        return;
+      }
       let statusName: TaskStatus;
       let timestamp;
       let error;
@@ -609,7 +616,32 @@ export class TaskDescriptionManager {
 
       const metadata = { timestamp, error };
       this.setStatus(statusName, metadata);
+
+      // When the task reaches a terminal state, sync usage from all
+      // iterations so that description.json always has the final cost.
+      if (statusName === 'COMPLETED' || statusName === 'FAILED') {
+        this.syncUsage();
+      }
     }
+  }
+
+  /**
+   * Recompute task-level usage by summing usage from all iterations.
+   * Always rebuilds from scratch so it is safe to call repeatedly.
+   */
+  syncUsage(): void {
+    const iterations = this.getIterations();
+    let total: UsageReport | undefined;
+
+    for (const iter of iterations) {
+      const iterUsage = iter.usage;
+      if (iterUsage) {
+        total = accumulateUsage(total, iterUsage);
+      }
+    }
+
+    this.data.usage = total;
+    this.save();
   }
 
   // ============================================================
@@ -755,6 +787,9 @@ export class TaskDescriptionManager {
   }
   get source(): TaskDescription['source'] {
     return this.data.source;
+  }
+  get usage(): TaskDescription['usage'] {
+    return this.data.usage;
   }
   get onCompleteHookFiredAt(): TaskDescription['onCompleteHookFiredAt'] {
     return this.data.onCompleteHookFiredAt;
@@ -965,4 +1000,46 @@ export class TaskDescriptionManager {
       );
     }
   }
+}
+
+/**
+ * Sum two UsageReport values together.
+ * If `existing` is undefined, returns `incoming` as-is.
+ * Top-level `agent` / `model` are set only when both reports agree.
+ */
+function accumulateUsage(
+  existing: UsageReport | undefined,
+  incoming: UsageReport
+): UsageReport {
+  if (!existing) return incoming;
+
+  if (
+    existing.currency &&
+    incoming.currency &&
+    existing.currency !== incoming.currency
+  ) {
+    throw new Error(
+      `Cannot accumulate usage with different currencies: ${existing.currency} vs ${incoming.currency}`
+    );
+  }
+
+  const add = (a?: number, b?: number): number | undefined =>
+    a !== undefined || b !== undefined ? (a ?? 0) + (b ?? 0) : undefined;
+
+  return {
+    inputTokens: add(existing.inputTokens, incoming.inputTokens),
+    outputTokens: add(existing.outputTokens, incoming.outputTokens),
+    totalTokens: add(existing.totalTokens, incoming.totalTokens),
+    cost: add(existing.cost, incoming.cost),
+    currency: incoming.currency ?? existing.currency,
+    agent:
+      existing.agent && incoming.agent && existing.agent === incoming.agent
+        ? existing.agent
+        : undefined,
+    model:
+      existing.model && incoming.model && existing.model === incoming.model
+        ? existing.model
+        : undefined,
+    steps: [...(existing.steps ?? []), ...(incoming.steps ?? [])],
+  };
 }

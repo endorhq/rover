@@ -2,6 +2,7 @@ import { CommandOutput } from '../cli.js';
 import colors from 'ansi-colors';
 import {
   WorkflowManager,
+  IterationManager,
   IterationStatusManager,
   JsonlLogger,
   ProjectConfigManager,
@@ -48,6 +49,9 @@ function usageProperties(
   if (usage.cost !== undefined) {
     const currency = usage.currency ?? 'USD';
     props['Cost'] = colors.yellow(`${usage.cost.toFixed(4)} ${currency}`);
+  }
+  if (usage.agent) {
+    props['Agent'] = colors.gray(usage.agent);
   }
   if (usage.model) {
     props['Model'] = colors.gray(usage.model);
@@ -284,6 +288,7 @@ export const runCommand = async (
   // Declare status manager outside try block so it's accessible in catch
   let statusManager: IterationStatusManager | undefined;
   let totalDuration = 0;
+  let workflowUsage: UsageReport | undefined;
 
   // Determine the logs directory. Prefer /logs (bind-mounted by the sandbox
   // to the project-level logs directory), fall back to the output directory.
@@ -532,6 +537,7 @@ export const runCommand = async (
         if (failedSteps > 0) {
           output.success = false;
           output.error = runResult.error;
+          workflowUsage = runResult.usage;
           logger?.error('workflow_fail', 'Workflow completed with errors', {
             taskId: options.taskId,
             duration: runResult.totalDuration,
@@ -543,6 +549,7 @@ export const runCommand = async (
           });
         } else {
           output.success = true;
+          workflowUsage = runResult.usage;
           statusManager?.complete('Workflow completed successfully');
           logger?.info('workflow_complete', 'Workflow completed successfully', {
             taskId: options.taskId,
@@ -562,6 +569,19 @@ export const runCommand = async (
   } catch (err) {
     output.success = false;
     output.error = err instanceof Error ? err.message : `${err}`;
+  }
+
+  // Persist usage to iteration.json (versioned).
+  const finalUsage = workflowUsage;
+  if (finalUsage && options.output) {
+    try {
+      if (IterationManager.exists(options.output)) {
+        const iterManager = IterationManager.load(options.output);
+        iterManager.setUsage(finalUsage);
+      }
+    } catch {
+      // Best-effort: iteration.json may not exist in all execution contexts
+    }
   }
 
   if (!output.success) {

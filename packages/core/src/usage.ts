@@ -37,9 +37,8 @@ export interface ResultWithUsage<T> {
  * (multiple prompts per step) and at the workflow level
  * (multiple steps per workflow).
  *
- * Token counts and costs are summed. The model field retains the
- * last recorded value (since a step may use multiple models, the
- * caller can inspect individual reports if needed).
+ * Token counts and costs are summed. Top-level `agent` and `model`
+ * are set only when every recorded report used the same value.
  */
 export class UsageTracker {
   private reports: UsageReport[] = [];
@@ -72,10 +71,12 @@ export class UsageTracker {
     let totalTokens = 0;
     let cost = 0;
     let currency: string | undefined;
-    let model: string | undefined;
 
     let hasTokens = false;
     let hasCost = false;
+
+    const models = new Set<string>();
+    const agents = new Set<string>();
 
     for (const report of this.reports) {
       if (report.inputTokens !== undefined) {
@@ -98,7 +99,10 @@ export class UsageTracker {
         currency = report.currency;
       }
       if (report.model !== undefined) {
-        model = report.model;
+        models.add(report.model);
+      }
+      if (report.agent !== undefined) {
+        agents.add(report.agent);
       }
     }
 
@@ -108,7 +112,8 @@ export class UsageTracker {
       totalTokens: hasTokens ? totalTokens : undefined,
       cost: hasCost ? cost : undefined,
       currency: hasCost ? (currency ?? 'USD') : undefined,
-      model,
+      agent: agents.size === 1 ? [...agents][0] : undefined,
+      model: models.size === 1 ? [...models][0] : undefined,
     };
   }
 

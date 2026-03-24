@@ -24,6 +24,7 @@ const mockTask = {
   setAgentImage: vi.fn(),
   setContainerInfo: vi.fn(),
   updateStatusFromIteration: vi.fn(),
+  syncUsage: vi.fn(),
   getIterationPath: vi.fn(),
 };
 
