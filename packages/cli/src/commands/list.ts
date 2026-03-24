@@ -21,7 +21,13 @@ import {
   resolveProjectContext,
 } from '../lib/context.js';
 import { executeHooks } from '../lib/hooks.js';
-import { formatTaskStatus, statusColor } from '../utils/task-status.js';
+import { getTelemetry } from '../lib/telemetry.js';
+import {
+  formatTaskStatus,
+  isTerminalStatus,
+  statusColor,
+} from '../utils/task-status.js';
+import { tryRemoveTaskContainer } from '../lib/sandbox/index.js';
 import type { ListTasksOutput } from '../output-types.js';
 import type { CommandDefinition } from '../types.js';
 
@@ -246,7 +252,7 @@ const listCommand = async (
         const currentStatus = task.status;
 
         // Check if this is a terminal status that should trigger onComplete hooks
-        const isTerminalStatus =
+        const isTerminalOrFailed =
           currentStatus === 'COMPLETED' || currentStatus === 'FAILED';
 
         // Check if hook has already been fired for this status transition
@@ -261,7 +267,7 @@ const listCommand = async (
 
         // Execute onComplete hooks if configured and not already fired for this status
         if (
-          isTerminalStatus &&
+          isTerminalOrFailed &&
           !hookAlreadyFired &&
           projectConfig?.hooks?.onComplete?.length &&
           projectData?.path
@@ -280,6 +286,13 @@ const listCommand = async (
 
           // Record that hook was fired for this status transition (persists to task file)
           task.setOnCompleteHookFiredAt(task.lastStatusCheck!);
+        }
+
+        // Opportunistically remove containers for tasks that have reached a
+        // terminal state. FAILED tasks are intentionally kept so that users
+        // can still debug the container.
+        if (isTerminalStatus(currentStatus) && task.containerId) {
+          tryRemoveTaskContainer(task).catch(() => {});
         }
       } catch (err) {
         if (!isJsonMode()) {

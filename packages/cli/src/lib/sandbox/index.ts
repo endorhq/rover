@@ -72,3 +72,26 @@ export async function createSandbox(
     'Neither Docker nor Podman are available. Please install Docker or Podman to run tasks.'
   );
 }
+
+/**
+ * Opportunistically remove a task's container when it has reached a terminal state.
+ * This is a best-effort operation — errors are silently ignored.
+ * The container's output is already persisted via mounted volumes, so removal is safe.
+ *
+ * @param task The task whose container should be removed
+ */
+export async function tryRemoveTaskContainer(
+  task: TaskDescriptionManager
+): Promise<void> {
+  if (!task.containerId) return;
+
+  try {
+    const sandbox = await createSandbox(task, undefined, {
+      sandboxMetadata: task.sandboxMetadata,
+    });
+    await sandbox.stopAndRemove();
+    task.setContainerInfo('', '');
+  } catch {
+    // Best-effort: ignore errors during opportunistic cleanup
+  }
+}
