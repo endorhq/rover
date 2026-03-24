@@ -574,11 +574,12 @@ export class ACPRunner {
 
       // Build usage report from ACP response
       const model = stepModel || this.defaultModel;
+      const agent = this.tool;
       let usage: UsageReport | undefined = promptResult.usage;
       if (usage) {
-        usage = { ...usage, model };
-      } else if (model) {
-        usage = { model };
+        usage = { ...usage, model, agent };
+      } else if (model || agent) {
+        usage = { model, agent };
       }
 
       if (VERBOSE) {

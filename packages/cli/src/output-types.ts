@@ -7,6 +7,7 @@ import type { IterationManager, WorkflowSource } from 'rover-core';
 import type {
   TaskDescription,
   TaskStatus as SchemaTaskStatus,
+  UsageReport,
   Workflow,
 } from 'rover-schemas';
 import type { Span, TaskMapping } from './lib/autopilot/types.js';
@@ -210,6 +211,7 @@ export interface TaskInspectionOutput {
   worktreePath: string;
   agentModel?: string;
   agentDisplay?: string;
+  usage?: UsageReport;
   source?: {
     type: 'github' | 'manual';
     id?: string;

@@ -160,6 +160,9 @@ const inspectCommand = async (
       throw new TaskNotFoundError(numericTaskId);
     }
 
+    // Sync task status from the latest iteration
+    task.updateStatusFromIteration();
+
     if (iterationNumber === undefined) {
       iterationNumber = task.iterations;
     }
@@ -276,6 +279,7 @@ const inspectCommand = async (
         uuid: task.uuid,
         workflowName: task.workflowName,
         worktreePath: task.worktreePath,
+        usage: task.usage,
         source: task.source,
       };
 
@@ -337,6 +341,33 @@ const inspectCommand = async (
       };
 
       showProperties(workspaceProps);
+
+      // Usage information
+      if (task.usage) {
+        showTitle('Usage');
+
+        const usageProps: Record<string, string> = {};
+
+        if (task.usage.cost != null) {
+          const currency = task.usage.currency || 'USD';
+          usageProps['Cost'] = colors.yellow(
+            `$${task.usage.cost.toFixed(4)} ${currency}`
+          );
+        }
+
+        if (task.usage.inputTokens != null) {
+          usageProps['Input Tokens'] = task.usage.inputTokens.toLocaleString();
+        }
+        if (task.usage.outputTokens != null) {
+          usageProps['Output Tokens'] =
+            task.usage.outputTokens.toLocaleString();
+        }
+        if (task.usage.totalTokens != null) {
+          usageProps['Total Tokens'] = task.usage.totalTokens.toLocaleString();
+        }
+
+        showProperties(usageProps);
+      }
 
       // Workflow files
       const discoveredFiles = iteration.listMarkdownFiles();

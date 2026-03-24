@@ -1,23 +1,21 @@
 /**
  * Usage reporting types for tracking token consumption and cost
  * across ACP invocations, steps, and workflows.
+ *
+ * All types are inferred from Zod schemas to ensure consistency.
  */
 
+import type { z } from 'zod';
+import type { UsageReportSchema, StepUsageReportSchema } from './schema.js';
+
 /**
- * A snapshot of resource usage from a single ACP invocation or
- * an accumulation across multiple invocations.
+ * Aggregated usage across all steps, with optional per-step breakdown.
+ * Top-level `agent` and `model` are populated only when every step
+ * used the same value.
  */
-export interface UsageReport {
-  /** Number of input tokens consumed. */
-  inputTokens?: number;
-  /** Number of output tokens produced. */
-  outputTokens?: number;
-  /** Total tokens (input + output + cached). */
-  totalTokens?: number;
-  /** Monetary cost incurred. */
-  cost?: number;
-  /** Currency of the cost value (default: USD). */
-  currency?: string;
-  /** Model identifier used. */
-  model?: string;
-}
+export type UsageReport = z.infer<typeof UsageReportSchema>;
+
+/**
+ * Usage report for a single workflow step.
+ */
+export type StepUsageReport = z.infer<typeof StepUsageReportSchema>;

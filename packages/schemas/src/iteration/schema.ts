@@ -3,9 +3,10 @@
  */
 
 import { z } from 'zod';
+import { UsageReportSchema } from '../usage/schema.js';
 
 // Current schema version
-export const CURRENT_ITERATION_SCHEMA_VERSION = '1.1';
+export const CURRENT_ITERATION_SCHEMA_VERSION = '1.2';
 
 // Filename constants
 export const ITERATION_FILENAME = 'iteration.json';
@@ -97,4 +98,6 @@ export const IterationSchema = z.object({
   previousContext: IterationPreviousContextSchema,
   /** Context entries for this iteration */
   context: z.array(IterationContextEntrySchema),
+  /** Usage/cost report for this iteration */
+  usage: UsageReportSchema.optional(),
 });

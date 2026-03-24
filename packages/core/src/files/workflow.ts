@@ -21,6 +21,7 @@ import {
   type WorkflowConfig,
   type WorkflowAgentTool,
   type UsageReport,
+  type StepUsageReport,
   ZodError,
 } from 'rover-schemas';
 import { launchSync } from '../os.js';
@@ -636,25 +637,31 @@ export class WorkflowManager {
 /**
  * Aggregate UsageReport values across a list of step results.
  * Returns undefined if no step reported usage.
+ *
+ * Builds a per-step breakdown and sets top-level `agent` / `model`
+ * only when every step with usage reported the same value.
  */
 function aggregateUsage(stepResults: StepResult[]): UsageReport | undefined {
-  const reports = stepResults
-    .map(r => r.usage)
-    .filter((u): u is UsageReport => u !== undefined);
+  const stepsWithUsage = stepResults.filter(
+    (r): r is StepResult & { usage: UsageReport } => r.usage !== undefined
+  );
 
-  if (reports.length === 0) return undefined;
+  if (stepsWithUsage.length === 0) return undefined;
 
   let inputTokens = 0;
   let outputTokens = 0;
   let totalTokens = 0;
   let cost = 0;
   let currency: string | undefined;
-  let model: string | undefined;
 
   let hasTokens = false;
   let hasCost = false;
 
-  for (const report of reports) {
+  const models = new Set<string>();
+  const agents = new Set<string>();
+  const steps: StepUsageReport[] = [];
+
+  for (const { id, usage: report } of stepsWithUsage) {
     if (report.inputTokens !== undefined) {
       inputTokens += report.inputTokens;
       hasTokens = true;
@@ -675,8 +682,22 @@ function aggregateUsage(stepResults: StepResult[]): UsageReport | undefined {
       currency = report.currency;
     }
     if (report.model !== undefined) {
-      model = report.model;
+      models.add(report.model);
     }
+    if (report.agent !== undefined) {
+      agents.add(report.agent);
+    }
+
+    steps.push({
+      stepId: id,
+      inputTokens: report.inputTokens,
+      outputTokens: report.outputTokens,
+      totalTokens: report.totalTokens,
+      cost: report.cost,
+      currency: report.currency,
+      agent: report.agent,
+      model: report.model,
+    });
   }
 
   return {
@@ -685,6 +706,8 @@ function aggregateUsage(stepResults: StepResult[]): UsageReport | undefined {
     totalTokens: hasTokens ? totalTokens : undefined,
     cost: hasCost ? cost : undefined,
     currency: hasCost ? (currency ?? 'USD') : undefined,
-    model,
+    agent: agents.size === 1 ? [...agents][0] : undefined,
+    model: models.size === 1 ? [...models][0] : undefined,
+    steps,
   };
 }

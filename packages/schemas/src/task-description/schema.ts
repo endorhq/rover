@@ -4,9 +4,10 @@
  */
 import { z } from 'zod';
 import { NetworkConfigSchema } from '../project-config/schema.js';
+import { UsageReportSchema } from '../usage/schema.js';
 
 // Schema version for migrations
-export const CURRENT_TASK_DESCRIPTION_SCHEMA_VERSION = '1.5';
+export const CURRENT_TASK_DESCRIPTION_SCHEMA_VERSION = '1.6';
 
 // Task status schema
 export const TaskStatusSchema = z.enum([
@@ -98,6 +99,9 @@ export const TaskDescriptionSchema = z.object({
   // Hook tracking - stores the lastStatusCheck timestamp when onComplete hook was last fired
   // Compared against lastStatusCheck to detect new terminal status transitions
   onCompleteHookFiredAt: z.string().datetime().optional(),
+
+  // Accumulated usage/cost across all iterations
+  usage: UsageReportSchema.optional(),
 
   // Metadata
   version: z.string(),

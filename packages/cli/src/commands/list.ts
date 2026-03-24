@@ -247,7 +247,7 @@ const listCommand = async (
     // Update task status and detect completions for onComplete hooks
     for (const { task, project: projectData } of tasksWithProjects) {
       try {
-        // Update status from iteration
+        // Update status from iterations (also syncs usage on terminal states)
         task.updateStatusFromIteration();
         const currentStatus = task.status;
 
