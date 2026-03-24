@@ -52,8 +52,15 @@ export {
   type DiagramOptions,
 } from './display/index.js';
 
-// Reexport the enum from schemas
-export { AI_AGENT } from 'rover-schemas';
+// Reexport the enum and usage types from schemas
+export { AI_AGENT, type UsageReport } from 'rover-schemas';
+
+// Usage tracking (InvokeResult, UsageTracker)
+export {
+  UsageTracker,
+  type InvokeResult,
+  type ResultWithUsage,
+} from './usage.js';
 
 export {
   getConfigDir,

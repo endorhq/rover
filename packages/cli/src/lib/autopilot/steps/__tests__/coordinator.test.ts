@@ -31,6 +31,7 @@ vi.mock('@endorhq/agent', () => ({
   },
 }));
 
+import type { ProjectManager } from 'rover-core';
 import { AutopilotStore } from '../../store.js';
 import type { Action, PendingAction, TraceItem } from '../../types.js';
 import { coordinatorStep, buildCoordinatorPrompt } from '../coordinator.js';
@@ -78,11 +79,12 @@ function makeTrace(): TraceItem {
 function makeContext(store: AutopilotStore): StepContext {
   return {
     store,
-    projectId: 'test-project',
-    projectPath: projectDir,
+    project: {
+      id: 'test-project',
+      path: projectDir,
+    } as unknown as ProjectManager,
     owner: 'test-owner',
     repo: 'test-repo',
-    project: undefined,
     workflowStore: undefined,
     memoryStore: undefined,
     botName: 'rover-bot',
@@ -94,15 +96,19 @@ function makeContext(store: AutopilotStore): StepContext {
   };
 }
 
-function makeDecisionResponse(overrides: Record<string, unknown> = {}): string {
-  return JSON.stringify({
-    action: 'plan',
-    confidence: 'high',
-    reasoning: 'This issue needs investigation.',
-    context: 'Issue #42 opened with feature request.',
-    meta: { scope: 'feature request', references: ['#42'] },
-    ...overrides,
-  });
+function makeDecisionResponse(overrides: Record<string, unknown> = {}): {
+  response: string;
+} {
+  return {
+    response: JSON.stringify({
+      action: 'plan',
+      confidence: 'high',
+      reasoning: 'This issue needs investigation.',
+      context: 'Issue #42 opened with feature request.',
+      meta: { scope: 'feature request', references: ['#42'] },
+      ...overrides,
+    }),
+  };
 }
 
 describe('coordinatorStep', () => {

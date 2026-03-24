@@ -90,7 +90,7 @@ const generateCommitMessage = async (
   options: { json?: boolean } = {}
 ): Promise<string | null> => {
   try {
-    const commitMessage = await aiAgent.generateCommitMessage(
+    const { result: commitMessage } = await aiAgent.generateCommitMessage(
       taskTitle,
       taskDescription,
       recentCommits,
@@ -154,7 +154,7 @@ const resolveMergeConflicts = async (
         .join('\n');
 
       try {
-        const resolvedContent = await aiAgent.resolveMergeConflicts(
+        const { result: resolvedContent } = await aiAgent.resolveMergeConflicts(
           filePath,
           diffContext,
           conflictedContent
@@ -288,6 +288,7 @@ const mergeCommand = async (taskId: string, options: MergeOptions = {}) => {
   // Create AI agent instance
   const aiAgent = getAIAgentTool(selectedAiAgent);
 
+  let commandOutcome: 'success' | 'error' = 'error';
   try {
     // Load task using ProjectManager
     const task = project.getTask(numericTaskId);
@@ -630,6 +631,7 @@ const mergeCommand = async (taskId: string, options: MergeOptions = {}) => {
         }
 
         jsonOutput.success = true;
+        commandOutcome = 'success';
         await exitWithSuccess(
           'Task has been successfully merged into your current branch',
           jsonOutput,
@@ -659,7 +661,7 @@ const mergeCommand = async (taskId: string, options: MergeOptions = {}) => {
       await exitWithError(jsonOutput, { telemetry });
     }
   } finally {
-    await telemetry?.shutdown();
+    await telemetry?.shutdown(commandOutcome);
   }
 };
 

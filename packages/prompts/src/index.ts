@@ -5,6 +5,10 @@ import resolveMergePrompt from './resolve-merge-conflicts.md';
 import extractGithubInputsPrompt from './extract-github-inputs.md';
 import type { WorkflowInput } from 'rover-schemas';
 
+export { default as commitPromptTemplate } from './commit-prompt.md';
+export { default as coordinatorPromptTemplate } from './coordinator-prompt.md';
+export { default as planPromptTemplate } from './plan-prompt.md';
+
 enum PROMPT_ID {
   ExpandIteration = 'ExpandIteration',
   ExpandTask = 'ExpandTask',

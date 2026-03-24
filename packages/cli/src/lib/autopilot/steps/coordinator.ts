@@ -4,7 +4,7 @@ import { replacePromptPlaceholders } from '../prompts.js';
 import type { PromptPlaceholderVars } from '../prompts.js';
 import type { PendingAction } from '../types.js';
 import type { Step, StepConfig, StepContext, StepResult } from './types.js';
-import coordinatorPromptTemplate from './prompts/coordinator-prompt.md';
+import { coordinatorPromptTemplate } from 'rover-prompts';
 
 interface CoordinatorDecision {
   action: string;
@@ -43,7 +43,9 @@ export const coordinatorStep: Step = {
   } satisfies StepConfig,
 
   async process(pending: PendingAction, ctx: StepContext): Promise<StepResult> {
-    const { store, projectId, projectPath } = ctx;
+    const { store, project } = ctx;
+    const projectId = project.id;
+    const projectPath = project.path;
 
     // Read full action from disk for spanId (parent) and meta (event JSON)
     const actionData = store.readAction(pending.actionId);
@@ -91,13 +93,13 @@ export const coordinatorStep: Step = {
 
       // Invoke AI via ACP
       const provider = ACPProvider.fromProject(projectPath);
-      const response = await provider.invoke(userMessage, {
+      const result = await provider.invoke(userMessage, {
         json: true,
         systemPrompt,
         cwd: projectPath,
       });
 
-      const decision = parseJsonResponse<CoordinatorDecision>(response);
+      const decision = parseJsonResponse<CoordinatorDecision>(result.response);
       if (!decision) {
         throw new Error(
           'Failed to parse coordinator decision from AI response'
@@ -125,11 +127,12 @@ export const coordinatorStep: Step = {
         store.removeWaitEntry(decision.meta.satisfied_wait_id as string);
       }
 
-      // Complete span
+      // Complete span (include usage in metadata if available)
       const summary = `coordinate: ${decision.action} — ${actionData?.reasoning ?? pending.action}`;
       span.complete(summary, {
         ...decision.meta,
         context: decision.context,
+        ...(result.usage ? { usage: result.usage } : {}),
       });
 
       // Create follow-up action on disk (orchestrator handles enqueuing)
@@ -149,6 +152,7 @@ export const coordinatorStep: Step = {
             action: decision.action,
           },
         ],
+        usage: result.usage,
       };
     } catch (error) {
       span.error(

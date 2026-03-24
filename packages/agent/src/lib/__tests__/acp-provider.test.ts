@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../acp-invoke.js', () => ({
-  acpInvoke: vi.fn().mockResolvedValue('mock response'),
+  acpInvoke: vi.fn().mockResolvedValue({ response: 'mock response' }),
 }));
 
 vi.mock('rover-prompts', () => ({
@@ -42,7 +42,7 @@ const mockedAcpInvoke = vi.mocked(acpInvoke);
 describe('ACPProvider', () => {
   beforeEach(() => {
     mockedAcpInvoke.mockClear();
-    mockedAcpInvoke.mockResolvedValue('mock response');
+    mockedAcpInvoke.mockResolvedValue({ response: 'mock response' });
   });
 
   describe('systemPrompt', () => {

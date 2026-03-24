@@ -15,6 +15,8 @@ import colors from 'ansi-colors';
 import { VERBOSE, launch } from 'rover-core';
 import { ACPClient } from './acp-client.js';
 import { GeminiOrQwenACPClient } from './gemini-or-qwen-acp-client.js';
+import type { InvokeResult } from 'rover-core';
+import type { UsageReport } from 'rover-schemas';
 
 /**
  * Format an error into a human-readable string.
@@ -134,9 +136,11 @@ export interface ACPInvokeConfig {
 /**
  * One-shot ACP invocation: spawn agent -> init -> session -> prompt -> capture -> cleanup.
  *
- * Returns the captured agent response text.
+ * Returns the captured agent response text along with usage metrics.
  */
-export async function acpInvoke(config: ACPInvokeConfig): Promise<string> {
+export async function acpInvoke(
+  config: ACPInvokeConfig
+): Promise<InvokeResult> {
   const { agentName, prompt, cwd, model, systemPrompt } = config;
 
   const finalPrompt = systemPrompt
@@ -278,7 +282,41 @@ export async function acpInvoke(config: ACPInvokeConfig): Promise<string> {
 
     const response = client.stopCapturing(sessionId);
 
-    return response;
+    // Extract usage metrics from the ACP response and client cost tracking
+    let usage: UsageReport | undefined;
+
+    const promptUsage = promptResult.usage;
+    const promptCost = client.getLastPromptCost(sessionId);
+
+    if (promptUsage || promptCost.amount > 0) {
+      const inputTokens = promptUsage?.inputTokens
+        ? Number(promptUsage.inputTokens)
+        : undefined;
+      const outputTokens = promptUsage?.outputTokens
+        ? Number(promptUsage.outputTokens)
+        : undefined;
+      const cachedRead = promptUsage?.cachedReadTokens
+        ? Number(promptUsage.cachedReadTokens)
+        : 0;
+      const cachedWrite = promptUsage?.cachedWriteTokens
+        ? Number(promptUsage.cachedWriteTokens)
+        : 0;
+
+      const totalTokens =
+        inputTokens !== undefined || outputTokens !== undefined
+          ? (inputTokens ?? 0) + (outputTokens ?? 0) + cachedRead + cachedWrite
+          : undefined;
+
+      usage = {
+        inputTokens,
+        outputTokens,
+        totalTokens,
+        cost: promptCost.amount > 0 ? promptCost.amount : undefined,
+        currency: promptCost.amount > 0 ? promptCost.currency : undefined,
+      };
+    }
+
+    return { response, usage };
   } catch (error) {
     if (VERBOSE) {
       console.error(colors.red('[ACP] Error:'), colors.red(formatError(error)));

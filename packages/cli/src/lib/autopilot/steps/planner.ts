@@ -3,7 +3,7 @@ import { SpanWriter, ActionWriter } from '../logging.js';
 import { replacePromptPlaceholders } from '../prompts.js';
 import type { Span, PendingAction } from '../types.js';
 import type { Step, StepConfig, StepContext, StepResult } from './types.js';
-import planPromptTemplate from './prompts/plan-prompt.md';
+import { planPromptTemplate } from 'rover-prompts';
 
 interface PlanTask {
   title: string;
@@ -98,7 +98,9 @@ export const plannerStep: Step = {
   } satisfies StepConfig,
 
   async process(pending: PendingAction, ctx: StepContext): Promise<StepResult> {
-    const { store, projectId, projectPath } = ctx;
+    const { store, project } = ctx;
+    const projectId = project.id;
+    const projectPath = project.path;
 
     // Read full action from disk for spanId (parent) and meta
     const actionData = store.readAction(pending.actionId);
@@ -130,7 +132,7 @@ export const plannerStep: Step = {
         cwd: projectPath,
       });
 
-      const planResult = parseJsonResponse<PlanResult>(response);
+      const planResult = parseJsonResponse<PlanResult>(response.response);
       if (!planResult) {
         span.fail('Failed to parse plan result from AI response');
         ctx.failTrace('Failed to parse plan result from AI response');
@@ -141,7 +143,10 @@ export const plannerStep: Step = {
       if (!planResult.tasks || planResult.tasks.length === 0) {
         span.complete(
           `plan: noop — ${planResult.reasoning || 'no tasks needed'}`,
-          { analysis: planResult.analysis }
+          {
+            analysis: planResult.analysis,
+            ...(response.usage ? { usage: response.usage } : {}),
+          }
         );
 
         const noop = new ActionWriter(projectId, {
@@ -154,6 +159,7 @@ export const plannerStep: Step = {
           spanId: span.id,
           terminal: false,
           newActions: [{ actionId: noop.id, action: 'noop' }],
+          usage: response.usage,
         };
       }
 
@@ -174,12 +180,18 @@ export const plannerStep: Step = {
         analysis: planResult.analysis,
         taskCount: planResult.tasks.length,
         executionOrder: planResult.execution_order,
+        ...(response.usage ? { usage: response.usage } : {}),
       });
 
       // Write workflow action files
       const newActions = writeWorkflowActions(projectId, planResult, span.id);
 
-      return { spanId: span.id, terminal: false, newActions };
+      return {
+        spanId: span.id,
+        terminal: false,
+        newActions,
+        usage: response.usage,
+      };
     } catch (error) {
       span.error(
         `Planner failed: ${error instanceof Error ? error.message : String(error)}`

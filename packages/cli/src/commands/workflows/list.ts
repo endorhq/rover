@@ -43,6 +43,7 @@ const listWorkflowsCommand = async (options: ListWorkflowsCommandOptions) => {
     workflows: [],
   };
 
+  let commandOutcome: 'success' | 'error' = 'error';
   try {
     // Track list workflows event
     telemetry?.eventListWorkflows();
@@ -115,11 +116,13 @@ const listWorkflowsCommand = async (options: ListWorkflowsCommandOptions) => {
 
       // No exit with success since we already printed the table
     }
+
+    commandOutcome = 'success';
   } catch (error) {
     output.error = 'Error loading the workflows.';
     await exitWithError(output, { telemetry });
   } finally {
-    await telemetry?.shutdown();
+    await telemetry?.shutdown(commandOutcome);
   }
 };
 

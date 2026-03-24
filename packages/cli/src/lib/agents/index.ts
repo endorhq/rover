@@ -6,7 +6,13 @@ import GeminiAI from './gemini.js';
 import OpenCodeAI from './opencode.js';
 import QwenAI from './qwen.js';
 import type { IPromptTask } from '../prompts/index.js';
-import { UserSettingsManager, AI_AGENT, launchSync } from 'rover-core';
+import {
+  UserSettingsManager,
+  AI_AGENT,
+  launchSync,
+  type InvokeResult,
+  type ResultWithUsage,
+} from 'rover-core';
 import type { WorkflowInput } from 'rover-schemas';
 import { getProjectPath } from '../context.js';
 
@@ -29,7 +35,7 @@ export interface InvokeOptions {
 
 export interface AIAgentTool {
   // Invoke the CLI tool using the SDK / direct mode with the given prompt
-  invoke(prompt: string, options?: InvokeOptions): Promise<string>;
+  invoke(prompt: string, options?: InvokeOptions): Promise<InvokeResult>;
 
   // Check if the current AI agent is available
   // It will throw an exception in other case
@@ -40,7 +46,7 @@ export interface AIAgentTool {
     briefDescription: string,
     projectPath: string,
     contextContent?: string
-  ): Promise<IPromptTask | null>;
+  ): Promise<ResultWithUsage<IPromptTask | null>>;
 
   // Expand iteration instructions based on previous work
   expandIterationInstructions(
@@ -48,7 +54,7 @@ export interface AIAgentTool {
     previousPlan?: string,
     previousChanges?: string,
     contextContent?: string
-  ): Promise<IPromptTask | null>;
+  ): Promise<ResultWithUsage<IPromptTask | null>>;
 
   // Generate a git commit message based on the task and recent commits
   generateCommitMessage(
@@ -56,20 +62,20 @@ export interface AIAgentTool {
     taskDescription: string,
     recentCommits: string[],
     summaries: string[]
-  ): Promise<string | null>;
+  ): Promise<ResultWithUsage<string | null>>;
 
   // Resolve merge conflicts automatically
   resolveMergeConflicts(
     filePath: string,
     diffContext: string,
     conflictedContent: string
-  ): Promise<string | null>;
+  ): Promise<ResultWithUsage<string | null>>;
 
   // Extract workflow input values from a GitHub issue description
   extractGithubInputs(
     issueDescription: string,
     inputs: WorkflowInput[]
-  ): Promise<Record<string, any> | null>;
+  ): Promise<ResultWithUsage<Record<string, any> | null>>;
 
   // Get Docker mount strings for agent-specific credential files
   getContainerMounts(): string[];

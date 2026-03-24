@@ -11,6 +11,7 @@ import {
   type StepResult,
   type WorkflowRunner,
   type OnStepComplete,
+  type UsageReport,
 } from 'rover-core';
 import {
   ROVER_LOG_FILENAME,
@@ -27,6 +28,35 @@ import { cpSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 /**
+ * Build display properties for a UsageReport, if any metrics are present.
+ */
+function usageProperties(
+  usage: UsageReport | undefined
+): Record<string, string> {
+  const props: Record<string, string> = {};
+  if (!usage) return props;
+
+  if (usage.inputTokens !== undefined) {
+    props['Input Tokens'] = colors.cyan(usage.inputTokens.toLocaleString());
+  }
+  if (usage.outputTokens !== undefined) {
+    props['Output Tokens'] = colors.cyan(usage.outputTokens.toLocaleString());
+  }
+  if (usage.totalTokens !== undefined) {
+    props['Total Tokens'] = colors.cyan(usage.totalTokens.toLocaleString());
+  }
+  if (usage.cost !== undefined) {
+    const currency = usage.currency ?? 'USD';
+    props['Cost'] = colors.yellow(`${usage.cost.toFixed(4)} ${currency}`);
+  }
+  if (usage.model) {
+    props['Model'] = colors.gray(usage.model);
+  }
+
+  return props;
+}
+
+/**
  * Helper function to display step results consistently
  */
 function displayStepResults(
@@ -40,6 +70,7 @@ function displayStepResults(
     ID: colors.cyan(result.id),
     Status: result.success ? colors.green('✓ Success') : colors.red('✗ Failed'),
     Duration: colors.yellow(`${result.duration.toFixed(2)}s`),
+    ...usageProperties(result.usage),
   };
 
   if (result.error) {
@@ -494,6 +525,7 @@ export const runCommand = async (
           'Failed Steps': colors.red(failedSteps.toString()),
           'Skipped Steps': colors.yellow(skippedSteps.toString()),
           Status: status,
+          ...usageProperties(runResult.usage),
         });
 
         // Mark workflow as completed in status file

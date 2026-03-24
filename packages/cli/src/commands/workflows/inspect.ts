@@ -151,6 +151,7 @@ const inspectWorkflowCommand = async (
   }
 
   let tempFile: string | null = null;
+  let commandOutcome: 'success' | 'error' = 'error';
 
   try {
     // Track inspect workflow event
@@ -410,6 +411,8 @@ const inspectWorkflowCommand = async (
 
       showDiagram(diagramSteps, { addLineBreak: false });
     }
+
+    commandOutcome = 'success';
   } catch (error) {
     if (isJsonMode()) {
       console.log(
@@ -432,7 +435,7 @@ const inspectWorkflowCommand = async (
     if (tempFile) {
       cleanupTempFile(tempFile);
     }
-    await telemetry?.shutdown();
+    await telemetry?.shutdown(commandOutcome);
   }
 };
 
