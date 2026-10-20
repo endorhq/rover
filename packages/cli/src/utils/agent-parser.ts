@@ -47,6 +47,9 @@ export function parseAgentString(agentString: string): ParsedAgent {
     case 'gemini':
       normalizedAgent = AI_AGENT.Gemini;
       break;
+    case 'minimax':
+      normalizedAgent = AI_AGENT.MiniMax;
+      break;
     case 'qwen':
       normalizedAgent = AI_AGENT.Qwen;
       break;

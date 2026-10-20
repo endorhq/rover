@@ -3,6 +3,7 @@ import CodexAI from './codex.js';
 import CopilotAI from './copilot.js';
 import CursorAI from './cursor.js';
 import GeminiAI from './gemini.js';
+import MiniMaxAI from './minimax.js';
 import OpenCodeAI from './opencode.js';
 import QwenAI from './qwen.js';
 import type { IPromptTask } from '../prompts/index.js';
@@ -122,6 +123,8 @@ export const getAIAgentTool = (agent: string): AIAgentTool => {
       return new CursorAI();
     case 'gemini':
       return new GeminiAI();
+    case 'minimax':
+      return new MiniMaxAI();
     case 'opencode':
       return new OpenCodeAI();
     case 'qwen':

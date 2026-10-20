@@ -15,6 +15,7 @@ import colors from 'ansi-colors';
 import { VERBOSE, launch } from 'rover-core';
 import { ACPClient } from './acp-client.js';
 import { GeminiOrQwenACPClient } from './gemini-or-qwen-acp-client.js';
+import { prepareMiniMaxConfig } from './agents/minimax-config.js';
 import type { InvokeResult } from 'rover-core';
 import type { UsageReport } from 'rover-schemas';
 
@@ -85,6 +86,8 @@ function getAgentACPConfig(agentName: string, model?: string): AgentACPConfig {
       }
       return { kind: 'native', command: 'gemini', args };
     }
+    case 'minimax':
+      return { kind: 'native', command: 'mini-agent-acp', args: [] };
     case 'qwen': {
       const args = ['--acp', '--include-directories', '/', '--yolo'];
       if (model) {
@@ -121,7 +124,7 @@ function getAgentACPConfig(agentName: string, model?: string): AgentACPConfig {
 }
 
 export interface ACPInvokeConfig {
-  /** Agent name (claude, codex, cursor, gemini, qwen, copilot, opencode). */
+  /** Agent name (claude, codex, cursor, gemini, minimax, qwen, copilot, opencode). */
   agentName: string;
   /** The prompt to send. */
   prompt: string;
@@ -146,6 +149,10 @@ export async function acpInvoke(
   const finalPrompt = systemPrompt
     ? `<system>${systemPrompt}</system>\n\n${prompt}`
     : prompt;
+
+  if (agentName === 'minimax') {
+    prepareMiniMaxConfig(model);
+  }
 
   const agentConfig = getAgentACPConfig(agentName, model);
 

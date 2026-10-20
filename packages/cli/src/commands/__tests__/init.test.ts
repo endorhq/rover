@@ -24,6 +24,7 @@ vi.mock('../../utils/system.js', async () => {
     checkCursor: vi.fn().mockResolvedValue(false),
     checkQwen: vi.fn().mockResolvedValue(false),
     checkGemini: vi.fn().mockResolvedValue(false),
+    checkMiniMax: vi.fn().mockResolvedValue(false),
     checkOpenCode: vi.fn().mockResolvedValue(false),
     checkGitHubCLI: vi.fn().mockResolvedValue(false),
   };
@@ -254,6 +255,7 @@ describe('init command', () => {
       checkCursor,
       checkQwen,
       checkGemini,
+      checkMiniMax,
       checkOpenCode,
     } = await import('../../utils/system.js');
     vi.mocked(checkClaude).mockResolvedValueOnce(false);
@@ -261,6 +263,7 @@ describe('init command', () => {
     vi.mocked(checkCursor).mockResolvedValueOnce(false);
     vi.mocked(checkQwen).mockResolvedValueOnce(false);
     vi.mocked(checkGemini).mockResolvedValueOnce(false);
+    vi.mocked(checkMiniMax).mockResolvedValueOnce(false);
     vi.mocked(checkOpenCode).mockResolvedValueOnce(false);
 
     await initCommand('.', { yes: true });
@@ -276,6 +279,7 @@ describe('init command', () => {
       checkCursor,
       checkQwen,
       checkGemini,
+      checkMiniMax,
       checkOpenCode,
     } = await import('../../utils/system.js');
     vi.mocked(checkClaude).mockResolvedValueOnce(true);
@@ -283,6 +287,7 @@ describe('init command', () => {
     vi.mocked(checkCursor).mockResolvedValueOnce(false);
     vi.mocked(checkQwen).mockResolvedValueOnce(false);
     vi.mocked(checkGemini).mockResolvedValueOnce(true);
+    vi.mocked(checkMiniMax).mockResolvedValueOnce(false);
     vi.mocked(checkOpenCode).mockResolvedValueOnce(false);
 
     // Create a simple project file for environment detection
@@ -295,6 +300,20 @@ describe('init command', () => {
     expect(settings.aiAgents).toContain('claude');
     expect(settings.aiAgents).toContain('gemini');
     expect(settings.defaults.aiAgent).toBe('claude');
+  });
+
+  it('should recognize MiniMax as an available AI agent', async () => {
+    const { checkClaude, checkMiniMax } = await import('../../utils/system.js');
+    vi.mocked(checkClaude).mockResolvedValueOnce(false);
+    vi.mocked(checkMiniMax).mockResolvedValueOnce(true);
+
+    writeFileSync('package.json', JSON.stringify({ name: 'test' }, null, 2));
+
+    await initCommand('.', { yes: true });
+
+    const settings = JSON.parse(readFileSync('.rover/settings.json', 'utf8'));
+    expect(settings.aiAgents).toContain('minimax');
+    expect(settings.defaults.aiAgent).toBe('minimax');
   });
 
   it('should update existing rover.json if reinitializing user settings', async () => {

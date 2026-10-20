@@ -123,6 +123,24 @@ const validations = (selectedAiAgent?: string): validationResult => {
         tips: ['Run ' + colors.cyan('qwen') + ' first to set up credentials'],
       };
     }
+  } else if (selectedAiAgent === 'minimax') {
+    const miniMaxConfig = join(
+      homedir(),
+      '.mini-agent',
+      'config',
+      'config.yaml'
+    );
+
+    if (!existsSync(miniMaxConfig)) {
+      return {
+        error: 'Mini-Agent configuration not found',
+        tips: [
+          'Configure ' +
+            colors.cyan('~/.mini-agent/config/config.yaml') +
+            ' before creating a task',
+        ],
+      };
+    }
   }
 
   return null;

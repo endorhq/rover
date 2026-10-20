@@ -15,6 +15,7 @@ import {
   checkCursor,
   checkDocker,
   checkGemini,
+  checkMiniMax,
   checkOpenCode,
   checkQwen,
   checkGit,
@@ -96,7 +97,7 @@ const ensureGitignore = async (projectPath: string): Promise<void> => {
  *
  * Sets up the project configuration (rover.json) and user settings (.rover/settings.json)
  * required to use Rover. The command performs system checks to verify Git, Docker, and
- * AI agent availability (Claude, Codex, Cursor, Gemini, Qwen), detects the project's
+ * AI agent availability (Claude, Codex, Cursor, Gemini, MiniMax, Qwen), detects the project's
  * programming languages and package managers, and configures the default AI agent.
  *
  * @param path - Path to the project root (defaults to current directory)
@@ -167,6 +168,10 @@ const initCommand = async (path: string = '.', options: { yes?: boolean }) => {
 
   const opencodeInstalled = await checkOpenCode();
 
+  reqSpinner.text = 'Checking MiniMax';
+
+  const minimaxInstalled = await checkMiniMax();
+
   const completeInstallation =
     gitInstalled &&
     dockerInstalled &&
@@ -174,7 +179,8 @@ const initCommand = async (path: string = '.', options: { yes?: boolean }) => {
       codexInstalled ||
       geminiInstalled ||
       opencodeInstalled ||
-      qwenInstalled);
+      qwenInstalled ||
+      minimaxInstalled);
 
   if (completeInstallation) {
     reqSpinner.succeed('Your system is ready!');
@@ -201,6 +207,7 @@ const initCommand = async (path: string = '.', options: { yes?: boolean }) => {
       `Gemini: ${statusLabel(geminiInstalled)}`,
       `OpenCode: ${statusLabel(opencodeInstalled)}`,
       `Qwen: ${statusLabel(qwenInstalled)}`,
+      `MiniMax: ${statusLabel(minimaxInstalled)}`,
     ],
     { title: colors.bold('AI Agents (at least one)'), addLineBreak: true }
   );
@@ -275,6 +282,10 @@ const initCommand = async (path: string = '.', options: { yes?: boolean }) => {
 
     if (opencodeInstalled) {
       availableAgents.push(AI_AGENT.OpenCode);
+    }
+
+    if (minimaxInstalled) {
+      availableAgents.push(AI_AGENT.MiniMax);
     }
 
     // If multiple AI agents are available, ask user to select one

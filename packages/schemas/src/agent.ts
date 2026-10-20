@@ -5,6 +5,7 @@ export enum AI_AGENT {
   Copilot = 'copilot',
   Cursor = 'cursor',
   Gemini = 'gemini',
+  MiniMax = 'minimax',
   OpenCode = 'opencode',
   Qwen = 'qwen',
 }

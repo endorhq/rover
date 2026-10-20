@@ -17,7 +17,7 @@ import { PromptBuilder, type IPromptTask } from 'rover-prompts';
 import type { InvokeResult, ResultWithUsage } from 'rover-core';
 
 export interface ACPProviderConfig {
-  /** Agent name (claude, codex, cursor, gemini, qwen, copilot, opencode). */
+  /** Agent name (claude, codex, cursor, gemini, minimax, qwen, copilot, opencode). */
   agentName: string;
   /** Default model override. */
   model?: string;

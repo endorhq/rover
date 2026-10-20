@@ -66,6 +66,7 @@ export const WorkflowAgentToolSchema = z.enum([
   'copilot',
   'cursor',
   'gemini',
+  'minimax',
   'opencode',
   'qwen',
 ]);

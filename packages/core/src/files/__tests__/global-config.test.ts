@@ -1027,6 +1027,7 @@ describe('GlobalConfigManager', () => {
         AI_AGENT.Codex,
         AI_AGENT.Cursor,
         AI_AGENT.Gemini,
+        AI_AGENT.MiniMax,
         AI_AGENT.Qwen,
       ];
 

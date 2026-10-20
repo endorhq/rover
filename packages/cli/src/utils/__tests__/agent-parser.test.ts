@@ -45,6 +45,12 @@ describe('parseAgentString', () => {
       expect(result.agent).toBe(AI_AGENT.OpenCode);
       expect(result.model).toBeUndefined();
     });
+
+    it('should parse "minimax" as MiniMax agent with no model', () => {
+      const result = parseAgentString('minimax');
+      expect(result.agent).toBe(AI_AGENT.MiniMax);
+      expect(result.model).toBeUndefined();
+    });
   });
 
   describe('parsing agent with model', () => {
@@ -88,6 +94,12 @@ describe('parseAgentString', () => {
       const result = parseAgentString('opencode:opus');
       expect(result.agent).toBe(AI_AGENT.OpenCode);
       expect(result.model).toBe('opus');
+    });
+
+    it('should preserve MiniMax model identifiers', () => {
+      const result = parseAgentString('minimax:MiniMax-M2.7');
+      expect(result.agent).toBe(AI_AGENT.MiniMax);
+      expect(result.model).toBe('MiniMax-M2.7');
     });
 
     it('should handle model names with hyphens', () => {

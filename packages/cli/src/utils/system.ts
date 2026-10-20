@@ -30,5 +30,7 @@ export const checkQwen = async (): Promise<boolean> =>
   await checkCommand('qwen');
 export const checkGemini = async (): Promise<boolean> =>
   await checkCommand('gemini');
+export const checkMiniMax = async (): Promise<boolean> =>
+  await checkCommand('mini-agent');
 export const checkOpenCode = async (): Promise<boolean> =>
   await checkCommand('opencode');
