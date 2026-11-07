@@ -4,7 +4,8 @@ COPY . /app
 WORKDIR /app
 
 # Install pnpm
-RUN npm install -g pnpm
+RUN npm install -g pnpm && \
+    npm cache clean --force
 
 # Build the agent
 RUN pnpm install && pnpm build-libs && pnpm --filter @endorhq/agent build
@@ -20,7 +21,6 @@ ENV NIX_AI_TOOLS_REV=${NIX_AI_TOOLS_REV}
 ENV ENV=/etc/profile
 RUN apt-get update && \
     apt-get install -y --no-install-recommends bash curl file g++ jq make nix-bin python3 sudo && \
-    rm -rf /var/lib/apt/lists/* && \
     curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="/usr/local/bin" sh && \
     case ${TARGETARCH} in \
       amd64) ARCH_SUFFIX="x86_64-unknown-linux-musl" ;; \
@@ -29,12 +29,16 @@ RUN apt-get update && \
     esac && \
     curl -fsSL -o /usr/local/bin/package-manager-mcp-server \
       https://github.com/endorhq/package-manager-mcp/releases/download/${PACKAGE_MANAGER_MCP_SERVER_VERSION}/package-manager-mcp-${ARCH_SUFFIX} && \
-    chmod +x /usr/local/bin/package-manager-mcp-server
+    chmod +x /usr/local/bin/package-manager-mcp-server && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 # Install Node dependencies
 COPY --from=agent-builder /rover-agent.tgz /rover-agent.tgz
-RUN npm install -g mcp-remote@0.1.37
-RUN npm install -g /rover-agent.tgz
+RUN npm install -g mcp-remote@0.1.37 && \
+    npm install -g /rover-agent.tgz && \
+    rm -f /rover-agent.tgz && \
+    npm cache clean --force
 
 COPY ./images/agent/assets/1-sudoers-setup /etc/sudoers.d/1-agent-setup
 COPY ./images/agent/assets/2-sudoers-cleanup /etc/sudoers.d/2-agent-cleanup
